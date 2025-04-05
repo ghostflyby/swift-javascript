@@ -20,7 +20,7 @@ extension JSContextGroupProtocol {
   }
 
   public func createContext(
-    globalClass: borrowing JSClass
+    globalClass: borrowing JSClassStruct
   ) -> JSContext {
     JSContext(group: self, globalClass: globalClass)
   }
@@ -66,11 +66,11 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
     self.ref = JSGlobalContextCreate(nil)
   }
 
-  public init(globalClass jsClass: borrowing JSClass) {
+  public init(globalClass jsClass: borrowing JSClassStruct) {
     self.ref = JSGlobalContextCreate(jsClass.ref)
   }
 
-  public init(group: borrowing some JSContextGroupProtocol, globalClass: borrowing JSClass) {
+  public init(group: borrowing some JSContextGroupProtocol, globalClass: borrowing JSClassStruct) {
     self.ref =
       JSGlobalContextCreateInGroup(group.ref, globalClass.ref)
   }

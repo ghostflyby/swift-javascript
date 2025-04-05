@@ -2,7 +2,7 @@ import JavaScriptCore
 
 public typealias JSClassDefinition = JavaScriptCore.JSClassDefinition
 
-public class JSClassClass: @unchecked Sendable {
+public class JSClass: @unchecked Sendable {
   public let ref: JSClassRef
 
   public init(ref: JSClassRef) {
@@ -20,7 +20,7 @@ public class JSClassClass: @unchecked Sendable {
 }
 
 @frozen
-public struct JSClass: @unchecked Sendable, ~Copyable, TransferableCopy {
+public struct JSClassStruct: @unchecked Sendable, ~Copyable, TransferableCopy {
   public let ref: JSClassRef
 
   public init(defination: JSClassDefinition) {
