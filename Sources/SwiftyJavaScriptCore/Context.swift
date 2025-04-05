@@ -40,7 +40,7 @@ public final class JSContextGroup: @unchecked Sendable, JSContextGroupProtocol {
 }
 
 @frozen
-public struct JSContextGroupValue: ~Copyable, @unchecked Sendable, JSContextGroupProtocol,
+public struct JSContextGroupStruct: ~Copyable, @unchecked Sendable, JSContextGroupProtocol,
 	TransferableCopy
 {
 	public let ref: JSContextGroupRef
@@ -49,7 +49,7 @@ public struct JSContextGroupValue: ~Copyable, @unchecked Sendable, JSContextGrou
 		self.ref = JSContextGroupRetain(ref)
 	}
 
-	public init(copying group: borrowing JSContextGroupValue) {
+	public init(copying group: borrowing JSContextGroupStruct) {
 		self.ref = group.ref
 	}
 
@@ -97,8 +97,8 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
 		}
 	}
 
-	public var group: JSContextGroupValue {
-		JSContextGroupValue(ref: JSContextGetGroup(ref)!)
+	public var group: JSContextGroupStruct {
+		JSContextGroupStruct(ref: JSContextGetGroup(ref)!)
 	}
 
 	deinit {

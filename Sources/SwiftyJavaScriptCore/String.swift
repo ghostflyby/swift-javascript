@@ -75,7 +75,7 @@ public struct JSString: @unchecked Sendable, ~Copyable, TransferableCopy {
 			if caching {
 				string.string
 			} else {
-				nil
+				string.cached
 			}
 		JSStringRetain(ref)
 	}
