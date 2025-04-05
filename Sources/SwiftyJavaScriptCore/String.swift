@@ -8,7 +8,7 @@ extension String {
   }
 }
 
-public protocol JSStringProtocol: ~Copyable {
+public protocol JSString: ~Copyable {
   var ref: JSStringRef { get }
   var cached: String? { get }
   var string: String { get }
@@ -16,24 +16,24 @@ public protocol JSStringProtocol: ~Copyable {
   init(_ string: String)
 }
 
-extension JSStringProtocol {
-  public init(group: borrowing some JSStringProtocol) {
+extension JSString {
+  public init(group: borrowing some JSString) {
     self.init(ref: group.ref)
   }
 }
 
-extension JSStringProtocol {
-  public static func == (lhs: borrowing Self, rhs: borrowing some JSStringProtocol) -> Bool {
+extension JSString {
+  public static func == (lhs: borrowing Self, rhs: borrowing some JSString) -> Bool {
     JSStringIsEqual(lhs.ref, rhs.ref)
   }
 
-  public static func != (lhs: borrowing Self, rhs: borrowing some JSStringProtocol) -> Bool {
+  public static func != (lhs: borrowing Self, rhs: borrowing some JSString) -> Bool {
     !(lhs == rhs)
   }
 
 }
 
-public final class JSStringClass: @unchecked Sendable, JSStringProtocol {
+public final class JSStringManaged: @unchecked Sendable, JSString {
 
   public let ref: JSStringRef
   public var cached: String? { string }
@@ -54,7 +54,7 @@ public final class JSStringClass: @unchecked Sendable, JSStringProtocol {
   }
 }
 
-public struct JSString: @unchecked Sendable, ~Copyable, JSStringProtocol {
+public struct JSStringValue: @unchecked Sendable, ~Copyable, JSString {
 
   public let ref: JSStringRef
   public let cached: String?
@@ -73,7 +73,7 @@ public struct JSString: @unchecked Sendable, ~Copyable, JSStringProtocol {
     self.cached = string
   }
 
-  public init(_ string: borrowing JSString, caching: Bool = false) {
+  public init(_ string: borrowing JSStringValue, caching: Bool = false) {
     ref = JSStringRetain(string.ref)
     self.cached =
       if caching {
@@ -83,7 +83,7 @@ public struct JSString: @unchecked Sendable, ~Copyable, JSStringProtocol {
       }
   }
 
-  public init(_ string: borrowing some JSStringProtocol, caching: Bool = false) {
+  public init(_ string: borrowing some JSString, caching: Bool = false) {
     ref = JSStringRetain(string.ref)
     self.cached =
       if caching {
@@ -98,8 +98,8 @@ public struct JSString: @unchecked Sendable, ~Copyable, JSStringProtocol {
   }
 }
 
-extension JSString: TransferableCopy {
-  public init(copying string: borrowing JSString) {
+extension JSStringValue: TransferableCopy {
+  public init(copying string: borrowing JSStringValue) {
     self.init(string, caching: false)
   }
 }

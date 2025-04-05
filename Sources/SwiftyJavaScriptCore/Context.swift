@@ -20,7 +20,7 @@ extension JSContextGroupProtocol {
   }
 
   public func createContext(
-    globalClass: borrowing JSClassStruct
+    globalClass: borrowing JSClassValue
   ) -> JSContext {
     JSContext(group: self, globalClass: globalClass)
   }
@@ -40,7 +40,7 @@ public final class JSContextGroup: @unchecked Sendable, JSContextGroupProtocol {
 }
 
 @frozen
-public struct JSContextGroupStruct: ~Copyable, @unchecked Sendable, JSContextGroupProtocol,
+public struct JSContextGroupValue: ~Copyable, @unchecked Sendable, JSContextGroupProtocol,
   TransferableCopy
 {
   public let ref: JSContextGroupRef
@@ -49,7 +49,7 @@ public struct JSContextGroupStruct: ~Copyable, @unchecked Sendable, JSContextGro
     self.ref = JSContextGroupRetain(ref)
   }
 
-  public init(copying group: borrowing JSContextGroupStruct) {
+  public init(copying group: borrowing JSContextGroupValue) {
     self.ref = group.ref
   }
 
@@ -66,11 +66,11 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
     self.ref = JSGlobalContextCreate(nil)
   }
 
-  public init(globalClass jsClass: borrowing JSClassStruct) {
+  public init(globalClass jsClass: borrowing JSClassValue) {
     self.ref = JSGlobalContextCreate(jsClass.ref)
   }
 
-  public init(group: borrowing some JSContextGroupProtocol, globalClass: borrowing JSClassStruct) {
+  public init(group: borrowing some JSContextGroupProtocol, globalClass: borrowing JSClassValue) {
     self.ref =
       JSGlobalContextCreateInGroup(group.ref, globalClass.ref)
   }
@@ -93,12 +93,12 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
       return String(jsStringRef: name)
     }
     set {
-      JSGlobalContextSetName(ref, JSString(newValue).ref)
+      JSGlobalContextSetName(ref, JSStringValue(newValue).ref)
     }
   }
 
-  public var group: JSContextGroupStruct {
-    JSContextGroupStruct(ref: JSContextGetGroup(ref)!)
+  public var group: JSContextGroupValue {
+    JSContextGroupValue(ref: JSContextGetGroup(ref)!)
   }
 
   deinit {
