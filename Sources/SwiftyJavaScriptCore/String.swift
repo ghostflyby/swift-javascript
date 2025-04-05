@@ -10,13 +10,51 @@ extension String {
 
 public protocol JSStringProtocol: ~Copyable {
 	var ref: JSStringRef { get }
+	var string: String { get }
 	init(ref: JSStringRef)
+}
+
+extension JSStringProtocol {
+	public init(group: borrowing some JSStringProtocol) {
+		self.init(ref: group.ref)
+	}
+}
+
+extension JSStringProtocol {
+	public static func == (lhs: borrowing Self, rhs: borrowing some JSStringProtocol) -> Bool {
+		JSStringIsEqual(lhs.ref, rhs.ref)
+	}
+
+	public static func != (lhs: borrowing Self, rhs: borrowing some JSStringProtocol) -> Bool {
+		!(lhs == rhs)
+	}
+
+}
+
+public final class JSStringClass: @unchecked Sendable, JSStringProtocol {
+
+	public let ref: JSStringRef
+	public let string: String
+
+	public init(ref: JSStringRef) {
+		self.ref = JSStringRetain(ref)
+		string = String(jsStringRef: ref)
+	}
+
+	public init(_ string: String) {
+		ref = JSStringCreateWithUTF8CString(string)
+		self.string = string
+	}
+
+	deinit {
+		JSStringRelease(ref)
+	}
 }
 
 public struct JSString: @unchecked Sendable, ~Copyable, TransferableCopy {
 
 	public let ref: JSStringRef
-	public let cached: String?
+	private let cached: String?
 	public var string: String {
 		cached
 			?? String(jsStringRef: ref)
@@ -37,13 +75,9 @@ public struct JSString: @unchecked Sendable, ~Copyable, TransferableCopy {
 			if caching {
 				string.string
 			} else {
-				string.cached
+				nil
 			}
 		JSStringRetain(ref)
-	}
-
-	public static func == (lhs: borrowing JSString, rhs: borrowing JSString) -> Bool {
-		JSStringIsEqual(lhs.ref, rhs.ref)
 	}
 
 	deinit {
