@@ -2,7 +2,7 @@ import JavaScriptCore
 
 extension String {
 	public init(jsStringRef: JSStringRef) {
-		let length = JSStringGetLength(jsStringRef)
+        let length = JSStringGetLength(jsStringRef)
 		let characters = JSStringGetCharactersPtr(jsStringRef)!
 		self = String(utf16CodeUnits: characters, count: length)
 	}
@@ -10,8 +10,10 @@ extension String {
 
 public protocol JSStringProtocol: ~Copyable {
 	var ref: JSStringRef { get }
+	var cached: String? { get }
 	var string: String { get }
 	init(ref: JSStringRef)
+	init(_ string: String)
 }
 
 extension JSStringProtocol {
@@ -34,6 +36,7 @@ extension JSStringProtocol {
 public final class JSStringClass: @unchecked Sendable, JSStringProtocol {
 
 	public let ref: JSStringRef
+	public var cached: String? { string }
 	public let string: String
 
 	public init(ref: JSStringRef) {
@@ -51,13 +54,18 @@ public final class JSStringClass: @unchecked Sendable, JSStringProtocol {
 	}
 }
 
-public struct JSString: @unchecked Sendable, ~Copyable, TransferableCopy {
+public struct JSString: @unchecked Sendable, ~Copyable, JSStringProtocol {
 
 	public let ref: JSStringRef
-	private let cached: String?
+	public let cached: String?
 	public var string: String {
 		cached
 			?? String(jsStringRef: ref)
+	}
+
+	public init(ref: JSStringRef) {
+		self.ref = JSStringRetain(ref)
+		cached = nil
 	}
 
 	public init(_ string: String) {
@@ -65,22 +73,33 @@ public struct JSString: @unchecked Sendable, ~Copyable, TransferableCopy {
 		self.cached = string
 	}
 
-	public init(copying string: borrowing JSString) {
-		self.init(string, caching: false)
-	}
-
 	public init(_ string: borrowing JSString, caching: Bool = false) {
-		ref = string.ref
+		ref = JSStringRetain(string.ref)
 		self.cached =
 			if caching {
 				string.string
 			} else {
 				string.cached
 			}
-		JSStringRetain(ref)
 	}
 
+	public init(_ string: borrowing some JSStringProtocol, caching: Bool = false) {
+		ref = JSStringRetain(string.ref)
+		self.cached =
+			if caching {
+				string.string
+			} else {
+				nil
+			}
+	}
+    
 	deinit {
 		JSStringRelease(ref)
+	}
+}
+
+extension JSString: TransferableCopy {
+	public init(copying string: borrowing JSString) {
+		self.init(string, caching: false)
 	}
 }
