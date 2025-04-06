@@ -79,6 +79,14 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
     self.ref = JSGlobalContextCreateInGroup(group.ref, nil)
   }
 
+  deinit {
+    JSGlobalContextRelease(ref)
+  }
+
+}
+
+extension JSContext {
+
   @available(macOS 13.3, *)
   public var isInspectable: Bool {
     get { JSGlobalContextIsInspectable(ref) }
@@ -100,9 +108,4 @@ public struct JSContext: ~Copyable, @unchecked Sendable {
   public var group: JSContextGroupValue {
     JSContextGroupValue(ref: JSContextGetGroup(ref)!)
   }
-
-  deinit {
-    JSGlobalContextRelease(ref)
-  }
-
 }
