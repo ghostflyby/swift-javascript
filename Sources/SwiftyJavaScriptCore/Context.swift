@@ -26,6 +26,21 @@ extension JSContextGroupProtocol {
   }
 }
 
+extension JSContextGroupProtocol {
+  public static func == (
+    lhs: borrowing Self,
+    rhs: borrowing some JSContextGroupProtocol
+  ) -> Bool {
+    lhs.ref == rhs.ref
+  }
+  public static func != (
+    lhs: borrowing Self,
+    rhs: borrowing some JSContextGroupProtocol
+  ) -> Bool {
+    !(lhs == rhs)
+  }
+}
+
 public final class JSContextGroup: @unchecked Sendable, JSContextGroupProtocol {
 
   public let ref: JSContextGroupRef
@@ -107,5 +122,21 @@ extension JSContext {
 
   public var group: JSContextGroupValue {
     JSContextGroupValue(ref: JSContextGetGroup(ref)!)
+  }
+}
+
+extension JSContext {
+  public static func == (
+    lhs: borrowing Self,
+    rhs: borrowing JSContext
+  ) -> Bool {
+    lhs.ref == rhs.ref
+  }
+
+  public static func != (
+    lhs: borrowing Self,
+    rhs: borrowing JSContext
+  ) -> Bool {
+    !(lhs == rhs)
   }
 }
