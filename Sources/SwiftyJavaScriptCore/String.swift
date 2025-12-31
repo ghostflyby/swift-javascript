@@ -35,6 +35,8 @@ extension JSString {
 
 public final class JSStringManaged: @unchecked Sendable, JSString {
 
+  public static let empty = JSStringManaged("")
+
   public let ref: JSStringRef
   public var cached: String? { string }
   public let string: String
@@ -45,7 +47,7 @@ public final class JSStringManaged: @unchecked Sendable, JSString {
   }
 
   public init(_ string: String) {
-    ref = JSStringCreateWithUTF8CString(string)
+    ref = JSStringCreateWithCFString(string as CFString)
     self.string = string
   }
 
@@ -69,7 +71,7 @@ public struct JSStringValue: @unchecked Sendable, ~Copyable, JSString {
   }
 
   public init(_ string: String) {
-    ref = JSStringCreateWithUTF8CString(string)
+    ref = JSStringCreateWithCFString(string as CFString)
     self.cached = string
   }
 
