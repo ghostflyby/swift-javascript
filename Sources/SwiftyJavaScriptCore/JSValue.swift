@@ -71,7 +71,7 @@ public struct JSValue: ~Copyable {
     @Sendable (
       _ context: isolated JSContext, _ function: borrowing JSValue,
       _ this: borrowing JSValue,
-      _ arguments: borrowing Span<JSValue>
+      _ arguments: borrowing JSArguments
     ) -> JSResult
 
   public init(
@@ -91,16 +91,7 @@ public struct JSValue: ~Copyable {
         let v = context.assumeIsolated { context in
           let function = JSValue(ref: f.value, ctx: context).toSendableBox()
           let this = JSValue(ref: this.value, ctx: context).toSendableBox()
-          let buffer = UnsafeMutableBufferPointer<JSValue>.allocate(capacity: Int(count))
-          let args = Span<JSValueRef?>(_unsafeStart: args.value, count: Int(count))
-          for i in 0..<count {
-            let arg = args[i] ?? JSValueMakeNull(context.globalContextRef)!
-            buffer.initializeElement(at: i, to: JSValue(ref: arg, ctx: context))
-          }
-          defer {
-            buffer.deinitialize().deallocate()
-          }
-          let span = buffer.span
+          let args = JSArguments(pointer: args.value, count: Int(count))
           // FIXME:
           let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(JSObjectGetPrivate(f.value)!)
             .takeUnretainedValue().value
@@ -108,7 +99,7 @@ public struct JSValue: ~Copyable {
             context,
             function.value,
             this.value,
-            span
+            args
           )
 
           switch callbackResult {
@@ -155,26 +146,21 @@ public struct JSValue: ~Copyable {
   ) {
     let swiftFunction = function
     let count = Mirror(reflecting: (repeat each A).self).children.count
-    self.init(name: name) { context, function, this, arguments in
+    let callback: JSFunctionCallback = { context, function, this, arguments in
       guard arguments.count == count else {
-        return .value(JSValue(undefinedIn: context))
+        return JSResult.value(JSValue(undefinedIn: context))
       }
-      var idx = 0
-      let nextIndex = {
-        defer { idx += 1 }
-        return idx
-      }
-      let typedArgs: (repeat each A) =
-        (repeat (each A).init(value: arguments[nextIndex()], in: context))
+      let typedArgs: (repeat each A) = arguments.unpack(types: repeat (each A).self)
       do {
-        let r = try swiftFunction(repeat each typedArgs)
-        return .value(r.toJSValue(in: context))
+        let r: R = try swiftFunction(repeat each typedArgs)
+        return JSResult.value(r.toJSValue(in: context))
       } catch let error as E {
-        return .exception(error.toJSValue(in: context))
+        return JSResult.exception(error.toJSValue(in: context))
       } catch {
-        return .value(JSValue(undefinedIn: context))
+        return JSResult.exception(JSValue(undefinedIn: context))
       }
     }
+    self.init(name: name, callback: callback)
   }
 
   deinit {
@@ -185,10 +171,9 @@ public struct JSValue: ~Copyable {
 public struct JSArguments: ~Copyable {
   let pointer: UnsafePointer<JSValueRef?>
   let count: Int
-  let ctx: JSContext
 
-  public func run<R: ~Copyable>(
-    at: Int, in context: isolated JSContext = #isolation, body: (borrowing JSValue) -> R
+  public func unpack<R: ~Copyable>(
+    at: Int, in context: isolated JSContext = #isolation, _ body: (borrowing JSValue) -> R
   ) -> R {
     guard at >= 0 && at < count else {
       fatalError("Index out of bounds")
@@ -200,6 +185,25 @@ public struct JSArguments: ~Copyable {
         JSValue(undefinedIn: context)
       }
     return body(value)
+  }
+
+  public func unpack<each T: JSValueMarshal>(
+    types: repeat (each T).Type, in context: isolated JSContext = #isolation
+  ) -> (repeat each T) {
+    var idx = 0
+    let pointer = self.pointer
+    let nextJSValue: () -> JSValue = {
+      defer { idx += 1 }
+      if let v = pointer[idx] {
+        JSValueProtect(context.globalContextRef, v)
+        return JSValue(ref: v, ctx: context)
+      } else {
+        return JSValue(undefinedIn: context)
+      }
+    }
+    return
+      (repeat (each T).init(value: nextJSValue(), in: context))
+
   }
 }
 
