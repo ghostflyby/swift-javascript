@@ -6,117 +6,158 @@
 //
 
 import Foundation
-import JavaScriptCore.JSValueRef
+@preconcurrency import JavaScriptCore.JSValueRef
 
 public protocol JSValueMarshal: ~Copyable, Sendable {
   init(value: borrowing JSValue, in context: isolated JSContext)
   func toJSValue(in context: isolated JSContext) -> JSValue
 }
 
-public struct JSValue: ~Copyable, @unchecked Sendable {
+public struct JSValue: ~Copyable {
   let ref: JSValueRef
-  let ctx: JSContextRef
+  let ctx: JSContext
 
-  init(ref: JSValueRef, ctx: JSContextRef) {
+  /// Wrap the `ref` **without retaining**
+  /// - Parameters:
+  ///   - ref: The JSValueRef to wrap
+  ///   - ctx: The JSContext in which the value exists
+  init(ref: JSValueRef, ctx: isolated JSContext = #isolation) {
     self.ref = ref
     self.ctx = ctx
-    JSValueProtect(ctx, ref)
-    JSGlobalContextRetain(ctx)
   }
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeString(context.ref, JSStringValue(value).ref)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeString(context.globalContextRef, JSStringValue(value).ref)
+    self.init(ref: s!, ctx: context)
   }
 
   public init(string value: borrowing JSString, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeString(context.ref, value.ref)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeString(context.globalContextRef, value.ref)
+    self.init(ref: s!, ctx: context)
   }
 
   public init(number value: Double, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNumber(context.ref, value)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeNumber(context.globalContextRef, value)
+    self.init(ref: s!, ctx: context)
   }
 
   public init(number value: some BinaryInteger, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNumber(context.ref, Double(value))
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeNumber(context.globalContextRef, Double(value))
+    self.init(ref: s!, ctx: context)
   }
 
   public init(boolean value: Bool, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeBoolean(context.ref, value)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeBoolean(context.globalContextRef, value)
+    self.init(ref: s!, ctx: context)
   }
 
   public init(symbol: String, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeSymbol(context.ref, JSStringCreateWithCFString(symbol as CFString))
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeSymbol(
+      context.globalContextRef, JSStringCreateWithCFString(symbol as CFString))
+    self.init(ref: s!, ctx: context)
   }
 
   public init(nullIn context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNull(context.ref)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeNull(context.globalContextRef)
+    self.init(ref: s!, ctx: context)
   }
 
   public init(undefinedIn context: isolated JSContext = #isolation) {
-    let s = JSValueMakeUndefined(context.ref)
-    self.init(ref: s!, ctx: context.ref)
+    let s = JSValueMakeUndefined(context.globalContextRef)
+    self.init(ref: s!, ctx: context)
   }
 
   public typealias JSFunctionCallback =
     @Sendable (
       _ context: isolated JSContext, _ function: borrowing JSValue,
       _ this: borrowing JSValue,
-      _ arguments: Span<JSValue>, _ exception: inout JSValue
-    ) -> JSValue
+      _ arguments: borrowing Span<JSValue>
+    ) -> JSResult
 
   public init(
     name: String,
     callback: @escaping JSFunctionCallback,
     in context: isolated JSContext = #isolation,
   ) {
-    let s = JSObjectMakeFunctionWithCallback(
-      context.ref, JSStringCreateWithCFString(name as CFString),
-      { c, f, this, count, args, excption in
-        // let context = JSContext(virtualMachine: JSVirtualMachine())
-        let function = JSValue(ref: f!, ctx: c!)
-        let this = JSValue(ref: this!, ctx: c!)
-        let buffer = UnsafeMutableBufferPointer<JSValue>.allocate(capacity: Int(count))
-        let args = Span<JSValueRef?>(_unsafeStart: args!, count: Int(count))
-        for i in 0..<count {
-          let arg = args[i] ?? JSValueMakeNull(c)!
-          buffer.initializeElement(at: i, to: JSValue(ref: arg, ctx: c!))
-        }
-        defer {
-          buffer.deinitialize().deallocate()
-        }
-        let span = buffer.span
-        var exceptionValue: JSValue = JSValue(ref: JSValueMakeNull(c), ctx: c!)
-        let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(JSObjectGetPrivate(f)!)
-          .takeUnretainedValue().value
+    let jsFunctionRef = JSObjectMakeFunctionWithCallback(
+      context.globalContextRef, JSStringCreateWithCFString(name as CFString),
+      { c, f, this, count, args, exception in
+        // FIXME: use the real context instead of creating a new one
+        let context = JSContext(virtualMachine: JSVirtualMachine())
+        let f = SendableBoxUnsafe(f!)
+        let this = SendableBoxUnsafe(this!)
+        let args = SendableBoxUnsafe(args!)
+
         let v = context.assumeIsolated { context in
-          return JSRefBox(ref: callback(context, function, this, span, &exceptionValue).ref)
+          let function = JSValue(ref: f.value, ctx: context).toSendableBox()
+          let this = JSValue(ref: this.value, ctx: context).toSendableBox()
+          let buffer = UnsafeMutableBufferPointer<JSValue>.allocate(capacity: Int(count))
+          let args = Span<JSValueRef?>(_unsafeStart: args.value, count: Int(count))
+          for i in 0..<count {
+            let arg = args[i] ?? JSValueMakeNull(context.globalContextRef)!
+            buffer.initializeElement(at: i, to: JSValue(ref: arg, ctx: context))
+          }
+          defer {
+            buffer.deinitialize().deallocate()
+          }
+          let span = buffer.span
+          // FIXME:
+          let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(JSObjectGetPrivate(f.value)!)
+            .takeUnretainedValue().value
+          let callbackResult = callback(
+            context,
+            function.value,
+            this.value,
+            span
+          )
+
+          switch callbackResult {
+          case .value(let value):
+            return JSPrivateResult.value(value.retainedRef)
+          case .exception(let error):
+            return JSPrivateResult.value(error.retainedRef)
+          }
         }
-        return v.ref
+        switch v {
+        case .value(let r):
+          return r
+        case .exception(let e):
+          exception?.pointee = e
+          return JSValueMakeUndefined(c!)
+        }
       })
-    JSObjectSetPrivate(s, Unmanaged.passRetained(Box(callback)).toOpaque())
-    self.init(ref: s!, ctx: context.ref)
+    JSObjectSetPrivate(jsFunctionRef, Unmanaged.passRetained(Box(callback)).toOpaque())
+    self.init(ref: jsFunctionRef!, ctx: context)
   }
 
-  private struct JSRefBox: @unchecked Sendable {
-    let ref: JSValueRef
+  public enum JSResult: ~Copyable {
+    case value(JSValue)
+    case exception(JSValue)
   }
 
-  public init<each A: JSValueMarshal, R: JSValueMarshal>(
+  private enum JSPrivateResult: @unchecked Sendable {
+    case value(JSValueRef)
+    case exception(JSValueRef)
+  }
+
+  private consuming func toSendableBox() -> SendableBoxUnsafe<JSValue> {
+    return SendableBoxUnsafe(self)
+  }
+
+  private var retainedRef: JSValueRef {
+    JSValueProtect(ctx.globalContextRef, ref)
+    return ref
+  }
+
+  public init<each A: JSValueMarshal, R: JSValueMarshal, E: JSValueMarshal>(
     in context: isolated JSContext = #isolation, name: String,
-    function: @escaping @Sendable (repeat each A) -> R
+    function: @escaping @Sendable (repeat each A) throws(E) -> R
   ) {
     let swiftFunction = function
     let count = Mirror(reflecting: (repeat each A).self).children.count
-    self.init(name: name) { context, function, this, arguments, exception in
+    self.init(name: name) { context, function, this, arguments in
       guard arguments.count == count else {
-        return JSValue(undefinedIn: context)
+        return .value(JSValue(undefinedIn: context))
       }
       var idx = 0
       let nextIndex = {
@@ -125,14 +166,40 @@ public struct JSValue: ~Copyable, @unchecked Sendable {
       }
       let typedArgs: (repeat each A) =
         (repeat (each A).init(value: arguments[nextIndex()], in: context))
-      let r = swiftFunction(repeat each typedArgs)
-      return r.toJSValue(in: context)
+      do {
+        let r = try swiftFunction(repeat each typedArgs)
+        return .value(r.toJSValue(in: context))
+      } catch let error as E {
+        return .exception(error.toJSValue(in: context))
+      } catch {
+        return .value(JSValue(undefinedIn: context))
+      }
     }
   }
 
   deinit {
-    JSValueUnprotect(ctx, ref)
-    JSGlobalContextRelease(ctx)
+    JSValueUnprotect(ctx.globalContextRef, ref)
+  }
+}
+
+public struct JSArguments: ~Copyable {
+  let pointer: UnsafePointer<JSValueRef?>
+  let count: Int
+  let ctx: JSContext
+
+  public func run<R: ~Copyable>(
+    at: Int, in context: isolated JSContext = #isolation, body: (borrowing JSValue) -> R
+  ) -> R {
+    guard at >= 0 && at < count else {
+      fatalError("Index out of bounds")
+    }
+    let value =
+      if let v = pointer[at] {
+        JSValue(ref: v, ctx: context)
+      } else {
+        JSValue(undefinedIn: context)
+      }
+    return body(value)
   }
 }
 
@@ -143,9 +210,17 @@ private class Box<T: ~Copyable> {
   }
 }
 
+private struct SendableBoxUnsafe<T: ~Copyable>: @unchecked Sendable, ~Copyable {
+  let value: T
+  init(_ value: consuming T) {
+    self.value = value
+  }
+}
+
 extension JSValue {
   public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return lhs.ctx == rhs.ctx && JSValueIsEqual(lhs.ctx, lhs.ref, rhs.ref, nil)
+    return lhs.ctx == rhs.ctx
+      && JSValueIsEqual(lhs.ctx.globalContextRef, lhs.ref, rhs.ref, nil)
   }
 
   public static func != (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
@@ -153,7 +228,7 @@ extension JSValue {
   }
 
   public static func === (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return lhs.ctx == rhs.ctx && JSValueIsStrictEqual(lhs.ctx, lhs.ref, rhs.ref)
+    return lhs.ctx == rhs.ctx && JSValueIsStrictEqual(lhs.ctx.globalContextRef, lhs.ref, rhs.ref)
   }
 
   public static func !== (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
