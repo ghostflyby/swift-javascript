@@ -60,40 +60,40 @@ extension JSType {
 
 extension JSValue {
   public var type: JSType {
-    JSType(JSValueGetType(ctx.globalContextRef, ref))
+    JSType(JSValueGetType(ctx, ref))
   }
 }
 
 extension JSValue {
   public var isUndefined: Bool {
-    JSValueIsUndefined(ctx.globalContextRef, ref)
+    JSValueIsUndefined(ctx, ref)
   }
 
   public var isNull: Bool {
-    JSValueIsNull(ctx.globalContextRef, ref)
+    JSValueIsNull(ctx, ref)
   }
 
   public var isBoolean: Bool {
-    JSValueIsBoolean(ctx.globalContextRef, ref)
+    JSValueIsBoolean(ctx, ref)
   }
 
   public var isNumber: Bool {
-    JSValueIsNumber(ctx.globalContextRef, ref)
+    JSValueIsNumber(ctx, ref)
   }
 
   public var isString: Bool {
-    JSValueIsString(ctx.globalContextRef, ref)
+    JSValueIsString(ctx, ref)
   }
 
   public var isSymbol: Bool {
-    JSValueIsSymbol(ctx.globalContextRef, ref)
+    JSValueIsSymbol(ctx, ref)
   }
 
   public var isObject: Bool {
-    JSValueIsObject(ctx.globalContextRef, ref)
+    JSValueIsObject(ctx, ref)
   }
 
   public var isBigInt: Bool {
-    JSValueIsBigInt(ctx.globalContextRef, ref)
+    JSValueIsBigInt(ctx, ref)
   }
 }
