@@ -113,16 +113,6 @@ public struct JSValue: ~Copyable {
     self.init(ref: jsFunctionRef!, ctx: context)
   }
 
-  public enum JSResult: ~Copyable {
-    case value(JSValue)
-    case exception(JSValue)
-  }
-
-  fileprivate enum JSPrivateResult: @unchecked Sendable {
-    case value(JSValueRef)
-    case exception(JSValueRef)
-  }
-
   private consuming func toSendableBox() -> SendableBoxUnsafe<JSValue> {
     return SendableBoxUnsafe(self)
   }
@@ -161,8 +151,8 @@ public struct JSValue: ~Copyable {
   }
 }
 
-extension JSValue.JSResult {
-  fileprivate consuming func toPrivateResult() -> JSValue.JSPrivateResult {
+extension JSResult {
+  consuming func toPrivateResult() -> JSPrivateResult {
     switch consume self {
     case .value(let v):
       return .value(v.retainedRef())
@@ -170,6 +160,15 @@ extension JSValue.JSResult {
       return .exception(e.retainedRef())
     }
   }
+}
+public enum JSResult: ~Copyable {
+  case value(JSValue)
+  case exception(JSValue)
+}
+
+enum JSPrivateResult: @unchecked Sendable {
+  case value(JSValueRef)
+  case exception(JSValueRef)
 }
 
 public struct JSArguments: ~Copyable {
@@ -217,7 +216,7 @@ private class Box<T: ~Copyable> {
   }
 }
 
-private struct SendableBoxUnsafe<T: ~Copyable>: @unchecked Sendable, ~Copyable {
+struct SendableBoxUnsafe<T: ~Copyable>: @unchecked Sendable, ~Copyable {
   let value: T
   init(_ value: consuming T) {
     self.value = value
