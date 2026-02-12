@@ -78,38 +78,10 @@ public struct JSValue: ~Copyable {
     callback: @escaping JSFunctionCallback,
     in context: isolated JSContext = #isolation,
   ) {
-    let jsFunctionRef = JSObjectMakeFunctionWithCallback(
-      context.globalContextRef, JSStringCreateWithCFString(name as CFString),
-      { c, f, this, count, args, exception in
-        // FIXME: use the real context instead of creating a new one
-        let context = JSContext(virtualMachine: JSVirtualMachine())
-        let f = SendableBoxUnsafe(f!)
-        let this = SendableBoxUnsafe(this!)
-        let args = SendableBoxUnsafe(args!)
+    let jsFunctionRef = JSObjectMake(
+      context.globalContextRef, context.functionClass,
+      Unmanaged.passRetained(Box(callback)).toOpaque())
 
-        let v = context.assumeIsolated { context in
-          let function = JSValue(ref: f.value, ctx: context)
-          let this = JSValue(ref: this.value, ctx: context)
-          let args = JSArguments(pointer: args.value, count: Int(count))
-          // FIXME:
-          let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(JSObjectGetPrivate(f.value)!)
-            .takeUnretainedValue().value
-          return callback(
-            context,
-            function,
-            this,
-            args
-          ).toPrivateResult()
-        }
-        switch v {
-        case .value(let r):
-          return r
-        case .exception(let e):
-          exception?.pointee = e
-          return JSValueMakeUndefined(c!)
-        }
-      })
-    JSObjectSetPrivate(jsFunctionRef, Unmanaged.passRetained(Box(callback)).toOpaque())
     self.init(ref: jsFunctionRef!, ctx: context)
   }
 
@@ -209,7 +181,7 @@ public struct JSArguments: ~Copyable {
   }
 }
 
-private class Box<T: ~Copyable> {
+class Box<T: ~Copyable> {
   let value: T
   init(_ value: consuming T) {
     self.value = value
