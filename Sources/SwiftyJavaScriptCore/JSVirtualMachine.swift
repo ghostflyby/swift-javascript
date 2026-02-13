@@ -1,11 +1,11 @@
 import JavaScriptCore.JSVirtualMachine
 
 public class JSVirtualMachine: @unchecked Sendable {
-  let peer: JavaScriptCore.JSVirtualMachine
+  let peer: JavaScriptCore.JSContextGroupRef
   let unownedExecutor: UnownedSerialExecutor
 
   public init() {
-    self.peer = .init()
+    self.peer = JavaScriptCore.JSContextGroupCreate()
     unownedExecutor = SingleThreadExecutor().asUnownedSerialExecutor()
   }
 
@@ -13,11 +13,11 @@ public class JSVirtualMachine: @unchecked Sendable {
 
 extension JSVirtualMachine: Hashable {
   public static func == (lhs: JSVirtualMachine, rhs: JSVirtualMachine) -> Bool {
-    return lhs.peer === rhs.peer
+    return lhs.peer == rhs.peer
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(ObjectIdentifier(peer))
+    hasher.combine(peer)
   }
 }
 

@@ -79,7 +79,7 @@ public struct JSValue: ~Copyable {
     in context: isolated JSContext = #isolation,
   ) {
     let jsFunctionRef = JSObjectMake(
-      context.globalContextRef, context.functionClass,
+      context.globalContextRef, context.functionClass.value,
       Unmanaged.passRetained(Box(callback)).toOpaque())
 
     self.init(ref: jsFunctionRef!, ctx: context)

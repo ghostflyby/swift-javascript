@@ -3,23 +3,39 @@
 public actor JSContext {
   nonisolated let peer: JavaScriptCore.JSContext
   let globalObjectRef: JSObjectRef
-  let functionClass: JSClassRef
+  let functionClass: SendableBoxUnsafe<JSClassRef>
+  let globalObjectClass: SendableBoxUnsafe<JSClassRef>
   public let virtualMachine: JSVirtualMachine
   nonisolated public let unownedExecutor: UnownedSerialExecutor
 
   public init(virtualMachine: JSVirtualMachine) {
     self.virtualMachine = virtualMachine
-    let context = JavaScriptCore.JSContext(virtualMachine: virtualMachine.peer)!
-    self.peer = context
-    globalObjectRef = context.globalObject!.jsValueRef
-    var def = functionClassDef
-    functionClass = JSClassCreate(&def)
     self.unownedExecutor = virtualMachine.unownedExecutor
+
+    var kJSClassDefinitionEmpty = kJSClassDefinitionEmpty
+    let cls = JSClassCreate(&kJSClassDefinitionEmpty)!
+    let ref = JSGlobalContextCreateInGroup(virtualMachine.peer, cls)
+    globalObjectClass = SendableBoxUnsafe(cls)
+
+    self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
+
+    globalObjectRef = peer.globalObject!.jsValueRef
+    var def = functionClassDef
+    functionClass = SendableBoxUnsafe(JSClassCreate(&def))
+
+    JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(self).toOpaque())
+
   }
 
   public func withGlobalObject(_ body: (borrowing JSValue) -> Void) {
     let globalObject = JSValue(ref: globalObjectRef, ctx: self)
     body(globalObject)
+  }
+
+  deinit {
+    JSGlobalContextRelease(peer.jsGlobalContextRef)
+    JSClassRelease(functionClass.value)
+    JSClassRelease(globalObjectClass.value)
   }
 
 }
@@ -42,8 +58,8 @@ extension JSContext {
 
 private let functionCallback: JSObjectCallAsFunctionCallback = {
   c, f, this, count, args, exception in
-  // FIXME: use the real context instead of creating a new one
-  let context = JSContext(virtualMachine: JSVirtualMachine())
+  let context = Unmanaged<JSContext>.fromOpaque(JSObjectGetPrivate(c)!)
+    .takeUnretainedValue()
   let f = SendableBoxUnsafe(f!)
   let this = SendableBoxUnsafe(this!)
   let args = SendableBoxUnsafe(args!)
