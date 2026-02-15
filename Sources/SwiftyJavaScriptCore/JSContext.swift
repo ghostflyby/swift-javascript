@@ -58,8 +58,7 @@ extension JSContext {
 
 private let functionCallback: JSObjectCallAsFunctionCallback = {
   c, f, this, count, args, exception in
-  let context = Unmanaged<JSContext>.fromOpaque(JSObjectGetPrivate(c)!)
-    .takeUnretainedValue()
+  let context = JSContext.borrow(ctx: c!)
   let f = SendableBoxUnsafe(f!)
   let this = SendableBoxUnsafe(this!)
   let args = SendableBoxUnsafe(args!)

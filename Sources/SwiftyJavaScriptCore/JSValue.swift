@@ -195,6 +195,8 @@ struct SendableBoxUnsafe<T: ~Copyable>: @unchecked Sendable, ~Copyable {
   }
 }
 
+extension SendableBoxUnsafe: Copyable where T: Copyable {}
+
 extension JSValue {
   public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
     return lhs.ctx == rhs.ctx
