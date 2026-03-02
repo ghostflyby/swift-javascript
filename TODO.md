@@ -41,4 +41,4 @@
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [ ] `swift build --build-tests` 持续绿灯
-- [ ] `swift test` 在本地环境稳定通过（排查并消除 signal 5）
+- [x] `swift test` 在本地环境稳定通过（已验证：21/21 通过）
