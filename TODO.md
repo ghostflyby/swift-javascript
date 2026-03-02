@@ -26,19 +26,19 @@
 - [ ] TypedArray 与 `JSValue` 互转辅助
 
 ## 4. JSClass 完整接线
-- [ ] `finalize` 回调接线
-- [ ] `staticValues` 回调接线
-- [ ] `staticFunctions` 回调接线
-- [ ] `getPropertyNames` 回调接线
-- [ ] `callAsFunction` 回调接线
-- [ ] `callAsConstructor` 回调接线
-- [ ] `hasInstance` 回调接线
-- [ ] `convertToType` 回调接线
+- [x] `finalize` 回调接线
+- [x] `staticValues` 回调接线
+- [x] `staticFunctions` 回调接线
+- [x] `getPropertyNames` 回调接线
+- [x] `callAsFunction` 回调接线
+- [x] `callAsConstructor` 回调接线
+- [x] `hasInstance` 回调接线
+- [x] `convertToType` 回调接线
 
 ## 5. 测试与稳定性
 - [ ] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
 - [ ] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
-- [ ] 为 JSClass 全部回调路径新增 Swift Testing 用例
+- [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [ ] `swift build --build-tests` 持续绿灯
 - [ ] `swift test` 在本地环境稳定通过（排查并消除 signal 5）
