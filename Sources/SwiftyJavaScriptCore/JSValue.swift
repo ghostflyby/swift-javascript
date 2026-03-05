@@ -129,8 +129,6 @@ public struct JSValue: ~Copyable {
 
   public init<
     each C: JSValueDecoder,
-    R,
-    E,
     RCoder: JSValueEncoder,
     ECoder: JSValueEncoder
   >(
@@ -139,11 +137,12 @@ public struct JSValue: ~Copyable {
     converters: repeat (each C).Type,
     returnCoder: RCoder.Type,
     errorCoder: ECoder.Type,
-    function: @escaping @Sendable (repeat (each C).SwiftType) throws(E) -> R
-  ) where RCoder.SwiftType == R, ECoder.SwiftType == E {
+    function:
+      @escaping @Sendable (repeat (each C).SwiftType) throws(ECoder.SwiftType) -> RCoder.SwiftType
+  ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each C).self)
-    let callback: JSFunctionCallback = { context, function, this, arguments in
+    let callback: JSFunctionCallback = { [swiftFunction] context, function, this, arguments in
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
       }
@@ -152,10 +151,10 @@ public struct JSValue: ~Copyable {
           using: repeat (each C).self,
           in: context
         )
-        let r: R = try swiftFunction(repeat each typedArgs)
+        let r: RCoder.SwiftType = try swiftFunction(repeat each typedArgs)
         let encoded = try RCoder.tryEncode(r, in: context)
         return JSResult.value(encoded)
-      } catch let error as E {
+      } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
           return JSResult.exception(encoded)
         }
