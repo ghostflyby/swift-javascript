@@ -92,7 +92,6 @@ enum ZeroOneBoolConverter: JSValueConverter {
 
   await context.withIsolatedGlobalObject { context, global in
     let fn = JSValue(
-      in: context,
       name: "mix",
       converters: ZeroOneBoolConverter.self, JSDefaultConverter<Double>.self,
       function: { (flag: Bool, value: Double) in

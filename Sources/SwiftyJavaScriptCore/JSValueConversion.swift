@@ -19,70 +19,72 @@ public protocol JSValueConverter {
 }
 
 public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
-  public static func decode(_ value: borrowing JSValue, in context: isolated JSContext) -> T {
+  public static func decode(_ value: borrowing JSValue, in context: isolated JSContext = #isolation)
+    -> T
+  {
     T(value: value, in: context)
   }
 
-  public static func encode(_ value: T, in context: isolated JSContext) -> JSValue {
+  public static func encode(_ value: T, in context: isolated JSContext = #isolation) -> JSValue {
     value.toJSValue(in: context)
   }
 }
 
 extension JSValue: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     self.init(ref: value.ref, ctx: context)
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(ref: self.ref, ctx: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(ref: self.ref)
   }
 }
 
 extension Bool: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     self = JSValueToBoolean(context.globalContextRef, value.ref)
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(boolean: self, in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(boolean: self)
   }
 }
 
 extension Double: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     var exception: JSValueRef?
     self = JSValueToNumber(context.globalContextRef, value.ref, &exception)
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(number: self, in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(number: self)
   }
 }
 
 extension Int32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     let number = Double(value: value, in: context)
     self = Int32(number)
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(number: self, in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(number: self)
   }
 }
 
 extension UInt32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     let number = Double(value: value, in: context)
     self = UInt32(number)
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(number: self, in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(number: self)
   }
 }
 
 extension String: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext) {
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
     var exception: JSValueRef?
     if let stringRef = JSValueToStringCopy(context.globalContextRef, value.ref, &exception) {
       defer { JSStringRelease(stringRef) }
@@ -92,13 +94,13 @@ extension String: JSValueCodable {
     self = ""
   }
 
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
-    JSValue(string: self, in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    JSValue(string: self)
   }
 }
 
 extension Never: JSValueEncodable {
-  public func toJSValue(in context: isolated JSContext) -> JSValue {
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
     switch self {}
   }
 }
