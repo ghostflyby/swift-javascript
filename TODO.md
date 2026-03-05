@@ -9,7 +9,7 @@
 - [x] `evaluateScript(_:)`（基于 `JSEvaluateScript`）
 - [x] `evaluateScript(_:sourceURL:)`（支持 sourceURL）
 - [x] `evaluateScript` 异常透出（返回/抛错策略定稿并实现，当前为 `JSResult`）
-- [ ] 全局对象快捷访问（读写封装，不依赖 ObjC 下标）
+- [x] 全局对象快捷访问（`withGlobalObject` / `withIsolatedGlobalObject`）
 
 ## 2. JSValue（核心能力）
 - [ ] 函数调用封装 `call(this:arguments:)`

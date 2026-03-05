@@ -2,15 +2,6 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-extension JSContext {
-  func withIsolatedGlobalObject<R: Sendable>(
-    _ body: @Sendable (isolated JSContext, borrowing JSValue) -> R
-  ) -> R {
-    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
-    return body(self, globalObject)
-  }
-}
-
 struct TestNumberMarshal: Sendable, JSValueCodable {
   let value: Double
 
