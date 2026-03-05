@@ -15,8 +15,8 @@
 - [ ] 函数调用封装 `call(this:arguments:)`
 - [ ] 构造调用封装 `construct(arguments:)`
 - [ ] 方法调用封装 `invokeMethod(_:arguments:)`
-- [ ] 基础转换：`toBool` / `toDouble` / `toInt32` / `toUInt32`
-- [ ] 扩展转换：`toString` / `toNumber` / `toObject`
+- [x] 基础转换：`toBool` / `toDouble` / `toInt32` / `toUInt32`
+- [ ] 扩展转换：`toString` / `toNumber` / `toObject`（已完成 `toString`）
 - [ ] 类型辅助：`isArray` / `isDate` / `isInstanceOf`
 - [ ] 属性定义封装：`defineProperty`
 
@@ -37,8 +37,13 @@
 
 ## 5. 测试与稳定性
 - [x] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
-- [ ] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例
+- [x] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例（新增转换体系与覆盖转换用例）
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
-- [ ] `swift build --build-tests` 持续绿灯
-- [x] `swift test` 在本地环境稳定通过（已验证：21/21 通过）
+- [x] `swift build --build-tests` 持续绿灯
+- [x] `swift test` 在本地环境稳定通过（已验证：27/27 通过）
+
+## 6. 类型转换体系
+- [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）并兼容现有 `JSValueMarshal`
+- [x] 调用点覆盖转换（属性读写与函数参数读取）
+- [x] 为后续宏自动实现预留统一转换器模型

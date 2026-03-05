@@ -6,11 +6,6 @@
 //
 import JavaScriptCore
 
-public protocol JSValueMarshal: ~Copyable, Sendable {
-  init(value: borrowing JSValue, in context: isolated JSContext)
-  func toJSValue(in context: isolated JSContext) -> JSValue
-}
-
 public struct JSValue: ~Copyable {
   let ref: JSValueRef
   let ctx: JSContextRef
@@ -95,17 +90,45 @@ public struct JSValue: ~Copyable {
     return ref
   }
 
-  public init<each A: JSValueMarshal, R: JSValueMarshal, E: JSValueMarshal>(
+  public init<each A: JSValueDecodable, R: JSValueEncodable, E: JSValueEncodable>(
     in context: isolated JSContext = #isolation, name: String,
     function: @escaping @Sendable (repeat each A) throws(E) -> R
   ) {
     let swiftFunction = function
-    let count = Mirror(reflecting: (repeat each A).self).children.count
+    let count = Mirror(reflecting: (repeat (each A).self)).children.count
     let callback: JSFunctionCallback = { context, function, this, arguments in
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
       }
       let typedArgs: (repeat each A) = arguments.unpack(types: repeat (each A).self)
+      do {
+        let r: R = try swiftFunction(repeat each typedArgs)
+        return JSResult.value(r.toJSValue(in: context))
+      } catch let error as E {
+        return JSResult.exception(error.toJSValue(in: context))
+      } catch {
+        return JSResult.exception(JSValue(undefinedIn: context))
+      }
+    }
+    self.init(name: name, callback: callback)
+  }
+
+  public init<each C: JSValueConverter, R: JSValueEncodable, E: JSValueEncodable>(
+    in context: isolated JSContext = #isolation,
+    name: String,
+    converters: repeat (each C).Type,
+    function: @escaping @Sendable (repeat (each C).SwiftType) throws(E) -> R
+  ) {
+    let swiftFunction = function
+    let count = Mirror(reflecting: (repeat (each C).self)).children.count
+    let callback: JSFunctionCallback = { context, function, this, arguments in
+      guard arguments.count == count else {
+        return JSResult.value(JSValue(undefinedIn: context))
+      }
+      let typedArgs: (repeat (each C).SwiftType) = arguments.unpack(
+        using: repeat (each C).self,
+        in: context
+      )
       do {
         let r: R = try swiftFunction(repeat each typedArgs)
         return JSResult.value(r.toJSValue(in: context))
@@ -162,7 +185,7 @@ public struct JSArguments: ~Copyable {
     return body(value)
   }
 
-  public func unpack<each T: JSValueMarshal>(
+  public func unpack<each T: JSValueDecodable>(
     types: repeat (each T).Type, in context: isolated JSContext = #isolation
   ) -> (repeat each T) {
     var idx = 0
@@ -178,6 +201,35 @@ public struct JSArguments: ~Copyable {
     return
       (repeat (each T).init(value: nextJSValue(), in: context))
 
+  }
+
+  public func unpack<C: JSValueConverter>(
+    at: Int,
+    using converter: C.Type,
+    in context: isolated JSContext = #isolation
+  ) -> C.SwiftType {
+    unpack(at: at, in: context) { value in
+      converter.decode(value, in: context)
+    }
+  }
+
+  public func unpack<each C: JSValueConverter>(
+    using converters: repeat (each C).Type,
+    in context: isolated JSContext = #isolation
+  ) -> (repeat (each C).SwiftType) {
+    var idx = 0
+    let pointer = self.pointer
+    let nextJSValue: () -> JSValue = {
+      defer { idx += 1 }
+      if let v = pointer[idx] {
+        return JSValue(ref: v, ctx: context)
+      } else {
+        return JSValue(undefinedIn: context)
+      }
+    }
+
+    return
+      (repeat (each C).decode(nextJSValue(), in: context))
   }
 }
 

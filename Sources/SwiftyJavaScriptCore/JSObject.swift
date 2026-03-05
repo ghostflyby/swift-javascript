@@ -1,33 +1,79 @@
 import JavaScriptCore
 
 extension JSValue {
-  public func setProperty<Val: JSValueMarshal>(
+  public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
-  ) {
+  ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
     JSObjectSetProperty(
       context.globalContextRef, self.ref, key.ref, value.toJSValue(in: context).retainedRef(),
       attributes.rawValue, &error)
   }
-  public func setProperty<Val: JSValueMarshal>(
+  public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing JSValue,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
-  ) {
+  ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
     JSObjectSetPropertyForKey(
       context.globalContextRef, self.ref, key.ref, value.toJSValue(in: context).retainedRef(),
       attributes.rawValue, &error)
   }
-  public func setProperty<Val: JSValueMarshal>(
+  public func setProperty<Val>(
     _ value: borrowing Val, at index: UInt32,
+    in context: isolated JSContext = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    var error: JSValueRef?
+    JSObjectSetPropertyAtIndex(
+      context.globalContextRef, self.ref, index, value.toJSValue(in: context).retainedRef(), &error
+    )
+  }
+
+  public func setProperty<C: JSValueConverter>(
+    _ value: C.SwiftType,
+    forKey key: borrowing some JSString,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) {
+    var error: JSValueRef?
+    JSObjectSetProperty(
+      context.globalContextRef, self.ref, key.ref,
+      converter.encode(value, in: context).retainedRef(),
+      attributes.rawValue,
+      &error
+    )
+  }
+
+  public func setProperty<C: JSValueConverter>(
+    _ value: C.SwiftType,
+    forKey key: borrowing JSValue,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) {
+    var error: JSValueRef?
+    JSObjectSetPropertyForKey(
+      context.globalContextRef, self.ref, key.ref,
+      converter.encode(value, in: context).retainedRef(),
+      attributes.rawValue,
+      &error
+    )
+  }
+
+  public func setProperty<C: JSValueConverter>(
+    _ value: C.SwiftType,
+    at index: UInt32,
+    using converter: C.Type,
     in context: isolated JSContext = #isolation
   ) {
     var error: JSValueRef?
     JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, value.toJSValue(in: context).retainedRef(), &error
+      context.globalContextRef, self.ref, index,
+      converter.encode(value, in: context).retainedRef(),
+      &error
     )
   }
 
@@ -56,6 +102,33 @@ extension JSValue {
     let result = JSObjectGetPropertyAtIndex(
       context.globalContextRef, self.ref, index, nil)!
     return JSValue(ref: result, ctx: context)
+  }
+
+  public func getProperty<C: JSValueConverter>(
+    forKey key: borrowing some JSString,
+    using converter: C.Type,
+    in context: isolated JSContext = #isolation
+  ) -> C.SwiftType {
+    let value = getProperty(forKey: key, in: context)
+    return converter.decode(value, in: context)
+  }
+
+  public func getProperty<C: JSValueConverter>(
+    forKey key: borrowing JSValue,
+    using converter: C.Type,
+    in context: isolated JSContext = #isolation
+  ) -> C.SwiftType {
+    let value = getProperty(forKey: key, in: context)
+    return converter.decode(value, in: context)
+  }
+
+  public func getProperty<C: JSValueConverter>(
+    at index: UInt32,
+    using converter: C.Type,
+    in context: isolated JSContext = #isolation
+  ) -> C.SwiftType {
+    let value = getProperty(at: index, in: context)
+    return converter.decode(value, in: context)
   }
 
   public func deleteProperty(
