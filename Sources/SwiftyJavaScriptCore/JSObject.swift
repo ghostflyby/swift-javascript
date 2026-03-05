@@ -7,8 +7,9 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetProperty(
-      context.globalContextRef, self.ref, key.ref, value.toJSValue(in: context).retainedRef(),
+      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
       attributes.rawValue, &error)
   }
   public func setProperty<Val>(
@@ -17,8 +18,9 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, value.toJSValue(in: context).retainedRef(),
+      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
       attributes.rawValue, &error)
   }
   public func setProperty<Val>(
@@ -26,8 +28,9 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, value.toJSValue(in: context).retainedRef(), &error
+      context.globalContextRef, self.ref, index, encoded.retainedRef(), &error
     )
   }
 
@@ -39,9 +42,10 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) {
     var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetProperty(
       context.globalContextRef, self.ref, key.ref,
-      converter.encode(value, in: context).retainedRef(),
+      encoded.retainedRef(),
       attributes.rawValue,
       &error
     )
@@ -55,9 +59,10 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) {
     var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetPropertyForKey(
       context.globalContextRef, self.ref, key.ref,
-      converter.encode(value, in: context).retainedRef(),
+      encoded.retainedRef(),
       attributes.rawValue,
       &error
     )
@@ -70,9 +75,10 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) {
     var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     JSObjectSetPropertyAtIndex(
       context.globalContextRef, self.ref, index,
-      converter.encode(value, in: context).retainedRef(),
+      encoded.retainedRef(),
       &error
     )
   }

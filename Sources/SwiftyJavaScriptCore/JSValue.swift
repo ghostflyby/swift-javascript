@@ -100,12 +100,16 @@ public struct JSValue: ~Copyable {
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
       }
-      let typedArgs: (repeat each A) = arguments.unpack(types: repeat (each A).self)
       do {
+        let typedArgs: (repeat each A) = try arguments.tryUnpack(types: repeat (each A).self)
         let r: R = try swiftFunction(repeat each typedArgs)
-        return JSResult.value(r.toJSValue(in: context))
+        let encoded = try r.tryEncode(in: context)
+        return JSResult.value(encoded)
       } catch let error as E {
-        return JSResult.exception(error.toJSValue(in: context))
+        if let encoded = try? error.tryEncode(in: context) {
+          return JSResult.exception(encoded)
+        }
+        return JSResult.exception(JSValue(undefinedIn: context))
       } catch {
         return JSResult.exception(JSValue(undefinedIn: context))
       }
@@ -125,15 +129,19 @@ public struct JSValue: ~Copyable {
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
       }
-      let typedArgs: (repeat (each C).SwiftType) = arguments.unpack(
-        using: repeat (each C).self,
-        in: context
-      )
       do {
+        let typedArgs: (repeat (each C).SwiftType) = try arguments.tryUnpack(
+          using: repeat (each C).self,
+          in: context
+        )
         let r: R = try swiftFunction(repeat each typedArgs)
-        return JSResult.value(r.toJSValue(in: context))
+        let encoded = try r.tryEncode(in: context)
+        return JSResult.value(encoded)
       } catch let error as E {
-        return JSResult.exception(error.toJSValue(in: context))
+        if let encoded = try? error.tryEncode(in: context) {
+          return JSResult.exception(encoded)
+        }
+        return JSResult.exception(JSValue(undefinedIn: context))
       } catch {
         return JSResult.exception(JSValue(undefinedIn: context))
       }

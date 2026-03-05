@@ -1,6 +1,6 @@
 import JavaScriptCore
 
-public enum JSType {
+public enum JSType: Sendable {
   case undefined
   case null
   case boolean

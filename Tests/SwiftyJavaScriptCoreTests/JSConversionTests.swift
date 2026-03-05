@@ -14,6 +14,16 @@ enum ZeroOneBoolConverter: JSValueConverter {
   }
 }
 
+struct FailingEncodeValue: JSValueEncodable {
+  func toJSValue(in context: isolated JSContext) -> JSValue {
+    JSValue(undefinedIn: context)
+  }
+
+  func tryEncode(in context: isolated JSContext) throws(JSValueConversionError) -> JSValue {
+    throw .nonFiniteNumber(target: "FailingEncodeValue")
+  }
+}
+
 @Test func builtinCodableRoundtrip() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
@@ -107,6 +117,53 @@ enum ZeroOneBoolConverter: JSValueConverter {
       #expect(value.toDouble(in: context) == 42)
     case .exception:
       Issue.record("Expected converted function call to succeed")
+    }
+  }
+}
+
+@Test func strictTryDecodeRejectsMismatchedType() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let stringValue = JSValue(string: "x", in: context)
+    do {
+      let _: Double = try stringValue.tryDecode(in: context)
+      Issue.record("Expected strict decode to fail")
+    } catch {
+      #expect(Bool(true))
+    }
+  }
+}
+
+@Test func strictTryUnpackRejectsMismatchedType() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let source = JSValue(string: "x", in: context)
+    let rawArguments = [Optional(source.ref)]
+
+    rawArguments.withUnsafeBufferPointer { buffer in
+      let args = JSArguments(pointer: buffer.baseAddress!, count: 1)
+      do {
+        let _: (Double) = try args.tryUnpack(types: Double.self, in: context)
+        Issue.record("Expected strict unpack to fail")
+      } catch {
+        #expect(Bool(true))
+      }
+    }
+  }
+}
+
+@Test func strictTryEncodeCanFail() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let value = FailingEncodeValue()
+    do {
+      _ = try value.tryEncode(in: context)
+      Issue.record("Expected strict encode to fail")
+    } catch {
+      #expect(Bool(true))
     }
   }
 }
