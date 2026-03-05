@@ -47,3 +47,8 @@
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
 - [x] 调用点覆盖转换（属性读写与函数参数读取）
 - [x] 为后续宏自动实现预留统一转换器模型
+
+## 7. 宏自动实现（进行中）
+- [x] 为 `JSValueCodable` 增加声明式自动实现宏（类似 Codable 自动合成）
+- [x] 宏支持类型级 `converter` 或 `decoder/encoder` 替换
+- [x] 宏支持成员级单独替换 `decoder/encoder`

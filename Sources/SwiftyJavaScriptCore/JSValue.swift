@@ -70,6 +70,11 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
+  public init(objectIn context: isolated JSContext = #isolation) {
+    let objectRef = JSObjectMake(context.globalContextRef, nil, nil)
+    self.init(ref: objectRef!, ctx: context)
+  }
+
   public typealias JSFunctionCallback =
     (
       _ context: isolated JSContext, _ function: borrowing JSValue,
