@@ -39,7 +39,7 @@ extension JSValueEncodable {
 
 public typealias JSValueCodable = JSValueDecodable & JSValueEncodable
 
-public protocol JSValueConverter {
+public protocol JSValueDecoder {
   associatedtype SwiftType
 
   static func decode(_ value: borrowing JSValue, in context: isolated JSContext) -> SwiftType
@@ -47,6 +47,11 @@ public protocol JSValueConverter {
     _ value: borrowing JSValue,
     in context: isolated JSContext
   ) throws(JSValueConversionError) -> SwiftType
+}
+
+public protocol JSValueEncoder {
+  associatedtype SwiftType
+
   static func tryEncode(
     _ value: SwiftType,
     in context: isolated JSContext
@@ -54,14 +59,18 @@ public protocol JSValueConverter {
   static func encode(_ value: SwiftType, in context: isolated JSContext) -> JSValue
 }
 
-extension JSValueConverter {
+public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
+
+extension JSValueDecoder {
   public static func tryDecode(
     _ value: borrowing JSValue,
     in context: isolated JSContext
   ) throws(JSValueConversionError) -> SwiftType {
     decode(value, in: context)
   }
+}
 
+extension JSValueEncoder {
   public static func tryEncode(
     _ value: SwiftType,
     in context: isolated JSContext

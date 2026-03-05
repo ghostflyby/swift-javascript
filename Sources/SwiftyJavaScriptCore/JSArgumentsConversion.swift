@@ -35,7 +35,7 @@ extension JSArguments {
 
   }
 
-  public func unpack<C: JSValueConverter>(
+  public func unpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
     in context: isolated JSContext = #isolation
@@ -45,7 +45,7 @@ extension JSArguments {
     }
   }
 
-  public func tryUnpack<C: JSValueConverter>(
+  public func tryUnpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
     in context: isolated JSContext = #isolation
@@ -62,7 +62,7 @@ extension JSArguments {
     return try converter.tryDecode(value, in: context)
   }
 
-  public func unpack<each C: JSValueConverter>(
+  public func unpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
     in context: isolated JSContext = #isolation
   ) -> (repeat (each C).SwiftType) {
@@ -81,7 +81,7 @@ extension JSArguments {
       (repeat (each C).decode(nextJSValue(), in: context))
   }
 
-  public func tryUnpack<each C: JSValueConverter>(
+  public func tryUnpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
     in context: isolated JSContext = #isolation
   ) throws(JSValueConversionError) -> (repeat (each C).SwiftType) {

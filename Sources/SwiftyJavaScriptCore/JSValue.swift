@@ -117,7 +117,7 @@ public struct JSValue: ~Copyable {
     self.init(name: name, callback: callback)
   }
 
-  public init<each C: JSValueConverter, R: JSValueEncodable, E: JSValueEncodable>(
+  public init<each C: JSValueDecoder, R: JSValueEncodable, E: JSValueEncodable>(
     in context: isolated JSContext = #isolation,
     name: String,
     converters: repeat (each C).Type,

@@ -34,7 +34,7 @@ extension JSValue {
     )
   }
 
-  public func setProperty<C: JSValueConverter>(
+  public func setProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
     forKey key: borrowing some JSString,
     using converter: C.Type,
@@ -51,7 +51,7 @@ extension JSValue {
     )
   }
 
-  public func setProperty<C: JSValueConverter>(
+  public func setProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
     forKey key: borrowing JSValue,
     using converter: C.Type,
@@ -68,7 +68,7 @@ extension JSValue {
     )
   }
 
-  public func setProperty<C: JSValueConverter>(
+  public func setProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
     at index: UInt32,
     using converter: C.Type,
@@ -110,7 +110,7 @@ extension JSValue {
     return JSValue(ref: result, ctx: context)
   }
 
-  public func getProperty<C: JSValueConverter>(
+  public func getProperty<C: JSValueDecoder>(
     forKey key: borrowing some JSString,
     using converter: C.Type,
     in context: isolated JSContext = #isolation
@@ -119,7 +119,7 @@ extension JSValue {
     return converter.decode(value, in: context)
   }
 
-  public func getProperty<C: JSValueConverter>(
+  public func getProperty<C: JSValueDecoder>(
     forKey key: borrowing JSValue,
     using converter: C.Type,
     in context: isolated JSContext = #isolation
@@ -128,7 +128,7 @@ extension JSValue {
     return converter.decode(value, in: context)
   }
 
-  public func getProperty<C: JSValueConverter>(
+  public func getProperty<C: JSValueDecoder>(
     at index: UInt32,
     using converter: C.Type,
     in context: isolated JSContext = #isolation
