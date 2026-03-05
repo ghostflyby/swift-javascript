@@ -131,7 +131,6 @@ public struct JSValue: ~Copyable {
     self.init(name: name, callback: callback)
   }
 
-
   public init<
     each C: JSValueDecoder,
     RCoder: JSValueEncoder,

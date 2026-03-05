@@ -173,7 +173,6 @@ struct MacroFieldOverrideUser: Equatable {
   }
 }
 
-
 @Test func strictTryDecodeRejectsMismatchedType() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 

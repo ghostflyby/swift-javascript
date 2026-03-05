@@ -1,5 +1,5 @@
-import JavaScriptCore.JSVirtualMachine
 import Dispatch
+import JavaScriptCore.JSVirtualMachine
 
 public class JSVirtualMachine: @unchecked Sendable {
   let peer: JavaScriptCore.JSContextGroupRef

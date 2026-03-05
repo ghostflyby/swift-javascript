@@ -80,7 +80,8 @@ extension JSContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
     let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(script, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    return evaluateScript(
+      script, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
   }
 
   public func evaluateScript<SourceURL>(
@@ -89,7 +90,8 @@ extension JSContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
     let scriptString = JSStringValue(script)
-    return evaluateScript(scriptString, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    return evaluateScript(
+      scriptString, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
   }
 
   public func evaluateScript(
@@ -99,15 +101,18 @@ extension JSContext {
   ) -> JSResult {
     let scriptString = JSStringValue(script)
     let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(scriptString, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    return evaluateScript(
+      scriptString, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
   }
 
   public func evaluateScript<Script, SourceURL>(
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResult where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    evaluateScript(scriptRef: script.ref, sourceURLRef: sourceURL.ref, startingLineNumber: startingLineNumber)
+  ) -> JSResult
+  where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
+    evaluateScript(
+      scriptRef: script.ref, sourceURLRef: sourceURL.ref, startingLineNumber: startingLineNumber)
   }
 
   private func evaluateScript(
