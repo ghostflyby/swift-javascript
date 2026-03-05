@@ -6,9 +6,9 @@
 - [ ] 每完成一条能力立即打勾并补充简要说明
 
 ## 1. JSContext（C API 对齐）
-- [ ] `evaluateScript(_:)`（基于 `JSEvaluateScript`）
-- [ ] `evaluateScript(_:sourceURL:)`（支持 sourceURL）
-- [ ] `evaluateScript` 异常透出（返回/抛错策略定稿并实现）
+- [x] `evaluateScript(_:)`（基于 `JSEvaluateScript`）
+- [x] `evaluateScript(_:sourceURL:)`（支持 sourceURL）
+- [x] `evaluateScript` 异常透出（返回/抛错策略定稿并实现，当前为 `JSResult`）
 - [ ] 全局对象快捷访问（读写封装，不依赖 ObjC 下标）
 
 ## 2. JSValue（核心能力）
@@ -36,7 +36,7 @@
 - [x] `convertToType` 回调接线
 
 ## 5. 测试与稳定性
-- [ ] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
+- [x] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
 - [ ] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
