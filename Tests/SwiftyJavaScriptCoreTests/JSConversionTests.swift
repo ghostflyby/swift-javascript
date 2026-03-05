@@ -51,6 +51,19 @@ enum FailurePayloadEncoder: JSValueEncoder {
   }
 }
 
+struct CodableAddress: Codable, Equatable {
+  let city: String
+  let zip: Int
+}
+
+struct CodableUser: Codable, Equatable {
+  let name: String
+  let age: Int
+  let active: Bool
+  let tags: [String]
+  let address: CodableAddress
+}
+
 @Test func builtinCodableRoundtrip() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
@@ -206,5 +219,34 @@ enum FailurePayloadEncoder: JSValueEncoder {
     case .exception:
       Issue.record("Expected failure path to use error coder")
     }
+  }
+}
+
+@Test func codableConverterRoundtripDirectObjectGraph() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let user = CodableUser(
+      name: "alice",
+      age: 30,
+      active: true,
+      tags: ["swift", "jsc"],
+      address: CodableAddress(city: "shanghai", zip: 200000)
+    )
+
+    global.setProperty(
+      user,
+      forKey: JSStringManaged("user"),
+      using: JSCodableValueConverter<CodableUser>.self,
+      in: context
+    )
+
+    let decoded: CodableUser = global.getProperty(
+      forKey: JSStringManaged("user"),
+      using: JSCodableValueConverter<CodableUser>.self,
+      in: context
+    )
+
+    #expect(decoded == user)
   }
 }

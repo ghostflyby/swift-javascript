@@ -5,6 +5,7 @@ public enum JSValueConversionError: Error {
   case nonFiniteNumber(target: String)
   case outOfRange(target: String, value: Double)
   case nonInteger(target: String, value: Double)
+  case codable(String)
 }
 
 public protocol JSValueDecodable: ~Copyable {
