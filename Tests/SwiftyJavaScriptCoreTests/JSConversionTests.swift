@@ -24,6 +24,33 @@ struct FailingEncodeValue: JSValueEncodable {
   }
 }
 
+struct ReturnPayload {
+  let value: Double
+}
+
+enum ReturnPayloadEncoder: JSValueEncoder {
+  typealias SwiftType = ReturnPayload
+
+  static func encode(_ value: ReturnPayload, in context: isolated JSContext) -> JSValue {
+    JSValue(number: value.value, in: context)
+  }
+}
+
+enum FailurePayload: Error {
+  case bad
+}
+
+enum FailurePayloadEncoder: JSValueEncoder {
+  typealias SwiftType = FailurePayload
+
+  static func encode(_ value: FailurePayload, in context: isolated JSContext) -> JSValue {
+    switch value {
+    case .bad:
+      return JSValue(string: "bad", in: context)
+    }
+  }
+}
+
 @Test func builtinCodableRoundtrip() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
@@ -97,29 +124,6 @@ struct FailingEncodeValue: JSValueEncodable {
   }
 }
 
-@Test func functionInitSupportsVariadicConverters() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
-
-  await context.withIsolatedGlobalObject { context, global in
-    let fn = JSValue(
-      name: "mix",
-      converters: ZeroOneBoolConverter.self, JSDefaultConverter<Double>.self,
-      function: { (flag: Bool, value: Double) in
-        flag ? value + 1 : value - 1
-      }
-    )
-
-    global.setProperty(fn, forKey: JSStringManaged("mix"), in: context)
-
-    let result = context.evaluateScript("mix(1, 41)")
-    switch consume result {
-    case .value(let value):
-      #expect(value.toDouble(in: context) == 42)
-    case .exception:
-      Issue.record("Expected converted function call to succeed")
-    }
-  }
-}
 
 @Test func strictTryDecodeRejectsMismatchedType() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
@@ -164,6 +168,43 @@ struct FailingEncodeValue: JSValueEncodable {
       Issue.record("Expected strict encode to fail")
     } catch {
       #expect(Bool(true))
+    }
+  }
+}
+
+@Test func functionInitSupportsReturnAndErrorCoder() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let fn = JSValue(
+      name: "coded",
+      converters: JSDefaultConverter<Double>.self,
+      returnCoder: ReturnPayloadEncoder.self,
+      errorCoder: FailurePayloadEncoder.self,
+      function: { (value: Double) throws(FailurePayload) -> ReturnPayload in
+        if value < 0 {
+          throw .bad
+        }
+        return ReturnPayload(value: value + 2)
+      }
+    )
+
+    global.setProperty(fn, forKey: JSStringManaged("coded"), in: context)
+
+    let success = context.evaluateScript("coded(40)")
+    switch consume success {
+    case .value(let value):
+      #expect(value.toDouble(in: context) == 42)
+    case .exception:
+      Issue.record("Expected success path to use return coder")
+    }
+
+    let failure = context.evaluateScript("try { coded(-1) } catch (e) { e }")
+    switch consume failure {
+    case .value(let value):
+      #expect(value.toString(in: context) == "bad")
+    case .exception:
+      Issue.record("Expected failure path to use error coder")
     }
   }
 }

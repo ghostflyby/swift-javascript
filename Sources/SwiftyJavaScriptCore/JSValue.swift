@@ -6,6 +6,15 @@
 //
 import JavaScriptCore
 
+@inline(__always)
+func countTypePack<each T>(_ types: repeat (each T).Type) -> Int {
+  var count = 0
+  for _ in repeat each types {
+    count += 1
+  }
+  return count
+}
+
 public struct JSValue: ~Copyable {
   let ref: JSValueRef
   let ctx: JSContextRef
@@ -95,7 +104,7 @@ public struct JSValue: ~Copyable {
     function: @escaping @Sendable (repeat each A) throws(E) -> R
   ) {
     let swiftFunction = function
-    let count = Mirror(reflecting: (repeat (each A).self)).children.count
+    let count = countTypePack(repeat (each A).self)
     let callback: JSFunctionCallback = { context, function, this, arguments in
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
@@ -117,14 +126,23 @@ public struct JSValue: ~Copyable {
     self.init(name: name, callback: callback)
   }
 
-  public init<each C: JSValueDecoder, R: JSValueEncodable, E: JSValueEncodable>(
+
+  public init<
+    each C: JSValueDecoder,
+    R,
+    E,
+    RCoder: JSValueEncoder,
+    ECoder: JSValueEncoder
+  >(
     in context: isolated JSContext = #isolation,
     name: String,
     converters: repeat (each C).Type,
+    returnCoder: RCoder.Type,
+    errorCoder: ECoder.Type,
     function: @escaping @Sendable (repeat (each C).SwiftType) throws(E) -> R
-  ) {
+  ) where RCoder.SwiftType == R, ECoder.SwiftType == E {
     let swiftFunction = function
-    let count = Mirror(reflecting: (repeat (each C).self)).children.count
+    let count = countTypePack(repeat (each C).self)
     let callback: JSFunctionCallback = { context, function, this, arguments in
       guard arguments.count == count else {
         return JSResult.value(JSValue(undefinedIn: context))
@@ -135,10 +153,10 @@ public struct JSValue: ~Copyable {
           in: context
         )
         let r: R = try swiftFunction(repeat each typedArgs)
-        let encoded = try r.tryEncode(in: context)
+        let encoded = try RCoder.tryEncode(r, in: context)
         return JSResult.value(encoded)
       } catch let error as E {
-        if let encoded = try? error.tryEncode(in: context) {
+        if let encoded = try? ECoder.tryEncode(error, in: context) {
           return JSResult.exception(encoded)
         }
         return JSResult.exception(JSValue(undefinedIn: context))
