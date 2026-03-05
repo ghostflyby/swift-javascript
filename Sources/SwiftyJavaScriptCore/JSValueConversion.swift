@@ -9,7 +9,6 @@ public protocol JSValueEncodable: ~Copyable {
 }
 
 public typealias JSValueCodable = JSValueDecodable & JSValueEncodable
-public typealias JSValueMarshal = JSValueCodable
 
 public protocol JSValueConverter {
   associatedtype SwiftType

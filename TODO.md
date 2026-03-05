@@ -44,6 +44,6 @@
 - [x] `swift test` 在本地环境稳定通过（已验证：27/27 通过）
 
 ## 6. 类型转换体系
-- [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）并兼容现有 `JSValueMarshal`
+- [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
 - [x] 调用点覆盖转换（属性读写与函数参数读取）
 - [x] 为后续宏自动实现预留统一转换器模型

@@ -11,7 +11,7 @@ extension JSContext {
   }
 }
 
-struct TestNumberMarshal: Sendable, JSValueMarshal {
+struct TestNumberMarshal: Sendable, JSValueCodable {
   let value: Double
 
   init(_ value: Double) {
@@ -27,7 +27,7 @@ struct TestNumberMarshal: Sendable, JSValueMarshal {
   }
 }
 
-struct TestStringMarshal: Sendable, JSValueMarshal, Error {
+struct TestStringMarshal: Sendable, JSValueCodable, Error {
   let value: String
 
   init(_ value: String) {
@@ -43,7 +43,7 @@ struct TestStringMarshal: Sendable, JSValueMarshal, Error {
   }
 }
 
-struct TestBoolMarshal: Sendable, JSValueMarshal {
+struct TestBoolMarshal: Sendable, JSValueCodable {
   let value: Bool
 
   init(_ value: Bool) {
