@@ -101,7 +101,7 @@ public struct JSClassDefinition: Sendable {
       nil
 }
 
-private final class JSNativeClassBacking {
+final class JSManualNativeClassBacking {
   var className: ContiguousArray<CChar>? = nil
   var staticValueNames: [ContiguousArray<CChar>] = []
   var staticValues: [JavaScriptCore.JSStaticValue] = []
@@ -135,6 +135,83 @@ private final class JSClassObjectContextRegistry: @unchecked Sendable {
 
 private let classObjectContextRegistry = JSClassObjectContextRegistry()
 
+private final class JSClassDefinitionRegistry: @unchecked Sendable {
+  private let lock = NSLock()
+  private var map: [UInt: JSClassDefinition] = [:]
+
+  func set(_ jsClass: JSClassRef, definition: JSClassDefinition) {
+    lock.lock()
+    map[classKey(jsClass)] = definition
+    lock.unlock()
+  }
+
+  func get(_ jsClass: JSClassRef) -> JSClassDefinition? {
+    lock.lock()
+    let value = map[classKey(jsClass)]
+    lock.unlock()
+    return value
+  }
+}
+
+private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
+  private let lock = NSLock()
+  private var map: [UInt: (definition: JSClassDefinition, depth: Int)] = [:]
+
+  func set(_ object: JSObjectRef, definition: JSClassDefinition, depth: Int) {
+    lock.lock()
+    let key = classObjectKey(object)
+    if let current = map[key], current.depth > depth {
+      lock.unlock()
+      return
+    }
+    map[key] = (definition, depth)
+    lock.unlock()
+  }
+
+  func get(_ object: JSObjectRef) -> JSClassDefinition? {
+    lock.lock()
+    let value = map[classObjectKey(object)]?.definition
+    lock.unlock()
+    return value
+  }
+
+  func remove(_ object: JSObjectRef) {
+    lock.lock()
+    map.removeValue(forKey: classObjectKey(object))
+    lock.unlock()
+  }
+}
+
+private final class JSClassObjectFinalizeCounterRegistry: @unchecked Sendable {
+  private let lock = NSLock()
+  private var map: [UInt: Int] = [:]
+
+  func setMax(_ object: JSObjectRef, count: Int) {
+    lock.lock()
+    let key = classObjectKey(object)
+    map[key] = max(count, map[key] ?? 0)
+    lock.unlock()
+  }
+
+  func decrement(_ object: JSObjectRef) -> Int {
+    lock.lock()
+    let key = classObjectKey(object)
+    let current = map[key] ?? 1
+    let next = current - 1
+    if next <= 0 {
+      map.removeValue(forKey: key)
+    } else {
+      map[key] = next
+    }
+    lock.unlock()
+    return next
+  }
+}
+
+private let classDefinitionRegistry = JSClassDefinitionRegistry()
+private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
+private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
+
 private func withJSArguments<R>(
   _ arguments: UnsafePointer<JSValueRef?>?,
   count: Int,
@@ -153,23 +230,110 @@ private func classObjectKey(_ object: JSObjectRef) -> UInt {
   UInt(bitPattern: object)
 }
 
-private func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
+private func classKey(_ jsClass: JSClassRef) -> UInt {
+  UInt(bitPattern: jsClass)
+}
+
+func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
   classObjectContextRegistry.set(object, context: ctx)
 }
 
-private func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
+func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
   classObjectContextRegistry.get(object)
 }
 
-private func removeClassObjectContext(_ object: JSObjectRef) {
+func removeClassObjectContext(_ object: JSObjectRef) {
   classObjectContextRegistry.remove(object)
 }
 
 private func classDefinition(from object: JSObjectRef) -> JSClassDefinition? {
-  guard let pointer = JSObjectGetPrivate(object) else {
+  classObjectDefinitionRegistry.get(object)
+}
+
+func classDefinition(for jsClass: JSClassRef) -> JSClassDefinition? {
+  classDefinitionRegistry.get(jsClass)
+}
+
+private func definitionDepth(_ definition: JSClassDefinition) -> Int {
+  guard let parentClass = definition.parentClass,
+    let parentDefinition = classDefinition(for: parentClass.ref)
+  else {
+    return 1
+  }
+  return 1 + definitionDepth(parentDefinition)
+}
+
+func rememberClassObjectDefinition(_ object: JSObjectRef, definition: JSClassDefinition) {
+  classObjectDefinitionRegistry.set(
+    object, definition: definition, depth: definitionDepth(definition))
+}
+
+func exportedDefinitionCount(_ definition: JSClassDefinition) -> Int {
+  guard let parentClass = definition.parentClass,
+    let parentDefinition = classDefinition(for: parentClass.ref)
+  else {
+    return 1
+  }
+  return 1 + exportedDefinitionCount(parentDefinition)
+}
+
+func rememberClassObjectFinalizeCount(_ object: JSObjectRef, definition: JSClassDefinition) {
+  classObjectFinalizeCounterRegistry.setMax(object, count: exportedDefinitionCount(definition))
+}
+
+private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
+  classObjectFinalizeCounterRegistry.decrement(object)
+}
+
+private func rememberClassDefinition(_ definition: JSClassDefinition, for jsClass: JSClassRef) {
+  classDefinitionRegistry.set(jsClass, definition: definition)
+}
+
+func inheritedStaticValue(named name: String, from definition: JSClassDefinition)
+  -> JSStaticValue?
+{
+  if let value = definition.staticValues.first(where: { $0.name == name }) {
+    return value
+  }
+  guard let parentClass = definition.parentClass,
+    let parentDefinition = classDefinition(for: parentClass.ref)
+  else {
     return nil
   }
-  return Unmanaged<Box<JSClassDefinition>>.fromOpaque(pointer).takeUnretainedValue().value
+  return inheritedStaticValue(named: name, from: parentDefinition)
+}
+
+func inheritedStaticFunction(named name: String, from definition: JSClassDefinition)
+  -> JSStaticFunction?
+{
+  if let function = definition.staticFunctions.first(where: { $0.name == name }) {
+    return function
+  }
+  guard let parentClass = definition.parentClass,
+    let parentDefinition = classDefinition(for: parentClass.ref)
+  else {
+    return nil
+  }
+  return inheritedStaticFunction(named: name, from: parentDefinition)
+}
+
+private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
+  guard let ctx, let object else {
+    return
+  }
+
+  rememberClassObjectContext(ctx, object)
+}
+
+private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
+  guard let object else {
+    return
+  }
+
+  if finalizeCountAfterDecrement(object) <= 0 {
+    classObjectDefinitionRegistry.remove(object)
+    removeClassObjectContext(object)
+  }
 }
 
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
@@ -182,7 +346,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   rememberClassObjectContext(ctx, object)
 
   let name = String(jsStringRef: propertyName)
-  guard let valueDef = definition.staticValues.first(where: { $0.name == name }) else {
+  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
     return JSValueMakeUndefined(ctx)
   }
 
@@ -208,7 +372,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   rememberClassObjectContext(ctx, object)
 
   let name = String(jsStringRef: propertyName)
-  guard let valueDef = definition.staticValues.first(where: { $0.name == name }) else {
+  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
     return false
   }
 
@@ -248,7 +412,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
   }
 
   guard let functionName,
-    let functionDef = definition.staticFunctions.first(where: { $0.name == functionName })
+    let functionDef = inheritedStaticFunction(named: functionName, from: definition)
   else {
     return JSValueMakeUndefined(ctx)
   }
@@ -272,7 +436,9 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
 
 extension JSClassDefinition {
 
-  fileprivate func toNative(backing: JSNativeClassBacking) -> JavaScriptCore.JSClassDefinition {
+  fileprivate func manualNativeDefinition(backing: JSManualNativeClassBacking)
+    -> JavaScriptCore.JSClassDefinition
+  {
     var cls = JavaScriptCore.kJSClassDefinitionEmpty
 
     cls.version = version
@@ -325,41 +491,8 @@ extension JSClassDefinition {
       }
     }
 
-    if initialize != nil || finalize != nil {
-      cls.initialize = { ctx, object in
-        guard let ctx, let object,
-          let type = classDefinition(from: object)
-        else {
-          return
-        }
-        rememberClassObjectContext(ctx, object)
-        guard let initialize = type.initialize else {
-          return
-        }
-        let context = JSCallbackContext(ctx: ctx)
-        let this = JSValue(ref: object, ctx: context)
-        initialize(this, context)
-      }
-    }
-
-    if finalize != nil {
-      cls.finalize = { object in
-        guard let object,
-          let type = classDefinition(from: object),
-          let finalize = type.finalize,
-          let objectContext = classObjectContext(object)
-        else {
-          if let object {
-            removeClassObjectContext(object)
-          }
-          return
-        }
-        let context = JSCallbackContext(ctx: objectContext)
-        let this = JSValue(ref: object, ctx: context)
-        finalize(this)
-        removeClassObjectContext(object)
-      }
-    }
+    cls.initialize = classInitializeCallback
+    cls.finalize = classFinalizeCallback
 
     if getProperty != nil {
       cls.getProperty = { ctx, object, propertyName, exception in
@@ -585,7 +718,7 @@ extension JSContext {
 
 public class JSClass: @unchecked Sendable {
   public let ref: JSClassRef
-  private let nativeBacking: JSNativeClassBacking?
+  private let nativeBacking: AnyObject?
 
   public init(ref: JSClassRef) {
     self.ref = JSClassRetain(ref)
@@ -593,10 +726,24 @@ public class JSClass: @unchecked Sendable {
   }
 
   public init(defination: JSClassDefinition) {
-    let backing = JSNativeClassBacking()
-    var copy = defination.toNative(backing: backing)
+    let backing = JSManualNativeClassBacking()
+    var copy = defination.manualNativeDefinition(backing: backing)
     self.ref = JSClassCreate(&copy)
     self.nativeBacking = backing
+    rememberClassDefinition(defination, for: ref)
+  }
+
+  init(
+    nativeDefinition: JavaScriptCore.JSClassDefinition,
+    retainedBacking: AnyObject?,
+    rememberedDefinition: JSClassDefinition? = nil
+  ) {
+    var copy = nativeDefinition
+    self.ref = JSClassCreate(&copy)
+    self.nativeBacking = retainedBacking
+    if let rememberedDefinition {
+      rememberClassDefinition(rememberedDefinition, for: ref)
+    }
   }
 
   deinit {

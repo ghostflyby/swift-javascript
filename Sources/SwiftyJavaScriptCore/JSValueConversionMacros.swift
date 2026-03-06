@@ -75,3 +75,14 @@ public macro JSValueFieldEncoding(_ encoder: any JSValueEncoder.Type) =
     module: "SwiftyJavaScriptCoreMacrosPlugin",
     type: "JSValueFieldMarkerMacro"
   )
+
+@attached(member, names: named(jsClassDefinition))
+@attached(
+  extension,
+  conformances: JSClassValueConvertible
+)
+public macro JSClassAutoConvertible() =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSClassAutoConvertibleMacro"
+  )

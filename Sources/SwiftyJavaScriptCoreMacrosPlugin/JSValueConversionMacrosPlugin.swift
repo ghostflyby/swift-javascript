@@ -11,6 +11,7 @@ private struct MacroUsageError: Error, CustomStringConvertible {
 private struct PropertyPlan {
   let name: String
   let typeName: String
+  let isMutable: Bool
   let decoderOverride: String?
   let encoderOverride: String?
 }
@@ -81,10 +82,10 @@ private func parseFieldOverrides(from attributes: AttributeListSyntax?) -> (
   return (decoder, encoder)
 }
 
-private func collectStoredProperties(from decl: StructDeclSyntax) -> [PropertyPlan] {
+private func collectStoredProperties(from members: MemberBlockItemListSyntax) -> [PropertyPlan] {
   var plans: [PropertyPlan] = []
 
-  for member in decl.memberBlock.members {
+  for member in members {
     guard let variable = member.decl.as(VariableDeclSyntax.self) else {
       continue
     }
@@ -109,6 +110,7 @@ private func collectStoredProperties(from decl: StructDeclSyntax) -> [PropertyPl
         PropertyPlan(
           name: pattern.identifier.text,
           typeName: trimmed(typeAnnotation.type.description),
+          isMutable: variable.bindingSpecifier.tokenKind == .keyword(.var),
           decoderOverride: overrides.decoder,
           encoderOverride: overrides.encoder
         ))
@@ -116,6 +118,16 @@ private func collectStoredProperties(from decl: StructDeclSyntax) -> [PropertyPl
   }
 
   return plans
+}
+
+private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
+  guard let inheritanceClause = decl.inheritanceClause,
+    let inheritedType = inheritanceClause.inheritedTypes.first
+  else {
+    return nil
+  }
+
+  return trimmed(inheritedType.type.description)
 }
 
 public struct JSValueAutoConvertibleMacro: ExtensionMacro {
@@ -131,7 +143,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     }
 
     let typeName = trimmed(type.description)
-    let properties = collectStoredProperties(from: structDecl)
+    let properties = collectStoredProperties(from: structDecl.memberBlock.members)
     let arguments = parseTypeArguments(from: node)
 
     let sharedDecoder: String?
@@ -248,6 +260,161 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
   }
 }
 
+public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
+  public static func expansion(
+    of _: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in _: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let classDecl = declaration.as(ClassDeclSyntax.self) else {
+      throw MacroUsageError(description: "@JSClassAutoConvertible supports class only")
+    }
+
+    let properties = collectStoredProperties(from: classDecl.memberBlock.members)
+    let inheritedClass = inheritedClassName(from: classDecl)
+
+    let declarationModifier = inheritedClass == nil ? "public class" : "public override class"
+
+    let parentClassSetup: String
+    let parentHasPropertyFallback: String
+    let parentGetPropertyFallback: String
+    let parentSetPropertyFallback: String
+
+    if let inheritedClass {
+      parentClassSetup = """
+        definition.parentClass = \(inheritedClass).jsClass
+        """
+      parentHasPropertyFallback = """
+              return \(inheritedClass).jsClassDefinition.hasProperty?(context, this, property) ?? false
+        """
+      parentGetPropertyFallback = """
+              return \(inheritedClass).jsClassDefinition.getProperty?(context, this, property)
+                ?? .value(JSValue(undefinedIn: context))
+        """
+      parentSetPropertyFallback = """
+              return \(inheritedClass).jsClassDefinition.setProperty?(context, this, property, value)
+        """
+    } else {
+      parentClassSetup = ""
+      parentHasPropertyFallback = "              return false"
+      parentGetPropertyFallback = "              return .value(JSValue(undefinedIn: context))"
+      parentSetPropertyFallback = "              return nil"
+    }
+
+    let hasPropertyCases = properties.map { "case \"\($0.name)\": return true" }
+      .joined(separator: "\n")
+
+    let getPropertyCases = properties.map { property in
+      let encodeLine: String
+      if let encoder = property.encoderOverride {
+        encodeLine =
+          "return .value((try? \(encoder).tryEncode(instance.\(property.name), in: context)) ?? JSValue(undefinedIn: context))"
+      } else {
+        encodeLine =
+          "return .value((try? instance.\(property.name).tryEncode(in: context)) ?? JSValue(undefinedIn: context))"
+      }
+
+      return """
+            case \"\(property.name)\":
+              \(encodeLine)
+        """
+    }.joined(separator: "\n")
+
+    let setPropertyCases = properties.map { property in
+      if !property.isMutable {
+        return """
+            case \"\(property.name)\":
+              return nil
+          """
+      }
+
+      let decodeLine: String
+      if let decoder = property.decoderOverride {
+        decodeLine = "instance.\(property.name) = try \(decoder).tryDecode(value, in: context)"
+      } else {
+        decodeLine =
+          "instance.\(property.name) = try \(property.typeName).tryDecode(value, in: context)"
+      }
+
+      return """
+          case \"\(property.name)\":
+            do {
+              \(decodeLine)
+              return nil
+            } catch {
+              return JSValue(string: "\\(error)", in: context)
+            }
+        """
+    }.joined(separator: "\n")
+
+    let propertySource = """
+      \(declarationModifier) var jsClassDefinition: JSClassDefinition {
+        var definition = JSClassDefinition()
+        definition.className = \"\(trimmed(classDecl.name.text))\"
+        \(parentClassSetup)
+        definition.hasProperty = { context, this, property in
+          switch property {
+          \(hasPropertyCases)
+          default:
+        \(parentHasPropertyFallback)
+          }
+        }
+        definition.getProperty = { context, this, property in
+          guard let instance = try? Self.tryDecode(this, in: context) else {
+            return .value(JSValue(undefinedIn: context))
+          }
+          switch property {
+          \(getPropertyCases)
+          default:
+        \(parentGetPropertyFallback)
+          }
+        }
+        definition.setProperty = { context, this, property, value in
+          guard let instance = try? Self.tryDecode(this, in: context) else {
+            return JSValue(string: \"failed to decode \\(Self.self) backing instance\", in: context)
+          }
+          switch property {
+          \(setPropertyCases)
+          default:
+        \(parentSetPropertyFallback)
+          }
+        }
+        return definition
+      }
+      """
+
+    return [DeclSyntax(stringLiteral: propertySource)]
+  }
+
+  public static func expansion(
+    of _: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo _: [TypeSyntax],
+    in _: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    guard let classDecl = declaration.as(ClassDeclSyntax.self) else {
+      throw MacroUsageError(description: "@JSClassAutoConvertible supports class only")
+    }
+
+    guard inheritedClassName(from: classDecl) == nil else {
+      return []
+    }
+
+    let extSource = """
+      extension \(trimmed(type.description)): JSClassValueConvertible {}
+      """
+
+    let extDecl = DeclSyntax(stringLiteral: extSource)
+    guard let ext = extDecl.as(ExtensionDeclSyntax.self) else {
+      throw MacroUsageError(
+        description: "failed to build JSClass extension for \(trimmed(type.description))")
+    }
+
+    return [ext]
+  }
+}
+
 public struct JSValueFieldMarkerMacro: PeerMacro {
   public static func expansion(
     of _: AttributeSyntax,
@@ -262,6 +429,7 @@ public struct JSValueFieldMarkerMacro: PeerMacro {
 struct SwiftyJavaScriptCoreMacrosPlugin: CompilerPlugin {
   let providingMacros: [Macro.Type] = [
     JSValueAutoConvertibleMacro.self,
+    JSClassAutoConvertibleMacro.self,
     JSValueFieldMarkerMacro.self,
   ]
 }
