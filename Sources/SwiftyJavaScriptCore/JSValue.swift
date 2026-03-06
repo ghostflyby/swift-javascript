@@ -277,3 +277,404 @@ extension JSValue {
     return !(lhs === rhs)
   }
 }
+
+extension JSValue {
+  @inline(__always)
+  private static func result(
+    value resultRef: JSValueRef?,
+    exception exceptionRef: JSValueRef?,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    if let exceptionRef {
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    }
+
+    if let resultRef {
+      return .value(JSValue(ref: resultRef, ctx: context))
+    }
+
+    return .value(JSValue(undefinedIn: context))
+  }
+
+  @inline(__always)
+  private func objectRef(in context: borrowing JSCallbackContext) -> JSPrivateResult {
+    var exception: JSValueRef?
+    guard let objectRef = JSValueToObject(context.globalContextRef, self.ref, &exception) else {
+      let exceptionValue = exception ?? JSValue(undefinedIn: context).retainedRef()
+      return .exception(exceptionValue)
+    }
+    return .value(objectRef)
+  }
+
+  @inline(__always)
+  private func callInternal(
+    thisObjectRef: JSObjectRef?,
+    argumentRefs: [JSValueRef?],
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    switch objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let functionRef):
+      var exception: JSValueRef?
+      let resultRef = argumentRefs.withUnsafeBufferPointer { buffer in
+        JSObjectCallAsFunction(
+          context.globalContextRef,
+          functionRef,
+          thisObjectRef,
+          buffer.count,
+          buffer.baseAddress,
+          &exception
+        )
+      }
+      return Self.result(value: resultRef, exception: exception, in: context)
+    }
+  }
+
+  @inline(__always)
+  private func constructInternal(
+    argumentRefs: [JSValueRef?],
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    switch objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let constructorRef):
+      var exception: JSValueRef?
+      let resultRef = argumentRefs.withUnsafeBufferPointer { buffer in
+        JSObjectCallAsConstructor(
+          context.globalContextRef,
+          constructorRef,
+          buffer.count,
+          buffer.baseAddress,
+          &exception
+        )
+      }
+
+      if let exception {
+        return .exception(JSValue(ref: exception, ctx: context))
+      }
+
+      if let resultRef {
+        return .value(JSValue(ref: resultRef, ctx: context))
+      }
+
+      return .value(JSValue(undefinedIn: context))
+    }
+  }
+
+  @inline(__always)
+  private func encodedArgumentRefs<each A: JSValueEncodable>(
+    _ arguments: repeat each A,
+    in context: borrowing JSCallbackContext
+  ) -> [JSValueRef?] {
+    var refs: [JSValueRef?] = []
+    refs.reserveCapacity(countTypePack(repeat (each A).self))
+
+    func appendArgument<T: JSValueEncodable>(_ argument: T) {
+      let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+      refs.append(encoded.retainedRef())
+    }
+
+    repeat appendArgument(each arguments)
+    return refs
+  }
+
+  public func call(in context: isolated JSContext = #isolation) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      call(in: callbackContext)
+    }
+  }
+
+  public func call(in context: borrowing JSCallbackContext) -> JSResult {
+    callInternal(thisObjectRef: nil, argumentRefs: [], in: context)
+  }
+
+  public func call<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      call(arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func call<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    callInternal(
+      thisObjectRef: nil,
+      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
+      in: context
+    )
+  }
+
+  public func call(
+    this thisValue: borrowing JSValue,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      call(this: thisValue, in: callbackContext)
+    }
+  }
+
+  public func call(
+    this thisValue: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    switch thisValue.objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let thisObjectRef):
+      return callInternal(
+        thisObjectRef: thisObjectRef,
+        argumentRefs: [],
+        in: context
+      )
+    }
+  }
+
+  public func call<each A: JSValueEncodable>(
+    this thisValue: borrowing JSValue,
+    arguments: repeat each A,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func call<each A: JSValueEncodable>(
+    this thisValue: borrowing JSValue,
+    arguments: repeat each A,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    switch thisValue.objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let thisObjectRef):
+      return callInternal(
+        thisObjectRef: thisObjectRef,
+        argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
+        in: context
+      )
+    }
+  }
+
+  public func construct(in context: isolated JSContext = #isolation) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      construct(in: callbackContext)
+    }
+  }
+
+  public func construct(in context: borrowing JSCallbackContext) -> JSResult {
+    constructInternal(argumentRefs: [], in: context)
+  }
+
+  public func construct<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      construct(arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func construct<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    constructInternal(
+      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
+      in: context
+    )
+  }
+
+  public func invokeMethod<Name: JSString>(
+    _ name: borrowing Name,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult where Name: ~Copyable {
+    context.withCallbackContext { callbackContext in
+      invokeMethod(name, in: callbackContext)
+    }
+  }
+
+  public func invokeMethod<Name: JSString>(
+    _ name: borrowing Name,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult where Name: ~Copyable {
+    invokeMethodInternal(name.ref, argumentRefs: [], in: context)
+  }
+
+  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
+    _ name: borrowing Name,
+    arguments: repeat each A,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult where Name: ~Copyable {
+    context.withCallbackContext { callbackContext in
+      invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
+    _ name: borrowing Name,
+    arguments: repeat each A,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult where Name: ~Copyable {
+    invokeMethodInternal(
+      name.ref,
+      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
+      in: context
+    )
+  }
+
+  private func invokeMethodInternal(
+    _ nameRef: JSStringRef,
+    argumentRefs: [JSValueRef?],
+    in context: borrowing JSCallbackContext
+  ) -> JSResult {
+    switch objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let objectValueRef):
+      let objectRef = objectValueRef
+      var exception: JSValueRef?
+      guard
+        let methodRef = JSObjectGetProperty(
+          context.globalContextRef,
+          objectRef,
+          nameRef,
+          &exception
+        )
+      else {
+        return Self.result(value: nil, exception: exception, in: context)
+      }
+
+      if let exception {
+        return .exception(JSValue(ref: exception, ctx: context))
+      }
+
+      let method = JSValue(ref: methodRef, ctx: context)
+      return method.callInternal(thisObjectRef: objectRef, argumentRefs: argumentRefs, in: context)
+    }
+  }
+
+  public func toNumber(in context: isolated JSContext = #isolation) -> Double {
+    toDouble(in: context)
+  }
+
+  public func toNumber(in context: borrowing JSCallbackContext) -> Double {
+    toDouble(in: context)
+  }
+
+  public func toObject(in context: isolated JSContext = #isolation) -> JSResult {
+    context.withCallbackContext { callbackContext in
+      toObject(in: callbackContext)
+    }
+  }
+
+  public func toObject(in context: borrowing JSCallbackContext) -> JSResult {
+    switch objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let objectRef):
+      return .value(JSValue(ref: objectRef, ctx: context))
+    }
+  }
+
+  public func isArray(in context: isolated JSContext = #isolation) -> Bool {
+    context.withCallbackContext { callbackContext in
+      isArray(in: callbackContext)
+    }
+  }
+
+  public func isArray(in context: borrowing JSCallbackContext) -> Bool {
+    JSValueIsArray(context.globalContextRef, ref)
+  }
+
+  public func isDate(in context: isolated JSContext = #isolation) -> Bool {
+    context.withCallbackContext { callbackContext in
+      isDate(in: callbackContext)
+    }
+  }
+
+  public func isDate(in context: borrowing JSCallbackContext) -> Bool {
+    JSValueIsDate(context.globalContextRef, ref)
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing JSValue,
+    in context: isolated JSContext = #isolation
+  ) -> Bool {
+    context.withCallbackContext { callbackContext in
+      isInstanceOf(constructor, in: callbackContext)
+    }
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) -> Bool {
+    switch constructor.objectRef(in: context) {
+    case .exception:
+      return false
+    case .value(let constructorRef):
+      var exception: JSValueRef?
+      let result = JSValueIsInstanceOfConstructor(
+        context.globalContextRef,
+        ref,
+        constructorRef,
+        &exception
+      )
+      return exception == nil && result
+    }
+  }
+
+  public func defineProperty<Val, Key>(
+    _ value: borrowing Val,
+    forKey key: borrowing Key,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+    context.withCallbackContext { callbackContext in
+      defineProperty(value, forKey: key, with: attributes, in: callbackContext)
+    }
+  }
+
+  public func defineProperty<Val, Key>(
+    _ value: borrowing Val,
+    forKey key: borrowing Key,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSCallbackContext
+  ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+    switch objectRef(in: context) {
+    case .exception(let exceptionRef):
+      return .exception(JSValue(ref: exceptionRef, ctx: context))
+    case .value(let objectValueRef):
+      var exception: JSValueRef?
+      let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+      JSObjectSetProperty(
+        context.globalContextRef,
+        objectValueRef,
+        key.ref,
+        encoded.retainedRef(),
+        attributes.rawValue,
+        &exception
+      )
+
+      if let exception {
+        return .exception(JSValue(ref: exception, ctx: context))
+      }
+
+      let storedRef = JSObjectGetProperty(
+        context.globalContextRef,
+        objectValueRef,
+        key.ref,
+        nil
+      )
+      return .value(
+        JSValue(ref: storedRef ?? JSValueMakeUndefined(context.globalContextRef), ctx: context))
+    }
+  }
+}

@@ -12,13 +12,13 @@
 - [x] 全局对象快捷访问（`withGlobalObject` / `withIsolatedGlobalObject`）
 
 ## 2. JSValue（核心能力）
-- [ ] 函数调用封装 `call(this:arguments:)`
-- [ ] 构造调用封装 `construct(arguments:)`
-- [ ] 方法调用封装 `invokeMethod(_:arguments:)`
+- [x] 函数调用封装 `call(this:arguments:)`
+- [x] 构造调用封装 `construct(arguments:)`
+- [x] 方法调用封装 `invokeMethod(_:arguments:)`
 - [x] 基础转换：`toBool` / `toDouble` / `toInt32` / `toUInt32`
-- [ ] 扩展转换：`toString` / `toNumber` / `toObject`（已完成 `toString`）
-- [ ] 类型辅助：`isArray` / `isDate` / `isInstanceOf`
-- [ ] 属性定义封装：`defineProperty`
+- [x] 扩展转换：`toString` / `toNumber` / `toObject`
+- [x] 类型辅助：`isArray` / `isDate` / `isInstanceOf`
+- [x] 属性定义封装：`defineProperty`（基于 `JSObjectSetProperty` + attributes 语义封装）
 
 ## 3. 对象与类型化内存（C API）
 - [ ] ArrayBuffer 封装（创建、长度、字节指针）
@@ -37,11 +37,11 @@
 
 ## 5. 测试与稳定性
 - [x] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
-- [x] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例（新增转换体系与覆盖转换用例）
+- [x] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例（补充 call/construct/invokeMethod/toObject/type helpers/defineProperty 覆盖）
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [x] `swift build --build-tests` 持续绿灯
-- [x] `swift test` 在本地环境稳定通过（已验证：27/27 通过）
+- [x] `swift test` 在本地环境稳定通过（已验证：41/41 通过）
 
 ## 6. 类型转换体系
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）

@@ -350,3 +350,155 @@ struct MacroFieldOverrideUser: Equatable {
     #expect(decoded == MacroFieldOverrideUser(name: "bob", active: false))
   }
 }
+
+@Test func jsValueCallSupportsThisAndArguments() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let functionResult = context.evaluateScript("(function(a, b) { return this.base + a + b })")
+
+    switch consume functionResult {
+    case .value(let function):
+      let thisObject = JSValue(objectIn: context)
+      thisObject.setProperty(10, forKey: JSStringManaged("base"), in: context)
+
+      let callResult = function.call(this: thisObject, arguments: 1, 2, in: context)
+      switch consume callResult {
+      case .value(let value):
+        #expect(value.toDouble(in: context) == 13)
+      case .exception:
+        Issue.record("Expected function.call to succeed")
+      }
+    case .exception:
+      Issue.record("Expected callable function value")
+    }
+  }
+}
+
+@Test func jsValueConstructCreatesObject() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let constructorResult = context.evaluateScript(
+      "(function Person(name) { this.name = name; this.kind = 'person' })"
+    )
+
+    switch consume constructorResult {
+    case .value(let constructor):
+      let constructResult = constructor.construct(arguments: "alice", in: context)
+      switch consume constructResult {
+      case .value(let instance):
+        let isObject = instance.isObject
+        let name = instance.getProperty(forKey: JSStringManaged("name"), in: context).toString(
+          in: context)
+        let kind = instance.getProperty(forKey: JSStringManaged("kind"), in: context).toString(
+          in: context)
+        #expect(isObject)
+        #expect(name == "alice")
+        #expect(kind == "person")
+      case .exception:
+        Issue.record("Expected constructor.construct to succeed")
+      }
+    case .exception:
+      Issue.record("Expected constructor function value")
+    }
+  }
+}
+
+@Test func jsValueInvokeMethodUsesReceiverAndSurfacesErrors() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let objectResult = context.evaluateScript(
+      "({ scale: 4, mul(value) { return this.scale * value } })")
+
+    switch consume objectResult {
+    case .value(let object):
+      let invokeResult = object.invokeMethod(JSStringManaged("mul"), arguments: 5, in: context)
+      switch consume invokeResult {
+      case .value(let value):
+        #expect(value.toDouble(in: context) == 20)
+      case .exception:
+        Issue.record("Expected method invocation to succeed")
+      }
+
+      let missingResult = object.invokeMethod(JSStringManaged("missing"), in: context)
+      switch consume missingResult {
+      case .value:
+        Issue.record("Expected missing method invocation to raise exception")
+      case .exception(let exception):
+        let isObject = exception.isObject
+        #expect(isObject)
+      }
+    case .exception:
+      Issue.record("Expected object literal value")
+    }
+  }
+}
+
+@Test func jsValueObjectAndTypeHelpersWork() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let arrayResult = context.evaluateScript("[1, 2, 3]")
+    let dateResult = context.evaluateScript("new Date(0)")
+    let arrayConstructorResult = context.evaluateScript("Array")
+
+    switch consume arrayResult {
+    case .value(let array):
+      switch consume dateResult {
+      case .value(let date):
+        switch consume arrayConstructorResult {
+        case .value(let arrayConstructor):
+          let arrayIsArray = array.isArray(in: context)
+          let arrayIsDate = array.isDate(in: context)
+          let dateIsDate = date.isDate(in: context)
+          let isArrayInstance = array.isInstanceOf(arrayConstructor, in: context)
+          #expect(arrayIsArray)
+          #expect(!arrayIsDate)
+          #expect(dateIsDate)
+          #expect(isArrayInstance)
+
+          let primitive = JSValue(number: 42, in: context)
+          let objectResult = primitive.toObject(in: context)
+          switch consume objectResult {
+          case .value(let object):
+            let isObject = object.isObject
+            #expect(isObject)
+          case .exception:
+            Issue.record("Expected toObject to box primitive numbers")
+          }
+
+          #expect(primitive.toNumber(in: context) == 42)
+        case .exception:
+          Issue.record("Expected Array constructor value")
+        }
+      case .exception:
+        Issue.record("Expected Date instance value")
+      }
+    case .exception:
+      Issue.record("Expected array value")
+    }
+  }
+}
+
+@Test func jsValueDefinePropertyAppliesAttributes() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let object = JSValue(objectIn: context)
+    let key = JSStringManaged("locked")
+
+    let defineResult = object.defineProperty(7, forKey: key, with: [.readOnly], in: context)
+    switch consume defineResult {
+    case .value(let stored):
+      #expect(stored.toInt32(in: context) == 7)
+    case .exception:
+      Issue.record("Expected defineProperty to succeed")
+    }
+
+    object.setProperty(9, forKey: key, in: context)
+    let stored = object.getProperty(forKey: key, in: context)
+    #expect(stored.toInt32(in: context) == 7)
+  }
+}
