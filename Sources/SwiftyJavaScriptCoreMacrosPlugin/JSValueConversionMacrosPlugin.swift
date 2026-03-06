@@ -208,7 +208,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
 
     let extSource = """
       extension \(typeName): JSValueCodable {
-        public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
+        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -218,12 +218,12 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
 
         public static func tryDecode(
           _ value: borrowing JSValue,
-          in context: isolated JSContext = #isolation
+          in context: borrowing JSCallbackContext
         ) throws(JSValueConversionError) -> Self {
           \(decodeBody)
         }
 
-        public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+        public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
           do {
             return try self.tryEncode(in: context)
           } catch {
@@ -232,7 +232,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
         }
 
         public func tryEncode(
-          in context: isolated JSContext = #isolation
+          in context: borrowing JSCallbackContext
         ) throws(JSValueConversionError) -> JSValue {
           \(encodeBody)
         }

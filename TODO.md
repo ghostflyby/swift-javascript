@@ -47,6 +47,8 @@
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
 - [x] 调用点覆盖转换（属性读写与函数参数读取）
 - [x] 为后续宏自动实现预留统一转换器模型
+- [x] 保留 Callback 协议为底层实现，并由 Actor 版本统一转调（新增 `withCallbackContext` 与默认转调扩展）
+- [x] 删除 Runtime 转换协议，统一由 `JSValue*` 协议声明 CallbackContext 约束并用扩展补 Actor API
 
 ## 7. 宏自动实现（进行中）
 - [x] 为 `JSValueCodable` 增加声明式自动实现宏（类似 Codable 自动合成）

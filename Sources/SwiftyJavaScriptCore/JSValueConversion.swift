@@ -9,14 +9,6 @@ public enum JSValueConversionError: Error {
 }
 
 public protocol JSValueDecodable: ~Copyable {
-  init(value: borrowing JSValue, in context: isolated JSContext)
-  static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext
-  ) throws(JSValueConversionError) -> Self
-}
-
-public protocol JSRuntimeValueDecodable: ~Copyable {
   init(value: borrowing JSValue, in context: borrowing JSCallbackContext)
   static func tryDecode(
     _ value: borrowing JSValue,
@@ -25,63 +17,59 @@ public protocol JSRuntimeValueDecodable: ~Copyable {
 }
 
 extension JSValueDecodable {
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> Self {
-    Self(value: value, in: context)
+  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
+    self = context.withCallbackContext { callbackContext in
+      Self(value: value, in: callbackContext)
+    }
   }
-}
 
-extension JSRuntimeValueDecodable {
   public static func tryDecode(
     _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> Self {
     Self(value: value, in: context)
   }
+
+  public static func tryDecode(
+    _ value: borrowing JSValue,
+    in context: isolated JSContext = #isolation
+  ) throws(JSValueConversionError) -> Self {
+    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+      try Self.tryDecode(value, in: callbackContext)
+    }
+  }
 }
 
 public protocol JSValueEncodable: ~Copyable {
-  func toJSValue(in context: isolated JSContext) -> JSValue
-  func tryEncode(in context: isolated JSContext) throws(JSValueConversionError) -> JSValue
-}
-
-public protocol JSRuntimeValueEncodable: ~Copyable {
   func toJSValue(in context: borrowing JSCallbackContext) -> JSValue
   func tryEncode(in context: borrowing JSCallbackContext) throws(JSValueConversionError) -> JSValue
 }
 
 extension JSValueEncodable {
-  public func tryEncode(
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> JSValue {
-    toJSValue(in: context)
+  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+    context.withCallbackContext { callbackContext in
+      self.toJSValue(in: callbackContext)
+    }
   }
-}
 
-extension JSRuntimeValueEncodable {
   public func tryEncode(
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> JSValue {
     toJSValue(in: context)
   }
+
+  public func tryEncode(
+    in context: isolated JSContext = #isolation
+  ) throws(JSValueConversionError) -> JSValue {
+    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+      try self.tryEncode(in: callbackContext)
+    }
+  }
 }
 
 public typealias JSValueCodable = JSValueDecodable & JSValueEncodable
-public typealias JSRuntimeValueCodable = JSRuntimeValueDecodable & JSRuntimeValueEncodable
 
 public protocol JSValueDecoder {
-  associatedtype SwiftType
-
-  static func decode(_ value: borrowing JSValue, in context: isolated JSContext) -> SwiftType
-  static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext
-  ) throws(JSValueConversionError) -> SwiftType
-}
-
-public protocol JSRuntimeValueDecoder {
   associatedtype SwiftType
 
   static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
@@ -97,87 +85,64 @@ public protocol JSValueEncoder {
 
   static func tryEncode(
     _ value: SwiftType,
-    in context: isolated JSContext
-  ) throws(JSValueConversionError) -> JSValue
-  static func encode(_ value: SwiftType, in context: isolated JSContext) -> JSValue
-}
-
-public protocol JSRuntimeValueEncoder {
-  associatedtype SwiftType
-
-  static func tryEncode(
-    _ value: SwiftType,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> JSValue
   static func encode(_ value: SwiftType, in context: borrowing JSCallbackContext) -> JSValue
 }
 
 public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
-public typealias JSRuntimeValueConverter = JSRuntimeValueDecoder & JSRuntimeValueEncoder
 
 extension JSValueDecoder {
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext
-  ) throws(JSValueConversionError) -> SwiftType {
-    decode(value, in: context)
+  public static func decode(_ value: borrowing JSValue, in context: isolated JSContext)
+    -> SwiftType
+  {
+    context.withCallbackContext { callbackContext in
+      Self.decode(value, in: callbackContext)
+    }
   }
-}
 
-extension JSRuntimeValueDecoder {
   public static func tryDecode(
     _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> SwiftType {
     decode(value, in: context)
+  }
+
+  public static func tryDecode(
+    _ value: borrowing JSValue,
+    in context: isolated JSContext
+  ) throws(JSValueConversionError) -> SwiftType {
+    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+      try Self.tryDecode(value, in: callbackContext)
+    }
   }
 }
 
 extension JSValueEncoder {
-  public static func tryEncode(
-    _ value: SwiftType,
-    in context: isolated JSContext
-  ) throws(JSValueConversionError) -> JSValue {
-    encode(value, in: context)
+  public static func encode(_ value: SwiftType, in context: isolated JSContext) -> JSValue {
+    context.withCallbackContext { callbackContext in
+      Self.encode(value, in: callbackContext)
+    }
   }
-}
 
-extension JSRuntimeValueEncoder {
   public static func tryEncode(
     _ value: SwiftType,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> JSValue {
     encode(value, in: context)
   }
+
+  public static func tryEncode(
+    _ value: SwiftType,
+    in context: isolated JSContext
+  ) throws(JSValueConversionError) -> JSValue {
+    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+      try Self.tryEncode(value, in: callbackContext)
+    }
+  }
 }
 
 public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
-  public static func decode(_ value: borrowing JSValue, in context: isolated JSContext = #isolation)
-    -> T
-  {
-    T(value: value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> T {
-    try T.tryDecode(value, in: context)
-  }
-
-  public static func encode(_ value: T, in context: isolated JSContext = #isolation) -> JSValue {
-    value.toJSValue(in: context)
-  }
-
-  public static func tryEncode(
-    _ value: T,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> JSValue {
-    try value.tryEncode(in: context)
-  }
-}
-
-extension JSDefaultConverter: JSRuntimeValueConverter where T: JSRuntimeValueCodable {
   public static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
     -> T
   {
@@ -204,24 +169,15 @@ extension JSDefaultConverter: JSRuntimeValueConverter where T: JSRuntimeValueCod
 }
 
 extension JSValue: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    self.init(ref: value.ref, ctx: context)
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(ref: self.ref)
-  }
-
-  public func tryEncode(
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> JSValue {
-    JSValue(ref: self.ref)
-  }
-}
-
-extension JSValue: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self.init(ref: value.ref, ctx: context)
+  }
+
+  public static func tryDecode(
+    _ value: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) throws(JSValueConversionError) -> JSValue {
+    JSValue(value: value, in: context)
   }
 
   public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
@@ -235,33 +191,7 @@ extension JSValue: JSRuntimeValueCodable {
   }
 }
 
-extension JSValue {
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> JSValue {
-    JSValue(value: value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
-  ) throws(JSValueConversionError) -> JSValue {
-    JSValue(value: value, in: context)
-  }
-}
-
 extension Bool: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    self = JSValueToBoolean(context.globalContextRef, value.ref)
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(boolean: self)
-  }
-}
-
-extension Bool: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self = JSValueToBoolean(context.globalContextRef, value.ref)
   }
@@ -274,16 +204,6 @@ extension Bool: JSRuntimeValueCodable {
 extension Bool {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> Bool {
-    guard value.isBoolean else {
-      throw .typeMismatch(expected: "boolean", actual: value.type)
-    }
-    return Bool(value: value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> Bool {
     guard value.isBoolean else {
@@ -294,17 +214,6 @@ extension Bool {
 }
 
 extension Double: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    var exception: JSValueRef?
-    self = JSValueToNumber(context.globalContextRef, value.ref, &exception)
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(number: self)
-  }
-}
-
-extension Double: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     var exception: JSValueRef?
     self = JSValueToNumber(context.globalContextRef, value.ref, &exception)
@@ -318,16 +227,6 @@ extension Double: JSRuntimeValueCodable {
 extension Double {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> Double {
-    guard value.isNumber else {
-      throw .typeMismatch(expected: "number", actual: value.type)
-    }
-    return Double(value: value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> Double {
     guard value.isNumber else {
@@ -338,17 +237,6 @@ extension Double {
 }
 
 extension Int32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    let number = Double(value: value, in: context)
-    self = Int32(number)
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(number: self)
-  }
-}
-
-extension Int32: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     let number = Double(value: value, in: context)
     self = Int32(number)
@@ -360,25 +248,6 @@ extension Int32: JSRuntimeValueCodable {
 }
 
 extension Int32 {
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> Int32 {
-    let number = try Double.tryDecode(value, in: context)
-    guard number.isFinite else {
-      throw .nonFiniteNumber(target: "Int32")
-    }
-    guard floor(number) == number else {
-      throw .nonInteger(target: "Int32", value: number)
-    }
-    let minValue = Double(Int32.min)
-    let maxValue = Double(Int32.max)
-    guard number >= minValue && number <= maxValue else {
-      throw .outOfRange(target: "Int32", value: number)
-    }
-    return Int32(number)
-  }
-
   public static func tryDecode(
     _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
@@ -400,17 +269,6 @@ extension Int32 {
 }
 
 extension UInt32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    let number = Double(value: value, in: context)
-    self = UInt32(number)
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(number: self)
-  }
-}
-
-extension UInt32: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     let number = Double(value: value, in: context)
     self = UInt32(number)
@@ -422,25 +280,6 @@ extension UInt32: JSRuntimeValueCodable {
 }
 
 extension UInt32 {
-  public static func tryDecode(
-    _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> UInt32 {
-    let number = try Double.tryDecode(value, in: context)
-    guard number.isFinite else {
-      throw .nonFiniteNumber(target: "UInt32")
-    }
-    guard floor(number) == number else {
-      throw .nonInteger(target: "UInt32", value: number)
-    }
-    let minValue = 0.0
-    let maxValue = Double(UInt32.max)
-    guard number >= minValue && number <= maxValue else {
-      throw .outOfRange(target: "UInt32", value: number)
-    }
-    return UInt32(number)
-  }
-
   public static func tryDecode(
     _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
@@ -462,22 +301,6 @@ extension UInt32 {
 }
 
 extension String: JSValueCodable {
-  public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    var exception: JSValueRef?
-    if let stringRef = JSValueToStringCopy(context.globalContextRef, value.ref, &exception) {
-      defer { JSStringRelease(stringRef) }
-      self = String(jsStringRef: stringRef)
-      return
-    }
-    self = ""
-  }
-
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    JSValue(string: self)
-  }
-}
-
-extension String: JSRuntimeValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     var exception: JSValueRef?
     if let stringRef = JSValueToStringCopy(context.globalContextRef, value.ref, &exception) {
@@ -496,16 +319,6 @@ extension String: JSRuntimeValueCodable {
 extension String {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: isolated JSContext = #isolation
-  ) throws(JSValueConversionError) -> String {
-    guard value.isString else {
-      throw .typeMismatch(expected: "string", actual: value.type)
-    }
-    return String(value: value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing JSValue,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> String {
     guard value.isString else {
@@ -516,7 +329,7 @@ extension String {
 }
 
 extension Never: JSValueEncodable {
-  public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
+  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
     switch self {}
   }
 }

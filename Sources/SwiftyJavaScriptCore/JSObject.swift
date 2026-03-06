@@ -4,10 +4,47 @@ extension JSValue {
   public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext = #isolation
+    in context: borrowing JSCallbackContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetProperty(
+      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
+      attributes.rawValue, &error)
+  }
+
+  public func setProperty<Val>(
+    _ value: borrowing Val, forKey key: borrowing JSValue,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSCallbackContext
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    var error: JSValueRef?
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetPropertyForKey(
+      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
+      attributes.rawValue, &error)
+  }
+
+  public func setProperty<Val>(
+    _ value: borrowing Val, at index: UInt32,
+    in context: borrowing JSCallbackContext
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    var error: JSValueRef?
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetPropertyAtIndex(
+      context.globalContextRef, self.ref, index, encoded.retainedRef(), &error
+    )
+  }
+
+  public func setProperty<Val>(
+    _ value: borrowing Val, forKey key: borrowing some JSString,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    var error: JSValueRef?
+    let callbackContext = JSCallbackContext(ctx: context.globalContextRef)
+    let encoded =
+      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
     JSObjectSetProperty(
       context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
       attributes.rawValue, &error)
@@ -18,7 +55,9 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
-    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    let callbackContext = JSCallbackContext(ctx: context.globalContextRef)
+    let encoded =
+      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
     JSObjectSetPropertyForKey(
       context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
       attributes.rawValue, &error)
@@ -28,9 +67,60 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
     var error: JSValueRef?
-    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    let callbackContext = JSCallbackContext(ctx: context.globalContextRef)
+    let encoded =
+      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
     JSObjectSetPropertyAtIndex(
       context.globalContextRef, self.ref, index, encoded.retainedRef(), &error
+    )
+  }
+
+  public func setProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: borrowing some JSString,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSCallbackContext
+  ) {
+    var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetProperty(
+      context.globalContextRef, self.ref, key.ref,
+      encoded.retainedRef(),
+      attributes.rawValue,
+      &error
+    )
+  }
+
+  public func setProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: borrowing JSValue,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSCallbackContext
+  ) {
+    var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetPropertyForKey(
+      context.globalContextRef, self.ref, key.ref,
+      encoded.retainedRef(),
+      attributes.rawValue,
+      &error
+    )
+  }
+
+  public func setProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    at index: UInt32,
+    using converter: C.Type,
+    in context: borrowing JSCallbackContext
+  ) {
+    var error: JSValueRef?
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
+    JSObjectSetPropertyAtIndex(
+      context.globalContextRef, self.ref, index,
+      encoded.retainedRef(),
+      &error
     )
   }
 
@@ -85,6 +175,33 @@ extension JSValue {
 
   public func getProperty(
     forKey key: borrowing some JSString,
+    in context: borrowing JSCallbackContext
+  ) -> JSValue {
+    let result = JSObjectGetProperty(
+      context.globalContextRef, self.ref, key.ref, nil)!
+    return JSValue(ref: result, ctx: context)
+  }
+
+  public func getProperty(
+    forKey key: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) -> JSValue {
+    let result = JSObjectGetPropertyForKey(
+      context.globalContextRef, self.ref, key.ref, nil)!
+    return JSValue(ref: result, ctx: context)
+  }
+
+  public func getProperty(
+    at index: UInt32,
+    in context: borrowing JSCallbackContext
+  ) -> JSValue {
+    let result = JSObjectGetPropertyAtIndex(
+      context.globalContextRef, self.ref, index, nil)!
+    return JSValue(ref: result, ctx: context)
+  }
+
+  public func getProperty(
+    forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
     let result = JSObjectGetProperty(
@@ -108,6 +225,33 @@ extension JSValue {
     let result = JSObjectGetPropertyAtIndex(
       context.globalContextRef, self.ref, index, nil)!
     return JSValue(ref: result, ctx: context)
+  }
+
+  public func getProperty<C: JSValueDecoder>(
+    forKey key: borrowing some JSString,
+    using converter: C.Type,
+    in context: borrowing JSCallbackContext
+  ) -> C.SwiftType {
+    let value = getProperty(forKey: key, in: context)
+    return converter.decode(value, in: context)
+  }
+
+  public func getProperty<C: JSValueDecoder>(
+    forKey key: borrowing JSValue,
+    using converter: C.Type,
+    in context: borrowing JSCallbackContext
+  ) -> C.SwiftType {
+    let value = getProperty(forKey: key, in: context)
+    return converter.decode(value, in: context)
+  }
+
+  public func getProperty<C: JSValueDecoder>(
+    at index: UInt32,
+    using converter: C.Type,
+    in context: borrowing JSCallbackContext
+  ) -> C.SwiftType {
+    let value = getProperty(at: index, in: context)
+    return converter.decode(value, in: context)
   }
 
   public func getProperty<C: JSValueDecoder>(
@@ -139,6 +283,24 @@ extension JSValue {
 
   public func deleteProperty(
     forKey key: borrowing some JSString,
+    in context: borrowing JSCallbackContext
+  ) {
+    var error: JSValueRef?
+    JSObjectDeleteProperty(
+      context.globalContextRef, self.ref, key.ref, &error)
+  }
+
+  public func deleteProperty(
+    forKey key: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) {
+    var error: JSValueRef?
+    JSObjectDeletePropertyForKey(
+      context.globalContextRef, self.ref, key.ref, &error)
+  }
+
+  public func deleteProperty(
+    forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) {
     var error: JSValueRef?
@@ -152,6 +314,23 @@ extension JSValue {
   ) {
     var error: JSValueRef?
     JSObjectDeletePropertyForKey(
+      context.globalContextRef, self.ref, key.ref, &error)
+  }
+
+  public func hasProperty(
+    _ key: borrowing some JSString,
+    in context: borrowing JSCallbackContext
+  ) -> Bool {
+    JSObjectHasProperty(
+      context.globalContextRef, self.ref, key.ref)
+  }
+
+  public func hasProperty(
+    _ key: borrowing JSValue,
+    in context: borrowing JSCallbackContext
+  ) -> Bool {
+    var error: JSValueRef?
+    return JSObjectHasPropertyForKey(
       context.globalContextRef, self.ref, key.ref, &error)
   }
 

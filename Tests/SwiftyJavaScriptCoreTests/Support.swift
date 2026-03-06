@@ -9,11 +9,11 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     self.value = value
   }
 
-  init(value: borrowing JSValue, in context: isolated JSContext) {
+  init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self.value = value.isNumber ? 1 : 0
   }
 
-  func toJSValue(in context: isolated JSContext) -> JSValue {
+  func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
     JSValue(number: value, in: context)
   }
 }
@@ -25,11 +25,11 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     self.value = value
   }
 
-  init(value: borrowing JSValue, in context: isolated JSContext) {
+  init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self.value = value.isString ? "string" : "other"
   }
 
-  func toJSValue(in context: isolated JSContext) -> JSValue {
+  func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
     JSValue(string: value, in: context)
   }
 }
@@ -41,11 +41,11 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     self.value = value
   }
 
-  init(value: borrowing JSValue, in context: isolated JSContext) {
+  init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self.value = value.isBoolean
   }
 
-  func toJSValue(in context: isolated JSContext) -> JSValue {
+  func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
     JSValue(boolean: value, in: context)
   }
 }

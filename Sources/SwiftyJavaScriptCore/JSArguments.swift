@@ -54,7 +54,7 @@ extension JSArguments {
 
   }
 
-  public func tryUnpack<each T: JSRuntimeValueDecodable>(
+  public func tryUnpack<each T: JSValueDecodable>(
     types: repeat (each T).Type, in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> (repeat each T) {
     var idx = 0
@@ -92,7 +92,7 @@ extension JSArguments {
 
   }
 
-  public func unpack<each T: JSRuntimeValueDecodable>(
+  public func unpack<each T: JSValueDecodable>(
     types: repeat (each T).Type, in context: borrowing JSCallbackContext
   ) -> (repeat each T) {
     var idx = 0
@@ -122,7 +122,7 @@ extension JSArguments {
     }
   }
 
-  public func unpack<C: JSRuntimeValueDecoder>(
+  public func unpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
     in context: borrowing JSCallbackContext
@@ -149,7 +149,7 @@ extension JSArguments {
     return try converter.tryDecode(value, in: context)
   }
 
-  public func tryUnpack<C: JSRuntimeValueDecoder>(
+  public func tryUnpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
     in context: borrowing JSCallbackContext
@@ -185,7 +185,7 @@ extension JSArguments {
       (repeat (each C).decode(nextJSValue(), in: context))
   }
 
-  public func unpack<each C: JSRuntimeValueDecoder>(
+  public func unpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
     in context: borrowing JSCallbackContext
   ) -> (repeat (each C).SwiftType) {
@@ -225,7 +225,7 @@ extension JSArguments {
       (repeat try (each C).tryDecode(nextJSValue(), in: context))
   }
 
-  public func tryUnpack<each C: JSRuntimeValueDecoder>(
+  public func tryUnpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
     in context: borrowing JSCallbackContext
   ) throws(JSValueConversionError) -> (repeat (each C).SwiftType) {

@@ -39,6 +39,13 @@ public actor JSContext {
     return body(self, globalObject)
   }
 
+  public func withCallbackContext<R: ~Copyable, E: Error>(
+    _ body: (borrowing JSCallbackContext) throws(E) -> R
+  ) throws(E) -> R {
+    let callbackContext = JSCallbackContext(ctx: globalContextRef)
+    return try body(callbackContext)
+  }
+
   deinit {
     JSGlobalContextRelease(peer.jsGlobalContextRef)
     JSClassRelease(functionClass.value)

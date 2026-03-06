@@ -146,9 +146,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init<
-    each A: JSRuntimeValueDecodable,
-    R: JSRuntimeValueEncodable,
-    E: JSRuntimeValueEncodable
+    each A: JSValueDecodable,
+    R: JSValueEncodable,
+    E: JSValueEncodable
   >(
     in context: isolated JSContext = #isolation, name: String,
     function: @escaping @Sendable (repeat each A) throws(E) -> R
@@ -180,9 +180,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init<
-    each C: JSRuntimeValueDecoder,
-    RCoder: JSRuntimeValueEncoder,
-    ECoder: JSRuntimeValueEncoder
+    each C: JSValueDecoder,
+    RCoder: JSValueEncoder,
+    ECoder: JSValueEncoder
   >(
     in context: isolated JSContext = #isolation,
     name: String,
