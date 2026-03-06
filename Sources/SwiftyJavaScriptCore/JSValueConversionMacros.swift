@@ -21,7 +21,7 @@ public macro JSValueAutoConvertible() =
   named(tryEncode(in:))
 )
 public macro JSValueAutoConvertible(
-  _ converter: any JSValueConverter.Type
+  _ converter: Any.Type
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
@@ -37,8 +37,8 @@ public macro JSValueAutoConvertible(
   named(tryEncode(in:))
 )
 public macro JSValueAutoConvertible(
-  _ decoder: any JSValueDecoder.Type,
-  _ encoder: any JSValueEncoder.Type
+  _ decoder: Any.Type,
+  _ encoder: Any.Type
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",

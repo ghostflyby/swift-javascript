@@ -62,3 +62,63 @@ import Testing
     #expect(decoded == MacroFieldOverrideUser(name: "bob", active: false))
   }
 }
+
+@Test func macroEnumSynthesisUsesCaseNameStrings() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let value = MacroStringEnum.running
+    global.setProperty(value, forKey: JSStringManaged("macroEnum"), in: context)
+
+    let raw = global.getProperty(forKey: JSStringManaged("macroEnum"), in: context)
+    #expect(raw.toString(in: context) == "running")
+
+    _ = context.evaluateScript("macroEnum = 'done'")
+    let decoded: MacroStringEnum = global.getProperty(
+      forKey: JSStringManaged("macroEnum"),
+      using: JSDefaultConverter<MacroStringEnum>.self,
+      in: context
+    )
+    #expect(decoded == .done)
+  }
+}
+
+@Test func macroRawEnumSynthesisUsesRawValue() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let value = MacroRawEnum.alpha
+    global.setProperty(value, forKey: JSStringManaged("macroRawEnum"), in: context)
+
+    let raw = global.getProperty(forKey: JSStringManaged("macroRawEnum"), in: context)
+    #expect(raw.toString(in: context) == "alpha")
+
+    _ = context.evaluateScript("macroRawEnum = 'beta'")
+    let decoded: MacroRawEnum = global.getProperty(
+      forKey: JSStringManaged("macroRawEnum"),
+      using: JSDefaultConverter<MacroRawEnum>.self,
+      in: context
+    )
+    #expect(decoded == .beta)
+  }
+}
+
+@Test func macroRawEnumCanOptIntoRawValueConverter() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let value = MacroRawValueEnum.alpha
+    global.setProperty(value, forKey: JSStringManaged("macroRawValueEnum"), in: context)
+
+    let raw = global.getProperty(forKey: JSStringManaged("macroRawValueEnum"), in: context)
+    #expect(raw.toString(in: context) == "A")
+
+    _ = context.evaluateScript("macroRawValueEnum = 'B'")
+    let decoded: MacroRawValueEnum = global.getProperty(
+      forKey: JSStringManaged("macroRawValueEnum"),
+      using: JSDefaultConverter<MacroRawValueEnum>.self,
+      in: context
+    )
+    #expect(decoded == .beta)
+  }
+}

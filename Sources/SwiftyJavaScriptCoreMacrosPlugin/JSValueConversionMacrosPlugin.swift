@@ -28,6 +28,14 @@ private func stripDotSelf(_ raw: String) -> String {
   return value
 }
 
+private func baseTypeName(_ raw: String) -> String {
+  trimmed(raw).split(separator: ".").last.map(String.init) ?? trimmed(raw)
+}
+
+private func isRawRepresentableValueConverterMarker(_ raw: String) -> Bool {
+  baseTypeName(raw) == "JSRawRepresentableValueConverter"
+}
+
 private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
   guard let arguments = node.arguments,
     case .argumentList(let list) = arguments
@@ -130,6 +138,34 @@ private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
   return trimmed(inheritedType.type.description)
 }
 
+private struct EnumCasePlan {
+  let name: String
+}
+
+private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(MacroUsageError)
+  -> [EnumCasePlan]
+{
+  var plans: [EnumCasePlan] = []
+
+  for member in members {
+    guard let enumCase = member.decl.as(EnumCaseDeclSyntax.self) else {
+      continue
+    }
+
+    for element in enumCase.elements {
+      if element.parameterClause != nil {
+        throw MacroUsageError(
+          description: "@JSValueAutoConvertible does not support enum cases with associated values"
+        )
+      }
+
+      plans.append(EnumCasePlan(name: element.name.text))
+    }
+  }
+
+  return plans
+}
+
 public struct JSValueAutoConvertibleMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -138,12 +174,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     conformingTo _: [TypeSyntax],
     in _: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    guard let structDecl = declaration.as(StructDeclSyntax.self) else {
-      throw MacroUsageError(description: "@JSValueAutoConvertible currently supports struct only")
-    }
-
     let typeName = trimmed(type.description)
-    let properties = collectStoredProperties(from: structDecl.memberBlock.members)
     let arguments = parseTypeArguments(from: node)
 
     let sharedDecoder: String?
@@ -165,14 +196,20 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     let decodeBody: String
     let encodeBody: String
 
-    if let decoder = sharedDecoder, let encoder = sharedEncoder {
+    if let decoder = sharedDecoder, let encoder = sharedEncoder,
+      !(declaration.is(EnumDeclSyntax.self)
+        && isRawRepresentableValueConverterMarker(decoder)
+        && isRawRepresentableValueConverterMarker(encoder))
+    {
       decodeBody = """
         return try \(decoder).tryDecode(value, in: context)
         """
       encodeBody = """
         return try \(encoder).tryEncode(self, in: context)
         """
-    } else {
+    } else if let structDecl = declaration.as(StructDeclSyntax.self) {
+      let properties = collectStoredProperties(from: structDecl.memberBlock.members)
+
       var decodeLines: [String] = [
         "guard value.isObject else {",
         "  throw .typeMismatch(expected: \"object\", actual: value.type)",
@@ -216,6 +253,52 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
       }
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
+    } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
+      let cases = try collectEnumCases(from: enumDecl.memberBlock.members)
+      guard !cases.isEmpty else {
+        throw MacroUsageError(
+          description: "@JSValueAutoConvertible requires at least one enum case")
+      }
+
+      if let decoder = sharedDecoder, let encoder = sharedEncoder,
+        isRawRepresentableValueConverterMarker(decoder)
+          && isRawRepresentableValueConverterMarker(encoder)
+      {
+        decodeBody = """
+          return try JSRawRepresentableValueConverter.tryDecode(value, as: Self.self, in: context)
+          """
+        encodeBody = """
+          return try JSRawRepresentableValueConverter.tryEncode(self, in: context)
+          """
+      } else {
+
+        let switchCases = cases.map { enumCase in
+          "case \"\(enumCase.name)\": return .\(enumCase.name)"
+        }.joined(separator: "\n")
+
+        let encodeCases = cases.map { enumCase in
+          "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+        }.joined(separator: "\n")
+
+        decodeBody = """
+          let caseName = try String.tryDecode(value, in: context)
+          switch caseName {
+          \(switchCases)
+          default:
+            throw .codable("\(typeName) does not contain case \\(caseName)")
+          }
+          """
+        encodeBody = """
+          switch self {
+          \(encodeCases)
+          }
+          """
+      }
+    } else {
+      throw MacroUsageError(
+        description:
+          "@JSValueAutoConvertible currently supports struct, enum without associated values, or explicit converter arguments"
+      )
     }
 
     let extSource = """

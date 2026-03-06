@@ -102,3 +102,22 @@ struct MacroFieldOverrideUser: Equatable {
   @JSValueFieldCoding(ZeroOneBoolConverter.self)
   let active: Bool
 }
+
+@JSValueAutoConvertible
+enum MacroStringEnum: Equatable {
+  case pending
+  case running
+  case done
+}
+
+@JSValueAutoConvertible
+enum MacroRawEnum: String, Equatable {
+  case alpha = "A"
+  case beta = "B"
+}
+
+@JSValueAutoConvertible(JSRawRepresentableValueConverter.self)
+enum MacroRawValueEnum: String, Equatable {
+  case alpha = "A"
+  case beta = "B"
+}
