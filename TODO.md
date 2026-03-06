@@ -21,7 +21,7 @@
 - [x] 属性定义封装：`defineProperty`（基于 `JSObjectSetProperty` + attributes 语义封装）
 
 ## 3. 对象与类型化内存（C API）
-- [ ] ArrayBuffer 封装（创建、长度、字节指针）
+- [x] ArrayBuffer 封装（创建、长度、字节指针）
 - [ ] TypedArray 封装（创建、长度、offset、buffer 访问）
 - [ ] TypedArray 与 `JSValue` 互转辅助
 
@@ -38,10 +38,10 @@
 ## 5. 测试与稳定性
 - [x] 为 `JSContext.evaluateScript` 新增 Swift Testing 用例
 - [x] 为 `JSValue` 调用与转换 API 新增 Swift Testing 用例（补充 call/construct/invokeMethod/toObject/type helpers/defineProperty 覆盖）
-- [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例
+- [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例（已补 ArrayBuffer，TypedArray 待补）
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [x] `swift build --build-tests` 持续绿灯
-- [x] `swift test` 在本地环境稳定通过（已验证：41/41 通过）
+- [x] `swift test` 在本地环境稳定通过（已验证：43/43 通过）
 
 ## 6. 类型转换体系
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
