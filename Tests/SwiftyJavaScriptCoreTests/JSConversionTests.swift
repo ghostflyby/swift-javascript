@@ -14,6 +14,16 @@ enum ZeroOneBoolConverter: JSValueConverter {
   }
 }
 
+extension ZeroOneBoolConverter: JSRuntimeValueConverter {
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext) -> Bool {
+    value.toDouble(in: context) != 0
+  }
+
+  static func encode(_ value: Bool, in context: borrowing JSCallbackContext) -> JSValue {
+    JSValue(number: value ? 1 : 0, in: context)
+  }
+}
+
 struct FailingEncodeValue: JSValueEncodable {
   func toJSValue(in context: isolated JSContext) -> JSValue {
     JSValue(undefinedIn: context)
@@ -36,6 +46,12 @@ enum ReturnPayloadEncoder: JSValueEncoder {
   }
 }
 
+extension ReturnPayloadEncoder: JSRuntimeValueEncoder {
+  static func encode(_ value: ReturnPayload, in context: borrowing JSCallbackContext) -> JSValue {
+    JSValue(number: value.value, in: context)
+  }
+}
+
 enum FailurePayload: Error {
   case bad
 }
@@ -44,6 +60,15 @@ enum FailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = FailurePayload
 
   static func encode(_ value: FailurePayload, in context: isolated JSContext) -> JSValue {
+    switch value {
+    case .bad:
+      return JSValue(string: "bad", in: context)
+    }
+  }
+}
+
+extension FailurePayloadEncoder: JSRuntimeValueEncoder {
+  static func encode(_ value: FailurePayload, in context: borrowing JSCallbackContext) -> JSValue {
     switch value {
     case .bad:
       return JSValue(string: "bad", in: context)
@@ -85,10 +110,26 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
   }
 }
 
+extension MacroDelegatedUserDecoder: JSRuntimeValueDecoder {
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+    -> MacroDelegatedUser
+  {
+    MacroDelegatedUser(score: value.toDouble(in: context))
+  }
+}
+
 enum MacroDelegatedUserEncoder: JSValueEncoder {
   typealias SwiftType = MacroDelegatedUser
 
   static func encode(_ value: MacroDelegatedUser, in context: isolated JSContext) -> JSValue {
+    JSValue(number: value.score, in: context)
+  }
+}
+
+extension MacroDelegatedUserEncoder: JSRuntimeValueEncoder {
+  static func encode(_ value: MacroDelegatedUser, in context: borrowing JSCallbackContext)
+    -> JSValue
+  {
     JSValue(number: value.score, in: context)
   }
 }
@@ -197,7 +238,8 @@ struct MacroFieldOverrideUser: Equatable {
     rawArguments.withUnsafeBufferPointer { buffer in
       let args = JSArguments(pointer: buffer.baseAddress!, count: 1)
       do {
-        let _: (Double) = try args.tryUnpack(types: Double.self, in: context)
+        let _: Double = try args.tryUnpack(
+          at: 0, using: JSDefaultConverter<Double>.self, in: context)
         Issue.record("Expected strict unpack to fail")
       } catch {
         #expect(Bool(true))

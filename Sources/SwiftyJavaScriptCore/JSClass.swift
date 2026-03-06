@@ -16,16 +16,16 @@ public struct JSClassAttributes: OptionSet, Sendable {
 public struct JSStaticValue: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
-  public let getProperty: @Sendable (isolated JSContext, borrowing JSValue) -> JSResult
+  public let getProperty: @Sendable (borrowing JSCallbackContext, borrowing JSValue) -> JSResult
   public let setProperty:
-    @Sendable (isolated JSContext, borrowing JSValue, borrowing JSValue) -> JSResult
+    @Sendable (borrowing JSCallbackContext, borrowing JSValue, borrowing JSValue) -> JSResult
 }
 
 public struct JSStaticFunction: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
-    @Sendable (isolated JSContext, borrowing JSValue, borrowing JSArguments) -> JSResult
+    @Sendable (borrowing JSCallbackContext, borrowing JSValue, borrowing JSArguments) -> JSResult
 }
 
 public struct JSClassDefinition: Sendable {
@@ -52,40 +52,53 @@ public struct JSClassDefinition: Sendable {
 
   public var staticFunctions: [JSStaticFunction] = []
 
-  public var initialize: (@Sendable (borrowing JSValue, isolated JSContext) -> Void)? = nil
+  public var initialize: (@Sendable (borrowing JSValue, borrowing JSCallbackContext) -> Void)? = nil
 
   public var finalize: (@Sendable (borrowing JSValue) -> Void)? = nil
 
-  public var hasProperty: (@Sendable (isolated JSContext, borrowing JSValue, String) -> Bool)? = nil
+  public var hasProperty:
+    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> Bool)? = nil
 
-  public var getProperty: (@Sendable (isolated JSContext, borrowing JSValue, String) -> JSResult)? =
-    nil
-
-  public var setProperty:
-    (@Sendable (isolated JSContext, borrowing JSValue, String, borrowing JSValue) -> JSValue?)? =
+  public var getProperty:
+    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> JSResult)? =
       nil
 
-  public var deleteProperty: (@Sendable (isolated JSContext, borrowing JSValue, String) -> Bool)? =
-    nil
+  public var setProperty:
+    (
+      @Sendable (borrowing JSCallbackContext, borrowing JSValue, String, borrowing JSValue) ->
+        JSValue?
+    )? =
+      nil
+
+  public var deleteProperty:
+    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> Bool)? =
+      nil
 
   public var getPropertyNames:
-    (@Sendable (isolated JSContext, inout JSValue, JSPropertyNameAccumulatorRef) -> Void)? = nil
+    (@Sendable (borrowing JSCallbackContext, inout JSValue, JSPropertyNameAccumulatorRef) -> Void)? =
+      nil
 
   public var callAsFunction:
     (
-      @Sendable (isolated JSContext, inout JSValue, inout JSValue, borrowing JSArguments) -> JSValue
+      @Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue, borrowing JSArguments)
+        ->
+        JSValue
     )? = nil
 
   public var callAsConstructor:
     (
-      @Sendable (isolated JSContext, inout JSValue, inout JSValue, borrowing JSArguments) -> JSValue
+      @Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue, borrowing JSArguments)
+        ->
+        JSValue
     )? = nil
 
-  public var hasInstance: (@Sendable (isolated JSContext, inout JSValue, inout JSValue) -> Bool)? =
-    nil
+  public var hasInstance:
+    (@Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue) -> Bool)? =
+      nil
 
   public var convertToType:
-    (@Sendable (isolated JSContext, inout JSValue, JSType, inout JSValue) -> JSValue)? = nil
+    (@Sendable (borrowing JSCallbackContext, inout JSValue, JSType, inout JSValue) -> JSValue)? =
+      nil
 }
 
 private final class JSNativeClassBacking {
@@ -173,12 +186,9 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSContext.borrow(ctx: ctx)
-  let boxedObject = SendableBoxUnsafe(object)
-  let result = context.assumeIsolated { context in
-    let this = JSValue(ref: boxedObject.value, ctx: context)
-    return valueDef.getProperty(context, this).toPrivateResult()
-  }
+  let context = JSCallbackContext(ctx: ctx)
+  let this = JSValue(ref: object, ctx: context)
+  let result = valueDef.getProperty(context, this).toPrivateResult()
   switch result {
   case .value(let value):
     return value
@@ -202,14 +212,10 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     return false
   }
 
-  let context = JSContext.borrow(ctx: ctx)
-  let boxedObject = SendableBoxUnsafe(object)
-  let boxedValue = SendableBoxUnsafe(value)
-  let result = context.assumeIsolated { context in
-    let this = JSValue(ref: boxedObject.value, ctx: context)
-    let newValue = JSValue(ref: boxedValue.value, ctx: context)
-    return valueDef.setProperty(context, this, newValue).toPrivateResult()
-  }
+  let context = JSCallbackContext(ctx: ctx)
+  let this = JSValue(ref: object, ctx: context)
+  let newValue = JSValue(ref: value, ctx: context)
+  let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
 
   switch result {
   case .value:
@@ -247,15 +253,12 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSContext.borrow(ctx: ctx)
-  let boxedThisObject = SendableBoxUnsafe(thisObjectRef)
+  let context = JSCallbackContext(ctx: ctx)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-  let result = context.assumeIsolated { context in
-    let thisValue = JSValue(ref: boxedThisObject.value, ctx: context)
-    let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-    return withJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
-      functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
-    }
+  let thisValue = JSValue(ref: thisObjectRef, ctx: context)
+  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
+  let result = withJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
+    functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
   }
 
   switch result {
@@ -333,12 +336,9 @@ extension JSClassDefinition {
         guard let initialize = type.initialize else {
           return
         }
-        let context = JSContext.borrow(ctx: ctx)
-        let this = SendableBoxUnsafe(object)
-        context.assumeIsolated { context in
-          let this = JSValue(ref: this.value, ctx: context)
-          initialize(this, context)
-        }
+        let context = JSCallbackContext(ctx: ctx)
+        let this = JSValue(ref: object, ctx: context)
+        initialize(this, context)
       }
     }
 
@@ -354,12 +354,9 @@ extension JSClassDefinition {
           }
           return
         }
-        let context = JSContext.borrow(ctx: objectContext)
-        let this = SendableBoxUnsafe(object)
-        context.assumeIsolated { context in
-          let this = JSValue(ref: this.value, ctx: context)
-          finalize(this)
-        }
+        let context = JSCallbackContext(ctx: objectContext)
+        let this = JSValue(ref: object, ctx: context)
+        finalize(this)
         removeClassObjectContext(object)
       }
     }
@@ -372,14 +369,10 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSContext.borrow(ctx: ctx)
-        let obj = SendableBoxUnsafe(object)
-
+        let context = JSCallbackContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
-        let p = context.assumeIsolated { context in
-          let value = JSValue(ref: obj.value, ctx: context)
-          return def.getProperty!(context, value, s).toPrivateResult()
-        }
+        let value = JSValue(ref: object, ctx: context)
+        let p = def.getProperty!(context, value, s).toPrivateResult()
 
         switch p {
         case .value(let v):
@@ -400,24 +393,13 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSContext.borrow(ctx: ctx)
-        let this = SendableBoxUnsafe(object)
-        let newValue = SendableBoxUnsafe(value)
+        let context = JSCallbackContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
-        let setResult = context.assumeIsolated { context in
-          let this = JSValue(ref: this.value, ctx: context)
-          let value = JSValue(ref: newValue.value, ctx: context)
-          let setResult = type.setProperty!(context, this, s, value)
-          let ref: JSValueRef? =
-            if let setResult = setResult {
-              setResult.retainedRef()
-            } else {
-              nil
-            }
-          return SendableBoxUnsafe(ref)
-        }
+        let this = JSValue(ref: object, ctx: context)
+        let newValue = JSValue(ref: value, ctx: context)
+        let setResult = type.setProperty!(context, this, s, newValue)
 
-        if let error = setResult.value {
+        if let error = setResult?.retainedRef() {
           exception?.pointee = error
           return false
         }
@@ -434,13 +416,10 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSContext.borrow(ctx: ctx)
-        let this = SendableBoxUnsafe(object)
+        let context = JSCallbackContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
-        return context.assumeIsolated { context in
-          let this = JSValue(ref: this.value, ctx: context)
-          return type.hasProperty!(context, this, s)
-        }
+        let this = JSValue(ref: object, ctx: context)
+        return type.hasProperty!(context, this, s)
       }
     }
 
@@ -452,13 +431,10 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSContext.borrow(ctx: ctx)
-        let this = SendableBoxUnsafe(object)
+        let context = JSCallbackContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
-        let deleteResult = context.assumeIsolated { context in
-          let this = JSValue(ref: this.value, ctx: context)
-          return type.deleteProperty!(context, this, s)
-        }
+        let this = JSValue(ref: object, ctx: context)
+        let deleteResult = type.deleteProperty!(context, this, s)
         return deleteResult
       }
     }
@@ -471,13 +447,9 @@ extension JSClassDefinition {
           return
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSContext.borrow(ctx: ctx)
-        let boxedObject = SendableBoxUnsafe(object)
-        let boxedAccumulator = SendableBoxUnsafe(accumulator)
-        context.assumeIsolated { context in
-          var this = JSValue(ref: boxedObject.value, ctx: context)
-          type.getPropertyNames?(context, &this, boxedAccumulator.value)
-        }
+        let context = JSCallbackContext(ctx: ctx)
+        var this = JSValue(ref: object, ctx: context)
+        type.getPropertyNames?(context, &this, accumulator)
       }
     }
 
@@ -490,20 +462,18 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, thisObjectRef)
-        let context = JSContext.borrow(ctx: ctx)
-        let function = SendableBoxUnsafe(functionRef)
-        let thisObject = SendableBoxUnsafe(thisObjectRef)
+        let context = JSCallbackContext(ctx: ctx)
         let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-        let callbackResult: JSPrivateResult = context.assumeIsolated { context in
-          var functionValue = JSValue(ref: function.value, ctx: context)
-          var thisValue = JSValue(ref: thisObject.value, ctx: context)
-          let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-          return withJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
-            let result =
-              type.callAsFunction?(context, &functionValue, &thisValue, args)
-              ?? JSValue(undefinedIn: context)
-            return .value(result.retainedRef())
-          }
+        var functionValue = JSValue(ref: functionRef, ctx: context)
+        var thisValue = JSValue(ref: thisObjectRef, ctx: context)
+        let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
+        let callbackResult: JSPrivateResult = withJSArguments(
+          argumentsPointer, count: Int(argumentCount)
+        ) { args in
+          let result =
+            type.callAsFunction?(context, &functionValue, &thisValue, args)
+            ?? JSValue(undefinedIn: context)
+          return .value(result.retainedRef())
         }
         switch callbackResult {
         case .value(let value):
@@ -524,22 +494,21 @@ extension JSClassDefinition {
           return nil
         }
         rememberClassObjectContext(ctx, constructorRef)
-        let context = JSContext.borrow(ctx: ctx)
-        let constructor = SendableBoxUnsafe(constructorRef)
+        let context = JSCallbackContext(ctx: ctx)
         let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-        let callbackResult: JSPrivateResult = context.assumeIsolated { context in
-          var constructorValue = JSValue(ref: constructor.value, ctx: context)
-          var thisValue = JSValue(undefinedIn: context)
-          let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-          return withJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
-            let result =
-              type.callAsConstructor?(context, &constructorValue, &thisValue, args)
-              ?? JSValue(undefinedIn: context)
-            guard result.isObject else {
-              return .value(JSValue(undefinedIn: context).retainedRef())
-            }
-            return .value(result.retainedRef())
+        var constructorValue = JSValue(ref: constructorRef, ctx: context)
+        var thisValue = JSValue(undefinedIn: context)
+        let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
+        let callbackResult: JSPrivateResult = withJSArguments(
+          argumentsPointer, count: Int(argumentCount)
+        ) { args in
+          let result =
+            type.callAsConstructor?(context, &constructorValue, &thisValue, args)
+            ?? JSValue(undefinedIn: context)
+          guard result.isObject else {
+            return .value(JSValue(undefinedIn: context).retainedRef())
           }
+          return .value(result.retainedRef())
         }
         switch callbackResult {
         case .value(let value):
@@ -562,14 +531,10 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, constructorRef)
-        let context = JSContext.borrow(ctx: ctx)
-        let constructor = SendableBoxUnsafe(constructorRef)
-        let possibleInstance = SendableBoxUnsafe(possibleInstanceRef)
-        return context.assumeIsolated { context in
-          var constructorValue = JSValue(ref: constructor.value, ctx: context)
-          var possibleInstanceValue = JSValue(ref: possibleInstance.value, ctx: context)
-          return type.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
-        }
+        let context = JSCallbackContext(ctx: ctx)
+        var constructorValue = JSValue(ref: constructorRef, ctx: context)
+        var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
+        return type.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
       }
     }
 
@@ -581,20 +546,19 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, objectRef)
-        let context = JSContext.borrow(ctx: ctx)
-        let object = SendableBoxUnsafe(objectRef)
+        let context = JSCallbackContext(ctx: ctx)
         let jsType = JSType(type)
-        let conversion: JSPrivateResult = context.assumeIsolated { context in
-          var objectValue = JSValue(ref: object.value, ctx: context)
-          var exceptionValue = JSValue(undefinedIn: context)
-          let result =
-            callbackOwner.convertToType?(context, &objectValue, jsType, &exceptionValue)
-            ?? JSValue(undefinedIn: context)
+        var objectValue = JSValue(ref: objectRef, ctx: context)
+        var exceptionValue = JSValue(undefinedIn: context)
+        let result =
+          callbackOwner.convertToType?(context, &objectValue, jsType, &exceptionValue)
+          ?? JSValue(undefinedIn: context)
+        let conversion: JSPrivateResult =
           if !exceptionValue.isUndefined {
-            return .exception(exceptionValue.retainedRef())
+            .exception(exceptionValue.retainedRef())
+          } else {
+            .value(result.retainedRef())
           }
-          return .value(result.retainedRef())
-        }
         switch conversion {
         case .value(let value):
           return value

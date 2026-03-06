@@ -144,26 +144,23 @@ extension JSContext {
 
 private let functionCallback: JSObjectCallAsFunctionCallback = {
   c, f, this, count, args, exception in
-  let context = JSContext.borrow(ctx: c!)
-  let f = SendableBoxUnsafe(f!)
-  let this = SendableBoxUnsafe(this!)
-  let args = SendableBoxUnsafe(args!)
-
-  let v = context.assumeIsolated { context in
-    let function = JSValue(ref: f.value, ctx: context)
-    let this = JSValue(ref: this.value, ctx: context)
-    let args = JSArguments(pointer: args.value, count: Int(count))
-    let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(
-      JSObjectGetPrivate(f.value)!
-    )
-    .takeUnretainedValue().value
-    return callback(
-      context,
-      function,
-      this,
-      args
-    ).toPrivateResult()
-  }
+  let context = JSCallbackContext(ctx: c!)
+  let functionRef = f!
+  let thisRef = this!
+  let argsRef = args!
+  let function = JSValue(ref: functionRef, ctx: context)
+  let this = JSValue(ref: thisRef, ctx: context)
+  let jsArgs = JSArguments(pointer: argsRef, count: Int(count))
+  let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(
+    JSObjectGetPrivate(functionRef)!
+  )
+  .takeUnretainedValue().value
+  let v = callback(
+    context,
+    function,
+    this,
+    jsArgs
+  ).toPrivateResult()
   switch v {
   case .value(let r):
     return r

@@ -28,7 +28,18 @@ public struct JSValue: ~Copyable {
     self.ctx = ctx.globalContextRef
   }
 
+  init(ref: JSValueRef, ctx: borrowing JSCallbackContext) {
+    self.ref = ref
+    self.ctx = ctx.globalContextRef
+  }
+
   public init(string value: String, in context: isolated JSContext = #isolation) {
+    let s = JSValueMakeString(
+      context.globalContextRef, JSStringCreateWithCFString(value as CFString))
+    self.init(ref: s!, ctx: context)
+  }
+
+  public init(string value: String, in context: borrowing JSCallbackContext) {
     let s = JSValueMakeString(
       context.globalContextRef, JSStringCreateWithCFString(value as CFString))
     self.init(ref: s!, ctx: context)
@@ -44,12 +55,27 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
+  public init(number value: Double, in context: borrowing JSCallbackContext) {
+    let s = JSValueMakeNumber(context.globalContextRef, value)
+    self.init(ref: s!, ctx: context)
+  }
+
   public init(number value: some BinaryInteger, in context: isolated JSContext = #isolation) {
     let s = JSValueMakeNumber(context.globalContextRef, Double(value))
     self.init(ref: s!, ctx: context)
   }
 
+  public init(number value: some BinaryInteger, in context: borrowing JSCallbackContext) {
+    let s = JSValueMakeNumber(context.globalContextRef, Double(value))
+    self.init(ref: s!, ctx: context)
+  }
+
   public init(boolean value: Bool, in context: isolated JSContext = #isolation) {
+    let s = JSValueMakeBoolean(context.globalContextRef, value)
+    self.init(ref: s!, ctx: context)
+  }
+
+  public init(boolean value: Bool, in context: borrowing JSCallbackContext) {
     let s = JSValueMakeBoolean(context.globalContextRef, value)
     self.init(ref: s!, ctx: context)
   }
@@ -65,7 +91,17 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
+  public init(nullIn context: borrowing JSCallbackContext) {
+    let s = JSValueMakeNull(context.globalContextRef)
+    self.init(ref: s!, ctx: context)
+  }
+
   public init(undefinedIn context: isolated JSContext = #isolation) {
+    let s = JSValueMakeUndefined(context.globalContextRef)
+    self.init(ref: s!, ctx: context)
+  }
+
+  public init(undefinedIn context: borrowing JSCallbackContext) {
     let s = JSValueMakeUndefined(context.globalContextRef)
     self.init(ref: s!, ctx: context)
   }
@@ -75,9 +111,14 @@ public struct JSValue: ~Copyable {
     self.init(ref: objectRef!, ctx: context)
   }
 
+  public init(objectIn context: borrowing JSCallbackContext) {
+    let objectRef = JSObjectMake(context.globalContextRef, nil, nil)
+    self.init(ref: objectRef!, ctx: context)
+  }
+
   public typealias JSFunctionCallback =
     (
-      _ context: isolated JSContext, _ function: borrowing JSValue,
+      _ context: borrowing JSCallbackContext, _ function: borrowing JSValue,
       _ this: borrowing JSValue,
       _ arguments: borrowing JSArguments
     ) -> JSResult
@@ -104,7 +145,11 @@ public struct JSValue: ~Copyable {
     return ref
   }
 
-  public init<each A: JSValueDecodable, R: JSValueEncodable, E: JSValueEncodable>(
+  public init<
+    each A: JSRuntimeValueDecodable,
+    R: JSRuntimeValueEncodable,
+    E: JSRuntimeValueEncodable
+  >(
     in context: isolated JSContext = #isolation, name: String,
     function: @escaping @Sendable (repeat each A) throws(E) -> R
   ) {
@@ -115,26 +160,29 @@ public struct JSValue: ~Copyable {
         return JSResult.value(JSValue(undefinedIn: context))
       }
       do {
-        let typedArgs: (repeat each A) = try arguments.tryUnpack(types: repeat (each A).self)
+        let typedArgs: (repeat each A) = try arguments.tryUnpack(
+          types: repeat (each A).self,
+          in: context
+        )
         let r: R = try swiftFunction(repeat each typedArgs)
         let encoded = try r.tryEncode(in: context)
-        return JSResult.value(encoded)
+        return .value(encoded)
       } catch let error as E {
         if let encoded = try? error.tryEncode(in: context) {
-          return JSResult.exception(encoded)
+          return .exception(encoded)
         }
-        return JSResult.exception(JSValue(undefinedIn: context))
+        return .exception(JSValue(undefinedIn: context))
       } catch {
-        return JSResult.exception(JSValue(undefinedIn: context))
+        return .exception(JSValue(undefinedIn: context))
       }
     }
     self.init(name: name, callback: callback)
   }
 
   public init<
-    each C: JSValueDecoder,
-    RCoder: JSValueEncoder,
-    ECoder: JSValueEncoder
+    each C: JSRuntimeValueDecoder,
+    RCoder: JSRuntimeValueEncoder,
+    ECoder: JSRuntimeValueEncoder
   >(
     in context: isolated JSContext = #isolation,
     name: String,
@@ -157,14 +205,14 @@ public struct JSValue: ~Copyable {
         )
         let r: RCoder.SwiftType = try swiftFunction(repeat each typedArgs)
         let encoded = try RCoder.tryEncode(r, in: context)
-        return JSResult.value(encoded)
+        return .value(encoded)
       } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
-          return JSResult.exception(encoded)
+          return .exception(encoded)
         }
-        return JSResult.exception(JSValue(undefinedIn: context))
+        return .exception(JSValue(undefinedIn: context))
       } catch {
-        return JSResult.exception(JSValue(undefinedIn: context))
+        return .exception(JSValue(undefinedIn: context))
       }
     }
     self.init(name: name, callback: callback)
@@ -201,6 +249,21 @@ public struct JSArguments: ~Copyable {
 
   public func unpack<R: ~Copyable>(
     at: Int, in context: isolated JSContext = #isolation, _ body: (borrowing JSValue) -> R
+  ) -> R {
+    guard at >= 0 && at < count else {
+      fatalError("Index out of bounds")
+    }
+    let value =
+      if let v = pointer[at] {
+        JSValue(ref: v, ctx: context)
+      } else {
+        JSValue(undefinedIn: context)
+      }
+    return body(value)
+  }
+
+  public func unpack<R: ~Copyable>(
+    at: Int, in context: borrowing JSCallbackContext, _ body: (borrowing JSValue) -> R
   ) -> R {
     guard at >= 0 && at < count else {
       fatalError("Index out of bounds")
