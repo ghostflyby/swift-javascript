@@ -243,41 +243,6 @@ enum JSPrivateResult: @unchecked Sendable {
   case exception(JSValueRef)
 }
 
-public struct JSArguments: ~Copyable {
-  let pointer: UnsafePointer<JSValueRef?>
-  let count: Int
-
-  public func unpack<R: ~Copyable>(
-    at: Int, in context: isolated JSContext = #isolation, _ body: (borrowing JSValue) -> R
-  ) -> R {
-    guard at >= 0 && at < count else {
-      fatalError("Index out of bounds")
-    }
-    let value =
-      if let v = pointer[at] {
-        JSValue(ref: v, ctx: context)
-      } else {
-        JSValue(undefinedIn: context)
-      }
-    return body(value)
-  }
-
-  public func unpack<R: ~Copyable>(
-    at: Int, in context: borrowing JSCallbackContext, _ body: (borrowing JSValue) -> R
-  ) -> R {
-    guard at >= 0 && at < count else {
-      fatalError("Index out of bounds")
-    }
-    let value =
-      if let v = pointer[at] {
-        JSValue(ref: v, ctx: context)
-      } else {
-        JSValue(undefinedIn: context)
-      }
-    return body(value)
-  }
-}
-
 class Box<T: ~Copyable> {
   let value: T
   init(_ value: consuming T) {
