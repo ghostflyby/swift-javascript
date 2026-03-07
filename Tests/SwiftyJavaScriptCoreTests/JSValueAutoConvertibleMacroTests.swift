@@ -124,9 +124,9 @@ import Testing
     global.setProperty(value, forKey: JSStringManaged("macroRawEnum"), in: context)
 
     let raw = global.getProperty(forKey: JSStringManaged("macroRawEnum"), in: context)
-    #expect(raw.toString(in: context) == "alpha")
+    #expect(raw.toString(in: context) == "A")
 
-    _ = context.evaluateScript("macroRawEnum = 'beta'")
+    _ = context.evaluateScript("macroRawEnum = 'B'")
     let decoded: MacroRawEnum = global.getProperty(
       forKey: JSStringManaged("macroRawEnum"),
       using: JSDefaultConverter<MacroRawEnum>.self,

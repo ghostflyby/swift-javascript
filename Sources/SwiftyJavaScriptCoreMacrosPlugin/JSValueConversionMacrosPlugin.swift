@@ -290,6 +290,24 @@ private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
   return trimmed(inheritedType.type.description)
 }
 
+private func enumRawValueTypeName(from decl: EnumDeclSyntax) -> String? {
+  guard let inheritanceClause = decl.inheritanceClause,
+    let inheritedType = inheritanceClause.inheritedTypes.first
+  else {
+    return nil
+  }
+
+  let typeName = trimmed(inheritedType.type.description)
+  switch typeName {
+  case "String", "Character", "Int", "Int8", "Int16", "Int32", "Int64", "UInt",
+    "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double"
+  :
+    return typeName
+  default:
+    return nil
+  }
+}
+
 private func isFinalClass(_ decl: ClassDeclSyntax) -> Bool {
   decl.modifiers.contains(where: { $0.name.tokenKind == .keyword(.final) })
 }
@@ -749,6 +767,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         from: enumDecl.memberBlock.members,
         fieldOverrides: enumFieldOverrides
       )
+      let rawValueTypeName = enumRawValueTypeName(from: enumDecl)
       initSource = """
         public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
           do {
@@ -833,28 +852,40 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }
           """
       } else {
+        if let rawValueTypeName {
+          decodeBody = """
+            let rawValue = try \(rawValueTypeName).tryDecode(value, in: context)
+            guard let decoded = Self(rawValue: rawValue) else {
+              throw .codable("\(typeName) does not contain rawValue \\(rawValue)")
+            }
+            return decoded
+            """
+          encodeBody = """
+            return try self.rawValue.tryEncode(in: context)
+            """
+        } else {
+          let switchCases = cases.map { enumCase in
+            "case \"\(enumCase.name)\": return .\(enumCase.name)"
+          }.joined(separator: "\n")
 
-        let switchCases = cases.map { enumCase in
-          "case \"\(enumCase.name)\": return .\(enumCase.name)"
-        }.joined(separator: "\n")
+          let encodeCases = cases.map { enumCase in
+            "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+          }.joined(separator: "\n")
 
-        let encodeCases = cases.map { enumCase in
-          "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
-        }.joined(separator: "\n")
-
-        decodeBody = """
-          let caseName = try String.tryDecode(value, in: context)
-          switch caseName {
-          \(switchCases)
-          default:
-            throw .codable("\(typeName) does not contain case \\(caseName)")
-          }
-          """
-        encodeBody = """
-          switch self {
-          \(encodeCases)
-          }
-          """
+          decodeBody = """
+            let caseName = try String.tryDecode(value, in: context)
+            switch caseName {
+            \(switchCases)
+            default:
+              throw .codable("\(typeName) does not contain case \\(caseName)")
+            }
+            """
+          encodeBody = """
+            switch self {
+            \(encodeCases)
+            }
+            """
+        }
       }
     } else {
       throw MacroUsageError(

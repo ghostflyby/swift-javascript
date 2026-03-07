@@ -4,6 +4,11 @@
 /// decoding creates a new Swift instance and does not preserve object identity.
 /// Use `JSClassAutoConvertible` instead when reference semantics or a JSClass-backed
 /// prototype chain must be preserved.
+///
+/// For enums without associated values, the macro uses case names by default. Enums declared
+/// with built-in raw-value syntax such as `enum Kind: String` or `enum Code: Int` are encoded
+/// and decoded using `rawValue` instead. Only this built-in declaration form is recognized
+/// automatically; a manual `RawRepresentable` conformance added later is not detected.
 @attached(
   extension,
   conformances: JSValueCodable,
@@ -20,6 +25,10 @@ public macro JSValueAutoSerialization() =
 
 /// Generates default JS value serialization using custom tag and payload keys for
 /// associated-value enums.
+///
+/// For enums without associated values, built-in raw-value declarations such as
+/// `enum Kind: String` still use `rawValue` by default. Manual `RawRepresentable`
+/// conformances are not detected automatically.
 ///
 /// - Parameters:
 ///   - tagKey: The key used to store the case discriminator. The default shape uses `kind`.
