@@ -102,3 +102,74 @@ import Testing
     #expect(decoded == .beta)
   }
 }
+
+@Test func macroAssociatedEnumSynthesisUsesTaggedObjects() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    global.setProperty(MacroAssociatedEnum.idle, forKey: JSStringManaged("enumIdle"), in: context)
+    global.setProperty(MacroAssociatedEnum.count(7), forKey: JSStringManaged("enumCount"), in: context)
+    global.setProperty(MacroAssociatedEnum.range(3, 9), forKey: JSStringManaged("enumRange"), in: context)
+    global.setProperty(
+      MacroAssociatedEnum.user(id: 42, name: "neo"),
+      forKey: JSStringManaged("enumUser"),
+      in: context
+    )
+
+    let shapeCheck = context.evaluateScript("""
+      [
+        enumIdle.tag,
+        enumCount.payload,
+        Array.isArray(enumRange.payload),
+        enumRange.payload[0] + enumRange.payload[1],
+        enumUser.payload.id,
+        enumUser.payload.name
+      ].join(':')
+      """)
+    switch consume shapeCheck {
+    case .value(let value):
+      #expect(value.toString(in: context) == "idle:7:true:12:42:neo")
+    case .exception:
+      Issue.record("Expected associated enum payloads to be encoded as tagged objects")
+    }
+  }
+}
+
+@Test func macroAssociatedEnumCanDecodeTaggedObjects() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    _ = context.evaluateScript("""
+      globalThis.enumIdle = { tag: 'idle' }
+      globalThis.enumCount = { tag: 'count', payload: 5 }
+      globalThis.enumRange = { tag: 'range', payload: [1, 4] }
+      globalThis.enumUser = { tag: 'user', payload: { id: 8, name: 'trinity' } }
+      """)
+
+    let idle: MacroAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("enumIdle"),
+      using: JSDefaultConverter<MacroAssociatedEnum>.self,
+      in: context
+    )
+    let count: MacroAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("enumCount"),
+      using: JSDefaultConverter<MacroAssociatedEnum>.self,
+      in: context
+    )
+    let range: MacroAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("enumRange"),
+      using: JSDefaultConverter<MacroAssociatedEnum>.self,
+      in: context
+    )
+    let user: MacroAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("enumUser"),
+      using: JSDefaultConverter<MacroAssociatedEnum>.self,
+      in: context
+    )
+
+    #expect(idle == .idle)
+    #expect(count == .count(5))
+    #expect(range == .range(1, 4))
+    #expect(user == .user(id: 8, name: "trinity"))
+  }
+}

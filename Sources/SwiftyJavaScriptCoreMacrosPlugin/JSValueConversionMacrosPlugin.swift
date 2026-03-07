@@ -132,6 +132,39 @@ private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
 
 private struct EnumCasePlan {
   let name: String
+  let associatedValues: [EnumAssociatedValuePlan]
+
+  var hasAssociatedValues: Bool {
+    !associatedValues.isEmpty
+  }
+
+  var payloadKind: EnumPayloadKind {
+    if associatedValues.isEmpty {
+      return .none
+    }
+
+    let labeledCount = associatedValues.count(where: { $0.label != nil })
+    if labeledCount == 0 {
+      return associatedValues.count == 1 ? .singleUnlabeled : .multipleUnlabeled
+    }
+    if labeledCount == associatedValues.count {
+      return .labeledObject
+    }
+    return .invalidMixed
+  }
+}
+
+private struct EnumAssociatedValuePlan {
+  let label: String?
+  let typeName: String
+}
+
+private enum EnumPayloadKind {
+  case none
+  case singleUnlabeled
+  case multipleUnlabeled
+  case labeledObject
+  case invalidMixed
 }
 
 private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(MacroUsageError)
@@ -145,17 +178,157 @@ private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(Ma
     }
 
     for element in enumCase.elements {
-      if element.parameterClause != nil {
+      var associatedValues: [EnumAssociatedValuePlan] = []
+      if let parameterClause = element.parameterClause {
+        associatedValues.reserveCapacity(parameterClause.parameters.count)
+        for parameter in parameterClause.parameters {
+          let firstName = parameter.firstName?.text
+          let secondName = parameter.secondName?.text
+          let label: String?
+          if let secondName {
+            label = secondName == "_" ? nil : secondName
+          } else if let firstName {
+            label = firstName == "_" ? nil : firstName
+          } else {
+            label = nil
+          }
+
+          associatedValues.append(
+            EnumAssociatedValuePlan(
+              label: label,
+              typeName: trimmed(parameter.type.description)
+            ))
+        }
+      }
+
+      let plan = EnumCasePlan(name: element.name.text, associatedValues: associatedValues)
+      if case .invalidMixed = plan.payloadKind {
         throw MacroUsageError(
-          description: "@JSValueAutoConvertible does not support enum cases with associated values"
+          description:
+            "@JSValueAutoConvertible does not support enum cases that mix labeled and unlabeled associated values"
         )
       }
 
-      plans.append(EnumCasePlan(name: element.name.text))
+      plans.append(plan)
     }
   }
 
   return plans
+}
+
+private func makeEnumDecodeCase(
+  _ enumCase: EnumCasePlan,
+  typeName: String
+) -> String {
+  switch enumCase.payloadKind {
+  case .none:
+    return "case \"\(enumCase.name)\": return .\(enumCase.name)"
+  case .singleUnlabeled:
+    let associatedValue = enumCase.associatedValues[0]
+    return """
+      case "\(enumCase.name)":
+        let __payload = value.getProperty(forKey: __payloadKey, in: context)
+        return .\(enumCase.name)(try \(associatedValue.typeName).tryDecode(__payload, in: context))
+      """
+  case .multipleUnlabeled:
+    var lines: [String] = [
+      "case \"\(enumCase.name)\":",
+      "  let __payload = value.getProperty(forKey: __payloadKey, in: context)",
+      "  guard __payload.isArray(in: context) else {",
+      "    throw .typeMismatch(expected: \"array\", actual: __payload.type)",
+      "  }",
+    ]
+    var arguments: [String] = []
+    for (index, associatedValue) in enumCase.associatedValues.enumerated() {
+      let localName = "__payload_\(enumCase.name)_\(index)"
+      lines.append("  let \(localName) = __payload.getProperty(at: \(index), in: context)")
+      arguments.append("try \(associatedValue.typeName).tryDecode(\(localName), in: context)")
+    }
+    lines.append("  return .\(enumCase.name)(\(arguments.joined(separator: ", ")))")
+    return lines.joined(separator: "\n")
+  case .labeledObject:
+    var lines: [String] = [
+      "case \"\(enumCase.name)\":",
+      "  let __payload = value.getProperty(forKey: __payloadKey, in: context)",
+      "  guard __payload.isObject else {",
+      "    throw .typeMismatch(expected: \"object\", actual: __payload.type)",
+      "  }",
+    ]
+    var arguments: [String] = []
+    for associatedValue in enumCase.associatedValues {
+      let label = associatedValue.label!
+      let keyName = "__payloadKey_\(enumCase.name)_\(label)"
+      let valueName = "__payloadValue_\(enumCase.name)_\(label)"
+      lines.append("  let \(keyName) = JSStringManaged(\"\(label)\")")
+      lines.append("  let \(valueName) = __payload.getProperty(forKey: \(keyName), in: context)")
+      arguments.append("\(label): try \(associatedValue.typeName).tryDecode(\(valueName), in: context)")
+    }
+    lines.append("  return .\(enumCase.name)(\(arguments.joined(separator: ", ")))")
+    return lines.joined(separator: "\n")
+  case .invalidMixed:
+    return ""
+  }
+}
+
+private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool) -> String {
+  switch enumCase.payloadKind {
+  case .none:
+    if taggedObjectMode {
+      return """
+        case .\(enumCase.name):
+          let __object = JSValue(objectIn: context)
+          __object.setProperty("\(enumCase.name)", forKey: __tagKey, in: context)
+          return __object
+        """
+    }
+    return "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+  case .singleUnlabeled:
+    let associatedValue = enumCase.associatedValues[0]
+    let binding = associatedValue.label ?? "associated0"
+    return """
+      case .\(enumCase.name)(let \(binding)):
+        let __object = JSValue(objectIn: context)
+        __object.setProperty("\(enumCase.name)", forKey: __tagKey, in: context)
+        let __payload = try \(binding).tryEncode(in: context)
+        __object.setProperty(__payload, forKey: __payloadKey, in: context)
+        return __object
+      """
+  case .multipleUnlabeled:
+    let bindings = enumCase.associatedValues.enumerated().map { index, _ in "associated\(index)" }
+    let pattern = bindings.map { "let \($0)" }.joined(separator: ", ")
+    var lines: [String] = [
+      "case .\(enumCase.name)(\(pattern)):",
+      "  let __object = JSValue(objectIn: context)",
+      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
+      "  let __payload = JSValue(arrayIn: context)",
+    ]
+    for (index, binding) in bindings.enumerated() {
+      lines.append("  let __encoded_\(index) = try \(binding).tryEncode(in: context)")
+      lines.append("  __payload.setProperty(__encoded_\(index), at: \(index), in: context)")
+    }
+    lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
+    lines.append("  return __object")
+    return lines.joined(separator: "\n")
+  case .labeledObject:
+    let bindings = enumCase.associatedValues.map { $0.label! }
+    let pattern = bindings.map { "\($0): let \($0)" }.joined(separator: ", ")
+    var lines: [String] = [
+      "case .\(enumCase.name)(\(pattern)):",
+      "  let __object = JSValue(objectIn: context)",
+      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
+      "  let __payload = JSValue(objectIn: context)",
+    ]
+    for label in bindings {
+      lines.append("  let __payloadKey_\(label) = JSStringManaged(\"\(label)\")")
+      lines.append("  let __encoded_\(label) = try \(label).tryEncode(in: context)")
+      lines.append("  __payload.setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
+    }
+    lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
+    lines.append("  return __object")
+    return lines.joined(separator: "\n")
+  case .invalidMixed:
+    return ""
+  }
 }
 
 public struct JSValueAutoConvertibleMacro: ExtensionMacro {
@@ -248,27 +421,59 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
           description: "@JSValueAutoConvertible requires at least one enum case")
       }
 
-      let switchCases = cases.map { enumCase in
-        "case \"\(enumCase.name)\": return .\(enumCase.name)"
-      }.joined(separator: "\n")
+      let hasAssociatedValues = cases.contains(where: { $0.hasAssociatedValues })
 
-      let encodeCases = cases.map { enumCase in
-        "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
-      }.joined(separator: "\n")
+      if hasAssociatedValues {
+        let decodeCases = cases.map { makeEnumDecodeCase($0, typeName: typeName) }
+          .joined(separator: "\n")
+        let encodeCases = cases.map { makeEnumEncodeCase($0, taggedObjectMode: true) }
+          .joined(separator: "\n")
 
-      decodeBody = """
-        let caseName = try String.tryDecode(value, in: context)
-        switch caseName {
-        \(switchCases)
-        default:
-          throw .codable("\(typeName) does not contain case \\(caseName)")
-        }
-        """
-      encodeBody = """
-        switch self {
-        \(encodeCases)
-        }
-        """
+        decodeBody = """
+          guard value.isObject else {
+            throw .typeMismatch(expected: "object", actual: value.type)
+          }
+          let __tagKey = JSStringManaged("tag")
+          let __payloadKey = JSStringManaged("payload")
+          let __tagValue = value.getProperty(forKey: __tagKey, in: context)
+          let __caseName = try String.tryDecode(__tagValue, in: context)
+          switch __caseName {
+          \(decodeCases)
+          default:
+            throw .codable("\(typeName) does not contain case \\(__caseName)")
+          }
+          """
+        encodeBody = """
+          let __tagKey = JSStringManaged("tag")
+          let __payloadKey = JSStringManaged("payload")
+          switch self {
+          \(encodeCases)
+          }
+          """
+      } else {
+
+        let switchCases = cases.map { enumCase in
+          "case \"\(enumCase.name)\": return .\(enumCase.name)"
+        }.joined(separator: "\n")
+
+        let encodeCases = cases.map { enumCase in
+          "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+        }.joined(separator: "\n")
+
+        decodeBody = """
+          let caseName = try String.tryDecode(value, in: context)
+          switch caseName {
+          \(switchCases)
+          default:
+            throw .codable("\(typeName) does not contain case \\(caseName)")
+          }
+          """
+        encodeBody = """
+          switch self {
+          \(encodeCases)
+          }
+          """
+      }
     } else {
       throw MacroUsageError(
         description:

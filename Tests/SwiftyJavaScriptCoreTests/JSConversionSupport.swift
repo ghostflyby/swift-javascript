@@ -115,3 +115,11 @@ enum MacroRawEnum: String, Equatable {
   case alpha = "A"
   case beta = "B"
 }
+
+@JSValueAutoConvertible
+enum MacroAssociatedEnum: Equatable {
+  case idle
+  case count(Int32)
+  case range(Int32, Int32)
+  case user(id: Int32, name: String)
+}

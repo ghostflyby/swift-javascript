@@ -116,6 +116,22 @@ public struct JSValue: ~Copyable {
     self.init(ref: objectRef!, ctx: context)
   }
 
+  public init(arrayIn context: isolated JSContext = #isolation) {
+    var exception: JSValueRef?
+    let arrayRef = JSObjectMakeArray(context.globalContextRef, 0, nil, &exception)
+    precondition(exception == nil, "JSValue array creation raised exception")
+    precondition(arrayRef != nil, "JSValue array creation returned nil")
+    self.init(ref: arrayRef!, ctx: context)
+  }
+
+  public init(arrayIn context: borrowing JSCallbackContext) {
+    var exception: JSValueRef?
+    let arrayRef = JSObjectMakeArray(context.globalContextRef, 0, nil, &exception)
+    precondition(exception == nil, "JSValue array creation raised exception")
+    precondition(arrayRef != nil, "JSValue array creation returned nil")
+    self.init(ref: arrayRef!, ctx: context)
+  }
+
   public typealias JSFunctionCallback =
     (
       _ context: borrowing JSCallbackContext, _ function: borrowing JSValue,
