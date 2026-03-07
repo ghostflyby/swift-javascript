@@ -115,9 +115,3 @@ enum MacroRawEnum: String, Equatable {
   case alpha = "A"
   case beta = "B"
 }
-
-@JSValueAutoConvertible(JSRawRepresentableValueConverter.self)
-enum MacroRawValueEnum: String, Equatable {
-  case alpha = "A"
-  case beta = "B"
-}

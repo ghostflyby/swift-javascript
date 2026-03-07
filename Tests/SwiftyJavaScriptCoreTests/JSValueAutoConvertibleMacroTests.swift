@@ -102,23 +102,3 @@ import Testing
     #expect(decoded == .beta)
   }
 }
-
-@Test func macroRawEnumCanOptIntoRawValueConverter() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
-
-  await context.withIsolatedGlobalObject { context, global in
-    let value = MacroRawValueEnum.alpha
-    global.setProperty(value, forKey: JSStringManaged("macroRawValueEnum"), in: context)
-
-    let raw = global.getProperty(forKey: JSStringManaged("macroRawValueEnum"), in: context)
-    #expect(raw.toString(in: context) == "A")
-
-    _ = context.evaluateScript("macroRawValueEnum = 'B'")
-    let decoded: MacroRawValueEnum = global.getProperty(
-      forKey: JSStringManaged("macroRawValueEnum"),
-      using: JSDefaultConverter<MacroRawValueEnum>.self,
-      in: context
-    )
-    #expect(decoded == .beta)
-  }
-}

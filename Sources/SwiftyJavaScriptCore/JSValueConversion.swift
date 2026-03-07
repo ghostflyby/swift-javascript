@@ -168,46 +168,6 @@ public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
   }
 }
 
-public enum JSRawRepresentableValueConverter {
-  public static func decode<T: RawRepresentable>(
-    _ value: borrowing JSValue,
-    as _: T.Type,
-    in context: borrowing JSCallbackContext
-  ) -> T where T.RawValue: JSValueCodable {
-    do {
-      return try tryDecode(value, as: T.self, in: context)
-    } catch {
-      fatalError("JSRawRepresentableValueConverter.decode(\(T.self)) failed: \(error)")
-    }
-  }
-
-  public static func tryDecode<T: RawRepresentable>(
-    _ value: borrowing JSValue,
-    as _: T.Type,
-    in context: borrowing JSCallbackContext
-  ) throws(JSValueConversionError) -> T where T.RawValue: JSValueCodable {
-    let rawValue = try T.RawValue.tryDecode(value, in: context)
-    guard let decoded = T(rawValue: rawValue) else {
-      throw .codable("\(T.self) cannot decode raw value \(rawValue)")
-    }
-    return decoded
-  }
-
-  public static func encode<T: RawRepresentable>(
-    _ value: T,
-    in context: borrowing JSCallbackContext
-  ) -> JSValue where T.RawValue: JSValueCodable {
-    value.rawValue.toJSValue(in: context)
-  }
-
-  public static func tryEncode<T: RawRepresentable>(
-    _ value: T,
-    in context: borrowing JSCallbackContext
-  ) throws(JSValueConversionError) -> JSValue where T.RawValue: JSValueCodable {
-    try value.rawValue.tryEncode(in: context)
-  }
-}
-
 extension JSValue: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
     self.init(ref: value.ref, ctx: context)

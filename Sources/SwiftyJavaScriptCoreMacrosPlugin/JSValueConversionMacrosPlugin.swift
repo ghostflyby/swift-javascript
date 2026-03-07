@@ -28,14 +28,6 @@ private func stripDotSelf(_ raw: String) -> String {
   return value
 }
 
-private func baseTypeName(_ raw: String) -> String {
-  trimmed(raw).split(separator: ".").last.map(String.init) ?? trimmed(raw)
-}
-
-private func isRawRepresentableValueConverterMarker(_ raw: String) -> Bool {
-  baseTypeName(raw) == "JSRawRepresentableValueConverter"
-}
-
 private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
   guard let arguments = node.arguments,
     case .argumentList(let list) = arguments
@@ -196,11 +188,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     let decodeBody: String
     let encodeBody: String
 
-    if let decoder = sharedDecoder, let encoder = sharedEncoder,
-      !(declaration.is(EnumDeclSyntax.self)
-        && isRawRepresentableValueConverterMarker(decoder)
-        && isRawRepresentableValueConverterMarker(encoder))
-    {
+    if let decoder = sharedDecoder, let encoder = sharedEncoder {
       decodeBody = """
         return try \(decoder).tryDecode(value, in: context)
         """
@@ -260,40 +248,27 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
           description: "@JSValueAutoConvertible requires at least one enum case")
       }
 
-      if let decoder = sharedDecoder, let encoder = sharedEncoder,
-        isRawRepresentableValueConverterMarker(decoder)
-          && isRawRepresentableValueConverterMarker(encoder)
-      {
-        decodeBody = """
-          return try JSRawRepresentableValueConverter.tryDecode(value, as: Self.self, in: context)
-          """
-        encodeBody = """
-          return try JSRawRepresentableValueConverter.tryEncode(self, in: context)
-          """
-      } else {
+      let switchCases = cases.map { enumCase in
+        "case \"\(enumCase.name)\": return .\(enumCase.name)"
+      }.joined(separator: "\n")
 
-        let switchCases = cases.map { enumCase in
-          "case \"\(enumCase.name)\": return .\(enumCase.name)"
-        }.joined(separator: "\n")
+      let encodeCases = cases.map { enumCase in
+        "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+      }.joined(separator: "\n")
 
-        let encodeCases = cases.map { enumCase in
-          "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
-        }.joined(separator: "\n")
-
-        decodeBody = """
-          let caseName = try String.tryDecode(value, in: context)
-          switch caseName {
-          \(switchCases)
-          default:
-            throw .codable("\(typeName) does not contain case \\(caseName)")
-          }
-          """
-        encodeBody = """
-          switch self {
-          \(encodeCases)
-          }
-          """
-      }
+      decodeBody = """
+        let caseName = try String.tryDecode(value, in: context)
+        switch caseName {
+        \(switchCases)
+        default:
+          throw .codable("\(typeName) does not contain case \\(caseName)")
+        }
+        """
+      encodeBody = """
+        switch self {
+        \(encodeCases)
+        }
+        """
     } else {
       throw MacroUsageError(
         description:
