@@ -14,9 +14,20 @@ private struct FieldOverrideSpec {
   let encoder: String?
 }
 
+private struct JSValueAutoConvertibleOptions {
+  let typeArguments: [String]
+  let tagKey: String
+  let payloadKey: String
+}
+
 private enum ParsedAttributeArgument {
   case string(String)
   case type(String)
+}
+
+private struct ParsedLabeledAttributeArgument {
+  let label: String?
+  let value: ParsedAttributeArgument
 }
 
 private struct PropertyPlan {
@@ -40,6 +51,12 @@ private func stripDotSelf(_ raw: String) -> String {
 }
 
 private func parseAttributeArguments(from node: AttributeSyntax) -> [ParsedAttributeArgument] {
+  parseLabeledAttributeArguments(from: node).map(\.value)
+}
+
+private func parseLabeledAttributeArguments(from node: AttributeSyntax)
+  -> [ParsedLabeledAttributeArgument]
+{
   guard let arguments = node.arguments,
     case .argumentList(let list) = arguments
   else {
@@ -47,13 +64,20 @@ private func parseAttributeArguments(from node: AttributeSyntax) -> [ParsedAttri
   }
 
   return list.map { element in
+    let parsedValue: ParsedAttributeArgument
     if let literal = element.expression.as(StringLiteralExprSyntax.self),
       literal.segments.count == 1,
       case .stringSegment(let segment) = literal.segments.first
     {
-      return .string(segment.content.text)
+      parsedValue = .string(segment.content.text)
+    } else {
+      parsedValue = .type(stripDotSelf(element.expression.description))
     }
-    return .type(stripDotSelf(element.expression.description))
+
+    return ParsedLabeledAttributeArgument(
+      label: element.label?.text,
+      value: parsedValue
+    )
   }
 }
 
@@ -66,6 +90,44 @@ private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
       return typeName
     }
   }
+}
+
+private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(MacroUsageError)
+  -> JSValueAutoConvertibleOptions
+{
+  var typeArguments: [String] = []
+  var tagKey = "tag"
+  var payloadKey = "payload"
+
+  for argument in parseLabeledAttributeArguments(from: node) {
+    switch (argument.label, argument.value) {
+    case (nil, .type(let typeName)):
+      typeArguments.append(typeName)
+    case ("tagKey", .string(let value)):
+      tagKey = value
+    case ("payloadKey", .string(let value)):
+      payloadKey = value
+    case ("tagKey", .type), ("payloadKey", .type):
+      throw MacroUsageError(
+        description:
+          "@JSValueAutoConvertible tagKey and payloadKey arguments must be string literals"
+      )
+    case (.some(let label), _):
+      throw MacroUsageError(
+        description: "@JSValueAutoConvertible does not support argument label \"\(label)\""
+      )
+    case (nil, .string):
+      throw MacroUsageError(
+        description: "@JSValueAutoConvertible unnamed string arguments are not supported"
+      )
+    }
+  }
+
+  return JSValueAutoConvertibleOptions(
+    typeArguments: typeArguments,
+    tagKey: tagKey,
+    payloadKey: payloadKey
+  )
 }
 
 private func parseFieldOverrideSpec(from attribute: AttributeSyntax) -> FieldOverrideSpec? {
@@ -494,7 +556,8 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     in _: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
     let typeName = trimmed(type.description)
-    let arguments = parseTypeArguments(from: node)
+    let options = try parseAutoConvertibleOptions(from: node)
+    let arguments = options.typeArguments
 
     let sharedDecoder: String?
     let sharedEncoder: String?
@@ -591,8 +654,8 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
           guard value.isObject else {
             throw .typeMismatch(expected: "object", actual: value.type)
           }
-          let __tagKey = JSStringManaged("tag")
-          let __payloadKey = JSStringManaged("payload")
+          let __tagKey = JSStringManaged("\(options.tagKey)")
+          let __payloadKey = JSStringManaged("\(options.payloadKey)")
           let __tagValue = value.getProperty(forKey: __tagKey, in: context)
           let __caseName = try String.tryDecode(__tagValue, in: context)
           switch __caseName {
@@ -602,8 +665,8 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
           }
           """
         encodeBody = """
-          let __tagKey = JSStringManaged("tag")
-          let __payloadKey = JSStringManaged("payload")
+          let __tagKey = JSStringManaged("\(options.tagKey)")
+          let __payloadKey = JSStringManaged("\(options.payloadKey)")
           switch self {
           \(encodeCases)
           }

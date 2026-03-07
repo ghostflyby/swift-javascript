@@ -21,7 +21,42 @@ public macro JSValueAutoConvertible() =
   named(tryEncode(in:))
 )
 public macro JSValueAutoConvertible(
+  tagKey: StaticString,
+  payloadKey: StaticString = "payload"
+) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueAutoConvertibleMacro"
+  )
+
+@attached(
+  extension,
+  conformances: JSValueCodable,
+  names: named(init(value:in:)),
+  named(tryDecode(_:in:)),
+  named(toJSValue(in:)),
+  named(tryEncode(in:))
+)
+public macro JSValueAutoConvertible(
   _ converter: any JSValueConverter.Type
+) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueAutoConvertibleMacro"
+  )
+
+@attached(
+  extension,
+  conformances: JSValueCodable,
+  names: named(init(value:in:)),
+  named(tryDecode(_:in:)),
+  named(toJSValue(in:)),
+  named(tryEncode(in:))
+)
+public macro JSValueAutoConvertible(
+  _ converter: any JSValueConverter.Type,
+  tagKey: StaticString,
+  payloadKey: StaticString = "payload"
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
@@ -39,6 +74,25 @@ public macro JSValueAutoConvertible(
 public macro JSValueAutoConvertible(
   _ decoder: any JSValueDecoder.Type,
   _ encoder: any JSValueEncoder.Type
+) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueAutoConvertibleMacro"
+  )
+
+@attached(
+  extension,
+  conformances: JSValueCodable,
+  names: named(init(value:in:)),
+  named(tryDecode(_:in:)),
+  named(toJSValue(in:)),
+  named(tryEncode(in:))
+)
+public macro JSValueAutoConvertible(
+  _ decoder: any JSValueDecoder.Type,
+  _ encoder: any JSValueEncoder.Type,
+  tagKey: StaticString,
+  payloadKey: StaticString = "payload"
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",

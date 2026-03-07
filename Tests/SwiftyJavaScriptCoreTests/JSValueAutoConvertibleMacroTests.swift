@@ -178,6 +178,73 @@ import Testing
   }
 }
 
+@Test func macroAssociatedEnumCanCustomizeTagAndPayloadKeys() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    global.setProperty(
+      MacroCustomKeyAssociatedEnum.idle,
+      forKey: JSStringManaged("customIdle"),
+      in: context
+    )
+    global.setProperty(
+      MacroCustomKeyAssociatedEnum.count(11),
+      forKey: JSStringManaged("customCount"),
+      in: context
+    )
+    global.setProperty(
+      MacroCustomKeyAssociatedEnum.user(id: 3, name: "smith"),
+      forKey: JSStringManaged("customUser"),
+      in: context
+    )
+
+    let shapeCheck = context.evaluateScript(
+      """
+      [
+        customIdle.kind,
+        customCount.data,
+        customUser.data.id,
+        customUser.data.name,
+        typeof customUser.tag,
+        typeof customUser.payload
+      ].join(':')
+      """)
+    switch consume shapeCheck {
+    case .value(let value):
+      #expect(value.toString(in: context) == "idle:11:3:smith:undefined:undefined")
+    case .exception:
+      Issue.record("Expected custom tag and payload keys to be used for associated enum encoding")
+    }
+
+    _ = context.evaluateScript(
+      """
+      globalThis.customIdle = { kind: 'idle' }
+      globalThis.customCount = { kind: 'count', data: 8 }
+      globalThis.customUser = { kind: 'user', data: { id: 5, name: 'oracle' } }
+      """)
+
+    let idle: MacroCustomKeyAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("customIdle"),
+      using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
+      in: context
+    )
+    let count: MacroCustomKeyAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("customCount"),
+      using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
+      in: context
+    )
+    let user: MacroCustomKeyAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("customUser"),
+      using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
+      in: context
+    )
+
+    #expect(idle == .idle)
+    #expect(count == .count(8))
+    #expect(user == .user(id: 5, name: "oracle"))
+  }
+}
+
 @Test func macroAssociatedEnumFieldOverridesApplyPerPayloadField() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 

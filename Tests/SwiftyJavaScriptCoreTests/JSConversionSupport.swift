@@ -124,6 +124,13 @@ enum MacroAssociatedEnum: Equatable {
   case user(id: Int32, name: String)
 }
 
+@JSValueAutoConvertible(tagKey: "kind", payloadKey: "data")
+enum MacroCustomKeyAssociatedEnum: Equatable {
+  case idle
+  case count(Int32)
+  case user(id: Int32, name: String)
+}
+
 @JSValueFieldCoding("enabled", ZeroOneBoolConverter.self)
 @JSValueFieldCoding("pair.0", ZeroOneBoolConverter.self)
 @JSValueFieldCoding("pair.1", ZeroOneBoolConverter.self)
