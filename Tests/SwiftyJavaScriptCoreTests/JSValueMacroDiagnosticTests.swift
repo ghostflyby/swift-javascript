@@ -31,3 +31,28 @@ private let macroTestImplementations = [
     macros: macroTestImplementations
   )
 }
+
+@Test func jsValueAutoConvertibleRejectsEmptyPayloadKeyForUnlabeledPayload() {
+  assertMacroExpansion(
+    """
+    @JSValueAutoConvertible(payloadKey: "")
+    enum InvalidFlattenedEnum {
+      case rgb(Int32, Int32, Int32)
+    }
+    """,
+    expandedSource: """
+      enum InvalidFlattenedEnum {
+        case rgb(Int32, Int32, Int32)
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message:
+          "@JSValueAutoConvertible payloadKey cannot be empty unless every associated-value case uses labeled payload fields",
+        line: 1,
+        column: 1
+      )
+    ],
+    macros: macroTestImplementations
+  )
+}

@@ -18,6 +18,7 @@ private struct JSValueAutoConvertibleOptions {
   let typeArguments: [String]
   let tagKey: String
   let payloadKey: String
+  let isPayloadKeyExplicit: Bool
 }
 
 private enum ParsedAttributeArgument {
@@ -96,8 +97,9 @@ private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(Macr
   -> JSValueAutoConvertibleOptions
 {
   var typeArguments: [String] = []
-  var tagKey = "tag"
+  var tagKey = "kind"
   var payloadKey = "payload"
+  var isPayloadKeyExplicit = false
 
   for argument in parseLabeledAttributeArguments(from: node) {
     switch (argument.label, argument.value) {
@@ -107,6 +109,7 @@ private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(Macr
       tagKey = value
     case ("payloadKey", .string(let value)):
       payloadKey = value
+      isPayloadKeyExplicit = true
     case ("tagKey", .type), ("payloadKey", .type):
       throw MacroUsageError(
         description:
@@ -126,7 +129,8 @@ private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(Macr
   return JSValueAutoConvertibleOptions(
     typeArguments: typeArguments,
     tagKey: tagKey,
-    payloadKey: payloadKey
+    payloadKey: payloadKey,
+    isPayloadKeyExplicit: isPayloadKeyExplicit
   )
 }
 
@@ -404,7 +408,8 @@ private func collectEnumCases(
 
 private func makeEnumDecodeCase(
   _ enumCase: EnumCasePlan,
-  typeName: String
+  typeName: String,
+  flattenedLabeledPayload: Bool
 ) -> String {
   switch enumCase.payloadKind {
   case .none:
@@ -444,19 +449,24 @@ private func makeEnumDecodeCase(
     return lines.joined(separator: "\n")
   case .labeledObject:
     var lines: [String] = [
-      "case \"\(enumCase.name)\":",
-      "  let __payload = value.getProperty(forKey: __payloadKey, in: context)",
-      "  guard __payload.isObject else {",
-      "    throw .typeMismatch(expected: \"object\", actual: __payload.type)",
-      "  }",
+      "case \"\(enumCase.name)\":"
     ]
+    if flattenedLabeledPayload {
+    } else {
+      lines.append("  let __payload = value.getProperty(forKey: __payloadKey, in: context)")
+      lines.append("  guard __payload.isObject else {")
+      lines.append("    throw .typeMismatch(expected: \"object\", actual: __payload.type)")
+      lines.append("  }")
+    }
+    let payloadSource = flattenedLabeledPayload ? "value" : "__payload"
     var arguments: [String] = []
     for associatedValue in enumCase.associatedValues {
       let label = associatedValue.label!
       let keyName = "__payloadKey_\(enumCase.name)_\(label)"
       let valueName = "__payloadValue_\(enumCase.name)_\(label)"
       lines.append("  let \(keyName) = JSStringManaged(\"\(label)\")")
-      lines.append("  let \(valueName) = __payload.getProperty(forKey: \(keyName), in: context)")
+      lines.append(
+        "  let \(valueName) = \(payloadSource).getProperty(forKey: \(keyName), in: context)")
       if let decoder = associatedValue.decoderOverride {
         arguments.append("\(label): try \(decoder).tryDecode(\(valueName), in: context)")
       } else {
@@ -471,7 +481,11 @@ private func makeEnumDecodeCase(
   }
 }
 
-private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool) -> String {
+private func makeEnumEncodeCase(
+  _ enumCase: EnumCasePlan,
+  taggedObjectMode: Bool,
+  flattenedLabeledPayload: Bool
+) -> String {
   switch enumCase.payloadKind {
   case .none:
     if taggedObjectMode {
@@ -526,9 +540,13 @@ private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool
     var lines: [String] = [
       "case .\(enumCase.name)(\(pattern)):",
       "  let __object = JSValue(objectIn: context)",
-      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
-      "  let __payload = JSValue(objectIn: context)",
+      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)"
     ]
+    if flattenedLabeledPayload {
+    } else {
+      lines.append("  let __payload = JSValue(objectIn: context)")
+    }
+    let payloadTarget = flattenedLabeledPayload ? "__object" : "__payload"
     for (index, label) in bindings.enumerated() {
       lines.append("  let __payloadKey_\(label) = JSStringManaged(\"\(label)\")")
       if let encoder = enumCase.associatedValues[index].encoderOverride {
@@ -537,9 +555,11 @@ private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool
         lines.append("  let __encoded_\(label) = try \(label).tryEncode(in: context)")
       }
       lines.append(
-        "  __payload.setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
+        "  \(payloadTarget).setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
     }
-    lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
+    if !flattenedLabeledPayload {
+      lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
+    }
     lines.append("  return __object")
     return lines.joined(separator: "\n")
   case .invalidMixed:
@@ -645,17 +665,55 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
       let hasAssociatedValues = cases.contains(where: { $0.hasAssociatedValues })
 
       if hasAssociatedValues {
-        let decodeCases = cases.map { makeEnumDecodeCase($0, typeName: typeName) }
+        let canFlattenLabeledPayload = cases.allSatisfy {
+          switch $0.payloadKind {
+          case .none, .labeledObject:
+            return true
+          case .singleUnlabeled, .multipleUnlabeled, .invalidMixed:
+            return false
+          }
+        }
+        let flattenedLabeledPayload = if options.isPayloadKeyExplicit {
+          options.payloadKey.isEmpty
+        } else {
+          canFlattenLabeledPayload
+        }
+        if flattenedLabeledPayload && !canFlattenLabeledPayload {
+          throw MacroUsageError(
+            description:
+              "@JSValueAutoConvertible payloadKey cannot be empty unless every associated-value case uses labeled payload fields"
+          )
+        }
+
+        let decodeCases = cases.map {
+          makeEnumDecodeCase(
+            $0,
+            typeName: typeName,
+            flattenedLabeledPayload: flattenedLabeledPayload
+          )
+        }
           .joined(separator: "\n")
-        let encodeCases = cases.map { makeEnumEncodeCase($0, taggedObjectMode: true) }
+        let encodeCases = cases.map {
+          makeEnumEncodeCase(
+            $0,
+            taggedObjectMode: true,
+            flattenedLabeledPayload: flattenedLabeledPayload
+          )
+        }
           .joined(separator: "\n")
+
+        let payloadKeyDeclaration = if flattenedLabeledPayload {
+          ""
+        } else {
+          "let __payloadKey = JSStringManaged(\"\(options.payloadKey)\")"
+        }
 
         decodeBody = """
           guard value.isObject else {
             throw .typeMismatch(expected: "object", actual: value.type)
           }
           let __tagKey = JSStringManaged("\(options.tagKey)")
-          let __payloadKey = JSStringManaged("\(options.payloadKey)")
+          \(payloadKeyDeclaration)
           let __tagValue = value.getProperty(forKey: __tagKey, in: context)
           let __caseName = try String.tryDecode(__tagValue, in: context)
           switch __caseName {
@@ -666,7 +724,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
           """
         encodeBody = """
           let __tagKey = JSStringManaged("\(options.tagKey)")
-          let __payloadKey = JSStringManaged("\(options.payloadKey)")
+          \(payloadKeyDeclaration)
           switch self {
           \(encodeCases)
           }

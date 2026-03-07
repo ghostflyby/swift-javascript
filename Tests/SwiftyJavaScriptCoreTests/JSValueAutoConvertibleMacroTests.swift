@@ -121,7 +121,7 @@ import Testing
     let shapeCheck = context.evaluateScript(
       """
       [
-        enumIdle.tag,
+        enumIdle.kind,
         enumCount.payload,
         Array.isArray(enumRange.payload),
         enumRange.payload[0] + enumRange.payload[1],
@@ -144,10 +144,10 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     _ = context.evaluateScript(
       """
-      globalThis.enumIdle = { tag: 'idle' }
-      globalThis.enumCount = { tag: 'count', payload: 5 }
-      globalThis.enumRange = { tag: 'range', payload: [1, 4] }
-      globalThis.enumUser = { tag: 'user', payload: { id: 8, name: 'trinity' } }
+      globalThis.enumIdle = { kind: 'idle' }
+      globalThis.enumCount = { kind: 'count', payload: 5 }
+      globalThis.enumRange = { kind: 'range', payload: [1, 4] }
+      globalThis.enumUser = { kind: 'user', payload: { id: 8, name: 'trinity' } }
       """)
 
     let idle: MacroAssociatedEnum = global.getProperty(
@@ -201,11 +201,11 @@ import Testing
     let shapeCheck = context.evaluateScript(
       """
       [
-        customIdle.kind,
+        customIdle.type,
         customCount.data,
         customUser.data.id,
         customUser.data.name,
-        typeof customUser.tag,
+        typeof customUser.kind,
         typeof customUser.payload
       ].join(':')
       """)
@@ -218,9 +218,9 @@ import Testing
 
     _ = context.evaluateScript(
       """
-      globalThis.customIdle = { kind: 'idle' }
-      globalThis.customCount = { kind: 'count', data: 8 }
-      globalThis.customUser = { kind: 'user', data: { id: 5, name: 'oracle' } }
+      globalThis.customIdle = { type: 'idle' }
+      globalThis.customCount = { type: 'count', data: 8 }
+      globalThis.customUser = { type: 'user', data: { id: 5, name: 'oracle' } }
       """)
 
     let idle: MacroCustomKeyAssociatedEnum = global.getProperty(
@@ -242,6 +242,77 @@ import Testing
     #expect(idle == .idle)
     #expect(count == .count(8))
     #expect(user == .user(id: 5, name: "oracle"))
+  }
+}
+
+@Test func macroAssociatedEnumCanFlattenLabeledPayloadIntoTopLevelObject() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    global.setProperty(
+      MacroFlattenedAssociatedEnum.rgb(r: 1, g: 2, b: 3),
+      forKey: JSStringManaged("flattenedRgb"),
+      in: context
+    )
+    global.setProperty(
+      MacroFlattenedAssociatedEnum.named(name: "cyan"),
+      forKey: JSStringManaged("flattenedNamed"),
+      in: context
+    )
+    global.setProperty(
+      MacroFlattenedAssociatedEnum.idle,
+      forKey: JSStringManaged("flattenedIdle"),
+      in: context
+    )
+
+    let shapeCheck = context.evaluateScript(
+      """
+      [
+        flattenedRgb.kind,
+        flattenedRgb.r,
+        flattenedRgb.g,
+        flattenedRgb.b,
+        typeof flattenedRgb.payload,
+        flattenedNamed.kind,
+        flattenedNamed.name,
+        flattenedIdle.kind
+      ].join(':')
+      """)
+    switch consume shapeCheck {
+    case .value(let value):
+      #expect(value.toString(in: context) == "rgb:1:2:3:undefined:named:cyan:idle")
+    case .exception:
+      Issue.record(
+        "Expected payloadKey empty string to flatten labeled payload fields into the top-level object"
+      )
+    }
+
+    _ = context.evaluateScript(
+      """
+      globalThis.flattenedRgb = { kind: 'rgb', r: 7, g: 8, b: 9 }
+      globalThis.flattenedNamed = { kind: 'named', name: 'amber' }
+      globalThis.flattenedIdle = { kind: 'idle' }
+      """)
+
+    let rgb: MacroFlattenedAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("flattenedRgb"),
+      using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
+      in: context
+    )
+    let named: MacroFlattenedAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("flattenedNamed"),
+      using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
+      in: context
+    )
+    let idle: MacroFlattenedAssociatedEnum = global.getProperty(
+      forKey: JSStringManaged("flattenedIdle"),
+      using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
+      in: context
+    )
+
+    #expect(rgb == .rgb(r: 7, g: 8, b: 9))
+    #expect(named == .named(name: "amber"))
+    #expect(idle == .idle)
   }
 }
 
@@ -285,9 +356,9 @@ import Testing
 
     _ = context.evaluateScript(
       """
-      globalThis.enumEnabled = { tag: 'enabled', payload: 0 }
-      globalThis.enumPair = { tag: 'pair', payload: [0, 1] }
-      globalThis.enumFlags = { tag: 'flags', payload: { id: 12, enabled: 0 } }
+      globalThis.enumEnabled = { kind: 'enabled', payload: 0 }
+      globalThis.enumPair = { kind: 'pair', payload: [0, 1] }
+      globalThis.enumFlags = { kind: 'flags', payload: { id: 12, enabled: 0 } }
       """)
 
     let enabled: MacroAssociatedOverrideEnum = global.getProperty(
