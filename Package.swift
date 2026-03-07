@@ -37,7 +37,11 @@ let package = Package(
     ),
     .testTarget(
       name: "SwiftyJavaScriptCoreTests",
-      dependencies: ["SwiftyJavaScriptCore"]
+      dependencies: [
+        "SwiftyJavaScriptCore",
+        "SwiftyJavaScriptCoreMacrosPlugin",
+        .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+      ]
     ),
   ]
 )

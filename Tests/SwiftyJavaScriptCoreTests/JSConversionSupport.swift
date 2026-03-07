@@ -123,3 +123,14 @@ enum MacroAssociatedEnum: Equatable {
   case range(Int32, Int32)
   case user(id: Int32, name: String)
 }
+
+@JSValueFieldCoding("enabled", ZeroOneBoolConverter.self)
+@JSValueFieldCoding("pair.0", ZeroOneBoolConverter.self)
+@JSValueFieldCoding("pair.1", ZeroOneBoolConverter.self)
+@JSValueFieldCoding("flags.enabled", ZeroOneBoolConverter.self)
+@JSValueAutoConvertible
+enum MacroAssociatedOverrideEnum: Equatable {
+  case enabled(Bool)
+  case pair(Bool, Bool)
+  case flags(id: Int32, enabled: Bool)
+}

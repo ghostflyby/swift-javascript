@@ -8,6 +8,17 @@ private struct MacroUsageError: Error, CustomStringConvertible {
   let description: String
 }
 
+private struct FieldOverrideSpec {
+  let selector: String?
+  let decoder: String?
+  let encoder: String?
+}
+
+private enum ParsedAttributeArgument {
+  case string(String)
+  case type(String)
+}
+
 private struct PropertyPlan {
   let name: String
   let typeName: String
@@ -28,13 +39,88 @@ private func stripDotSelf(_ raw: String) -> String {
   return value
 }
 
-private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
+private func parseAttributeArguments(from node: AttributeSyntax) -> [ParsedAttributeArgument] {
   guard let arguments = node.arguments,
     case .argumentList(let list) = arguments
   else {
     return []
   }
-  return list.map { stripDotSelf($0.expression.description) }
+
+  return list.map { element in
+    if let literal = element.expression.as(StringLiteralExprSyntax.self),
+      literal.segments.count == 1,
+      case .stringSegment(let segment) = literal.segments.first
+    {
+      return .string(segment.content.text)
+    }
+    return .type(stripDotSelf(element.expression.description))
+  }
+}
+
+private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
+  parseAttributeArguments(from: node).compactMap { argument in
+    switch argument {
+    case .string:
+      return nil
+    case .type(let typeName):
+      return typeName
+    }
+  }
+}
+
+private func parseFieldOverrideSpec(from attribute: AttributeSyntax) -> FieldOverrideSpec? {
+  guard let nameSyntax = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
+    return nil
+  }
+
+  let name = nameSyntax.name.text
+  let arguments = parseAttributeArguments(from: attribute)
+  let selector: String?
+  let payloadArguments: ArraySlice<ParsedAttributeArgument>
+  if case .string(let value)? = arguments.first {
+    selector = value
+    payloadArguments = arguments.dropFirst()
+  } else {
+    selector = nil
+    payloadArguments = arguments[...]
+  }
+
+  func payloadType(at index: Int) -> String? {
+    guard index >= 0, index < payloadArguments.count else {
+      return nil
+    }
+    let element = payloadArguments[
+      payloadArguments.index(payloadArguments.startIndex, offsetBy: index)]
+    switch element {
+    case .string:
+      return nil
+    case .type(let typeName):
+      return typeName
+    }
+  }
+
+  switch name {
+  case "JSValueFieldCoding":
+    if let converter = payloadType(at: 0) {
+      return FieldOverrideSpec(
+        selector: selector,
+        decoder: converter,
+        encoder: payloadType(at: 1) ?? converter
+      )
+    }
+  case "JSValueFieldDecoding":
+    if let decoder = payloadType(at: 0) {
+      return FieldOverrideSpec(selector: selector, decoder: decoder, encoder: nil)
+    }
+  case "JSValueFieldEncoding":
+    if let encoder = payloadType(at: 0) {
+      return FieldOverrideSpec(selector: selector, decoder: nil, encoder: encoder)
+    }
+  default:
+    return nil
+  }
+
+  return nil
 }
 
 private func parseFieldOverrides(from attributes: AttributeListSyntax?) -> (
@@ -49,37 +135,45 @@ private func parseFieldOverrides(from attributes: AttributeListSyntax?) -> (
 
   for element in attributes {
     guard case .attribute(let attribute) = element,
-      let nameSyntax = attribute.attributeName.as(IdentifierTypeSyntax.self)
+      let override = parseFieldOverrideSpec(from: attribute)
     else {
       continue
     }
 
-    let name = nameSyntax.name.text
-    let args = parseTypeArguments(from: attribute)
-
-    switch name {
-    case "JSValueFieldCoding":
-      if args.count >= 1 {
-        decoder = args[0]
-        encoder = args[0]
-      }
-      if args.count >= 2 {
-        encoder = args[1]
-      }
-    case "JSValueFieldDecoding":
-      if let first = args.first {
-        decoder = first
-      }
-    case "JSValueFieldEncoding":
-      if let first = args.first {
-        encoder = first
-      }
-    default:
-      continue
+    if let overrideDecoder = override.decoder {
+      decoder = overrideDecoder
+    }
+    if let overrideEncoder = override.encoder {
+      encoder = overrideEncoder
     }
   }
 
   return (decoder, encoder)
+}
+
+private func parseEnumFieldOverrides(from attributes: AttributeListSyntax?)
+  throws(MacroUsageError) -> [String: FieldOverrideSpec]
+{
+  guard let attributes else {
+    return [:]
+  }
+
+  var overrides: [String: FieldOverrideSpec] = [:]
+  for element in attributes {
+    guard case .attribute(let attribute) = element,
+      let override = parseFieldOverrideSpec(from: attribute)
+    else {
+      continue
+    }
+
+    guard let selector = override.selector else {
+      continue
+    }
+
+    overrides[selector] = override
+  }
+
+  return overrides
 }
 
 private func collectStoredProperties(from members: MemberBlockItemListSyntax) -> [PropertyPlan] {
@@ -157,6 +251,8 @@ private struct EnumCasePlan {
 private struct EnumAssociatedValuePlan {
   let label: String?
   let typeName: String
+  let decoderOverride: String?
+  let encoderOverride: String?
 }
 
 private enum EnumPayloadKind {
@@ -167,10 +263,14 @@ private enum EnumPayloadKind {
   case invalidMixed
 }
 
-private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(MacroUsageError)
+private func collectEnumCases(
+  from members: MemberBlockItemListSyntax,
+  fieldOverrides: [String: FieldOverrideSpec] = [:]
+) throws(MacroUsageError)
   -> [EnumCasePlan]
 {
   var plans: [EnumCasePlan] = []
+  var unmatchedFieldOverrides = fieldOverrides
 
   for member in members {
     guard let enumCase = member.decl.as(EnumCaseDeclSyntax.self) else {
@@ -179,9 +279,10 @@ private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(Ma
 
     for element in enumCase.elements {
       var associatedValues: [EnumAssociatedValuePlan] = []
+      let associatedValueCount = element.parameterClause?.parameters.count ?? 0
       if let parameterClause = element.parameterClause {
         associatedValues.reserveCapacity(parameterClause.parameters.count)
-        for parameter in parameterClause.parameters {
+        for (index, parameter) in parameterClause.parameters.enumerated() {
           let firstName = parameter.firstName?.text
           let secondName = parameter.secondName?.text
           let label: String?
@@ -193,10 +294,26 @@ private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(Ma
             label = nil
           }
 
+          let caseName = element.name.text
+          let selector = label ?? String(index)
+          let scopedSelector = "\(caseName).\(selector)"
+          let override: FieldOverrideSpec?
+          if let explicit = unmatchedFieldOverrides.removeValue(forKey: scopedSelector) {
+            override = explicit
+          } else if associatedValueCount == 1,
+            let implicit = unmatchedFieldOverrides.removeValue(forKey: caseName)
+          {
+            override = implicit
+          } else {
+            override = nil
+          }
+
           associatedValues.append(
             EnumAssociatedValuePlan(
               label: label,
-              typeName: trimmed(parameter.type.description)
+              typeName: trimmed(parameter.type.description),
+              decoderOverride: override?.decoder,
+              encoderOverride: override?.encoder
             ))
         }
       }
@@ -213,6 +330,13 @@ private func collectEnumCases(from members: MemberBlockItemListSyntax) throws(Ma
     }
   }
 
+  if let unknownSelector = unmatchedFieldOverrides.keys.sorted().first {
+    throw MacroUsageError(
+      description:
+        "@JSValueFieldCoding selector \"\(unknownSelector)\" does not match any associated value"
+    )
+  }
+
   return plans
 }
 
@@ -225,10 +349,16 @@ private func makeEnumDecodeCase(
     return "case \"\(enumCase.name)\": return .\(enumCase.name)"
   case .singleUnlabeled:
     let associatedValue = enumCase.associatedValues[0]
+    let decodeExpression: String
+    if let decoder = associatedValue.decoderOverride {
+      decodeExpression = "try \(decoder).tryDecode(__payload, in: context)"
+    } else {
+      decodeExpression = "try \(associatedValue.typeName).tryDecode(__payload, in: context)"
+    }
     return """
       case "\(enumCase.name)":
         let __payload = value.getProperty(forKey: __payloadKey, in: context)
-        return .\(enumCase.name)(try \(associatedValue.typeName).tryDecode(__payload, in: context))
+        return .\(enumCase.name)(\(decodeExpression))
       """
   case .multipleUnlabeled:
     var lines: [String] = [
@@ -242,7 +372,11 @@ private func makeEnumDecodeCase(
     for (index, associatedValue) in enumCase.associatedValues.enumerated() {
       let localName = "__payload_\(enumCase.name)_\(index)"
       lines.append("  let \(localName) = __payload.getProperty(at: \(index), in: context)")
-      arguments.append("try \(associatedValue.typeName).tryDecode(\(localName), in: context)")
+      if let decoder = associatedValue.decoderOverride {
+        arguments.append("try \(decoder).tryDecode(\(localName), in: context)")
+      } else {
+        arguments.append("try \(associatedValue.typeName).tryDecode(\(localName), in: context)")
+      }
     }
     lines.append("  return .\(enumCase.name)(\(arguments.joined(separator: ", ")))")
     return lines.joined(separator: "\n")
@@ -261,7 +395,12 @@ private func makeEnumDecodeCase(
       let valueName = "__payloadValue_\(enumCase.name)_\(label)"
       lines.append("  let \(keyName) = JSStringManaged(\"\(label)\")")
       lines.append("  let \(valueName) = __payload.getProperty(forKey: \(keyName), in: context)")
-      arguments.append("\(label): try \(associatedValue.typeName).tryDecode(\(valueName), in: context)")
+      if let decoder = associatedValue.decoderOverride {
+        arguments.append("\(label): try \(decoder).tryDecode(\(valueName), in: context)")
+      } else {
+        arguments.append(
+          "\(label): try \(associatedValue.typeName).tryDecode(\(valueName), in: context)")
+      }
     }
     lines.append("  return .\(enumCase.name)(\(arguments.joined(separator: ", ")))")
     return lines.joined(separator: "\n")
@@ -285,11 +424,17 @@ private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool
   case .singleUnlabeled:
     let associatedValue = enumCase.associatedValues[0]
     let binding = associatedValue.label ?? "associated0"
+    let encodeExpression: String
+    if let encoder = associatedValue.encoderOverride {
+      encodeExpression = "try \(encoder).tryEncode(\(binding), in: context)"
+    } else {
+      encodeExpression = "try \(binding).tryEncode(in: context)"
+    }
     return """
       case .\(enumCase.name)(let \(binding)):
         let __object = JSValue(objectIn: context)
         __object.setProperty("\(enumCase.name)", forKey: __tagKey, in: context)
-        let __payload = try \(binding).tryEncode(in: context)
+        let __payload = \(encodeExpression)
         __object.setProperty(__payload, forKey: __payloadKey, in: context)
         return __object
       """
@@ -303,7 +448,11 @@ private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool
       "  let __payload = JSValue(arrayIn: context)",
     ]
     for (index, binding) in bindings.enumerated() {
-      lines.append("  let __encoded_\(index) = try \(binding).tryEncode(in: context)")
+      if let encoder = enumCase.associatedValues[index].encoderOverride {
+        lines.append("  let __encoded_\(index) = try \(encoder).tryEncode(\(binding), in: context)")
+      } else {
+        lines.append("  let __encoded_\(index) = try \(binding).tryEncode(in: context)")
+      }
       lines.append("  __payload.setProperty(__encoded_\(index), at: \(index), in: context)")
     }
     lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
@@ -318,10 +467,15 @@ private func makeEnumEncodeCase(_ enumCase: EnumCasePlan, taggedObjectMode: Bool
       "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
       "  let __payload = JSValue(objectIn: context)",
     ]
-    for label in bindings {
+    for (index, label) in bindings.enumerated() {
       lines.append("  let __payloadKey_\(label) = JSStringManaged(\"\(label)\")")
-      lines.append("  let __encoded_\(label) = try \(label).tryEncode(in: context)")
-      lines.append("  __payload.setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
+      if let encoder = enumCase.associatedValues[index].encoderOverride {
+        lines.append("  let __encoded_\(label) = try \(encoder).tryEncode(\(label), in: context)")
+      } else {
+        lines.append("  let __encoded_\(label) = try \(label).tryEncode(in: context)")
+      }
+      lines.append(
+        "  __payload.setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
     }
     lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
     lines.append("  return __object")
@@ -415,7 +569,11 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
-      let cases = try collectEnumCases(from: enumDecl.memberBlock.members)
+      let enumFieldOverrides = try parseEnumFieldOverrides(from: enumDecl.attributes)
+      let cases = try collectEnumCases(
+        from: enumDecl.memberBlock.members,
+        fieldOverrides: enumFieldOverrides
+      )
       guard !cases.isEmpty else {
         throw MacroUsageError(
           description: "@JSValueAutoConvertible requires at least one enum case")

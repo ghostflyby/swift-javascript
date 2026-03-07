@@ -108,15 +108,18 @@ import Testing
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(MacroAssociatedEnum.idle, forKey: JSStringManaged("enumIdle"), in: context)
-    global.setProperty(MacroAssociatedEnum.count(7), forKey: JSStringManaged("enumCount"), in: context)
-    global.setProperty(MacroAssociatedEnum.range(3, 9), forKey: JSStringManaged("enumRange"), in: context)
+    global.setProperty(
+      MacroAssociatedEnum.count(7), forKey: JSStringManaged("enumCount"), in: context)
+    global.setProperty(
+      MacroAssociatedEnum.range(3, 9), forKey: JSStringManaged("enumRange"), in: context)
     global.setProperty(
       MacroAssociatedEnum.user(id: 42, name: "neo"),
       forKey: JSStringManaged("enumUser"),
       in: context
     )
 
-    let shapeCheck = context.evaluateScript("""
+    let shapeCheck = context.evaluateScript(
+      """
       [
         enumIdle.tag,
         enumCount.payload,
@@ -139,7 +142,8 @@ import Testing
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
   await context.withIsolatedGlobalObject { context, global in
-    _ = context.evaluateScript("""
+    _ = context.evaluateScript(
+      """
       globalThis.enumIdle = { tag: 'idle' }
       globalThis.enumCount = { tag: 'count', payload: 5 }
       globalThis.enumRange = { tag: 'range', payload: [1, 4] }
@@ -171,5 +175,72 @@ import Testing
     #expect(count == .count(5))
     #expect(range == .range(1, 4))
     #expect(user == .user(id: 8, name: "trinity"))
+  }
+}
+
+@Test func macroAssociatedEnumFieldOverridesApplyPerPayloadField() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    global.setProperty(
+      MacroAssociatedOverrideEnum.enabled(true),
+      forKey: JSStringManaged("enumEnabled"),
+      in: context
+    )
+    global.setProperty(
+      MacroAssociatedOverrideEnum.pair(true, false),
+      forKey: JSStringManaged("enumPair"),
+      in: context
+    )
+    global.setProperty(
+      MacroAssociatedOverrideEnum.flags(id: 9, enabled: true),
+      forKey: JSStringManaged("enumFlags"),
+      in: context
+    )
+
+    let shapeCheck = context.evaluateScript(
+      """
+      [
+        enumEnabled.payload,
+        enumPair.payload[0],
+        enumPair.payload[1],
+        enumFlags.payload.id,
+        enumFlags.payload.enabled
+      ].join(':')
+      """)
+    switch consume shapeCheck {
+    case .value(let value):
+      #expect(value.toString(in: context) == "1:1:0:9:1")
+    case .exception:
+      Issue.record(
+        "Expected associated enum field-level converters to affect encoded payload values")
+    }
+
+    _ = context.evaluateScript(
+      """
+      globalThis.enumEnabled = { tag: 'enabled', payload: 0 }
+      globalThis.enumPair = { tag: 'pair', payload: [0, 1] }
+      globalThis.enumFlags = { tag: 'flags', payload: { id: 12, enabled: 0 } }
+      """)
+
+    let enabled: MacroAssociatedOverrideEnum = global.getProperty(
+      forKey: JSStringManaged("enumEnabled"),
+      using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
+      in: context
+    )
+    let pair: MacroAssociatedOverrideEnum = global.getProperty(
+      forKey: JSStringManaged("enumPair"),
+      using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
+      in: context
+    )
+    let flags: MacroAssociatedOverrideEnum = global.getProperty(
+      forKey: JSStringManaged("enumFlags"),
+      using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
+      in: context
+    )
+
+    #expect(enabled == .enabled(false))
+    #expect(pair == .pair(false, true))
+    #expect(flags == .flags(id: 12, enabled: false))
   }
 }
