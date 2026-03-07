@@ -104,6 +104,22 @@ struct MacroFieldOverrideUser: Equatable {
 }
 
 @JSValueAutoSerialization
+final class MacroSerializedClass: Equatable {
+  let name: String
+  @JSValueFieldCoding(ZeroOneBoolConverter.self)
+  var active: Bool
+
+  init(name: String, active: Bool) {
+    self.name = name
+    self.active = active
+  }
+
+  static func == (lhs: MacroSerializedClass, rhs: MacroSerializedClass) -> Bool {
+    lhs.name == rhs.name && lhs.active == rhs.active
+  }
+}
+
+@JSValueAutoSerialization
 enum MacroStringEnum: Equatable {
   case pending
   case running

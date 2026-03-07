@@ -63,6 +63,39 @@ import Testing
   }
 }
 
+@Test func macroFinalClassSerializationUsesValueSemantics() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let value = MacroSerializedClass(name: "iris", active: true)
+    global.setProperty(value, forKey: JSStringManaged("macroClass"), in: context)
+
+    let shapeCheck = context.evaluateScript("[macroClass.name, macroClass.active].join(':')")
+    switch consume shapeCheck {
+    case .value(let encoded):
+      #expect(encoded.toString(in: context) == "iris:1")
+    case .exception:
+      Issue.record("Expected serialized final class to encode as a plain JS object")
+    }
+
+    let decoded: MacroSerializedClass = global.getProperty(
+      forKey: JSStringManaged("macroClass"),
+      using: JSDefaultConverter<MacroSerializedClass>.self,
+      in: context
+    )
+    #expect(decoded == value)
+    #expect(decoded !== value)
+
+    _ = context.evaluateScript("macroClass = { name: 'rhea', active: 0 }")
+    let decodedFromObject: MacroSerializedClass = global.getProperty(
+      forKey: JSStringManaged("macroClass"),
+      using: JSDefaultConverter<MacroSerializedClass>.self,
+      in: context
+    )
+    #expect(decodedFromObject == MacroSerializedClass(name: "rhea", active: false))
+  }
+}
+
 @Test func macroEnumSynthesisUsesCaseNameStrings() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 

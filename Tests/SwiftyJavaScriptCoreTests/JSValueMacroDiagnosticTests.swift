@@ -56,3 +56,36 @@ private let macroTestImplementations = [
     macros: macroTestImplementations
   )
 }
+
+@Test func jsValueAutoSerializationRejectsNonFinalClassSynthesis() {
+  assertMacroExpansion(
+    """
+    @JSValueAutoSerialization
+    class NonFinalSerializedClass {
+      let name: String
+
+      init(name: String) {
+        self.name = name
+      }
+    }
+    """,
+    expandedSource: """
+      class NonFinalSerializedClass {
+        let name: String
+
+        init(name: String) {
+          self.name = name
+        }
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message:
+          "@JSValueAutoSerialization automatic class synthesis currently supports final class only",
+        line: 1,
+        column: 1
+      )
+    ],
+    macros: macroTestImplementations
+  )
+}

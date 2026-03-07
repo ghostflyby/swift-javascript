@@ -290,6 +290,10 @@ private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
   return trimmed(inheritedType.type.description)
 }
 
+private func isFinalClass(_ decl: ClassDeclSyntax) -> Bool {
+  decl.modifiers.contains(where: { $0.name.tokenKind == .keyword(.final) })
+}
+
 private struct EnumCasePlan {
   let name: String
   let associatedValues: [EnumAssociatedValuePlan]
@@ -540,7 +544,7 @@ private func makeEnumEncodeCase(
     var lines: [String] = [
       "case .\(enumCase.name)(\(pattern)):",
       "  let __object = JSValue(objectIn: context)",
-      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)"
+      "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
     ]
     if flattenedLabeledPayload {
     } else {
@@ -555,7 +559,8 @@ private func makeEnumEncodeCase(
         lines.append("  let __encoded_\(label) = try \(label).tryEncode(in: context)")
       }
       lines.append(
-        "  \(payloadTarget).setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)")
+        "  \(payloadTarget).setProperty(__encoded_\(label), forKey: __payloadKey_\(label), in: context)"
+      )
     }
     if !flattenedLabeledPayload {
       lines.append("  __object.setProperty(__payload, forKey: __payloadKey, in: context)")
@@ -598,6 +603,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
     let decodeBody: String
     let encodeBody: String
+    let initSource: String
 
     if let decoder = sharedDecoder, let encoder = sharedEncoder {
       decodeBody = """
@@ -605,6 +611,15 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         """
       encodeBody = """
         return try \(encoder).tryEncode(self, in: context)
+        """
+      initSource = """
+        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+          do {
+            self = try Self.tryDecode(value, in: context)
+          } catch {
+            fatalError("\(typeName).init(value:in:) failed: \\(error)")
+          }
+        }
         """
     } else if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = collectStoredProperties(from: structDecl.memberBlock.members)
@@ -652,12 +667,97 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       }
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
+      initSource = """
+        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+          do {
+            self = try Self.tryDecode(value, in: context)
+          } catch {
+            fatalError("\(typeName).init(value:in:) failed: \\(error)")
+          }
+        }
+        """
+    } else if let classDecl = declaration.as(ClassDeclSyntax.self) {
+      guard isFinalClass(classDecl) else {
+        throw MacroUsageError(
+          description:
+            "@JSValueAutoSerialization automatic class synthesis currently supports final class only"
+        )
+      }
+
+      let properties = collectStoredProperties(from: classDecl.memberBlock.members)
+
+      var decodeLines: [String] = [
+        "guard value.isObject else {",
+        "  throw .typeMismatch(expected: \"object\", actual: value.type)",
+        "}",
+      ]
+
+      var initArgs: [String] = []
+      for property in properties {
+        let keyName = "__key_\(property.name)"
+        let localName = "__\(property.name)Value"
+        decodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        decodeLines.append(
+          "let \(localName) = value.getProperty(forKey: \(keyName), in: context)")
+
+        if let decoder = property.decoderOverride ?? sharedDecoder {
+          initArgs.append("\(property.name): try \(decoder).tryDecode(\(localName), in: context)")
+        } else {
+          initArgs.append(
+            "\(property.name): try \(property.typeName).tryDecode(\(localName), in: context)")
+        }
+      }
+
+      decodeLines.append("return Self(\(initArgs.joined(separator: ", ")))")
+      decodeBody = decodeLines.joined(separator: "\n")
+
+      let initForwardArgs = properties.map { "\($0.name): __decoded.\($0.name)" }
+        .joined(separator: ", ")
+      initSource = """
+        public convenience init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+          do {
+            let __decoded = try Self.tryDecode(value, in: context)
+            self.init(\(initForwardArgs))
+          } catch {
+            fatalError("\(typeName).init(value:in:) failed: \\(error)")
+          }
+        }
+        """
+
+      var encodeLines: [String] = [
+        "let object = JSValue(objectIn: context)"
+      ]
+      for property in properties {
+        let keyName = "__key_\(property.name)"
+        let encodedName = "__encoded_\(property.name)"
+        encodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        if let encoder = property.encoderOverride ?? sharedEncoder {
+          encodeLines.append(
+            "let \(encodedName) = try \(encoder).tryEncode(self.\(property.name), in: context)")
+        } else {
+          encodeLines.append(
+            "let \(encodedName) = try self.\(property.name).tryEncode(in: context)")
+        }
+        encodeLines.append(
+          "object.setProperty(\(encodedName), forKey: \(keyName), in: context)")
+      }
+      encodeLines.append("return object")
+      encodeBody = encodeLines.joined(separator: "\n")
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
       let enumFieldOverrides = try parseEnumFieldOverrides(from: enumDecl.attributes)
       let cases = try collectEnumCases(
         from: enumDecl.memberBlock.members,
         fieldOverrides: enumFieldOverrides
       )
+      initSource = """
+        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+          do {
+            self = try Self.tryDecode(value, in: context)
+          } catch {
+            fatalError("\(typeName).init(value:in:) failed: \\(error)")
+          }
+        }
+        """
       guard !cases.isEmpty else {
         throw MacroUsageError(
           description: "@JSValueAutoSerialization requires at least one enum case")
@@ -674,11 +774,12 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             return false
           }
         }
-        let flattenedLabeledPayload = if options.isPayloadKeyExplicit {
-          options.payloadKey.isEmpty
-        } else {
-          canFlattenLabeledPayload
-        }
+        let flattenedLabeledPayload =
+          if options.isPayloadKeyExplicit {
+            options.payloadKey.isEmpty
+          } else {
+            canFlattenLabeledPayload
+          }
         if flattenedLabeledPayload && !canFlattenLabeledPayload {
           throw MacroUsageError(
             description:
@@ -693,7 +794,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             flattenedLabeledPayload: flattenedLabeledPayload
           )
         }
-          .joined(separator: "\n")
+        .joined(separator: "\n")
         let encodeCases = cases.map {
           makeEnumEncodeCase(
             $0,
@@ -701,13 +802,14 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             flattenedLabeledPayload: flattenedLabeledPayload
           )
         }
-          .joined(separator: "\n")
+        .joined(separator: "\n")
 
-        let payloadKeyDeclaration = if flattenedLabeledPayload {
-          ""
-        } else {
-          "let __payloadKey = JSStringManaged(\"\(options.payloadKey)\")"
-        }
+        let payloadKeyDeclaration =
+          if flattenedLabeledPayload {
+            ""
+          } else {
+            "let __payloadKey = JSStringManaged(\"\(options.payloadKey)\")"
+          }
 
         decodeBody = """
           guard value.isObject else {
@@ -763,13 +865,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
     let extSource = """
       extension \(typeName): JSValueCodable {
-        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
-          do {
-            self = try Self.tryDecode(value, in: context)
-          } catch {
-            fatalError("\(typeName).init(value:in:) failed: \\(error)")
-          }
-        }
+        \(initSource)
 
         public static func tryDecode(
           _ value: borrowing JSValue,

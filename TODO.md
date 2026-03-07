@@ -42,7 +42,7 @@
 - [ ] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例（已补 ArrayBuffer，TypedArray 待补）
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [x] `swift build --build-tests` 持续绿灯
-- [x] `swift test` 在本地环境稳定通过（已验证：55/55 通过）
+- [x] `swift test` 在本地环境稳定通过（已验证：57/57 通过）
 
 ## 6. 类型转换体系
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
@@ -57,3 +57,4 @@
 - [x] 宏支持成员级单独替换 `decoder/encoder`
 - [x] 宏支持 class 类型导出为 `JSClass` 并反映 Swift 继承链
 - [x] 调整 enum tagged union 默认模式：`tagKey` 默认改为 `kind`，并在可判定为全 labeled payload 时自动优先扁平展开
+- [x] 为 `JSValueAutoSerialization` 增加 final class 值语义自动实现（明确丢失 identity）
