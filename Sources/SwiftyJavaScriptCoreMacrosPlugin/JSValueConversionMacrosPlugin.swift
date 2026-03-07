@@ -39,6 +39,30 @@ private struct PropertyPlan {
   let encoderOverride: String?
 }
 
+private struct MethodParameterPlan {
+  let externalName: String?
+  let localName: String
+  let typeName: String
+  let decoderOverride: String?
+}
+
+private struct MethodPlan {
+  let swiftName: String
+  let jsName: String
+  let parameters: [MethodParameterPlan]
+  let returnTypeName: String?
+  let returnEncoder: String?
+  let errorEncoder: String?
+  let isThrowing: Bool
+}
+
+private struct MethodExportSpec {
+  let jsName: String?
+  let argumentDecoders: [String]?
+  let returnEncoder: String?
+  let errorEncoder: String?
+}
+
 private func trimmed(_ raw: String) -> String {
   raw.trimmingCharacters(in: .whitespacesAndNewlines)
 }
@@ -217,6 +241,89 @@ private func parseFieldOverrides(from attributes: AttributeListSyntax?) -> (
   return (decoder, encoder)
 }
 
+private func parseMethodExportSpec(from attributes: AttributeListSyntax?) throws(MacroUsageError)
+  -> MethodExportSpec?
+{
+  guard let attributes else {
+    return nil
+  }
+
+  var isExported = false
+  var jsName: String?
+  var argumentDecoders: [String]?
+  var returnEncoder: String?
+  var errorEncoder: String?
+
+  for element in attributes {
+    guard case .attribute(let attribute) = element,
+      let nameSyntax = attribute.attributeName.as(IdentifierTypeSyntax.self)
+    else {
+      continue
+    }
+
+    let name = nameSyntax.name.text
+    switch name {
+    case "JSClassFunction":
+      isExported = true
+      let arguments = parseAttributeArguments(from: attribute)
+      if arguments.isEmpty {
+        break
+      }
+      guard arguments.count == 1,
+        case .string(let value) = arguments[0]
+      else {
+        throw MacroUsageError(
+          description: "@JSClassFunction accepts at most one string literal function name"
+        )
+      }
+      jsName = value
+    case "JSClassFunctionArguments":
+      let decoders = parseTypeArguments(from: attribute)
+      guard !decoders.isEmpty else {
+        throw MacroUsageError(
+          description: "@JSClassFunctionArguments requires at least one decoder type"
+        )
+      }
+      argumentDecoders = decoders
+    case "JSClassFunctionReturn":
+      let encoders = parseTypeArguments(from: attribute)
+      guard encoders.count == 1 else {
+        throw MacroUsageError(
+          description: "@JSClassFunctionReturn requires exactly one encoder type"
+        )
+      }
+      returnEncoder = encoders[0]
+    case "JSClassFunctionError":
+      let encoders = parseTypeArguments(from: attribute)
+      guard encoders.count == 1 else {
+        throw MacroUsageError(
+          description: "@JSClassFunctionError requires exactly one encoder type"
+        )
+      }
+      errorEncoder = encoders[0]
+    default:
+      continue
+    }
+  }
+
+  if !isExported {
+    if argumentDecoders != nil || returnEncoder != nil || errorEncoder != nil {
+      throw MacroUsageError(
+        description:
+          "@JSClassFunctionArguments, @JSClassFunctionReturn, and @JSClassFunctionError require @JSClassFunction on the same method"
+      )
+    }
+    return nil
+  }
+
+  return MethodExportSpec(
+    jsName: jsName,
+    argumentDecoders: argumentDecoders,
+    returnEncoder: returnEncoder,
+    errorEncoder: errorEncoder
+  )
+}
+
 private func parseEnumFieldOverrides(from attributes: AttributeListSyntax?)
   throws(MacroUsageError) -> [String: FieldOverrideSpec]
 {
@@ -280,6 +387,178 @@ private func collectStoredProperties(from members: MemberBlockItemListSyntax) ->
   return plans
 }
 
+private func collectExportedMethods(from members: MemberBlockItemListSyntax)
+  throws(MacroUsageError) -> [MethodPlan]
+{
+  var plans: [MethodPlan] = []
+
+  for member in members {
+    guard let function = member.decl.as(FunctionDeclSyntax.self) else {
+      continue
+    }
+
+    guard let export = try parseMethodExportSpec(from: function.attributes) else {
+      continue
+    }
+
+    if function.modifiers.contains(where: { $0.name.tokenKind == .keyword(.static) }) {
+      throw MacroUsageError(description: "@JSClassFunction supports instance methods only")
+    }
+    if function.genericParameterClause != nil {
+      throw MacroUsageError(description: "@JSClassFunction does not support generic methods")
+    }
+    if function.signature.effectSpecifiers?.asyncSpecifier != nil {
+      throw MacroUsageError(description: "@JSClassFunction does not support async methods")
+    }
+
+    var parameters: [MethodParameterPlan] = []
+    parameters.reserveCapacity(function.signature.parameterClause.parameters.count)
+    for (index, parameter) in function.signature.parameterClause.parameters.enumerated() {
+      let firstName = parameter.firstName.text
+      let secondName = parameter.secondName?.text
+      let localName = secondName ?? firstName
+      let externalName = firstName == "_" ? nil : firstName
+      let overrideDecoder: String?
+      if let argumentDecoders = export.argumentDecoders,
+        argumentDecoders.indices.contains(index)
+      {
+        overrideDecoder = argumentDecoders[index]
+      } else {
+        overrideDecoder = nil
+      }
+
+      if parameter.ellipsis != nil {
+        throw MacroUsageError(description: "@JSClassFunction does not support variadic parameters")
+      }
+
+      parameters.append(
+        MethodParameterPlan(
+          externalName: externalName,
+          localName: localName,
+          typeName: trimmed(parameter.type.description),
+          decoderOverride: overrideDecoder
+        ))
+    }
+
+    if let argumentDecoders = export.argumentDecoders,
+      argumentDecoders.count != parameters.count
+    {
+      throw MacroUsageError(
+        description:
+          "@JSClassFunctionArguments count must match the number of method parameters"
+      )
+    }
+
+    let isThrowing = function.signature.effectSpecifiers?.throwsClause != nil
+    if export.errorEncoder != nil && !isThrowing {
+      throw MacroUsageError(
+        description: "@JSClassFunctionError can only be used on throwing methods"
+      )
+    }
+
+    plans.append(
+      MethodPlan(
+        swiftName: function.name.text,
+        jsName: export.jsName ?? function.name.text,
+        parameters: parameters,
+        returnTypeName: function.signature.returnClause.map { trimmed($0.type.description) },
+        returnEncoder: export.returnEncoder,
+        errorEncoder: export.errorEncoder,
+        isThrowing: isThrowing
+      )
+    )
+  }
+
+  return plans
+}
+
+private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
+  let argumentCount = method.parameters.count
+  let decodeLines = method.parameters.enumerated().map { index, parameter in
+    let decoder = parameter.decoderOverride ?? "JSDefaultConverter<\(parameter.typeName)>"
+    return
+      "      let __arg\(index) = try arguments.tryUnpack(at: \(index), using: \(decoder).self, in: context)"
+  }.joined(separator: "\n")
+
+  let callArguments = method.parameters.enumerated().map { index, parameter in
+    if let externalName = parameter.externalName {
+      return "\(externalName): __arg\(index)"
+    }
+    return "__arg\(index)"
+  }.joined(separator: ", ")
+
+  let callExpression = "instance.\(method.swiftName)(\(callArguments))"
+  let invokedCallExpression = method.isThrowing ? "try \(callExpression)" : callExpression
+
+  var bodyLines: [String] = []
+  if !decodeLines.isEmpty {
+    bodyLines.append(decodeLines)
+  }
+
+  if let returnTypeName = method.returnTypeName, returnTypeName != "Void", returnTypeName != "()" {
+    if let returnEncoder = method.returnEncoder {
+      bodyLines.append("      let __result = \(invokedCallExpression)")
+      bodyLines.append(
+        "      let __encoded = try \(returnEncoder).tryEncode(__result, in: context)")
+      bodyLines.append("      return .value(__encoded)")
+    } else {
+      bodyLines.append("      let __result = \(invokedCallExpression)")
+      bodyLines.append("      let __encoded = try __result.tryEncode(in: context)")
+      bodyLines.append("      return .value(__encoded)")
+    }
+  } else {
+    bodyLines.append("      \(invokedCallExpression)")
+    bodyLines.append("      return .value(JSValue(undefinedIn: context))")
+  }
+
+  let executionSource: String
+  if method.isThrowing, let errorEncoder = method.errorEncoder {
+    executionSource =
+      (["                do {"] + bodyLines + [
+        "                } catch let error as \(errorEncoder).SwiftType {",
+        "                  if let encoded = try? \(errorEncoder).tryEncode(error, in: context) {",
+        "                    return .exception(encoded)",
+        "                  }",
+        "                  return .exception(JSValue(undefinedIn: context))",
+        "                } catch {",
+        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "                }",
+      ]).joined(separator: "\n")
+  } else if method.isThrowing {
+    executionSource =
+      (["                do {"] + bodyLines + [
+        "                } catch {",
+        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "                }",
+      ]).joined(separator: "\n")
+  } else {
+    executionSource =
+      (["                do {"] + bodyLines + [
+        "                } catch {",
+        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "                }",
+      ]).joined(separator: "\n")
+  }
+
+  return [
+    "            JSStaticFunction(",
+    "              name: \"\(method.jsName)\",",
+    "              attributes: .none,",
+    "              callAsFunction: { context, this, arguments in",
+    "                guard let instance = try? Self.tryDecode(this, in: context) else {",
+    "                  return .exception(",
+    "                    JSValue(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
+    "                  )",
+    "                }",
+    "                guard arguments.count == \(argumentCount) else {",
+    "                  return .value(JSValue(undefinedIn: context))",
+    "                }",
+    executionSource,
+    "              }",
+    "            )",
+  ].joined(separator: "\n")
+}
+
 private func inheritedClassName(from decl: ClassDeclSyntax) -> String? {
   guard let inheritanceClause = decl.inheritanceClause,
     let inheritedType = inheritanceClause.inheritedTypes.first
@@ -300,8 +579,7 @@ private func enumRawValueTypeName(from decl: EnumDeclSyntax) -> String? {
   let typeName = trimmed(inheritedType.type.description)
   switch typeName {
   case "String", "Character", "Int", "Int8", "Int16", "Int32", "Int64", "UInt",
-    "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double"
-  :
+    "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double":
     return typeName
   default:
     return nil
@@ -941,6 +1219,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let properties = collectStoredProperties(from: classDecl.memberBlock.members)
+    let methods = try collectExportedMethods(from: classDecl.memberBlock.members)
     let inheritedClass = inheritedClassName(from: classDecl)
 
     let declarationModifier = inheritedClass == nil ? "public class" : "public override class"
@@ -1017,11 +1296,24 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
         """
     }.joined(separator: "\n")
 
+    let staticFunctionsSource: String
+    if methods.isEmpty {
+      staticFunctionsSource = ""
+    } else {
+      let staticFunctionCases = methods.map(makeMethodFunctionCase).joined(separator: ",\n")
+      staticFunctionsSource = """
+          definition.staticFunctions = [
+          \(staticFunctionCases)
+          ]
+        """
+    }
+
     let propertySource = """
       \(declarationModifier) var jsClassDefinition: JSClassDefinition {
         var definition = JSClassDefinition()
         definition.className = \"\(trimmed(classDecl.name.text))\"
         \(parentClassSetup)
+        \(staticFunctionsSource)
         definition.hasProperty = { context, this, property in
           switch property {
           \(hasPropertyCases)

@@ -31,6 +31,50 @@ class ExportedLeafNode: ExportedChildNode {
   }
 }
 
+enum UppercaseStringDecoder: JSValueDecoder {
+  typealias SwiftType = String
+
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+    -> String
+  {
+    value.toString(in: context).uppercased()
+  }
+}
+
+@JSClassAutoConvertible
+class ExportedFunctionNode {
+  var name: String
+  var count: Double
+
+  init(name: String, count: Double) {
+    self.name = name
+    self.count = count
+  }
+
+  @JSClassFunction
+  func sum(_ lhs: Double, _ rhs: Double) -> Double {
+    lhs + rhs + count
+  }
+
+  @JSClassFunction("loudLabel")
+  @JSClassFunctionArguments(UppercaseStringDecoder.self, ZeroOneBoolConverter.self)
+  func renderLabel(_ prefix: String, enabled: Bool) -> String {
+    "\(prefix):\(name):\(enabled ? "on" : "off")"
+  }
+
+  @JSClassFunctionReturn(ReturnPayloadEncoder.self)
+  @JSClassFunction
+  func payload() -> ReturnPayload {
+    ReturnPayload(value: count * 2)
+  }
+
+  @JSClassFunctionError(FailurePayloadEncoder.self)
+  @JSClassFunction
+  func fail() throws(FailurePayload) -> String {
+    throw .bad
+  }
+}
+
 @Test func jsClassAutoConvertibleRoundTripsReferenceIdentity() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
@@ -105,6 +149,48 @@ class ExportedLeafNode: ExportedChildNode {
       #expect(matchesPrototypeChain)
     case .exception:
       Issue.record("Expected JS prototype chain to reflect exported Swift inheritance")
+    }
+  }
+}
+
+@Test func jsClassAutoConvertibleExportsMarkedMethods() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let instance = ExportedFunctionNode(name: "leaf", count: 4)
+    global.setProperty(instance, forKey: JSStringManaged("node"), in: context)
+
+    let sumResult = context.evaluateScript("node.sum(2, 3)")
+    switch consume sumResult {
+    case .value(let value):
+      #expect(value.toDouble(in: context) == 9)
+    case .exception:
+      Issue.record("Expected exported JSClass method to be callable from JavaScript")
+    }
+
+    let customNameResult = context.evaluateScript("node.loudLabel('seed', 1)")
+    switch consume customNameResult {
+    case .value(let value):
+      #expect(value.toString(in: context) == "SEED:leaf:on")
+    case .exception:
+      Issue.record(
+        "Expected exported JSClass method to honor custom function name and argument converters")
+    }
+
+    let returnCoderResult = context.evaluateScript("node.payload()")
+    switch consume returnCoderResult {
+    case .value(let value):
+      #expect(value.toDouble(in: context) == 8)
+    case .exception:
+      Issue.record("Expected exported JSClass method to honor custom return encoder")
+    }
+
+    let errorCoderResult = context.evaluateScript("node.fail()")
+    switch consume errorCoderResult {
+    case .value:
+      Issue.record("Expected throwing exported JSClass method to surface a JavaScript exception")
+    case .exception(let value):
+      #expect(value.toString(in: context) == "bad")
     }
   }
 }

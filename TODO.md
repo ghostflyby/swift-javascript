@@ -58,4 +58,5 @@
 - [x] 宏支持 class 类型导出为 `JSClass` 并反映 Swift 继承链
 - [x] 调整 enum tagged union 默认模式：`tagKey` 默认改为 `kind`，并在可判定为全 labeled payload 时自动优先扁平展开
 - [x] 为 `JSValueAutoSerialization` 增加 final class 值语义自动实现（明确丢失 identity）
-- [ ] 调整无关联值 RawRepresentable enum 默认语义：按 rawValue 而不是 case 名字合成
+- [x] 调整无关联值 RawRepresentable enum 默认语义：按 rawValue 而不是 case 名字合成
+- [x] 为 `JSClassAutoConvertible` 增加函数导出标记，支持参数/返回值/错误转换器覆盖

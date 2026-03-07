@@ -270,12 +270,66 @@ public macro JSValueFieldEncoding(
     type: "JSValueFieldMarkerMacro"
   )
 
+/// Marks an instance method for export as a JavaScript function on a `JSClass`.
+///
+/// The generated function is added to `staticFunctions` in the synthesized
+/// `jsClassDefinition` and is invoked with `this` bound to the exported Swift instance.
+/// Parameters are decoded from JavaScript arguments and the return value is encoded
+/// back into JavaScript using the method signature by default.
+@attached(peer, names: overloaded)
+public macro JSClassFunction() =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueFieldMarkerMacro"
+  )
+
+/// Marks an instance method for export as a JavaScript function using a custom JS name.
+///
+/// - Parameter name: The JavaScript-visible function name.
+@attached(peer, names: overloaded)
+public macro JSClassFunction(_ name: StaticString) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueFieldMarkerMacro"
+  )
+
+/// Overrides argument decoders for an exported `JSClass` method.
+///
+/// The number of decoders must match the number of method parameters.
+@attached(peer, names: overloaded)
+public macro JSClassFunctionArguments(_ decoders: any JSValueDecoder.Type...) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueFieldMarkerMacro"
+  )
+
+/// Overrides the return-value encoder for an exported `JSClass` method.
+@attached(peer, names: overloaded)
+public macro JSClassFunctionReturn(_ encoder: any JSValueEncoder.Type) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueFieldMarkerMacro"
+  )
+
+/// Overrides the thrown-error encoder for an exported `JSClass` method.
+///
+/// This only applies to throwing methods.
+@attached(peer, names: overloaded)
+public macro JSClassFunctionError(_ encoder: any JSValueEncoder.Type) =
+  #externalMacro(
+    module: "SwiftyJavaScriptCoreMacrosPlugin",
+    type: "JSValueFieldMarkerMacro"
+  )
+
 /// Generates a `JSClassDefinition` and `JSClassValueConvertible` conformance for a
 /// Swift class.
 ///
 /// Unlike `JSValueAutoSerialization`, this macro preserves reference semantics by
 /// exporting the Swift instance as a JSClass-backed object whose identity, prototype
 /// chain, and inheritance chain remain visible to JavaScript.
+/// Stored properties are exported automatically. Methods are exported only when they are
+/// marked with `JSClassFunction`, optionally combined with `JSClassFunctionArguments`,
+/// `JSClassFunctionReturn`, and `JSClassFunctionError`.
 @attached(member, names: named(jsClassDefinition))
 @attached(
   extension,

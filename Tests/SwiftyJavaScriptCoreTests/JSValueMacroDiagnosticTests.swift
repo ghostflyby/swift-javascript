@@ -1,11 +1,19 @@
+import SwiftSyntaxMacros
 import SwiftSyntaxMacrosTestSupport
 import Testing
 
 @testable import SwiftyJavaScriptCoreMacrosPlugin
 
-private let macroTestImplementations = [
-  "JSValueAutoSerialization": JSValueAutoSerializationMacro.self
-]
+private func macroTestImplementations() -> [String: Macro.Type] {
+  [
+    "JSValueAutoSerialization": JSValueAutoSerializationMacro.self as Macro.Type,
+    "JSClassAutoConvertible": JSClassAutoConvertibleMacro.self as Macro.Type,
+    "JSClassFunction": JSValueFieldMarkerMacro.self as Macro.Type,
+    "JSClassFunctionArguments": JSValueFieldMarkerMacro.self as Macro.Type,
+    "JSClassFunctionReturn": JSValueFieldMarkerMacro.self as Macro.Type,
+    "JSClassFunctionError": JSValueFieldMarkerMacro.self as Macro.Type,
+  ]
+}
 
 @Test func jsValueAutoSerializationRejectsMixedLabeledAssociatedValues() {
   assertMacroExpansion(
@@ -28,7 +36,7 @@ private let macroTestImplementations = [
         column: 1
       )
     ],
-    macros: macroTestImplementations
+    macros: macroTestImplementations()
   )
 }
 
@@ -53,7 +61,7 @@ private let macroTestImplementations = [
         column: 1
       )
     ],
-    macros: macroTestImplementations
+    macros: macroTestImplementations()
   )
 }
 
@@ -86,6 +94,95 @@ private let macroTestImplementations = [
         column: 1
       )
     ],
-    macros: macroTestImplementations
+    macros: macroTestImplementations()
+  )
+}
+
+@Test func jsClassAutoConvertibleRejectsStaticFunctionExport() {
+  assertMacroExpansion(
+    """
+    @JSClassAutoConvertible
+    class InvalidStaticExport {
+      @JSClassFunction
+      static func build() -> String {
+        "value"
+      }
+    }
+    """,
+    expandedSource: """
+      class InvalidStaticExport {
+        static func build() -> String {
+          "value"
+        }
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message: "@JSClassFunction supports instance methods only",
+        line: 1,
+        column: 1
+      )
+    ],
+    macros: macroTestImplementations()
+  )
+}
+
+@Test func jsClassAutoConvertibleRejectsMismatchedArgumentConverters() {
+  assertMacroExpansion(
+    """
+    @JSClassAutoConvertible
+    class InvalidArgumentConverters {
+      @JSClassFunction
+      @JSClassFunctionArguments(String.self)
+      func render(_ lhs: String, _ rhs: String) -> String {
+        lhs + rhs
+      }
+    }
+    """,
+    expandedSource: """
+      class InvalidArgumentConverters {
+        func render(_ lhs: String, _ rhs: String) -> String {
+          lhs + rhs
+        }
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message: "@JSClassFunctionArguments count must match the number of method parameters",
+        line: 1,
+        column: 1
+      )
+    ],
+    macros: macroTestImplementations()
+  )
+}
+
+@Test func jsClassAutoConvertibleRejectsErrorEncoderOnNonThrowingMethod() {
+  assertMacroExpansion(
+    """
+    @JSClassAutoConvertible
+    class InvalidErrorEncoder {
+      @JSClassFunction
+      @JSClassFunctionError(String.self)
+      func render() -> String {
+        "value"
+      }
+    }
+    """,
+    expandedSource: """
+      class InvalidErrorEncoder {
+        func render() -> String {
+          "value"
+        }
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message: "@JSClassFunctionError can only be used on throwing methods",
+        line: 1,
+        column: 1
+      )
+    ],
+    macros: macroTestImplementations()
   )
 }
