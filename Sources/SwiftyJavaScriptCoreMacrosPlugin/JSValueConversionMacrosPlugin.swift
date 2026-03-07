@@ -14,7 +14,7 @@ private struct FieldOverrideSpec {
   let encoder: String?
 }
 
-private struct JSValueAutoConvertibleOptions {
+private struct JSValueAutoSerializationOptions {
   let typeArguments: [String]
   let tagKey: String
   let payloadKey: String
@@ -93,8 +93,8 @@ private func parseTypeArguments(from node: AttributeSyntax) -> [String] {
   }
 }
 
-private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(MacroUsageError)
-  -> JSValueAutoConvertibleOptions
+private func parseAutoSerializationOptions(from node: AttributeSyntax) throws(MacroUsageError)
+  -> JSValueAutoSerializationOptions
 {
   var typeArguments: [String] = []
   var tagKey = "kind"
@@ -113,20 +113,20 @@ private func parseAutoConvertibleOptions(from node: AttributeSyntax) throws(Macr
     case ("tagKey", .type), ("payloadKey", .type):
       throw MacroUsageError(
         description:
-          "@JSValueAutoConvertible tagKey and payloadKey arguments must be string literals"
+          "@JSValueAutoSerialization tagKey and payloadKey arguments must be string literals"
       )
     case (.some(let label), _):
       throw MacroUsageError(
-        description: "@JSValueAutoConvertible does not support argument label \"\(label)\""
+        description: "@JSValueAutoSerialization does not support argument label \"\(label)\""
       )
     case (nil, .string):
       throw MacroUsageError(
-        description: "@JSValueAutoConvertible unnamed string arguments are not supported"
+        description: "@JSValueAutoSerialization unnamed string arguments are not supported"
       )
     }
   }
 
-  return JSValueAutoConvertibleOptions(
+  return JSValueAutoSerializationOptions(
     typeArguments: typeArguments,
     tagKey: tagKey,
     payloadKey: payloadKey,
@@ -388,7 +388,7 @@ private func collectEnumCases(
       if case .invalidMixed = plan.payloadKind {
         throw MacroUsageError(
           description:
-            "@JSValueAutoConvertible does not support enum cases that mix labeled and unlabeled associated values"
+            "@JSValueAutoSerialization does not support enum cases that mix labeled and unlabeled associated values"
         )
       }
 
@@ -567,7 +567,7 @@ private func makeEnumEncodeCase(
   }
 }
 
-public struct JSValueAutoConvertibleMacro: ExtensionMacro {
+public struct JSValueAutoSerializationMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: some DeclGroupSyntax,
@@ -576,7 +576,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     in _: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
     let typeName = trimmed(type.description)
-    let options = try parseAutoConvertibleOptions(from: node)
+    let options = try parseAutoSerializationOptions(from: node)
     let arguments = options.typeArguments
 
     let sharedDecoder: String?
@@ -592,7 +592,8 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
       sharedDecoder = arguments[0]
       sharedEncoder = arguments[1]
     default:
-      throw MacroUsageError(description: "@JSValueAutoConvertible accepts 0, 1 or 2 type arguments")
+      throw MacroUsageError(
+        description: "@JSValueAutoSerialization accepts 0, 1 or 2 type arguments")
     }
 
     let decodeBody: String
@@ -659,7 +660,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
       )
       guard !cases.isEmpty else {
         throw MacroUsageError(
-          description: "@JSValueAutoConvertible requires at least one enum case")
+          description: "@JSValueAutoSerialization requires at least one enum case")
       }
 
       let hasAssociatedValues = cases.contains(where: { $0.hasAssociatedValues })
@@ -681,7 +682,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
         if flattenedLabeledPayload && !canFlattenLabeledPayload {
           throw MacroUsageError(
             description:
-              "@JSValueAutoConvertible payloadKey cannot be empty unless every associated-value case uses labeled payload fields"
+              "@JSValueAutoSerialization payloadKey cannot be empty unless every associated-value case uses labeled payload fields"
           )
         }
 
@@ -756,7 +757,7 @@ public struct JSValueAutoConvertibleMacro: ExtensionMacro {
     } else {
       throw MacroUsageError(
         description:
-          "@JSValueAutoConvertible currently supports struct, enum without associated values, or explicit converter arguments"
+          "@JSValueAutoSerialization currently supports struct, enum without associated values, or explicit converter arguments"
       )
     }
 
@@ -970,7 +971,7 @@ public struct JSValueFieldMarkerMacro: PeerMacro {
 @main
 struct SwiftyJavaScriptCoreMacrosPlugin: CompilerPlugin {
   let providingMacros: [Macro.Type] = [
-    JSValueAutoConvertibleMacro.self,
+    JSValueAutoSerializationMacro.self,
     JSClassAutoConvertibleMacro.self,
     JSValueFieldMarkerMacro.self,
   ]

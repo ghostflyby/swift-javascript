@@ -65,13 +65,13 @@ struct CodableUser: Codable, Equatable {
   let address: CodableAddress
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 struct MacroDefaultUser: Equatable {
   let name: String
   let age: Double
 }
 
-@JSValueAutoConvertible(MacroDelegatedUserDecoder.self, MacroDelegatedUserEncoder.self)
+@JSValueAutoSerialization(MacroDelegatedUserDecoder.self, MacroDelegatedUserEncoder.self)
 struct MacroDelegatedUser: Equatable {
   let score: Double
 }
@@ -96,27 +96,27 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
   }
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 struct MacroFieldOverrideUser: Equatable {
   let name: String
   @JSValueFieldCoding(ZeroOneBoolConverter.self)
   let active: Bool
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 enum MacroStringEnum: Equatable {
   case pending
   case running
   case done
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 enum MacroRawEnum: String, Equatable {
   case alpha = "A"
   case beta = "B"
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 enum MacroAssociatedEnum: Equatable {
   case idle
   case count(Int32)
@@ -124,14 +124,14 @@ enum MacroAssociatedEnum: Equatable {
   case user(id: Int32, name: String)
 }
 
-@JSValueAutoConvertible(tagKey: "type", payloadKey: "data")
+@JSValueAutoSerialization(tagKey: "type", payloadKey: "data")
 enum MacroCustomKeyAssociatedEnum: Equatable {
   case idle
   case count(Int32)
   case user(id: Int32, name: String)
 }
 
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 enum MacroFlattenedAssociatedEnum: Equatable {
   case rgb(r: Int32, g: Int32, b: Int32)
   case named(name: String)
@@ -142,7 +142,7 @@ enum MacroFlattenedAssociatedEnum: Equatable {
 @JSValueFieldCoding("pair.0", ZeroOneBoolConverter.self)
 @JSValueFieldCoding("pair.1", ZeroOneBoolConverter.self)
 @JSValueFieldCoding("flags.enabled", ZeroOneBoolConverter.self)
-@JSValueAutoConvertible
+@JSValueAutoSerialization
 enum MacroAssociatedOverrideEnum: Equatable {
   case enabled(Bool)
   case pair(Bool, Bool)

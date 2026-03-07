@@ -6,10 +6,10 @@
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible() =
+public macro JSValueAutoSerialization() =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(
@@ -20,13 +20,13 @@ public macro JSValueAutoConvertible() =
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible(
+public macro JSValueAutoSerialization(
   tagKey: StaticString,
   payloadKey: StaticString = "payload"
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(
@@ -37,12 +37,12 @@ public macro JSValueAutoConvertible(
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible(
+public macro JSValueAutoSerialization(
   _ converter: any JSValueConverter.Type
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(
@@ -53,14 +53,14 @@ public macro JSValueAutoConvertible(
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible(
+public macro JSValueAutoSerialization(
   _ converter: any JSValueConverter.Type,
   tagKey: StaticString,
   payloadKey: StaticString = "payload"
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(
@@ -71,13 +71,13 @@ public macro JSValueAutoConvertible(
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible(
+public macro JSValueAutoSerialization(
   _ decoder: any JSValueDecoder.Type,
   _ encoder: any JSValueEncoder.Type
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(
@@ -88,7 +88,7 @@ public macro JSValueAutoConvertible(
   named(toJSValue(in:)),
   named(tryEncode(in:))
 )
-public macro JSValueAutoConvertible(
+public macro JSValueAutoSerialization(
   _ decoder: any JSValueDecoder.Type,
   _ encoder: any JSValueEncoder.Type,
   tagKey: StaticString,
@@ -96,7 +96,7 @@ public macro JSValueAutoConvertible(
 ) =
   #externalMacro(
     module: "SwiftyJavaScriptCoreMacrosPlugin",
-    type: "JSValueAutoConvertibleMacro"
+    type: "JSValueAutoSerializationMacro"
   )
 
 @attached(peer, names: overloaded)
