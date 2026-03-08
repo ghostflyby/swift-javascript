@@ -1250,7 +1250,9 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
       parentSetPropertyFallback = "              return nil"
     }
 
-    let hasPropertyCases = properties.map { "case \"\($0.name)\": return true" }
+    let hasPropertyCases =
+      (properties.map { "case \"\($0.name)\": return true" }
+      + methods.map { "case \"\($0.jsName)\": return true" })
       .joined(separator: "\n")
 
     let getPropertyCases = properties.map { property in

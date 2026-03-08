@@ -31,6 +31,10 @@ private final class JSClassCacheRegistry: @unchecked Sendable {
 private final class JSClassAutoNativeClassBacking {
   let definition: JSClassDefinition
   let usesManagedParent: Bool
+  var staticValueNames: [ContiguousArray<CChar>] = []
+  var staticValues: [JavaScriptCore.JSStaticValue] = []
+  var staticFunctionNames: [ContiguousArray<CChar>] = []
+  var staticFunctions: [JavaScriptCore.JSStaticFunction] = []
 
   init(definition: JSClassDefinition, usesManagedParent: Bool) {
     self.definition = definition
@@ -254,6 +258,119 @@ private func autoClassDefinition(from object: JSObjectRef) -> JSClassDefinition?
   autoClassStorage(from: object)?.definition
 }
 
+private func withAutoJSArguments<R>(
+  _ arguments: UnsafePointer<JSValueRef?>?,
+  count: Int,
+  _ body: (borrowing JSArguments) -> R
+) -> R {
+  if let arguments {
+    return body(JSArguments(pointer: arguments, count: count))
+  }
+  var empty: JSValueRef? = nil
+  return withUnsafePointer(to: &empty) { pointer in
+    body(JSArguments(pointer: pointer, count: count))
+  }
+}
+
+private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
+  ctx, object, propertyName, exception in
+  guard let ctx, let object, let propertyName,
+    let definition = autoClassDefinition(from: object)
+  else {
+    return JSValueMakeUndefined(ctx)
+  }
+  rememberClassObjectContext(ctx, object)
+
+  let name = String(jsStringRef: propertyName)
+  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
+    return JSValueMakeUndefined(ctx)
+  }
+
+  let context = JSCallbackContext(ctx: ctx)
+  let this = JSValue(ref: object, ctx: context)
+  let result = valueDef.getProperty(context, this).toPrivateResult()
+
+  switch result {
+  case .value(let value):
+    return value
+  case .exception(let error):
+    exception?.pointee = error
+    return JSValueMakeUndefined(ctx)
+  }
+}
+
+private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
+  ctx, object, propertyName, value, exception in
+  guard let ctx, let object, let propertyName, let value,
+    let definition = autoClassDefinition(from: object)
+  else {
+    return false
+  }
+  rememberClassObjectContext(ctx, object)
+
+  let name = String(jsStringRef: propertyName)
+  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
+    return false
+  }
+
+  let context = JSCallbackContext(ctx: ctx)
+  let this = JSValue(ref: object, ctx: context)
+  let newValue = JSValue(ref: value, ctx: context)
+  let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
+
+  switch result {
+  case .value:
+    return true
+  case .exception(let error):
+    exception?.pointee = error
+    return false
+  }
+}
+
+private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
+  ctx, function, thisObject, argumentCount, arguments, exception in
+  guard let ctx, let function,
+    let thisObjectRef = thisObject,
+    let definition = autoClassDefinition(from: thisObjectRef)
+  else {
+    return JSValueMakeUndefined(ctx)
+  }
+
+  rememberClassObjectContext(ctx, thisObjectRef)
+
+  let nameKey = JSStringManaged("name")
+  let functionNameValue = JSObjectGetProperty(ctx, function, nameKey.ref, nil)
+  let functionName = functionNameValue.flatMap { value -> String? in
+    guard let nameRef = JSValueToStringCopy(ctx, value, nil) else {
+      return nil
+    }
+    defer { JSStringRelease(nameRef) }
+    return String(jsStringRef: nameRef)
+  }
+
+  guard let functionName,
+    let functionDef = inheritedStaticFunction(named: functionName, from: definition)
+  else {
+    return JSValueMakeUndefined(ctx)
+  }
+
+  let context = JSCallbackContext(ctx: ctx)
+  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
+  let thisValue = JSValue(ref: thisObjectRef, ctx: context)
+  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
+  let result = withAutoJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
+    functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
+  }
+
+  switch result {
+  case .value(let value):
+    return value
+  case .exception(let error):
+    exception?.pointee = error
+    return JSValueMakeUndefined(ctx)
+  }
+}
+
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   -> JavaScriptCore.JSClassDefinition
 {
@@ -263,6 +380,45 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   cls.parentClass = backing.definition.parentClass?.ref
   cls.initialize = autoClassInitializeCallback
   cls.finalize = autoClassFinalizeCallback
+
+  if !backing.definition.staticValues.isEmpty {
+    backing.staticValueNames = backing.definition.staticValues.map { $0.name.utf8CString }
+    backing.staticValues = []
+    backing.staticValues.reserveCapacity(backing.definition.staticValues.count + 1)
+    for (index, value) in backing.definition.staticValues.enumerated() {
+      var staticValue = JavaScriptCore.JSStaticValue()
+      backing.staticValueNames[index].withUnsafeBufferPointer {
+        staticValue.name = $0.baseAddress
+      }
+      staticValue.getProperty = autoStaticValueGetPropertyCallback
+      staticValue.setProperty = autoStaticValueSetPropertyCallback
+      staticValue.attributes = value.attributes.rawValue
+      backing.staticValues.append(staticValue)
+    }
+    backing.staticValues.append(JavaScriptCore.JSStaticValue())
+    backing.staticValues.withUnsafeBufferPointer {
+      cls.staticValues = $0.baseAddress
+    }
+  }
+
+  if !backing.definition.staticFunctions.isEmpty {
+    backing.staticFunctionNames = backing.definition.staticFunctions.map { $0.name.utf8CString }
+    backing.staticFunctions = []
+    backing.staticFunctions.reserveCapacity(backing.definition.staticFunctions.count + 1)
+    for (index, function) in backing.definition.staticFunctions.enumerated() {
+      var staticFunction = JavaScriptCore.JSStaticFunction()
+      backing.staticFunctionNames[index].withUnsafeBufferPointer {
+        staticFunction.name = $0.baseAddress
+      }
+      staticFunction.callAsFunction = autoStaticFunctionCallAsFunctionCallback
+      staticFunction.attributes = function.attributes.rawValue
+      backing.staticFunctions.append(staticFunction)
+    }
+    backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
+    backing.staticFunctions.withUnsafeBufferPointer {
+      cls.staticFunctions = $0.baseAddress
+    }
+  }
 
   if backing.definition.getProperty != nil {
     cls.getProperty = { ctx, object, propertyName, exception in
