@@ -11,17 +11,17 @@ public struct JSArrayBuffer: ~Copyable {
     self.value = JSValue(ref: ref, ctx: ctx)
   }
 
-  init(ref: JSObjectRef, ctx: borrowing JSCallbackContext) {
+  init(ref: JSObjectRef, ctx: borrowing JSInstantContext) {
     self.value = JSValue(ref: ref, ctx: ctx)
   }
 
   public init(byteLength: Int, in context: isolated JSContext = #isolation) {
-    self = context.withCallbackContext { callbackContext in
+    self = context.withInstantContext { callbackContext in
       JSArrayBuffer(byteLength: byteLength, in: callbackContext)
     }
   }
 
-  public init(byteLength: Int, in context: borrowing JSCallbackContext) {
+  public init(byteLength: Int, in context: borrowing JSInstantContext) {
     precondition(byteLength >= 0, "ArrayBuffer byteLength must be non-negative")
 
     var exception: JSValueRef?
@@ -44,22 +44,22 @@ public struct JSArrayBuffer: ~Copyable {
   }
 
   public init(copying bytes: [UInt8], in context: isolated JSContext = #isolation) {
-    self = context.withCallbackContext { callbackContext in
+    self = context.withInstantContext { callbackContext in
       JSArrayBuffer(copying: bytes, in: callbackContext)
     }
   }
 
-  public init(copying bytes: [UInt8], in context: borrowing JSCallbackContext) {
+  public init(copying bytes: [UInt8], in context: borrowing JSInstantContext) {
     self.init(copying: bytes.withUnsafeBytes { $0 }, in: context)
   }
 
   public init(copying bytes: UnsafeRawBufferPointer, in context: isolated JSContext = #isolation) {
-    self = context.withCallbackContext { callbackContext in
+    self = context.withInstantContext { callbackContext in
       JSArrayBuffer(copying: bytes, in: callbackContext)
     }
   }
 
-  public init(copying bytes: UnsafeRawBufferPointer, in context: borrowing JSCallbackContext) {
+  public init(copying bytes: UnsafeRawBufferPointer, in context: borrowing JSInstantContext) {
     var exception: JSValueRef?
     let copiedBytes = Self.allocateCopy(of: bytes)
     let ref = JSObjectMakeArrayBufferWithBytesNoCopy(
@@ -84,7 +84,7 @@ public struct JSArrayBuffer: ~Copyable {
       return nil
     }
 
-    self.value = JSValue(ref: value.ref, ctx: JSCallbackContext(ctx: value.ctx))
+    self.value = JSValue(ref: value.ref, ctx: JSInstantContext(ctx: value.ctx))
   }
 
   public var byteLength: Int {
@@ -146,11 +146,11 @@ public struct JSArrayBuffer: ~Copyable {
 }
 
 extension JSArrayBuffer: JSValueEncodable {
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(ref: value.ref, ctx: context)
   }
 
-  public func tryEncode(in context: borrowing JSCallbackContext) throws(JSValueConversionError)
+  public func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError)
     -> JSValue
   {
     JSValue(ref: value.ref, ctx: context)

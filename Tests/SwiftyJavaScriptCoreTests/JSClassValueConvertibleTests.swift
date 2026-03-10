@@ -34,7 +34,7 @@ class ExportedLeafNode: ExportedChildNode {
 enum UppercaseStringDecoder: JSValueDecoder {
   typealias SwiftType = String
 
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> String
   {
     value.toString(in: context).uppercased()

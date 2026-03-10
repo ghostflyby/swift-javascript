@@ -6,6 +6,7 @@
 - [ ] 每完成一条能力立即打勾并补充简要说明
 
 ## 1. JSContext（C API 对齐）
+- [x] 将 `JSInstantContext` 作为同步上下文核心，并让 `JSContext` 作为 actor 薄封装一一转发（已完成命名迁移、`evaluateScript` 下沉与 `withGlobalObject` 转发）
 - [x] `evaluateScript(_:)`（基于 `JSEvaluateScript`）
 - [x] `evaluateScript(_:sourceURL:)`（支持 sourceURL）
 - [x] `evaluateScript` 异常透出（返回/抛错策略定稿并实现，当前为 `JSResult`）
@@ -48,7 +49,7 @@
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）
 - [x] 调用点覆盖转换（属性读写与函数参数读取）
 - [x] 为后续宏自动实现预留统一转换器模型
-- [x] 保留 Callback 协议为底层实现，并由 Actor 版本统一转调（新增 `withCallbackContext` 与默认转调扩展）
+- [x] 保留 Callback 协议为底层实现，并由 Actor 版本统一转调（现为 `withInstantContext` 与默认转调扩展）
 - [x] 删除 Runtime 转换协议，统一由 `JSValue*` 协议声明 CallbackContext 约束并用扩展补 Actor API
 
 ## 7. 宏自动实现（进行中）

@@ -16,16 +16,16 @@ public struct JSClassAttributes: OptionSet, Sendable {
 public struct JSStaticValue: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
-  public let getProperty: @Sendable (borrowing JSCallbackContext, borrowing JSValue) -> JSResult
+  public let getProperty: @Sendable (borrowing JSInstantContext, borrowing JSValue) -> JSResult
   public let setProperty:
-    @Sendable (borrowing JSCallbackContext, borrowing JSValue, borrowing JSValue) -> JSResult
+    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSValue) -> JSResult
 }
 
 public struct JSStaticFunction: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
-    @Sendable (borrowing JSCallbackContext, borrowing JSValue, borrowing JSArguments) -> JSResult
+    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments) -> JSResult
 }
 
 public struct JSClassDefinition: Sendable {
@@ -52,52 +52,52 @@ public struct JSClassDefinition: Sendable {
 
   public var staticFunctions: [JSStaticFunction] = []
 
-  public var initialize: (@Sendable (borrowing JSValue, borrowing JSCallbackContext) -> Void)? = nil
+  public var initialize: (@Sendable (borrowing JSValue, borrowing JSInstantContext) -> Void)? = nil
 
   public var finalize: (@Sendable (borrowing JSValue) -> Void)? = nil
 
   public var hasProperty:
-    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> Bool)? = nil
+    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> Bool)? = nil
 
   public var getProperty:
-    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> JSResult)? =
+    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> JSResult)? =
       nil
 
   public var setProperty:
     (
-      @Sendable (borrowing JSCallbackContext, borrowing JSValue, String, borrowing JSValue) ->
+      @Sendable (borrowing JSInstantContext, borrowing JSValue, String, borrowing JSValue) ->
         JSValue?
     )? =
       nil
 
   public var deleteProperty:
-    (@Sendable (borrowing JSCallbackContext, borrowing JSValue, String) -> Bool)? =
+    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> Bool)? =
       nil
 
   public var getPropertyNames:
-    (@Sendable (borrowing JSCallbackContext, inout JSValue, JSPropertyNameAccumulatorRef) -> Void)? =
+    (@Sendable (borrowing JSInstantContext, inout JSValue, JSPropertyNameAccumulatorRef) -> Void)? =
       nil
 
   public var callAsFunction:
     (
-      @Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue, borrowing JSArguments)
+      @Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue, borrowing JSArguments)
         ->
         JSValue
     )? = nil
 
   public var callAsConstructor:
     (
-      @Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue, borrowing JSArguments)
+      @Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue, borrowing JSArguments)
         ->
         JSValue
     )? = nil
 
   public var hasInstance:
-    (@Sendable (borrowing JSCallbackContext, inout JSValue, inout JSValue) -> Bool)? =
+    (@Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue) -> Bool)? =
       nil
 
   public var convertToType:
-    (@Sendable (borrowing JSCallbackContext, inout JSValue, JSType, inout JSValue) -> JSValue)? =
+    (@Sendable (borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) -> JSValue)? =
       nil
 }
 
@@ -350,7 +350,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
   let result = valueDef.getProperty(context, this).toPrivateResult()
   switch result {
@@ -376,7 +376,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     return false
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
   let newValue = JSValue(ref: value, ctx: context)
   let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
@@ -417,7 +417,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
@@ -502,7 +502,7 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
         let value = JSValue(ref: object, ctx: context)
         let p = def.getProperty!(context, value, s).toPrivateResult()
@@ -526,7 +526,7 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         let newValue = JSValue(ref: value, ctx: context)
@@ -549,7 +549,7 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         return type.hasProperty!(context, this, s)
@@ -564,7 +564,7 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         let deleteResult = type.deleteProperty!(context, this, s)
@@ -580,7 +580,7 @@ extension JSClassDefinition {
           return
         }
         rememberClassObjectContext(ctx, object)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         var this = JSValue(ref: object, ctx: context)
         type.getPropertyNames?(context, &this, accumulator)
       }
@@ -595,7 +595,7 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, thisObjectRef)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
         var functionValue = JSValue(ref: functionRef, ctx: context)
         var thisValue = JSValue(ref: thisObjectRef, ctx: context)
@@ -627,7 +627,7 @@ extension JSClassDefinition {
           return nil
         }
         rememberClassObjectContext(ctx, constructorRef)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
         var constructorValue = JSValue(ref: constructorRef, ctx: context)
         var thisValue = JSValue(undefinedIn: context)
@@ -664,7 +664,7 @@ extension JSClassDefinition {
           return false
         }
         rememberClassObjectContext(ctx, constructorRef)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         var constructorValue = JSValue(ref: constructorRef, ctx: context)
         var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
         return type.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
@@ -679,7 +679,7 @@ extension JSClassDefinition {
           return JSValueMakeUndefined(ctx)
         }
         rememberClassObjectContext(ctx, objectRef)
-        let context = JSCallbackContext(ctx: ctx)
+        let context = JSInstantContext(ctx: ctx)
         let jsType = JSType(type)
         var objectValue = JSValue(ref: objectRef, ctx: context)
         var exceptionValue = JSValue(undefinedIn: context)

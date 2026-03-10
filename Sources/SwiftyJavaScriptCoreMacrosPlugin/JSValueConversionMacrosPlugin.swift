@@ -472,12 +472,18 @@ private func collectExportedMethods(from members: MemberBlockItemListSyntax)
   return plans
 }
 
-private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
-  let argumentCount = method.parameters.count
+private func indent(_ source: String, by prefix: String) -> String {
+  source.split(separator: "\n", omittingEmptySubsequences: false)
+    .map { line in
+      line.isEmpty ? String(line) : prefix + line
+    }
+    .joined(separator: "\n")
+}
+
+private func makeMethodCallbackBody(_ method: MethodPlan, indentLevel: String) -> String {
   let decodeLines = method.parameters.enumerated().map { index, parameter in
     let decoder = parameter.decoderOverride ?? "JSDefaultConverter<\(parameter.typeName)>"
-    return
-      "      let __arg\(index) = try arguments.tryUnpack(at: \(index), using: \(decoder).self, in: context)"
+    return "let __arg\(index) = try arguments.tryUnpack(at: \(index), using: \(decoder).self, in: context)"
   }.joined(separator: "\n")
 
   let callArguments = method.parameters.enumerated().map { index, parameter in
@@ -497,48 +503,55 @@ private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
 
   if let returnTypeName = method.returnTypeName, returnTypeName != "Void", returnTypeName != "()" {
     if let returnEncoder = method.returnEncoder {
-      bodyLines.append("      let __result = \(invokedCallExpression)")
+      bodyLines.append("let __result = \(invokedCallExpression)")
       bodyLines.append(
-        "      let __encoded = try \(returnEncoder).tryEncode(__result, in: context)")
-      bodyLines.append("      return .value(__encoded)")
+        "let __encoded = try \(returnEncoder).tryEncode(__result, in: context)")
+      bodyLines.append("return .value(__encoded)")
     } else {
-      bodyLines.append("      let __result = \(invokedCallExpression)")
-      bodyLines.append("      let __encoded = try __result.tryEncode(in: context)")
-      bodyLines.append("      return .value(__encoded)")
+      bodyLines.append("let __result = \(invokedCallExpression)")
+      bodyLines.append("let __encoded = try __result.tryEncode(in: context)")
+      bodyLines.append("return .value(__encoded)")
     }
   } else {
-    bodyLines.append("      \(invokedCallExpression)")
-    bodyLines.append("      return .value(JSValue(undefinedIn: context))")
+    bodyLines.append("\(invokedCallExpression)")
+    bodyLines.append("return .value(JSValue(undefinedIn: context))")
   }
 
   let executionSource: String
   if method.isThrowing, let errorEncoder = method.errorEncoder {
     executionSource =
-      (["                do {"] + bodyLines + [
-        "                } catch let error as \(errorEncoder).SwiftType {",
-        "                  if let encoded = try? \(errorEncoder).tryEncode(error, in: context) {",
-        "                    return .exception(encoded)",
-        "                  }",
-        "                  return .exception(JSValue(undefinedIn: context))",
-        "                } catch {",
-        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
-        "                }",
+      (["do {"] + bodyLines + [
+        "} catch let error as \(errorEncoder).SwiftType {",
+        "  if let encoded = try? \(errorEncoder).tryEncode(error, in: context) {",
+        "    return .exception(encoded)",
+        "  }",
+        "  return .exception(JSValue(undefinedIn: context))",
+        "} catch {",
+        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "}",
       ]).joined(separator: "\n")
   } else if method.isThrowing {
     executionSource =
-      (["                do {"] + bodyLines + [
-        "                } catch {",
-        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
-        "                }",
+      (["do {"] + bodyLines + [
+        "} catch {",
+        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "}",
       ]).joined(separator: "\n")
   } else {
     executionSource =
-      (["                do {"] + bodyLines + [
-        "                } catch {",
-        "                  return .exception(JSValue(string: \"\\(error)\", in: context))",
-        "                }",
+      (["do {"] + bodyLines + [
+        "} catch {",
+        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "}",
       ]).joined(separator: "\n")
   }
+
+  return indent(executionSource, by: indentLevel)
+}
+
+private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
+  let callbackBody = makeMethodCallbackBody(method, indentLevel: "                ")
+  let argumentCount = method.parameters.count
 
   return [
     "            JSStaticFunction(",
@@ -553,9 +566,29 @@ private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
     "                guard arguments.count == \(argumentCount) else {",
     "                  return .value(JSValue(undefinedIn: context))",
     "                }",
-    executionSource,
+    callbackBody,
     "              }",
     "            )",
+  ].joined(separator: "\n")
+}
+
+private func makeMethodGetPropertyCase(_ method: MethodPlan) -> String {
+  let callbackBody = makeMethodCallbackBody(method, indentLevel: "                  ")
+  return [
+    "            case \"\(method.jsName)\":",
+    "              return .value(",
+    "                context.makeFunction(named: \"\(method.jsName)\") { context, _, this, arguments in",
+    "                  guard let instance = try? Self.tryDecode(this, in: context) else {",
+    "                    return .exception(",
+    "                      JSValue(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
+    "                    )",
+    "                  }",
+    "                  guard arguments.count == \(method.parameters.count) else {",
+    "                    return .value(JSValue(undefinedIn: context))",
+    "                  }",
+    callbackBody,
+    "                }",
+    "              )",
   ].joined(separator: "\n")
 }
 
@@ -909,7 +942,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         return try \(encoder).tryEncode(self, in: context)
         """
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -964,7 +997,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1010,7 +1043,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       let initForwardArgs = properties.map { "\($0.name): __decoded.\($0.name)" }
         .joined(separator: ", ")
       initSource = """
-        public convenience init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+        public convenience init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
           do {
             let __decoded = try Self.tryDecode(value, in: context)
             self.init(\(initForwardArgs))
@@ -1047,7 +1080,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       )
       let rawValueTypeName = enumRawValueTypeName(from: enumDecl)
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1178,12 +1211,12 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
         public static func tryDecode(
           _ value: borrowing JSValue,
-          in context: borrowing JSCallbackContext
+          in context: borrowing JSInstantContext
         ) throws(JSValueConversionError) -> Self {
           \(decodeBody)
         }
 
-        public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+        public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
           do {
             return try self.tryEncode(in: context)
           } catch {
@@ -1192,7 +1225,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         }
 
         public func tryEncode(
-          in context: borrowing JSCallbackContext
+          in context: borrowing JSInstantContext
         ) throws(JSValueConversionError) -> JSValue {
           \(encodeBody)
         }
@@ -1251,8 +1284,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let hasPropertyCases =
-      (properties.map { "case \"\($0.name)\": return true" }
-      + methods.map { "case \"\($0.jsName)\": return true" })
+      properties.map { "case \"\($0.name)\": return true" }
       .joined(separator: "\n")
 
     let getPropertyCases = properties.map { property in
@@ -1270,6 +1302,8 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
               \(encodeLine)
         """
     }.joined(separator: "\n")
+
+    let methodGetPropertyCases = methods.map(makeMethodGetPropertyCase).joined(separator: "\n")
 
     let setPropertyCases = properties.map { property in
       if !property.isMutable {
@@ -1329,6 +1363,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
           }
           switch property {
           \(getPropertyCases)
+          \(methodGetPropertyCases)
           default:
         \(parentGetPropertyFallback)
           }

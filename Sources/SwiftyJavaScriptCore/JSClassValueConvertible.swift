@@ -58,22 +58,22 @@ private let jsClassCacheRegistry = JSClassCacheRegistry()
 
 public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
   static var jsClassDefinition: JSClassDefinition { get }
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext) -> Self
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Self
   static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Self
-  static func encode(_ value: Self, in context: borrowing JSCallbackContext) -> JSValue
+  static func encode(_ value: Self, in context: borrowing JSInstantContext) -> JSValue
   static func tryEncode(
     _ value: Self,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue
 }
 
 public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter {
   public typealias SwiftType = T
 
-  public static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> T
   {
     T.decode(value, in: context)
@@ -81,18 +81,18 @@ public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter 
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> T {
     try T.tryDecode(value, in: context)
   }
 
-  public static func encode(_ value: T, in context: borrowing JSCallbackContext) -> JSValue {
+  public static func encode(_ value: T, in context: borrowing JSInstantContext) -> JSValue {
     T.encode(value, in: context)
   }
 
   public static func tryEncode(
     _ value: T,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     try T.tryEncode(value, in: context)
   }
@@ -119,7 +119,7 @@ extension JSClassValueConvertible {
     )
   }
 
-  public static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Self
   {
     do {
@@ -131,7 +131,7 @@ extension JSClassValueConvertible {
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Self {
     guard value.isObject else {
       throw .typeMismatch(expected: "object", actual: value.type)
@@ -154,7 +154,7 @@ extension JSClassValueConvertible {
     return instance
   }
 
-  public static func encode(_ value: Self, in context: borrowing JSCallbackContext) -> JSValue {
+  public static func encode(_ value: Self, in context: borrowing JSInstantContext) -> JSValue {
     do {
       return try tryEncode(value, in: context)
     } catch {
@@ -164,7 +164,7 @@ extension JSClassValueConvertible {
 
   public static func tryEncode(
     _ value: Self,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     let definition = Self.jsClassDefinition
     let storage = JSClassAutoObjectStorage(
@@ -182,11 +182,11 @@ extension JSClassValueConvertible {
     return JSValue(ref: object, ctx: context)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     Self.encode(self, in: context)
   }
 
-  public func tryEncode(in context: borrowing JSCallbackContext) throws(JSValueConversionError)
+  public func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError)
     -> JSValue
   {
     try Self.tryEncode(self, in: context)
@@ -196,7 +196,7 @@ extension JSClassValueConvertible {
 extension JSValue {
   public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> T {
     _ = type
     return try T.tryDecode(self, in: context)
@@ -207,7 +207,7 @@ extension JSValue {
     in context: isolated JSContext = #isolation
   ) throws(JSValueConversionError) -> T {
     _ = type
-    return try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+    return try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try T.tryDecode(self, in: callbackContext)
     }
   }
@@ -220,7 +220,7 @@ private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, obj
 
   let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
   if let initialize = storage.definition.initialize {
-    let context = JSCallbackContext(ctx: ctx)
+    let context = JSInstantContext(ctx: ctx)
     let this = JSValue(ref: object, ctx: context)
     initialize(this, context)
   }
@@ -235,7 +235,7 @@ private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
   if let finalize = storage.definition.finalize,
     let objectContext = classObjectContext(object)
   {
-    let context = JSCallbackContext(ctx: objectContext)
+    let context = JSInstantContext(ctx: objectContext)
     let this = JSValue(ref: object, ctx: context)
     finalize(this)
   }
@@ -286,7 +286,7 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
   let result = valueDef.getProperty(context, this).toPrivateResult()
 
@@ -313,7 +313,7 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     return false
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
   let newValue = JSValue(ref: value, ctx: context)
   let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
@@ -354,7 +354,7 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSCallbackContext(ctx: ctx)
+  let context = JSInstantContext(ctx: ctx)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
@@ -428,7 +428,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         return JSValueMakeUndefined(ctx)
       }
       rememberClassObjectContext(ctx, object)
-      let context = JSCallbackContext(ctx: ctx)
+      let context = JSInstantContext(ctx: ctx)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
       let result = definition.getProperty?(context, this, key).toPrivateResult()
@@ -452,7 +452,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         return false
       }
       rememberClassObjectContext(ctx, object)
-      let context = JSCallbackContext(ctx: ctx)
+      let context = JSInstantContext(ctx: ctx)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
       let newValue = JSValue(ref: value, ctx: context)
@@ -472,7 +472,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         return false
       }
       rememberClassObjectContext(ctx, object)
-      let context = JSCallbackContext(ctx: ctx)
+      let context = JSInstantContext(ctx: ctx)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
       return definition.hasProperty?(context, this, key) ?? false
@@ -487,7 +487,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         return false
       }
       rememberClassObjectContext(ctx, object)
-      let context = JSCallbackContext(ctx: ctx)
+      let context = JSInstantContext(ctx: ctx)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
       return definition.deleteProperty?(context, this, key) ?? false

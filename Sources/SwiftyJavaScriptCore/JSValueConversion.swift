@@ -9,23 +9,23 @@ public enum JSValueConversionError: Error {
 }
 
 public protocol JSValueDecodable: ~Copyable {
-  init(value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  init(value: borrowing JSValue, in context: borrowing JSInstantContext)
   static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Self
 }
 
 extension JSValueDecodable {
   public init(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    self = context.withCallbackContext { callbackContext in
+    self = context.withInstantContext { callbackContext in
       Self(value: value, in: callbackContext)
     }
   }
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Self {
     Self(value: value, in: context)
   }
@@ -34,26 +34,26 @@ extension JSValueDecodable {
     _ value: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) throws(JSValueConversionError) -> Self {
-    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryDecode(value, in: callbackContext)
     }
   }
 }
 
 public protocol JSValueEncodable: ~Copyable {
-  func toJSValue(in context: borrowing JSCallbackContext) -> JSValue
-  func tryEncode(in context: borrowing JSCallbackContext) throws(JSValueConversionError) -> JSValue
+  func toJSValue(in context: borrowing JSInstantContext) -> JSValue
+  func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError) -> JSValue
 }
 
 extension JSValueEncodable {
   public func toJSValue(in context: isolated JSContext = #isolation) -> JSValue {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       self.toJSValue(in: callbackContext)
     }
   }
 
   public func tryEncode(
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     toJSValue(in: context)
   }
@@ -61,7 +61,7 @@ extension JSValueEncodable {
   public func tryEncode(
     in context: isolated JSContext = #isolation
   ) throws(JSValueConversionError) -> JSValue {
-    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try self.tryEncode(in: callbackContext)
     }
   }
@@ -72,11 +72,11 @@ public typealias JSValueCodable = JSValueDecodable & JSValueEncodable
 public protocol JSValueDecoder {
   associatedtype SwiftType
 
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> SwiftType
   static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> SwiftType
 }
 
@@ -85,9 +85,9 @@ public protocol JSValueEncoder {
 
   static func tryEncode(
     _ value: SwiftType,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue
-  static func encode(_ value: SwiftType, in context: borrowing JSCallbackContext) -> JSValue
+  static func encode(_ value: SwiftType, in context: borrowing JSInstantContext) -> JSValue
 }
 
 public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
@@ -96,14 +96,14 @@ extension JSValueDecoder {
   public static func decode(_ value: borrowing JSValue, in context: isolated JSContext)
     -> SwiftType
   {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       Self.decode(value, in: callbackContext)
     }
   }
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> SwiftType {
     decode(value, in: context)
   }
@@ -112,7 +112,7 @@ extension JSValueDecoder {
     _ value: borrowing JSValue,
     in context: isolated JSContext
   ) throws(JSValueConversionError) -> SwiftType {
-    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryDecode(value, in: callbackContext)
     }
   }
@@ -120,14 +120,14 @@ extension JSValueDecoder {
 
 extension JSValueEncoder {
   public static func encode(_ value: SwiftType, in context: isolated JSContext) -> JSValue {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       Self.encode(value, in: callbackContext)
     }
   }
 
   public static func tryEncode(
     _ value: SwiftType,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     encode(value, in: context)
   }
@@ -136,14 +136,14 @@ extension JSValueEncoder {
     _ value: SwiftType,
     in context: isolated JSContext
   ) throws(JSValueConversionError) -> JSValue {
-    try context.withCallbackContext { callbackContext throws(JSValueConversionError) in
+    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryEncode(value, in: callbackContext)
     }
   }
 }
 
 public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
-  public static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> T
   {
     T(value: value, in: context)
@@ -151,52 +151,52 @@ public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> T {
     try T.tryDecode(value, in: context)
   }
 
-  public static func encode(_ value: T, in context: borrowing JSCallbackContext) -> JSValue {
+  public static func encode(_ value: T, in context: borrowing JSInstantContext) -> JSValue {
     value.toJSValue(in: context)
   }
 
   public static func tryEncode(
     _ value: T,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     try value.tryEncode(in: context)
   }
 }
 
 extension JSValue: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     self.init(ref: value.ref, ctx: context)
   }
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     JSValue(value: value, in: context)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(ref: self.ref, ctx: context)
   }
 
   public func tryEncode(
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     JSValue(ref: self.ref, ctx: context)
   }
 }
 
 extension Bool: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     self = JSValueToBoolean(context.globalContextRef, value.ref)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(boolean: self, in: context)
   }
 }
@@ -204,7 +204,7 @@ extension Bool: JSValueCodable {
 extension Bool {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Bool {
     guard value.isBoolean else {
       throw .typeMismatch(expected: "boolean", actual: value.type)
@@ -214,12 +214,12 @@ extension Bool {
 }
 
 extension Double: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     var exception: JSValueRef?
     self = JSValueToNumber(context.globalContextRef, value.ref, &exception)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: self, in: context)
   }
 }
@@ -227,7 +227,7 @@ extension Double: JSValueCodable {
 extension Double {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Double {
     guard value.isNumber else {
       throw .typeMismatch(expected: "number", actual: value.type)
@@ -237,12 +237,12 @@ extension Double {
 }
 
 extension Int32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     let number = Double(value: value, in: context)
     self = Int32(number)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: self, in: context)
   }
 }
@@ -250,7 +250,7 @@ extension Int32: JSValueCodable {
 extension Int32 {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Int32 {
     let number = try Double.tryDecode(value, in: context)
     guard number.isFinite else {
@@ -269,12 +269,12 @@ extension Int32 {
 }
 
 extension UInt32: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     let number = Double(value: value, in: context)
     self = UInt32(number)
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: self, in: context)
   }
 }
@@ -282,7 +282,7 @@ extension UInt32: JSValueCodable {
 extension UInt32 {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> UInt32 {
     let number = try Double.tryDecode(value, in: context)
     guard number.isFinite else {
@@ -301,7 +301,7 @@ extension UInt32 {
 }
 
 extension String: JSValueCodable {
-  public init(value: borrowing JSValue, in context: borrowing JSCallbackContext) {
+  public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     var exception: JSValueRef?
     if let stringRef = JSValueToStringCopy(context.globalContextRef, value.ref, &exception) {
       defer { JSStringRelease(stringRef) }
@@ -311,7 +311,7 @@ extension String: JSValueCodable {
     self = ""
   }
 
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(string: self, in: context)
   }
 }
@@ -319,7 +319,7 @@ extension String: JSValueCodable {
 extension String {
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> String {
     guard value.isString else {
       throw .typeMismatch(expected: "string", actual: value.type)
@@ -329,7 +329,7 @@ extension String {
 }
 
 extension Never: JSValueEncodable {
-  public func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     switch self {}
   }
 }
@@ -363,23 +363,23 @@ extension JSValue {
     String(value: self, in: context)
   }
 
-  public func toBool(in context: borrowing JSCallbackContext) -> Bool {
+  public func toBool(in context: borrowing JSInstantContext) -> Bool {
     Bool(value: self, in: context)
   }
 
-  public func toDouble(in context: borrowing JSCallbackContext) -> Double {
+  public func toDouble(in context: borrowing JSInstantContext) -> Double {
     Double(value: self, in: context)
   }
 
-  public func toInt32(in context: borrowing JSCallbackContext) -> Int32 {
+  public func toInt32(in context: borrowing JSInstantContext) -> Int32 {
     Int32(value: self, in: context)
   }
 
-  public func toUInt32(in context: borrowing JSCallbackContext) -> UInt32 {
+  public func toUInt32(in context: borrowing JSInstantContext) -> UInt32 {
     UInt32(value: self, in: context)
   }
 
-  public func toString(in context: borrowing JSCallbackContext) -> String {
+  public func toString(in context: borrowing JSInstantContext) -> String {
     String(value: self, in: context)
   }
 }

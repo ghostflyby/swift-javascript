@@ -5,22 +5,21 @@ import Testing
 enum ZeroOneBoolConverter: JSValueConverter {
   typealias SwiftType = Bool
 
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext) -> Bool {
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
     value.toDouble(in: context) != 0
   }
 
-  static func encode(_ value: Bool, in context: borrowing JSCallbackContext) -> JSValue {
+  static func encode(_ value: Bool, in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: value ? 1 : 0, in: context)
   }
 }
 
 struct FailingEncodeValue: JSValueEncodable {
-  func toJSValue(in context: borrowing JSCallbackContext) -> JSValue {
+  func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(undefinedIn: context)
   }
 
-  func tryEncode(in context: borrowing JSCallbackContext) throws(JSValueConversionError) -> JSValue
-  {
+  func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError) -> JSValue {
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 }
@@ -32,7 +31,7 @@ struct ReturnPayload {
 enum ReturnPayloadEncoder: JSValueEncoder {
   typealias SwiftType = ReturnPayload
 
-  static func encode(_ value: ReturnPayload, in context: borrowing JSCallbackContext) -> JSValue {
+  static func encode(_ value: ReturnPayload, in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: value.value, in: context)
   }
 }
@@ -44,7 +43,7 @@ enum FailurePayload: Error {
 enum FailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = FailurePayload
 
-  static func encode(_ value: FailurePayload, in context: borrowing JSCallbackContext) -> JSValue {
+  static func encode(_ value: FailurePayload, in context: borrowing JSInstantContext) -> JSValue {
     switch value {
     case .bad:
       return JSValue(string: "bad", in: context)
@@ -79,7 +78,7 @@ struct MacroDelegatedUser: Equatable {
 enum MacroDelegatedUserDecoder: JSValueDecoder {
   typealias SwiftType = MacroDelegatedUser
 
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> MacroDelegatedUser
   {
     MacroDelegatedUser(score: value.toDouble(in: context))
@@ -89,7 +88,7 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
 enum MacroDelegatedUserEncoder: JSValueEncoder {
   typealias SwiftType = MacroDelegatedUser
 
-  static func encode(_ value: MacroDelegatedUser, in context: borrowing JSCallbackContext)
+  static func encode(_ value: MacroDelegatedUser, in context: borrowing JSInstantContext)
     -> JSValue
   {
     JSValue(number: value.score, in: context)

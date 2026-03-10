@@ -28,7 +28,7 @@ public struct JSValue: ~Copyable {
     self.ctx = ctx.globalContextRef
   }
 
-  init(ref: JSValueRef, ctx: borrowing JSCallbackContext) {
+  init(ref: JSValueRef, ctx: borrowing JSInstantContext) {
     self.ref = ref
     self.ctx = ctx.globalContextRef
   }
@@ -39,7 +39,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(string value: String, in context: borrowing JSCallbackContext) {
+  public init(string value: String, in context: borrowing JSInstantContext) {
     let s = JSValueMakeString(
       context.globalContextRef, JSStringCreateWithCFString(value as CFString))
     self.init(ref: s!, ctx: context)
@@ -55,7 +55,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(number value: Double, in context: borrowing JSCallbackContext) {
+  public init(number value: Double, in context: borrowing JSInstantContext) {
     let s = JSValueMakeNumber(context.globalContextRef, value)
     self.init(ref: s!, ctx: context)
   }
@@ -65,7 +65,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(number value: some BinaryInteger, in context: borrowing JSCallbackContext) {
+  public init(number value: some BinaryInteger, in context: borrowing JSInstantContext) {
     let s = JSValueMakeNumber(context.globalContextRef, Double(value))
     self.init(ref: s!, ctx: context)
   }
@@ -75,7 +75,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(boolean value: Bool, in context: borrowing JSCallbackContext) {
+  public init(boolean value: Bool, in context: borrowing JSInstantContext) {
     let s = JSValueMakeBoolean(context.globalContextRef, value)
     self.init(ref: s!, ctx: context)
   }
@@ -91,7 +91,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(nullIn context: borrowing JSCallbackContext) {
+  public init(nullIn context: borrowing JSInstantContext) {
     let s = JSValueMakeNull(context.globalContextRef)
     self.init(ref: s!, ctx: context)
   }
@@ -101,7 +101,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: s!, ctx: context)
   }
 
-  public init(undefinedIn context: borrowing JSCallbackContext) {
+  public init(undefinedIn context: borrowing JSInstantContext) {
     let s = JSValueMakeUndefined(context.globalContextRef)
     self.init(ref: s!, ctx: context)
   }
@@ -111,7 +111,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: objectRef!, ctx: context)
   }
 
-  public init(objectIn context: borrowing JSCallbackContext) {
+  public init(objectIn context: borrowing JSInstantContext) {
     let objectRef = JSObjectMake(context.globalContextRef, nil, nil)
     self.init(ref: objectRef!, ctx: context)
   }
@@ -124,7 +124,7 @@ public struct JSValue: ~Copyable {
     self.init(ref: arrayRef!, ctx: context)
   }
 
-  public init(arrayIn context: borrowing JSCallbackContext) {
+  public init(arrayIn context: borrowing JSInstantContext) {
     var exception: JSValueRef?
     let arrayRef = JSObjectMakeArray(context.globalContextRef, 0, nil, &exception)
     precondition(exception == nil, "JSValue array creation raised exception")
@@ -134,7 +134,7 @@ public struct JSValue: ~Copyable {
 
   public typealias JSFunctionCallback =
     (
-      _ context: borrowing JSCallbackContext, _ function: borrowing JSValue,
+      _ context: borrowing JSInstantContext, _ function: borrowing JSValue,
       _ this: borrowing JSValue,
       _ arguments: borrowing JSArguments
     ) -> JSResult
@@ -147,6 +147,20 @@ public struct JSValue: ~Copyable {
     let jsFunctionRef = JSObjectMake(
       context.globalContextRef, context.functionClass.value,
       Unmanaged.passRetained(Box(callback)).toOpaque())
+
+    self.init(ref: jsFunctionRef!, ctx: context)
+  }
+
+  public init(
+    name: String,
+    callback: @escaping JSFunctionCallback,
+    in context: borrowing JSInstantContext
+  ) {
+    let jsFunctionRef = JSObjectMake(
+      context.globalContextRef,
+      context.actorContext.functionClass.value,
+      Unmanaged.passRetained(Box(callback)).toOpaque()
+    )
 
     self.init(ref: jsFunctionRef!, ctx: context)
   }
@@ -299,7 +313,7 @@ extension JSValue {
   private static func result(
     value resultRef: JSValueRef?,
     exception exceptionRef: JSValueRef?,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     if let exceptionRef {
       return .exception(JSValue(ref: exceptionRef, ctx: context))
@@ -313,7 +327,7 @@ extension JSValue {
   }
 
   @inline(__always)
-  private func objectRef(in context: borrowing JSCallbackContext) -> JSPrivateResult {
+  private func objectRef(in context: borrowing JSInstantContext) -> JSPrivateResult {
     var exception: JSValueRef?
     guard let objectRef = JSValueToObject(context.globalContextRef, self.ref, &exception) else {
       let exceptionValue = exception ?? JSValue(undefinedIn: context).retainedRef()
@@ -326,7 +340,7 @@ extension JSValue {
   private func callInternal(
     thisObjectRef: JSObjectRef?,
     argumentRefs: [JSValueRef?],
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     switch objectRef(in: context) {
     case .exception(let exceptionRef):
@@ -350,7 +364,7 @@ extension JSValue {
   @inline(__always)
   private func constructInternal(
     argumentRefs: [JSValueRef?],
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     switch objectRef(in: context) {
     case .exception(let exceptionRef):
@@ -382,7 +396,7 @@ extension JSValue {
   @inline(__always)
   private func encodedArgumentRefs<each A: JSValueEncodable>(
     _ arguments: repeat each A,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> [JSValueRef?] {
     var refs: [JSValueRef?] = []
     refs.reserveCapacity(countTypePack(repeat (each A).self))
@@ -397,12 +411,12 @@ extension JSValue {
   }
 
   public func call(in context: isolated JSContext = #isolation) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       call(in: callbackContext)
     }
   }
 
-  public func call(in context: borrowing JSCallbackContext) -> JSResult {
+  public func call(in context: borrowing JSInstantContext) -> JSResult {
     callInternal(thisObjectRef: nil, argumentRefs: [], in: context)
   }
 
@@ -410,14 +424,14 @@ extension JSValue {
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
   ) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       call(arguments: repeat each arguments, in: callbackContext)
     }
   }
 
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     callInternal(
       thisObjectRef: nil,
@@ -430,14 +444,14 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       call(this: thisValue, in: callbackContext)
     }
   }
 
   public func call(
     this thisValue: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     switch thisValue.objectRef(in: context) {
     case .exception(let exceptionRef):
@@ -456,7 +470,7 @@ extension JSValue {
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
   ) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
     }
   }
@@ -464,7 +478,7 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     this thisValue: borrowing JSValue,
     arguments: repeat each A,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     switch thisValue.objectRef(in: context) {
     case .exception(let exceptionRef):
@@ -479,12 +493,12 @@ extension JSValue {
   }
 
   public func construct(in context: isolated JSContext = #isolation) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       construct(in: callbackContext)
     }
   }
 
-  public func construct(in context: borrowing JSCallbackContext) -> JSResult {
+  public func construct(in context: borrowing JSInstantContext) -> JSResult {
     constructInternal(argumentRefs: [], in: context)
   }
 
@@ -492,14 +506,14 @@ extension JSValue {
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
   ) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       construct(arguments: repeat each arguments, in: callbackContext)
     }
   }
 
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     constructInternal(
       argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
@@ -511,14 +525,14 @@ extension JSValue {
     _ name: borrowing Name,
     in context: isolated JSContext = #isolation
   ) -> JSResult where Name: ~Copyable {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
     }
   }
 
   public func invokeMethod<Name: JSString>(
     _ name: borrowing Name,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
     invokeMethodInternal(name.ref, argumentRefs: [], in: context)
   }
@@ -528,7 +542,7 @@ extension JSValue {
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
   ) -> JSResult where Name: ~Copyable {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
     }
   }
@@ -536,7 +550,7 @@ extension JSValue {
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
     _ name: borrowing Name,
     arguments: repeat each A,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
     invokeMethodInternal(
       name.ref,
@@ -548,7 +562,7 @@ extension JSValue {
   private func invokeMethodInternal(
     _ nameRef: JSStringRef,
     argumentRefs: [JSValueRef?],
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult {
     switch objectRef(in: context) {
     case .exception(let exceptionRef):
@@ -580,17 +594,17 @@ extension JSValue {
     toDouble(in: context)
   }
 
-  public func toNumber(in context: borrowing JSCallbackContext) -> Double {
+  public func toNumber(in context: borrowing JSInstantContext) -> Double {
     toDouble(in: context)
   }
 
   public func toObject(in context: isolated JSContext = #isolation) -> JSResult {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       toObject(in: callbackContext)
     }
   }
 
-  public func toObject(in context: borrowing JSCallbackContext) -> JSResult {
+  public func toObject(in context: borrowing JSInstantContext) -> JSResult {
     switch objectRef(in: context) {
     case .exception(let exceptionRef):
       return .exception(JSValue(ref: exceptionRef, ctx: context))
@@ -600,22 +614,22 @@ extension JSValue {
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       isArray(in: callbackContext)
     }
   }
 
-  public func isArray(in context: borrowing JSCallbackContext) -> Bool {
+  public func isArray(in context: borrowing JSInstantContext) -> Bool {
     JSValueIsArray(context.globalContextRef, ref)
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       isDate(in: callbackContext)
     }
   }
 
-  public func isDate(in context: borrowing JSCallbackContext) -> Bool {
+  public func isDate(in context: borrowing JSInstantContext) -> Bool {
     JSValueIsDate(context.globalContextRef, ref)
   }
 
@@ -623,14 +637,14 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> Bool {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       isInstanceOf(constructor, in: callbackContext)
     }
   }
 
   public func isInstanceOf(
     _ constructor: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> Bool {
     switch constructor.objectRef(in: context) {
     case .exception:
@@ -653,7 +667,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
-    context.withCallbackContext { callbackContext in
+    context.withInstantContext { callbackContext in
       defineProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
   }
@@ -662,7 +676,7 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: borrowing Key,
     with attributes: JSPropertyAttributes = .none,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     switch objectRef(in: context) {
     case .exception(let exceptionRef):

@@ -20,7 +20,7 @@ final class JSCodableNode {
 public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public typealias SwiftType = T
 
-  public static func decode(_ value: borrowing JSValue, in context: borrowing JSCallbackContext)
+  public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> T
   {
     do {
@@ -32,7 +32,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
   public static func tryDecode(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> T {
     let node = try nodeFromJSValue(value, in: context)
     let decoder = _JSCodableDecoder(root: node, codingPath: [])
@@ -43,7 +43,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  public static func encode(_ value: T, in context: borrowing JSCallbackContext) -> JSValue {
+  public static func encode(_ value: T, in context: borrowing JSInstantContext) -> JSValue {
     do {
       return try tryEncode(value, in: context)
     } catch {
@@ -53,7 +53,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
   public static func tryEncode(
     _ value: T,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     let encoder = _JSCodableEncoder(context: context, codingPath: [])
     do {
@@ -69,7 +69,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
   static func nodeFromJSValue(
     _ value: borrowing JSValue,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSCodableNode {
     if value.isUndefined || value.isNull {
       return JSCodableNode(.null)
@@ -155,7 +155,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
   static func jsValueFromNode(
     _ node: JSCodableNode,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSValue {
     switch node.kind {
     case .null:
@@ -210,7 +210,7 @@ final class _JSCodableEncoder: Encoder {
   private let onCommit: ((JSValueRef) -> Void)?
 
   init(
-    context: borrowing JSCallbackContext,
+    context: borrowing JSInstantContext,
     codingPath: [any CodingKey],
     onCommit: ((JSValueRef) -> Void)? = nil
   ) {
@@ -326,7 +326,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
 
   func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
     let child = _JSCodableEncoder(
-      context: JSCallbackContext(ctx: globalContextRef),
+      context: JSInstantContext(ctx: globalContextRef),
       codingPath: codingPath + [key],
       onCommit: { ref in
         self.set(ref, forKey: key.stringValue)
@@ -364,12 +364,12 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   func superEncoder() -> any Encoder {
-    _JSCodableEncoder(context: JSCallbackContext(ctx: globalContextRef), codingPath: codingPath)
+    _JSCodableEncoder(context: JSInstantContext(ctx: globalContextRef), codingPath: codingPath)
   }
 
   func superEncoder(forKey key: Key) -> any Encoder {
     return _JSCodableEncoder(
-      context: JSCallbackContext(ctx: globalContextRef),
+      context: JSInstantContext(ctx: globalContextRef),
       codingPath: codingPath + [key],
       onCommit: { ref in
         self.set(ref, forKey: key.stringValue)
@@ -428,7 +428,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   func encode<T>(_ value: T) throws where T: Encodable {
     let index = count
     let child = _JSCodableEncoder(
-      context: JSCallbackContext(ctx: globalContextRef),
+      context: JSInstantContext(ctx: globalContextRef),
       codingPath: codingPath,
       onCommit: { ref in
         self.appendAtCurrent(ref, index: index)
@@ -466,7 +466,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     let index = count
     count += 1
     return _JSCodableEncoder(
-      context: JSCallbackContext(ctx: globalContextRef),
+      context: JSInstantContext(ctx: globalContextRef),
       codingPath: codingPath,
       onCommit: { ref in
         self.appendAtCurrent(ref, index: index)
@@ -526,7 +526,7 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
 
   func encode<T>(_ value: T) throws where T: Encodable {
     let child = _JSCodableEncoder(
-      context: JSCallbackContext(ctx: globalContextRef),
+      context: JSInstantContext(ctx: globalContextRef),
       codingPath: codingPath,
       onCommit: onCommit
     )

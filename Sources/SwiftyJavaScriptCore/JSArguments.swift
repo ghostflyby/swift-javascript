@@ -20,7 +20,7 @@ public struct JSArguments: ~Copyable {
   }
 
   public func unpack<R: ~Copyable>(
-    at: Int, in context: borrowing JSCallbackContext, _ body: (borrowing JSValue) -> R
+    at: Int, in context: borrowing JSInstantContext, _ body: (borrowing JSValue) -> R
   ) -> R {
     guard at >= 0 && at < count else {
       fatalError("Index out of bounds")
@@ -55,14 +55,14 @@ extension JSArguments {
   }
 
   public func tryUnpack<each T: JSValueDecodable>(
-    types: repeat (each T).Type, in context: borrowing JSCallbackContext
+    types: repeat (each T).Type, in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> (repeat each T) {
     var idx = 0
     let pointer = self.pointer
     let globalContextRef = context.globalContextRef
     let nextJSValue: () -> JSValue = {
       defer { idx += 1 }
-      let runtimeContext = JSCallbackContext(ctx: globalContextRef)
+      let runtimeContext = JSInstantContext(ctx: globalContextRef)
       if let v = pointer[idx] {
         return JSValue(ref: v, ctx: runtimeContext)
       } else {
@@ -93,14 +93,14 @@ extension JSArguments {
   }
 
   public func unpack<each T: JSValueDecodable>(
-    types: repeat (each T).Type, in context: borrowing JSCallbackContext
+    types: repeat (each T).Type, in context: borrowing JSInstantContext
   ) -> (repeat each T) {
     var idx = 0
     let pointer = self.pointer
     let globalContextRef = context.globalContextRef
     let nextJSValue: () -> JSValue = {
       defer { idx += 1 }
-      let runtimeContext = JSCallbackContext(ctx: globalContextRef)
+      let runtimeContext = JSInstantContext(ctx: globalContextRef)
       if let v = pointer[idx] {
         return JSValue(ref: v, ctx: runtimeContext)
       } else {
@@ -125,7 +125,7 @@ extension JSArguments {
   public func unpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> C.SwiftType {
     unpack(at: at, in: context) { value in
       converter.decode(value, in: context)
@@ -152,7 +152,7 @@ extension JSArguments {
   public func tryUnpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> C.SwiftType {
     guard at >= 0 && at < count else {
       fatalError("Index out of bounds")
@@ -187,14 +187,14 @@ extension JSArguments {
 
   public func unpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) -> (repeat (each C).SwiftType) {
     var idx = 0
     let pointer = self.pointer
     let globalContextRef = context.globalContextRef
     let nextJSValue: () -> JSValue = {
       defer { idx += 1 }
-      let runtimeContext = JSCallbackContext(ctx: globalContextRef)
+      let runtimeContext = JSInstantContext(ctx: globalContextRef)
       if let v = pointer[idx] {
         return JSValue(ref: v, ctx: runtimeContext)
       } else {
@@ -227,14 +227,14 @@ extension JSArguments {
 
   public func tryUnpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: borrowing JSCallbackContext
+    in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> (repeat (each C).SwiftType) {
     var idx = 0
     let pointer = self.pointer
     let globalContextRef = context.globalContextRef
     let nextJSValue: () -> JSValue = {
       defer { idx += 1 }
-      let runtimeContext = JSCallbackContext(ctx: globalContextRef)
+      let runtimeContext = JSInstantContext(ctx: globalContextRef)
       if let v = pointer[idx] {
         return JSValue(ref: v, ctx: runtimeContext)
       } else {

@@ -3,7 +3,7 @@
 public actor JSContext {
   nonisolated let peer: JavaScriptCore.JSContext
   let globalObjectRef: JSObjectRef
-  let functionClass: SendableBoxUnsafe<JSClassRef>
+  nonisolated let functionClass: SendableBoxUnsafe<JSClassRef>
   let globalObjectClass: SendableBoxUnsafe<JSClassRef>
   public let virtualMachine: JSVirtualMachine
   nonisolated public let unownedExecutor: UnownedSerialExecutor
@@ -28,8 +28,9 @@ public actor JSContext {
   }
 
   public func withGlobalObject(_ body: (borrowing JSValue) -> Void) {
-    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
-    body(globalObject)
+    withInstantContext { instantContext in
+      instantContext.withGlobalObject(body)
+    }
   }
 
   public func withIsolatedGlobalObject<R: Sendable>(
@@ -39,11 +40,11 @@ public actor JSContext {
     return body(self, globalObject)
   }
 
-  public func withCallbackContext<R: ~Copyable, E: Error>(
-    _ body: (borrowing JSCallbackContext) throws(E) -> R
+  public func withInstantContext<R: ~Copyable, E: Error>(
+    _ body: (borrowing JSInstantContext) throws(E) -> R
   ) throws(E) -> R {
-    let callbackContext = JSCallbackContext(ctx: globalContextRef)
-    return try body(callbackContext)
+    let instantContext = JSInstantContext(ctx: globalContextRef)
+    return try body(instantContext)
   }
 
   deinit {
@@ -70,15 +71,18 @@ extension JSContext {
   }
 
   public func evaluateScript(_ script: String) -> JSResult {
-    let scriptString = JSStringValue(script)
-    return evaluateScript(scriptString, startingLineNumber: 1)
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(script)
+    }
   }
 
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
-    evaluateScript(scriptRef: script.ref, sourceURLRef: nil, startingLineNumber: startingLineNumber)
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
+    }
   }
 
   public func evaluateScript<Script>(
@@ -86,9 +90,10 @@ extension JSContext {
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
-    let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(
-      script, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    }
   }
 
   public func evaluateScript<SourceURL>(
@@ -96,9 +101,10 @@ extension JSContext {
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
   ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
-    let scriptString = JSStringValue(script)
-    return evaluateScript(
-      scriptString, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    }
   }
 
   public func evaluateScript(
@@ -106,10 +112,10 @@ extension JSContext {
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult {
-    let scriptString = JSStringValue(script)
-    let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(
-      scriptString, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    }
   }
 
   public func evaluateScript<Script, SourceURL>(
@@ -118,40 +124,16 @@ extension JSContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    evaluateScript(
-      scriptRef: script.ref, sourceURLRef: sourceURL.ref, startingLineNumber: startingLineNumber)
-  }
-
-  private func evaluateScript(
-    scriptRef: JSStringRef,
-    sourceURLRef: JSStringRef?,
-    startingLineNumber: Int32
-  ) -> JSResult {
-    var exception: JSValueRef?
-    let result = JSEvaluateScript(
-      globalContextRef,
-      scriptRef,
-      nil,
-      sourceURLRef,
-      startingLineNumber,
-      &exception
-    )
-
-    if let exception {
-      return .exception(JSValue(ref: exception, ctx: self))
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
     }
-
-    if let result {
-      return .value(JSValue(ref: result, ctx: self))
-    }
-
-    return .value(JSValue(undefinedIn: self))
   }
 }
 
 private let functionCallback: JSObjectCallAsFunctionCallback = {
   c, f, this, count, args, exception in
-  let context = JSCallbackContext(ctx: c!)
+  let context = JSInstantContext(ctx: c!)
   let functionRef = f!
   let thisRef = this!
   let argsRef = args!
