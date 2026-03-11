@@ -483,7 +483,8 @@ private func indent(_ source: String, by prefix: String) -> String {
 private func makeMethodCallbackBody(_ method: MethodPlan, indentLevel: String) -> String {
   let decodeLines = method.parameters.enumerated().map { index, parameter in
     let decoder = parameter.decoderOverride ?? "JSDefaultConverter<\(parameter.typeName)>"
-    return "let __arg\(index) = try arguments.tryUnpack(at: \(index), using: \(decoder).self, in: context)"
+    return
+      "let __arg\(index) = try arguments.tryUnpack(at: \(index), using: \(decoder).self, in: context)"
   }.joined(separator: "\n")
 
   let callArguments = method.parameters.enumerated().map { index, parameter in

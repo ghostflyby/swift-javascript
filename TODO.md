@@ -6,6 +6,7 @@
 - [ ] 每完成一条能力立即打勾并补充简要说明
 
 ## 1. JSContext（C API 对齐）
+- [x] 补充 `JSInstantContext` 的 native module 常用入口（值构造、全局对象访问、全局函数安装），并让 `JSContext` 继续做一一对应薄转发（已补 String key 全局 helper、函数安装与基础值构造）
 - [x] 将 `JSInstantContext` 作为同步上下文核心，并让 `JSContext` 作为 actor 薄封装一一转发（已完成命名迁移、`evaluateScript` 下沉与 `withGlobalObject` 转发）
 - [x] `evaluateScript(_:)`（基于 `JSEvaluateScript`）
 - [x] `evaluateScript(_:sourceURL:)`（支持 sourceURL）

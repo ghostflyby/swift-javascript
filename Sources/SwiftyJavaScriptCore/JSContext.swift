@@ -70,6 +70,121 @@ extension JSContext {
     peer.jsGlobalContextRef
   }
 
+  public func makeString(_ value: String) -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeString(value)
+    }
+  }
+
+  public func makeNumber(_ value: Double) -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeNumber(value)
+    }
+  }
+
+  public func makeNumber(_ value: some BinaryInteger) -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeNumber(value)
+    }
+  }
+
+  public func makeBoolean(_ value: Bool) -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeBoolean(value)
+    }
+  }
+
+  public func makeNull() -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeNull()
+    }
+  }
+
+  public func makeUndefined() -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeUndefined()
+    }
+  }
+
+  public func makeObject() -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeObject()
+    }
+  }
+
+  public func makeArray() -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeArray()
+    }
+  }
+
+  public func makeFunction(
+    named name: String,
+    callback: @escaping JSValue.JSFunctionCallback
+  ) -> JSValue {
+    withInstantContext { instantContext in
+      instantContext.makeFunction(named: name, callback: callback)
+    }
+  }
+
+  public func installGlobalFunction(
+    named name: String,
+    with attributes: JSPropertyAttributes = .none,
+    callback: @escaping JSValue.JSFunctionCallback
+  ) {
+    withInstantContext { instantContext in
+      instantContext.installGlobalFunction(named: name, with: attributes, callback: callback)
+    }
+  }
+
+  public func setGlobalProperty<Val>(
+    _ value: borrowing Val,
+    forKey key: String,
+    with attributes: JSPropertyAttributes = .none
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.setGlobalProperty(value, forKey: key, with: attributes)
+    }
+  }
+
+  public func setGlobalProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: String,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none
+  ) {
+    withInstantContext { instantContext in
+      instantContext.setGlobalProperty(value, forKey: key, using: converter, with: attributes)
+    }
+  }
+
+  public func getGlobalProperty(forKey key: String) -> JSValue {
+    return withInstantContext { instantContext in
+      instantContext.getGlobalProperty(forKey: key)
+    }
+  }
+
+  public func getGlobalProperty<C: JSValueDecoder>(
+    forKey key: String,
+    using converter: C.Type
+  ) -> C.SwiftType {
+    return withInstantContext { instantContext in
+      instantContext.getGlobalProperty(forKey: key, using: converter)
+    }
+  }
+
+  public func deleteGlobalProperty(forKey key: String) {
+    withInstantContext { instantContext in
+      instantContext.deleteGlobalProperty(forKey: key)
+    }
+  }
+
+  public func hasGlobalProperty(_ key: String) -> Bool {
+    return withInstantContext { instantContext in
+      instantContext.hasGlobalProperty(key)
+    }
+  }
+
   public func evaluateScript(_ script: String) -> JSResult {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script)

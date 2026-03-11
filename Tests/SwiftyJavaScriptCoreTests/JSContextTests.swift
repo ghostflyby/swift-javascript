@@ -53,3 +53,73 @@ import Testing
     }
   }
 }
+
+@Test func instantContextSupportsNativeModuleStyleGlobalHelpers() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withInstantContext { context in
+    let answerKey = "answer"
+    context.setGlobalProperty(41, forKey: answerKey)
+    let hasAnswer = context.hasGlobalProperty(answerKey)
+    #expect(hasAnswer)
+
+    let answer = context.getGlobalProperty(forKey: answerKey)
+    #expect(answer.toDouble(in: context) == 41)
+
+    let object = context.makeObject()
+    object.setProperty(context.makeBoolean(true), forKey: JSStringManaged("flag"), in: context)
+    let flagValue = object.getProperty(forKey: JSStringManaged("flag"), in: context)
+    let flag = flagValue.toBool(in: context)
+    #expect(flag)
+
+    context.installGlobalFunction(named: "bump") { context, _, _, arguments in
+      let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
+      return .value(context.makeNumber(value + 1))
+    }
+
+    let result = context.evaluateScript("bump(answer)")
+    switch consume result {
+    case .value(let value):
+      #expect(value.toDouble(in: context) == 42)
+    case .exception:
+      Issue.record("Expected JSInstantContext-installed global function to be callable")
+    }
+
+    context.deleteGlobalProperty(forKey: answerKey)
+    let hasAnswerAfterDelete = context.hasGlobalProperty(answerKey)
+    #expect(!hasAnswerAfterDelete)
+  }
+}
+
+@Test func contextThinWrapsInstantContextGlobalHelpers() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let countKey = "count"
+    context.setGlobalProperty(5, forKey: countKey)
+    let hasCount = context.hasGlobalProperty(countKey)
+    #expect(hasCount)
+
+    context.installGlobalFunction(named: "double") { context, _, _, arguments in
+      let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
+      return .value(context.makeNumber(value * 2))
+    }
+
+    let result = context.evaluateScript("double(count)")
+    switch consume result {
+    case .value(let value):
+      let doubled = value.toDouble(in: context)
+      #expect(doubled == 10)
+    case .exception:
+      Issue.record("Expected JSContext thin wrappers to install callable globals")
+    }
+
+    let count = context.getGlobalProperty(forKey: countKey)
+    let countValue = count.toDouble(in: context)
+    #expect(countValue == 5)
+
+    context.deleteGlobalProperty(forKey: countKey)
+    let hasCountAfterDelete = context.hasGlobalProperty(countKey)
+    #expect(!hasCountAfterDelete)
+  }
+}
