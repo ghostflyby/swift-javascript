@@ -230,12 +230,11 @@ extension JSValue {
 
 private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, object in
   guard let ctx, let object,
-    let privateData = JavaScriptCoreBackendDriver.privateData(from: object)
+    let (storage, _) = autoClassStorageRecord(from: object)
   else {
     return
   }
 
-  let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
   if let initialize = storage.definition.initialize {
     let context = JSInstantContext(ctx: ctx)
     let this = JSValue(ref: object, ctx: context)
@@ -245,12 +244,11 @@ private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, obj
 
 private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
   guard let object,
-    let privateData = JavaScriptCoreBackendDriver.privateData(from: object)
+    let (storage, privateData) = autoClassStorageRecord(from: object)
   else {
     return
   }
 
-  let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
   if let finalize = storage.definition.finalize,
     let objectContext = classObjectContext(object)
   {
@@ -266,11 +264,18 @@ private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 }
 
-private func autoClassStorage(from object: JSObjectRef) -> JSClassAutoObjectStorage? {
+private func autoClassStorageRecord(from object: JSObjectRef)
+  -> (storage: JSClassAutoObjectStorage, privateData: UnsafeMutableRawPointer)?
+{
   guard let privateData = JavaScriptCoreBackendDriver.privateData(from: object) else {
     return nil
   }
-  return Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
+  let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
+  return (storage, privateData)
+}
+
+private func autoClassStorage(from object: JSObjectRef) -> JSClassAutoObjectStorage? {
+  autoClassStorageRecord(from: object)?.storage
 }
 
 private func autoClassDefinition(from object: JSObjectRef) -> JSClassDefinition? {

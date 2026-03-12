@@ -90,3 +90,4 @@
 - [x] 继续收口 `JSClassValueConvertible` dynamic property callback glue（已将 dynamic get/set 的结果/异常回写改复用 backend helper，并保留 auto storage 的 definition 解析路径）
 - [x] 继续收口 `JSClassValueConvertible` dynamic property 输入准备（已抽本地 auto helper，统一 definition/context/key/this 的准备逻辑）
 - [x] 继续收口 `JSClassValueConvertible` static value/function 输入准备（已抽本地 auto helper，统一 static member 名称解析与输入值组装）
+- [x] 继续收口 `JSClassValueConvertible` auto storage/lifecycle glue（已抽 privateData/storage 解包 helper，统一 initialize/finalize/storage 访问）
