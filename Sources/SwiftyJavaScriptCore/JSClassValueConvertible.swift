@@ -236,9 +236,9 @@ private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, obj
   }
 
   if let initialize = storage.definition.initialize {
-    let context = JSInstantContext(ctx: ctx)
-    let this = JSValue(ref: object, ctx: context)
-    initialize(this, context)
+    withAutoRememberedObjectValue(ctx, object: object) { context, thisValue in
+      initialize(thisValue, context)
+    }
   }
 }
 
@@ -282,6 +282,16 @@ private func autoClassDefinition(from object: JSObjectRef) -> JSClassDefinition?
   autoClassStorage(from: object)?.definition
 }
 
+private func withAutoRememberedObjectValue<R>(
+  _ ctx: JSContextRef,
+  object: JSObjectRef,
+  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R {
+  let context = makeRememberedClassCallbackContext(ctx, object)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(context, thisValue)
+}
+
 private func withAutoDynamicPropertyCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -294,11 +304,10 @@ private func withAutoDynamicPropertyCallbackInput<R>(
     return nil
   }
 
-  rememberClassObjectContext(ctx, object)
-  let context = JSInstantContext(ctx: ctx)
   let key = String(jsStringRef: propertyName)
-  let thisValue = JSValue(ref: object, ctx: context)
-  return body(definition, context, thisValue, key)
+  return withAutoRememberedObjectValue(ctx, object: object) { context, thisValue in
+    body(definition, context, thisValue, key)
+  }
 }
 
 private func withAutoStaticValueCallbackInput<R>(
@@ -313,15 +322,14 @@ private func withAutoStaticValueCallbackInput<R>(
     return nil
   }
 
-  rememberClassObjectContext(ctx, object)
   let name = String(jsStringRef: propertyName)
   guard let valueDefinition = inheritedStaticValue(named: name, from: definition) else {
     return nil
   }
 
-  let context = JSInstantContext(ctx: ctx)
-  let thisValue = JSValue(ref: object, ctx: context)
-  return body(valueDefinition, context, thisValue)
+  return withAutoRememberedObjectValue(ctx, object: object) { context, thisValue in
+    body(valueDefinition, context, thisValue)
+  }
 }
 
 private func withAutoStaticFunctionCallbackInput<R>(
@@ -336,18 +344,16 @@ private func withAutoStaticFunctionCallbackInput<R>(
     return nil
   }
 
-  rememberClassObjectContext(ctx, thisObject)
-  let context = JSInstantContext(ctx: ctx)
-  let functionValue = JSValue(ref: function, ctx: context)
-  let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
-    .toString(in: context)
-  guard let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
-  else {
-    return nil
+  return withAutoRememberedObjectValue(ctx, object: thisObject) { context, thisValue in
+    let functionValue = JSValue(ref: function, ctx: context)
+    let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
+      .toString(in: context)
+    guard let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
+    else {
+      return nil
+    }
+    return body(functionDefinition, context, thisValue)
   }
-
-  let thisValue = JSValue(ref: thisObject, ctx: context)
-  return body(functionDefinition, context, thisValue)
 }
 
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
