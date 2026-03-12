@@ -359,76 +359,50 @@ extension JSValue {
 
   @inline(__always)
   private func callInternal(
-    thisObjectRef: JSObjectRef?,
-    argumentRefs: [JSValueRef?],
+    thisRawValue: JavaScriptCoreRawValue?,
+    arguments: [JavaScriptCoreRawValue],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let functionRef):
-      var exception: JSValueRef?
-      let resultRef = argumentRefs.withUnsafeBufferPointer { buffer in
-        JSObjectCallAsFunction(
-          context.globalContextRef,
-          functionRef,
-          thisObjectRef,
-          buffer.count,
-          buffer.baseAddress,
-          &exception
-        )
-      }
-      return Self.result(value: resultRef, exception: exception, in: context)
-    }
+    let rawContext = context.driverContext
+    return .from(
+      driverResult: JavaScriptCoreBackendDriver.callFunction(
+        rawValue(in: rawContext),
+        this: thisRawValue,
+        arguments: arguments,
+        in: rawContext
+      ))
   }
 
   @inline(__always)
   private func constructInternal(
-    argumentRefs: [JSValueRef?],
+    arguments: [JavaScriptCoreRawValue],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let constructorRef):
-      var exception: JSValueRef?
-      let resultRef = argumentRefs.withUnsafeBufferPointer { buffer in
-        JSObjectCallAsConstructor(
-          context.globalContextRef,
-          constructorRef,
-          buffer.count,
-          buffer.baseAddress,
-          &exception
-        )
-      }
-
-      if let exception {
-        return .exception(JSValue(ref: exception, ctx: context))
-      }
-
-      if let resultRef {
-        return .value(JSValue(ref: resultRef, ctx: context))
-      }
-
-      return .value(JSValue(undefinedIn: context))
-    }
+    let rawContext = context.driverContext
+    return .from(
+      driverResult: JavaScriptCoreBackendDriver.construct(
+        rawValue(in: rawContext),
+        arguments: arguments,
+        in: rawContext
+      ))
   }
 
   @inline(__always)
-  private func encodedArgumentRefs<each A: JSValueEncodable>(
+  private func encodedArguments<each A: JSValueEncodable>(
     _ arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> [JSValueRef?] {
-    var refs: [JSValueRef?] = []
-    refs.reserveCapacity(countTypePack(repeat (each A).self))
+  ) -> [JavaScriptCoreRawValue] {
+    let rawContext = context.driverContext
+    var values: [JavaScriptCoreRawValue] = []
+    values.reserveCapacity(countTypePack(repeat (each A).self))
 
     func appendArgument<T: JSValueEncodable>(_ argument: T) {
       let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-      refs.append(encoded.retainedRef())
+      values.append(encoded.rawValue(in: rawContext))
     }
 
     repeat appendArgument(each arguments)
-    return refs
+    return values
   }
 
   public func call(in context: isolated JSContext = #isolation) -> JSResult {
@@ -438,7 +412,7 @@ extension JSValue {
   }
 
   public func call(in context: borrowing JSInstantContext) -> JSResult {
-    callInternal(thisObjectRef: nil, argumentRefs: [], in: context)
+    callInternal(thisRawValue: nil, arguments: [], in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -455,10 +429,8 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     callInternal(
-      thisObjectRef: nil,
-      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
-      in: context
-    )
+      thisRawValue: nil, arguments: encodedArguments(repeat each arguments, in: context),
+      in: context)
   }
 
   public func call(
@@ -474,16 +446,8 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch thisValue.objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let thisObjectRef):
-      return callInternal(
-        thisObjectRef: thisObjectRef,
-        argumentRefs: [],
-        in: context
-      )
-    }
+    callInternal(
+      thisRawValue: thisValue.rawValue(in: context.driverContext), arguments: [], in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -501,16 +465,11 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch thisValue.objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let thisObjectRef):
-      return callInternal(
-        thisObjectRef: thisObjectRef,
-        argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
-        in: context
-      )
-    }
+    callInternal(
+      thisRawValue: thisValue.rawValue(in: context.driverContext),
+      arguments: encodedArguments(repeat each arguments, in: context),
+      in: context
+    )
   }
 
   public func construct(in context: isolated JSContext = #isolation) -> JSResult {
@@ -520,7 +479,7 @@ extension JSValue {
   }
 
   public func construct(in context: borrowing JSInstantContext) -> JSResult {
-    constructInternal(argumentRefs: [], in: context)
+    constructInternal(arguments: [], in: context)
   }
 
   public func construct<each A: JSValueEncodable>(
@@ -536,10 +495,7 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    constructInternal(
-      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
-      in: context
-    )
+    constructInternal(arguments: encodedArguments(repeat each arguments, in: context), in: context)
   }
 
   public func invokeMethod<Name: JSString>(
@@ -555,7 +511,7 @@ extension JSValue {
     _ name: borrowing Name,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    invokeMethodInternal(name.ref, argumentRefs: [], in: context)
+    invokeMethodInternal(name.string, arguments: [], in: context)
   }
 
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
@@ -574,40 +530,31 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
     invokeMethodInternal(
-      name.ref,
-      argumentRefs: encodedArgumentRefs(repeat each arguments, in: context),
+      name.string,
+      arguments: encodedArguments(repeat each arguments, in: context),
       in: context
     )
   }
 
   private func invokeMethodInternal(
-    _ nameRef: JSStringRef,
-    argumentRefs: [JSValueRef?],
+    _ name: String,
+    arguments: [JavaScriptCoreRawValue],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let objectValueRef):
-      let objectRef = objectValueRef
-      var exception: JSValueRef?
-      guard
-        let methodRef = JSObjectGetProperty(
-          context.globalContextRef,
-          objectRef,
-          nameRef,
-          &exception
-        )
-      else {
-        return Self.result(value: nil, exception: exception, in: context)
-      }
-
-      if let exception {
-        return .exception(JSValue(ref: exception, ctx: context))
-      }
-
-      let method = JSValue(ref: methodRef, ctx: context)
-      return method.callInternal(thisObjectRef: objectRef, argumentRefs: argumentRefs, in: context)
+    let rawContext = context.driverContext
+    switch JavaScriptCoreBackendDriver.getProperty(
+      name, on: rawValue(in: rawContext), in: rawContext)
+    {
+    case .exception(let exception):
+      return .exception(JSValue(rawValue: exception))
+    case .value(let method):
+      return .from(
+        driverResult: JavaScriptCoreBackendDriver.callFunction(
+          method,
+          this: rawValue(in: rawContext),
+          arguments: arguments,
+          in: rawContext
+        ))
     }
   }
 

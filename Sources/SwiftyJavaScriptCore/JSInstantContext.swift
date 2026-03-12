@@ -51,11 +51,21 @@ extension JSInstantContext {
   }
 
   public func makeObject() -> JSValue {
-    JSValue(objectIn: self)
+    switch JavaScriptCoreBackendDriver.makeObject(in: driverContext) {
+    case .value(let value):
+      return JSValue(rawValue: value)
+    case .exception(let exception):
+      return JSValue(rawValue: exception)
+    }
   }
 
   public func makeArray() -> JSValue {
-    JSValue(arrayIn: self)
+    switch JavaScriptCoreBackendDriver.makeArray(in: driverContext) {
+    case .value(let value):
+      return JSValue(rawValue: value)
+    case .exception(let exception):
+      return JSValue(rawValue: exception)
+    }
   }
 
   public func makeFunction(

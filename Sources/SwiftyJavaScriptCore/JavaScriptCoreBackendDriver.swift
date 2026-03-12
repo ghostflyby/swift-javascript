@@ -164,6 +164,29 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     JavaScriptCoreRawValue(ref: JSValueMakeUndefined(context.ref)!, context: context)
   }
 
+  package static func makeObject(in context: JavaScriptCoreRawContext)
+    -> JSDriverResult<JavaScriptCoreRawValue>
+  {
+    guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
+      return .exception(makeUndefined(in: context))
+    }
+    return .value(JavaScriptCoreRawValue(ref: objectRef, context: context))
+  }
+
+  package static func makeArray(in context: JavaScriptCoreRawContext)
+    -> JSDriverResult<JavaScriptCoreRawValue>
+  {
+    var exception: JSValueRef?
+    let objectRef = JSObjectMakeArray(context.ref, 0, nil, &exception)
+    if let exception {
+      return .exception(JavaScriptCoreRawValue(ref: exception, context: context))
+    }
+    if let objectRef {
+      return .value(JavaScriptCoreRawValue(ref: objectRef, context: context))
+    }
+    return .value(makeUndefined(in: context))
+  }
+
   package static func getProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
@@ -184,6 +207,68 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
         }
         return .value(makeUndefined(in: context))
       }
+    }
+  }
+
+  package static func callFunction(
+    _ function: JavaScriptCoreRawValue,
+    this thisValue: JavaScriptCoreRawValue?,
+    arguments: [JavaScriptCoreRawValue],
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    switch objectRef(for: function, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .object(let functionRef):
+      let thisObjectRef: JSObjectRef?
+      if let thisValue {
+        switch objectRef(for: thisValue, in: context) {
+        case .exception(let exception):
+          return .exception(exception)
+        case .object(let objectRef):
+          thisObjectRef = objectRef
+        }
+      } else {
+        thisObjectRef = nil
+      }
+
+      var exception: JSValueRef?
+      let refs = arguments.map { Optional($0.ref) }
+      let resultRef = refs.withUnsafeBufferPointer { buffer in
+        JSObjectCallAsFunction(
+          context.ref,
+          functionRef,
+          thisObjectRef,
+          buffer.count,
+          buffer.baseAddress,
+          &exception
+        )
+      }
+      return result(value: resultRef, exception: exception, in: context)
+    }
+  }
+
+  package static func construct(
+    _ constructor: JavaScriptCoreRawValue,
+    arguments: [JavaScriptCoreRawValue],
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    switch objectRef(for: constructor, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .object(let constructorRef):
+      var exception: JSValueRef?
+      let refs = arguments.map { Optional($0.ref) }
+      let resultRef = refs.withUnsafeBufferPointer { buffer in
+        JSObjectCallAsConstructor(
+          context.ref,
+          constructorRef,
+          buffer.count,
+          buffer.baseAddress,
+          &exception
+        )
+      }
+      return result(value: resultRef, exception: exception, in: context)
     }
   }
 
@@ -228,6 +313,20 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
       return .exception(makeUndefined(in: context))
     }
     return .object(objectRef)
+  }
+
+  private static func result(
+    value resultRef: JSValueRef?,
+    exception exceptionRef: JSValueRef?,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    if let exceptionRef {
+      return .exception(JavaScriptCoreRawValue(ref: exceptionRef, context: context))
+    }
+    if let resultRef {
+      return .value(JavaScriptCoreRawValue(ref: resultRef, context: context))
+    }
+    return .value(makeUndefined(in: context))
   }
 }
 

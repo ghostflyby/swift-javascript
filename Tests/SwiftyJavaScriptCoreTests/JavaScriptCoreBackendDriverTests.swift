@@ -68,3 +68,60 @@ import Testing
     #expect(exception.toString() == "Error: boom")
   }
 }
+
+@Test func javaScriptCoreBackendDriverSupportsObjectArrayAndCalls() {
+  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
+  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+
+  switch JavaScriptCoreBackendDriver.makeObject(in: context) {
+  case .exception:
+    Issue.record("expected object creation to succeed")
+  case .value(let object):
+    switch JavaScriptCoreBackendDriver.makeArray(in: context) {
+    case .exception:
+      Issue.record("expected array creation to succeed")
+    case .value(let array):
+      #expect(object.type == .object)
+      #expect(array.type == .object)
+    }
+  }
+
+  switch JavaScriptCoreBackendDriver.evaluateScript(
+    "(function(a, b) { return this.base + a + b })",
+    in: context,
+    sourceURL: nil,
+    startingLineNumber: 1
+  ) {
+  case .exception:
+    Issue.record("expected function evaluation to succeed")
+  case .value(let function):
+    switch JavaScriptCoreBackendDriver.makeObject(in: context) {
+    case .exception:
+      Issue.record("expected receiver object creation to succeed")
+    case .value(let thisObject):
+      let base = JavaScriptCoreBackendDriver.makeNumber(10, in: context)
+      _ = JavaScriptCoreBackendDriver.setProperty(
+        "base",
+        on: thisObject,
+        to: base,
+        in: context,
+        attributes: .none
+      )
+      let one = JavaScriptCoreBackendDriver.makeNumber(1, in: context)
+      let two = JavaScriptCoreBackendDriver.makeNumber(2, in: context)
+
+      switch JavaScriptCoreBackendDriver.callFunction(
+        function,
+        this: thisObject,
+        arguments: [one, two],
+        in: context
+      ) {
+      case .exception:
+        Issue.record("expected backend function call to succeed")
+      case .value(let result):
+        #expect(result.type == .number)
+        #expect(result.toDouble() == 13)
+      }
+    }
+  }
+}

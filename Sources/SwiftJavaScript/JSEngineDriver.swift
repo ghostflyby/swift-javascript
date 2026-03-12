@@ -26,10 +26,25 @@ package protocol _JSEngineDriver {
   static func makeBoolean(_ value: Bool, in context: RawContext) -> RawValue
   static func makeNull(in context: RawContext) -> RawValue
   static func makeUndefined(in context: RawContext) -> RawValue
+  static func makeObject(in context: RawContext) -> JSDriverResult<RawValue>
+  static func makeArray(in context: RawContext) -> JSDriverResult<RawValue>
 
   static func getProperty(
     _ key: String,
     on object: RawValue,
+    in context: RawContext
+  ) -> JSDriverResult<RawValue>
+
+  static func callFunction(
+    _ function: RawValue,
+    this thisValue: RawValue?,
+    arguments: [RawValue],
+    in context: RawContext
+  ) -> JSDriverResult<RawValue>
+
+  static func construct(
+    _ constructor: RawValue,
+    arguments: [RawValue],
     in context: RawContext
   ) -> JSDriverResult<RawValue>
 
