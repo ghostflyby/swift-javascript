@@ -57,3 +57,53 @@ import Testing
   #expect(descriptor.types[0].propertyEnumeratorBinding == "timer_dynamic_enumerate")
   #expect(descriptor.types[0].callAsFunctionBinding == "timer_call")
 }
+
+@Test func genericHandlesKeepOpaqueStorageAndEngineTyping() {
+  let runtime = JSRuntimeHandle<JavaScriptCoreEngine>(_opaqueHandle: "runtime-token")
+  let context = JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: 42)
+  let value = JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: "value-token")
+
+  let runtimeToken = runtime.opaqueHandle(as: String.self)
+  let contextToken = context.opaqueHandle(as: Int.self)
+  let valueToken = value.opaqueHandle(as: String.self)
+  let runtimeIsJSC = runtime.engineType == JavaScriptCoreEngine.self
+  let contextIsJSC = context.engineType == JavaScriptCoreEngine.self
+  let valueIsJSC = value.engineType == JavaScriptCoreEngine.self
+
+  #expect(runtimeToken == "runtime-token")
+  #expect(contextToken == 42)
+  #expect(valueToken == "value-token")
+  #expect(runtimeIsJSC)
+  #expect(contextIsJSC)
+  #expect(valueIsJSC)
+}
+
+@Test func genericResultHandleWrapsValueAndExceptionStates() {
+  let valueHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-value")
+  let exceptionHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-error")
+
+  let valueResult = JSResultHandle<QuickJSEngine>.value(valueHandle)
+  let exceptionResult = JSResultHandle<QuickJSEngine>.exception(exceptionHandle)
+
+  let valueIsException = valueResult.isException
+  let exceptionIsException = exceptionResult.isException
+
+  #expect(!valueIsException)
+  #expect(exceptionIsException)
+
+  switch consume valueResult {
+  case .value(let wrapped):
+    let token = wrapped.opaqueHandle(as: String.self)
+    #expect(token == "quickjs-value")
+  case .exception:
+    Issue.record("Expected value result case")
+  }
+
+  switch consume exceptionResult {
+  case .value:
+    Issue.record("Expected exception result case")
+  case .exception(let wrapped):
+    let token = wrapped.opaqueHandle(as: String.self)
+    #expect(token == "quickjs-error")
+  }
+}

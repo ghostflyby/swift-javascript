@@ -384,7 +384,8 @@ public struct JSTypedArray: ~Copyable {
     var exception: JSValueRef?
     let bytes = JSObjectGetTypedArrayBytesPtr(value.ctx, value.ref, &exception)
     precondition(exception == nil, "Failed to access TypedArray bytes")
-    let rawBuffer = UnsafeRawBufferPointer(start: bytes, count: byteLength)
+    let start = bytes?.advanced(by: byteOffset)
+    let rawBuffer = UnsafeRawBufferPointer(start: start, count: byteLength)
     return body(rawBuffer)
   }
 
@@ -394,7 +395,8 @@ public struct JSTypedArray: ~Copyable {
     var exception: JSValueRef?
     let bytes = JSObjectGetTypedArrayBytesPtr(value.ctx, value.ref, &exception)
     precondition(exception == nil, "Failed to access mutable TypedArray bytes")
-    let rawBuffer = UnsafeMutableRawBufferPointer(start: bytes, count: byteLength)
+    let start = bytes?.advanced(by: byteOffset)
+    let rawBuffer = UnsafeMutableRawBufferPointer(start: start, count: byteLength)
     return body(rawBuffer)
   }
 }
