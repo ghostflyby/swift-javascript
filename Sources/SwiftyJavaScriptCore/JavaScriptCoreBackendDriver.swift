@@ -181,6 +181,29 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return JavaScriptCoreRawValue(ref: functionRef, context: context)
   }
 
+  package static func makeObject(
+    of jsClass: JSClassRef,
+    privateData: UnsafeMutableRawPointer?,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
+      return .exception(makeUndefined(in: context))
+    }
+    return .value(JavaScriptCoreRawValue(ref: objectRef, context: context))
+  }
+
+  package static func privateData(
+    from value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<UnsafeMutableRawPointer?> {
+    switch objectRef(for: value, in: context) {
+    case .exception:
+      return .exception(nil)
+    case .object(let objectRef):
+      return .value(JSObjectGetPrivate(objectRef))
+    }
+  }
+
   package static func evaluateScript(
     _ script: String,
     in context: JavaScriptCoreRawContext,

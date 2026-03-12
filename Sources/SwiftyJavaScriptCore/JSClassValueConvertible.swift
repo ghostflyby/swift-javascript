@@ -137,12 +137,19 @@ extension JSClassValueConvertible {
       throw .typeMismatch(expected: "object", actual: value.type)
     }
 
-    var exception: JSValueRef?
-    guard let object = JSValueToObject(context.globalContextRef, value.ref, &exception) else {
+    let rawContext = context.driverContext
+    let privateData: UnsafeMutableRawPointer?
+    switch JavaScriptCoreBackendDriver.privateData(
+      from: value.rawValue(in: rawContext),
+      in: rawContext
+    ) {
+    case .exception:
       throw .codable("\(Self.self) could not be converted to JSObjectRef")
+    case .value(let data):
+      privateData = data
     }
 
-    guard let privateData = JSObjectGetPrivate(object) else {
+    guard let privateData else {
       throw .codable("\(Self.self) does not have a Swift instance backing")
     }
 
@@ -174,12 +181,17 @@ extension JSClassValueConvertible {
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
-    guard let object = JSObjectMake(context.globalContextRef, Self.jsClass.ref, data) else {
+    switch JavaScriptCoreBackendDriver.makeObject(
+      of: Self.jsClass.ref,
+      privateData: data,
+      in: context.driverContext
+    ) {
+    case .exception:
       _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
       throw .codable("Failed to create JS object for \(Self.self)")
+    case .value(let object):
+      return JSValue(rawValue: object)
     }
-
-    return JSValue(ref: object, ctx: context)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
