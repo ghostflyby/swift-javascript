@@ -133,13 +133,13 @@ package protocol _JSEngineDriver {
   ) -> JSDriverResult<Void>
 }
 
-package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawValue: Sendable {
-  static func makeRuntimeHandle() -> JSRuntimeHandle<Engine> {
+extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawValue: Sendable {
+  package static func makeRuntimeHandle() -> JSRuntimeHandle<Engine> {
     JSRuntimeHandle<Engine>(_opaqueHandle: makeRuntime())
   }
 
-  static func makeBorrowedContextHandleFromRuntime(
-    _ runtime: JSRuntimeHandle<Engine>
+  package static func makeBorrowedContextHandleFromRuntime(
+    in runtime: JSRuntimeHandle<Engine>
   ) -> JSBorrowedContextHandle<Engine>? {
     guard let rawRuntime: RawRuntime = runtime.opaqueHandle() else {
       return nil
@@ -147,7 +147,7 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return JSBorrowedContextHandle<Engine>(_opaqueHandle: makeContext(in: rawRuntime))
   }
 
-  static func makeStringValueHandle(
+  package static func makeStringValueHandle(
     _ value: String,
     _ context: JSBorrowedContextHandle<Engine>
   ) -> JSValueHandle<Engine>? {
@@ -157,7 +157,7 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return JSValueHandle<Engine>(_opaqueHandle: makeString(value, in: rawContext))
   }
 
-  static func makeNumberValueHandle(
+  package static func makeNumberValueHandle(
     _ value: Double,
     _ context: JSBorrowedContextHandle<Engine>
   ) -> JSValueHandle<Engine>? {
@@ -167,7 +167,7 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return JSValueHandle<Engine>(_opaqueHandle: makeNumber(value, in: rawContext))
   }
 
-  static func makeBooleanValueHandle(
+  package static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: JSBorrowedContextHandle<Engine>
   ) -> JSValueHandle<Engine>? {
@@ -177,7 +177,43 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return JSValueHandle<Engine>(_opaqueHandle: makeBoolean(value, in: rawContext))
   }
 
-  static func evaluateScriptResultHandle(
+  package static func makeNullValueHandle(
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeNull(in: rawContext))
+  }
+
+  package static func makeUndefinedValueHandle(
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeUndefined(in: rawContext))
+  }
+
+  package static func makeObjectResultHandle(
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: makeObject(in: rawContext))
+  }
+
+  package static func makeArrayResultHandle(
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: makeArray(in: rawContext))
+  }
+
+  package static func evaluateScriptResultHandle(
     _ script: String,
     _ context: JSBorrowedContextHandle<Engine>,
     sourceURL: String? = nil,
@@ -196,9 +232,9 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     )
   }
 
-  static func propertyNamesForHandle(
-    _ object: JSValueHandle<Engine>,
-    _ context: JSBorrowedContextHandle<Engine>
+  package static func propertyNamesForHandle(
+    on object: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>
   ) -> [String]? {
     guard let rawObject: RawValue = object.opaqueHandle(),
       let rawContext: RawContext = context.opaqueHandle()
@@ -208,10 +244,10 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return propertyNames(on: rawObject, in: rawContext)
   }
 
-  static func getStringPropertyHandle(
+  package static func getStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<Engine>,
-    _ context: JSBorrowedContextHandle<Engine>
+    in context: JSBorrowedContextHandle<Engine>
   ) -> JSResultHandle<Engine>? {
     guard let rawObject: RawValue = object.opaqueHandle(),
       let rawContext: RawContext = context.opaqueHandle()
@@ -221,11 +257,11 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     return resultHandle(from: getProperty(key, on: rawObject, in: rawContext))
   }
 
-  static func setStringPropertyHandle(
+  package static func setStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<Engine>,
-    _ value: JSValueHandle<Engine>,
-    _ context: JSBorrowedContextHandle<Engine>,
+    to value: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     guard let rawObject: RawValue = object.opaqueHandle(),
@@ -243,7 +279,101 @@ package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendab
     }
   }
 
-  private static func resultHandle(from result: JSDriverResult<RawValue>) -> JSResultHandle<Engine> {
+  package static func callFunctionHandle(
+    _ function: JSValueHandle<Engine>,
+    this thisValue: JSValueHandle<Engine>? = nil,
+    arguments: [JSValueHandle<Engine>] = [],
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawFunction: RawValue = function.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+
+    let rawThisValue: RawValue? = thisValue?.opaqueHandle()
+    let rawArguments = arguments.compactMap { $0.opaqueHandle(as: RawValue.self) }
+    guard rawArguments.count == arguments.count else {
+      return nil
+    }
+
+    return resultHandle(
+      from: callFunction(rawFunction, this: rawThisValue, arguments: rawArguments, in: rawContext)
+    )
+  }
+
+  package static func constructHandle(
+    _ constructor: JSValueHandle<Engine>,
+    arguments: [JSValueHandle<Engine>] = [],
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawConstructor: RawValue = constructor.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+
+    let rawArguments = arguments.compactMap { $0.opaqueHandle(as: RawValue.self) }
+    guard rawArguments.count == arguments.count else {
+      return nil
+    }
+
+    return resultHandle(from: construct(rawConstructor, arguments: rawArguments, in: rawContext))
+  }
+
+  package static func toObjectHandle(
+    _ value: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawValue: RawValue = value.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+
+    return resultHandle(from: toObject(rawValue, in: rawContext))
+  }
+
+  package static func isArrayHandle(
+    _ value: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> Bool? {
+    guard let rawValue: RawValue = value.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+    return isArray(rawValue, in: rawContext)
+  }
+
+  package static func isDateHandle(
+    _ value: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> Bool? {
+    guard let rawValue: RawValue = value.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+    return isDate(rawValue, in: rawContext)
+  }
+
+  package static func isInstanceOfHandle(
+    _ value: JSValueHandle<Engine>,
+    constructor: JSValueHandle<Engine>,
+    in context: JSBorrowedContextHandle<Engine>
+  ) -> Bool? {
+    guard let rawValue: RawValue = value.opaqueHandle(),
+      let rawConstructor: RawValue = constructor.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+    return isInstanceOf(rawValue, constructor: rawConstructor, in: rawContext)
+  }
+
+  private static func resultHandle(from result: JSDriverResult<RawValue>) -> JSResultHandle<Engine>
+  {
     switch result {
     case .value(let rawValue):
       return .value(JSValueHandle<Engine>(_opaqueHandle: rawValue))

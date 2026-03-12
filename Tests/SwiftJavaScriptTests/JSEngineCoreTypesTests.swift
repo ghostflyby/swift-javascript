@@ -288,7 +288,7 @@ private enum MockDriver: _JSEngineDriver {
 
 @Test func genericHandlesBridgeThroughDriverProtocol() {
   let runtime = MockDriver.makeRuntimeHandle()
-  let context = MockDriver.makeBorrowedContextHandleFromRuntime(runtime)
+  let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime)
 
   guard let context else {
     Issue.record("Expected context handle from driver")
@@ -305,13 +305,13 @@ private enum MockDriver: _JSEngineDriver {
     return
   }
 
-  let names = MockDriver.propertyNamesForHandle(stringValue, context)
-  let property = MockDriver.getStringPropertyHandle("message", on: stringValue, context)
+  let names = MockDriver.propertyNamesForHandle(on: stringValue, in: context)
+  let property = MockDriver.getStringPropertyHandle("message", on: stringValue, in: context)
   let propertySet = MockDriver.setStringPropertyHandle(
     "message",
     on: stringValue,
-    numberValue,
-    context,
+    to: numberValue,
+    in: context,
     attributes: [.readOnly]
   )
 
@@ -346,4 +346,85 @@ private enum MockDriver: _JSEngineDriver {
   case .exception:
     Issue.record("Expected property access to succeed")
   }
+}
+
+@Test func genericHandlesBridgeObjectsCallsAndTypeHelpers() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime)
+
+  guard let context else {
+    Issue.record("Expected context handle from driver")
+    return
+  }
+
+  let object = MockDriver.makeObjectResultHandle(context)
+  let array = MockDriver.makeArrayResultHandle(context)
+  let function = MockDriver.makeStringValueHandle("callable", context)
+  let argument = MockDriver.makeNumberValueHandle(7, context)
+  let primitive = MockDriver.makeStringValueHandle("boxed", context)
+  let constructor = MockDriver.makeStringValueHandle("boxed", context)
+  let nullValue = MockDriver.makeNullValueHandle(context)
+  let undefinedValue = MockDriver.makeUndefinedValueHandle(context)
+
+  guard let object, let array, let function, let argument, let primitive, let constructor,
+    let nullValue, let undefinedValue
+  else {
+    Issue.record("Expected object/array/call scaffolding handles")
+    return
+  }
+
+  let callResult = MockDriver.callFunctionHandle(function, arguments: [argument], in: context)
+  let constructResult = MockDriver.constructHandle(function, arguments: [argument], in: context)
+  let boxedResult = MockDriver.toObjectHandle(primitive, in: context)
+  let isArray = MockDriver.isArrayHandle(function, in: context)
+  let isDate = MockDriver.isDateHandle(function, in: context)
+  let isInstanceOf = MockDriver.isInstanceOfHandle(primitive, constructor: constructor, in: context)
+
+  switch consume object {
+  case .value(let value):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "object", payload: "runtime"))
+  case .exception:
+    Issue.record("Expected object creation to succeed")
+  }
+
+  switch consume array {
+  case .value(let value):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "array", payload: "runtime"))
+  case .exception:
+    Issue.record("Expected array creation to succeed")
+  }
+
+  switch consume callResult {
+  case .some(.value(let value)):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "call", payload: "runtime:runtime:callable:1"))
+  default:
+    Issue.record("Expected function call to succeed")
+  }
+
+  switch consume constructResult {
+  case .some(.value(let value)):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "construct", payload: "runtime:1"))
+  default:
+    Issue.record("Expected constructor call to succeed")
+  }
+
+  switch consume boxedResult {
+  case .some(.value(let value)):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "object", payload: "runtime:boxed"))
+  default:
+    Issue.record("Expected toObject bridge to succeed")
+  }
+
+  #expect(isArray == false)
+  #expect(isDate == false)
+  #expect(isInstanceOf == true)
+  #expect(nullValue.opaqueHandle(as: MockValue.self) == MockValue(kind: "null", payload: "runtime"))
+  #expect(
+    undefinedValue.opaqueHandle(as: MockValue.self)
+      == MockValue(kind: "undefined", payload: "runtime"))
 }
