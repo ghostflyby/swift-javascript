@@ -290,107 +290,18 @@ private let classDefinitionRegistry = JSClassDefinitionRegistry()
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
-private func makeRememberedClassCallbackContext(_ ctx: JSContextRef, _ object: JSObjectRef)
+func makeRememberedClassCallbackContext(_ ctx: JSContextRef, _ object: JSObjectRef)
   -> JSInstantContext
 {
   rememberClassObjectContext(ctx, object)
   return JSInstantContext(ctx: ctx)
 }
 
-private func classPropertyName(_ propertyName: JSStringRef?) -> String? {
+func classPropertyName(_ propertyName: JSStringRef?) -> String? {
   guard let propertyName else {
     return nil
   }
   return String(jsStringRef: propertyName)
-}
-
-private func withDynamicPropertyCallbackInput<R>(
-  ctx: JSContextRef?,
-  object: JSObjectRef?,
-  propertyName: JSStringRef?,
-  _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> R
-) -> R? {
-  guard let ctx, let object,
-    let definition = classDefinition(from: object),
-    let propertyName = classPropertyName(propertyName)
-  else {
-    return nil
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, object)
-  let thisValue = JSValue(ref: object, ctx: context)
-  return body(definition, context, thisValue, propertyName)
-}
-
-private func withFunctionCallbackInput<R>(
-  ctx: JSContextRef?,
-  functionRef: JSObjectRef?,
-  thisObjectRef: JSObjectRef?,
-  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
-) -> R? {
-  guard let ctx, let functionRef, let thisObjectRef,
-    let definition = classDefinition(from: thisObjectRef)
-  else {
-    return nil
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
-  var functionValue = JSValue(ref: functionRef, ctx: context)
-  var thisValue = JSValue(ref: thisObjectRef, ctx: context)
-  return body(definition, context, &functionValue, &thisValue)
-}
-
-private func withConstructorCallbackInput<R>(
-  ctx: JSContextRef?,
-  constructorRef: JSObjectRef?,
-  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
-) -> R? {
-  guard let ctx, let constructorRef,
-    let definition = classDefinition(from: constructorRef)
-  else {
-    return nil
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-  var constructorValue = JSValue(ref: constructorRef, ctx: context)
-  var thisValue = JSValue(undefinedIn: context)
-  return body(definition, context, &constructorValue, &thisValue)
-}
-
-private func withHasInstanceCallbackInput<R>(
-  ctx: JSContextRef?,
-  constructorRef: JSObjectRef?,
-  possibleInstanceRef: JSObjectRef?,
-  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
-) -> R? {
-  guard let ctx, let constructorRef, let possibleInstanceRef,
-    let definition = classDefinition(from: constructorRef)
-  else {
-    return nil
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-  var constructorValue = JSValue(ref: constructorRef, ctx: context)
-  var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
-  return body(definition, context, &constructorValue, &possibleInstanceValue)
-}
-
-private func withConvertToTypeCallbackInput<R>(
-  ctx: JSContextRef?,
-  objectRef: JSObjectRef?,
-  jsType: JSType,
-  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) -> R
-) -> R? {
-  guard let ctx, let objectRef,
-    let definition = classDefinition(from: objectRef)
-  else {
-    return nil
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, objectRef)
-  var objectValue = JSValue(ref: objectRef, ctx: context)
-  var exceptionValue = JSValue(undefinedIn: context)
-  return body(definition, context, &objectValue, jsType, &exceptionValue)
 }
 
 private func classObjectKey(_ object: JSObjectRef) -> UInt {
@@ -413,7 +324,7 @@ func removeClassObjectContext(_ object: JSObjectRef) {
   classObjectContextRegistry.remove(object)
 }
 
-private func classDefinition(from object: JSObjectRef) -> JSClassDefinition? {
+func classDefinition(from object: JSObjectRef) -> JSClassDefinition? {
   classObjectDefinitionRegistry.get(object)
 }
 
@@ -662,7 +573,7 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) {
       cls.getProperty = { ctx, object, propertyName, exception in
-        let value = withDynamicPropertyCallbackInput(
+        let value = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
           ctx: ctx,
           object: object,
           propertyName: propertyName
@@ -685,7 +596,7 @@ extension JSClassDefinition {
         guard let value else {
           return false
         }
-        let didSet = withDynamicPropertyCallbackInput(
+        let didSet = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
           ctx: ctx,
           object: object,
           propertyName: propertyName
@@ -710,7 +621,7 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor) {
       cls.hasProperty = { ctx, object, propertyName in
-        let hasProperty = withDynamicPropertyCallbackInput(
+        let hasProperty = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
           ctx: ctx,
           object: object,
           propertyName: propertyName
@@ -726,7 +637,7 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) {
       cls.deleteProperty = { ctx, object, propertyName, exception in
-        let didDelete = withDynamicPropertyCallbackInput(
+        let didDelete = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
           ctx: ctx,
           object: object,
           propertyName: propertyName
@@ -756,7 +667,7 @@ extension JSClassDefinition {
     if JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) {
       cls.callAsFunction = {
         ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
-        let value = withFunctionCallbackInput(
+        let value = JavaScriptCoreBackendDriver.withFunctionCallbackInput(
           ctx: ctx,
           functionRef: functionRef,
           thisObjectRef: thisObjectRef
@@ -785,7 +696,7 @@ extension JSClassDefinition {
     if JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) {
       cls.callAsConstructor = {
         ctx, constructorRef, argumentCount, arguments, exception in
-        let object = withConstructorCallbackInput(
+        let object = JavaScriptCoreBackendDriver.withConstructorCallbackInput(
           ctx: ctx,
           constructorRef: constructorRef
         ) { definition, context, constructorValue, thisValue in
@@ -815,7 +726,7 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) {
       cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
-        let hasInstance = withHasInstanceCallbackInput(
+        let hasInstance = JavaScriptCoreBackendDriver.withHasInstanceCallbackInput(
           ctx: ctx,
           constructorRef: constructorRef,
           possibleInstanceRef: possibleInstanceRef
@@ -831,7 +742,7 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) {
       cls.convertToType = { ctx, objectRef, type, exception in
-        let value = withConvertToTypeCallbackInput(
+        let value = JavaScriptCoreBackendDriver.withConvertToTypeCallbackInput(
           ctx: ctx,
           objectRef: objectRef,
           jsType: JSType(type)

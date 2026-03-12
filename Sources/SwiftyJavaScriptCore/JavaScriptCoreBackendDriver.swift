@@ -289,6 +289,96 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     withJavaScriptCoreArguments(pointer, count: count, body)
   }
 
+  static func withDynamicPropertyCallbackInput<R>(
+    ctx: JSContextRef?,
+    object: JSObjectRef?,
+    propertyName: JSStringRef?,
+    _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> R
+  ) -> R? {
+    guard let ctx, let object,
+      let definition = classDefinition(from: object),
+      let propertyName = classPropertyName(propertyName)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, object)
+    let thisValue = JSValue(ref: object, ctx: context)
+    return body(definition, context, thisValue, propertyName)
+  }
+
+  static func withFunctionCallbackInput<R>(
+    ctx: JSContextRef?,
+    functionRef: JSObjectRef?,
+    thisObjectRef: JSObjectRef?,
+    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+  ) -> R? {
+    guard let ctx, let functionRef, let thisObjectRef,
+      let definition = classDefinition(from: thisObjectRef)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
+    var functionValue = JSValue(ref: functionRef, ctx: context)
+    var thisValue = JSValue(ref: thisObjectRef, ctx: context)
+    return body(definition, context, &functionValue, &thisValue)
+  }
+
+  static func withConstructorCallbackInput<R>(
+    ctx: JSContextRef?,
+    constructorRef: JSObjectRef?,
+    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+  ) -> R? {
+    guard let ctx, let constructorRef,
+      let definition = classDefinition(from: constructorRef)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+    var constructorValue = JSValue(ref: constructorRef, ctx: context)
+    var thisValue = JSValue(undefinedIn: context)
+    return body(definition, context, &constructorValue, &thisValue)
+  }
+
+  static func withHasInstanceCallbackInput<R>(
+    ctx: JSContextRef?,
+    constructorRef: JSObjectRef?,
+    possibleInstanceRef: JSObjectRef?,
+    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+  ) -> R? {
+    guard let ctx, let constructorRef, let possibleInstanceRef,
+      let definition = classDefinition(from: constructorRef)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+    var constructorValue = JSValue(ref: constructorRef, ctx: context)
+    var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
+    return body(definition, context, &constructorValue, &possibleInstanceValue)
+  }
+
+  static func withConvertToTypeCallbackInput<R>(
+    ctx: JSContextRef?,
+    objectRef: JSObjectRef?,
+    jsType: JSType,
+    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) ->
+      R
+  ) -> R? {
+    guard let ctx, let objectRef,
+      let definition = classDefinition(from: objectRef)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, objectRef)
+    var objectValue = JSValue(ref: objectRef, ctx: context)
+    var exceptionValue = JSValue(undefinedIn: context)
+    return body(definition, context, &objectValue, jsType, &exceptionValue)
+  }
+
   static func callbackReturnValue(
     _ result: JSPrivateResult,
     in ctx: JSContextRef?,
