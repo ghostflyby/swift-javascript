@@ -136,3 +136,49 @@ import Testing
   _ = retained
   #expect(definition.className == "C")
 }
+
+@Test func classDefinitionProjectsHostTypeDescriptor() {
+  var parentDefinition = JSClassDefinition()
+  parentDefinition.className = "BaseType"
+  let parentClass = JSClass(defination: parentDefinition)
+
+  var definition = JSClassDefinition()
+  definition.className = "ProjectedType"
+  definition.parentClass = parentClass
+  definition.staticValues = [
+    JSStaticValue(
+      name: "version",
+      attributes: [.readOnly, .dontDelete],
+      getProperty: { context, _ in .value(JSValue(number: 1, in: context)) },
+      setProperty: { context, _, _ in .value(JSValue(undefinedIn: context)) }
+    )
+  ]
+  definition.staticFunctions = [
+    JSStaticFunction(
+      name: "ping",
+      attributes: .dontEnum,
+      callAsFunction: { context, _, _ in .value(JSValue(string: "pong", in: context)) }
+    )
+  ]
+  definition.callAsConstructor = { context, _, _, _ in JSValue(objectIn: context) }
+  definition.finalize = { _ in }
+
+  let descriptor = definition.hostTypeDescriptor(storagePolicy: .swiftRetainedObject)
+
+  #expect(descriptor.name == "ProjectedType")
+  #expect(descriptor.parent == "BaseType")
+  #expect(descriptor.storagePolicy == .swiftRetainedObject)
+  #expect(descriptor.constructor?.binding == "ProjectedType.constructor")
+  #expect(descriptor.finalizerBinding == "ProjectedType.finalize")
+  #expect(descriptor.methods.count == 1)
+  #expect(descriptor.methods[0].name == "ping")
+  #expect(descriptor.methods[0].binding == "ProjectedType.method.ping")
+  #expect(descriptor.methods[0].attributes.contains(.dontEnum))
+  #expect(descriptor.staticMethods.isEmpty)
+  #expect(descriptor.properties.count == 1)
+  #expect(descriptor.properties[0].name == "version")
+  #expect(descriptor.properties[0].getterBinding == "ProjectedType.property.get.version")
+  #expect(descriptor.properties[0].setterBinding == "ProjectedType.property.set.version")
+  #expect(descriptor.properties[0].attributes.contains(.readOnly))
+  #expect(descriptor.properties[0].attributes.contains(.dontDelete))
+}

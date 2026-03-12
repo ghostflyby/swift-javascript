@@ -28,6 +28,30 @@ public struct JSStaticFunction: Sendable {
     @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments) -> JSResult
 }
 
+extension JSStaticValue {
+  public func hostPropertyDescriptor(
+    getterBinding: String? = nil,
+    setterBinding: String? = nil
+  ) -> JSHostPropertyDescriptor {
+    JSHostPropertyDescriptor(
+      name: name,
+      attributes: attributes.hostMemberAttributes,
+      getterBinding: getterBinding,
+      setterBinding: setterBinding
+    )
+  }
+}
+
+extension JSStaticFunction {
+  public func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
+    JSHostFunctionDescriptor(
+      name: name,
+      attributes: attributes.hostMemberAttributes,
+      binding: binding
+    )
+  }
+}
+
 public struct JSClassDefinition: Sendable {
 
   public var version: Int32 = 0
@@ -99,6 +123,39 @@ public struct JSClassDefinition: Sendable {
   public var convertToType:
     (@Sendable (borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) -> JSValue)? =
       nil
+
+  public func hostTypeDescriptor(
+    storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
+  ) -> JSHostTypeDescriptor {
+    let typeName = className ?? "AnonymousHostType"
+
+    return JSHostTypeDescriptor(
+      name: typeName,
+      constructor: callAsConstructor == nil
+        ? nil
+        : JSHostConstructorDescriptor(binding: hostBindingName(suffix: "constructor")),
+      methods: staticFunctions.map {
+        $0.hostFunctionDescriptor(binding: hostBindingName(suffix: "method.\($0.name)"))
+      },
+      staticMethods: [],
+      properties: staticValues.map {
+        $0.hostPropertyDescriptor(
+          getterBinding: hostBindingName(suffix: "property.get.\($0.name)"),
+          setterBinding: hostBindingName(suffix: "property.set.\($0.name)")
+        )
+      },
+      parent: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className },
+      storagePolicy: storagePolicy,
+      finalizerBinding: finalize == nil ? nil : hostBindingName(suffix: "finalize")
+    )
+  }
+
+  private func hostBindingName(suffix: String) -> String {
+    guard let className, !className.isEmpty else {
+      return suffix
+    }
+    return "\(className).\(suffix)"
+  }
 }
 
 final class JSManualNativeClassBacking {
