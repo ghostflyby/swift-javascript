@@ -136,13 +136,13 @@ extension JSClassValueConvertible {
     guard value.isObject else {
       throw .typeMismatch(expected: "object", actual: value.type)
     }
-
-    let rawContext = context.driverContext
     let privateData: UnsafeMutableRawPointer?
     switch JavaScriptCoreBackendDriver.privateData(
-      from: value.rawValue(in: rawContext),
-      in: rawContext
+      from: value.valueHandle(in: context),
+      in: context.driverContextHandle
     ) {
+    case .none:
+      throw .codable("\(Self.self) driver handle bridge failed")
     case .exception:
       throw .codable("\(Self.self) could not be converted to JSObjectRef")
     case .value(let data):
@@ -181,16 +181,19 @@ extension JSClassValueConvertible {
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
-    switch JavaScriptCoreBackendDriver.makeObject(
+    switch JavaScriptCoreBackendDriver.makeObjectResultHandle(
       of: Self.jsClass.ref,
       privateData: data,
-      in: context.driverContext
+      in: context.driverContextHandle
     ) {
-    case .exception:
+    case .none:
+      _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
+      throw .codable("Driver handle bridge failed to create JS object for \(Self.self)")
+    case .some(.exception):
       _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
       throw .codable("Failed to create JS object for \(Self.self)")
-    case .value(let object):
-      return JSValue(rawValue: object)
+    case .some(.value(let object)):
+      return JSValue(handleValue: object)
     }
   }
 

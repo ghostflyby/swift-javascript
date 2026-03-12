@@ -204,6 +204,36 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func makeObjectResultHandle(
+    of jsClass: JSClassRef,
+    privateData: UnsafeMutableRawPointer?,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle() else {
+      return nil
+    }
+
+    switch makeObject(of: jsClass, privateData: privateData, in: rawContext) {
+    case .value(let value):
+      return .value(JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: value))
+    case .exception(let exception):
+      return .exception(JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: exception))
+    }
+  }
+
+  package static func privateData(
+    from value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSDriverResult<UnsafeMutableRawPointer?>? {
+    guard let rawValue: JavaScriptCoreRawValue = value.opaqueHandle(),
+      let rawContext: JavaScriptCoreRawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+
+    return privateData(from: rawValue, in: rawContext)
+  }
+
   package static func privateData(from object: JSObjectRef?) -> UnsafeMutableRawPointer? {
     guard let object else {
       return nil
