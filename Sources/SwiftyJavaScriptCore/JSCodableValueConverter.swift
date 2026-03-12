@@ -84,68 +84,69 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       return JSCodableNode(.string(value.toString(in: context)))
     }
     if value.isObject {
-      var exception: JSValueRef?
-      let isArray = JSValueIsArray(context.globalContextRef, value.ref)
-      if isArray {
-        let lengthKey = JSStringCreateWithCFString("length" as CFString)
-        defer { JSStringRelease(lengthKey) }
-
-        let lengthRef = JSObjectGetProperty(
-          context.globalContextRef, value.ref, lengthKey, &exception)
-        if exception != nil {
+      if value.isArray(in: context) {
+        let rawContext = context.driverContext
+        let count: Int
+        switch JavaScriptCoreBackendDriver.getProperty(
+          "length",
+          on: value.rawValue(in: rawContext),
+          in: rawContext
+        ) {
+        case .exception:
           throw .codable("array length read raised exception")
+        case .value(let lengthRawValue):
+          let lengthValue = JSValue(rawValue: lengthRawValue)
+          if lengthValue.isUndefined {
+            throw .codable("array length missing")
+          }
+          let lengthNumber = lengthValue.toDouble(in: context)
+          if !lengthNumber.isFinite {
+            throw .codable("array length conversion failed")
+          }
+          count = max(0, Int(lengthNumber))
         }
-        guard let lengthRef else {
-          throw .codable("array length missing")
-        }
-
-        let lengthNumber = JSValueToNumber(context.globalContextRef, lengthRef, &exception)
-        if exception != nil {
-          throw .codable("array length conversion failed")
-        }
-        let count = max(0, Int(lengthNumber))
 
         var nodes: [JSCodableNode] = []
         nodes.reserveCapacity(count)
         for index in 0..<count {
-          let elementRef = JSObjectGetPropertyAtIndex(
-            context.globalContextRef, value.ref, UInt32(index), &exception)
-          if exception != nil {
+          switch JavaScriptCoreBackendDriver.getProperty(
+            at: UInt32(index),
+            on: value.rawValue(in: rawContext),
+            in: rawContext
+          ) {
+          case .exception:
             throw .codable("array element read failed at index \(index)")
+          case .value(let elementRawValue):
+            let element = JSValue(rawValue: elementRawValue)
+            nodes.append(try nodeFromJSValue(element, in: context))
           }
-          guard let elementRef else {
-            nodes.append(JSCodableNode(.null))
-            continue
-          }
-          let element = JSValue(ref: elementRef, ctx: context)
-          nodes.append(try nodeFromJSValue(element, in: context))
         }
         return JSCodableNode(.array(nodes))
       }
-
       let names = JSObjectCopyPropertyNames(context.globalContextRef, value.ref)
       defer { JSPropertyNameArrayRelease(names) }
 
       let count = JSPropertyNameArrayGetCount(names)
       var object: [String: JSCodableNode] = [:]
       object.reserveCapacity(Int(count))
+      let rawContext = context.driverContext
 
       for index in 0..<count {
         guard let keyRef = JSPropertyNameArrayGetNameAtIndex(names, index) else {
           continue
         }
         let key = String(jsStringRef: keyRef)
-        let propertyRef = JSObjectGetProperty(
-          context.globalContextRef, value.ref, keyRef, &exception)
-        if exception != nil {
+        switch JavaScriptCoreBackendDriver.getProperty(
+          key,
+          on: value.rawValue(in: rawContext),
+          in: rawContext
+        ) {
+        case .exception:
           throw .codable("object property read failed for key \(key)")
+        case .value(let propertyRawValue):
+          let property = JSValue(rawValue: propertyRawValue)
+          object[key] = try nodeFromJSValue(property, in: context)
         }
-        guard let propertyRef else {
-          object[key] = JSCodableNode(.null)
-          continue
-        }
-        let property = JSValue(ref: propertyRef, ctx: context)
-        object[key] = try nodeFromJSValue(property, in: context)
       }
       return JSCodableNode(.object(object))
     }
@@ -184,17 +185,24 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       }
       return JSValue(ref: arrayRef, ctx: context)
     case .object(let object):
-      var exception: JSValueRef?
       guard let objectRef = JSObjectMake(context.globalContextRef, nil, nil) else {
         throw .codable("object creation returned nil")
       }
+      let rawContext = context.driverContext
+      let rawObject = JavaScriptCoreRawValue(ref: objectRef, context: rawContext)
       for (key, value) in object {
-        let keyRef = JSStringCreateWithCFString(key as CFString)
-        defer { JSStringRelease(keyRef) }
         let encoded = try jsValueFromNode(value, in: context)
-        JSObjectSetProperty(context.globalContextRef, objectRef, keyRef, encoded.ref, 0, &exception)
-        if exception != nil {
+        switch JavaScriptCoreBackendDriver.setProperty(
+          key,
+          on: rawObject,
+          to: encoded.rawValue(in: rawContext),
+          in: rawContext,
+          attributes: .none
+        ) {
+        case .exception:
           throw .codable("object property write failed for key \(key)")
+        case .value:
+          break
         }
       }
       return JSValue(ref: objectRef, ctx: context)
@@ -378,10 +386,16 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   private func set(_ ref: JSValueRef, forKey key: String) {
-    var exception: JSValueRef?
-    let keyRef = JSStringCreateWithCFString(key as CFString)
-    defer { JSStringRelease(keyRef) }
-    JSObjectSetProperty(globalContextRef, objectRef, keyRef, ref, 0, &exception)
+    let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
+    let object = JavaScriptCoreRawValue(ref: objectRef, context: rawContext)
+    let value = JavaScriptCoreRawValue(ref: ref, context: rawContext)
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      key,
+      on: object,
+      to: value,
+      in: rawContext,
+      attributes: .none
+    )
   }
 }
 
@@ -480,8 +494,15 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   }
 
   private func appendAtCurrent(_ ref: JSValueRef, index: Int) {
-    var exception: JSValueRef?
-    JSObjectSetPropertyAtIndex(globalContextRef, arrayRef, UInt32(index), ref, &exception)
+    let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
+    let array = JavaScriptCoreRawValue(ref: arrayRef, context: rawContext)
+    let value = JavaScriptCoreRawValue(ref: ref, context: rawContext)
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      at: UInt32(index),
+      on: array,
+      to: value,
+      in: rawContext
+    )
   }
 }
 
