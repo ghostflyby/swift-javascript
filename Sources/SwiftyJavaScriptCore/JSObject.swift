@@ -22,21 +22,28 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
-      attributes.rawValue, &error)
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      key.rawValue(in: rawContext),
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext,
+      attributes: attributes.hostMemberAttributes
+    )
   }
 
   public func setProperty<Val>(
     _ value: borrowing Val, at index: UInt32,
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, encoded.retainedRef(), &error
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      at: index,
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext
     )
   }
 
@@ -53,25 +60,15 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    let encoded =
-      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
-    JSObjectSetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
-      attributes.rawValue, &error)
+    setProperty(value, forKey: key, with: attributes, in: callbackContext)
   }
   public func setProperty<Val>(
     _ value: borrowing Val, at index: UInt32,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    let encoded =
-      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
-    JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, encoded.retainedRef(), &error
-    )
+    setProperty(value, at: index, in: callbackContext)
   }
 
   public func setProperty<C: JSValueEncoder>(
@@ -98,13 +95,14 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) {
-    var error: JSValueRef?
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref,
-      encoded.retainedRef(),
-      attributes.rawValue,
-      &error
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      key.rawValue(in: rawContext),
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext,
+      attributes: attributes.hostMemberAttributes
     )
   }
 
@@ -114,12 +112,13 @@ extension JSValue {
     using converter: C.Type,
     in context: borrowing JSInstantContext
   ) {
-    var error: JSValueRef?
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index,
-      encoded.retainedRef(),
-      &error
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      at: index,
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext
     )
   }
 
@@ -130,14 +129,8 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) {
-    var error: JSValueRef?
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetProperty(
-      context.globalContextRef, self.ref, key.ref,
-      encoded.retainedRef(),
-      attributes.rawValue,
-      &error
-    )
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
   }
 
   public func setProperty<C: JSValueEncoder>(
@@ -147,14 +140,8 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) {
-    var error: JSValueRef?
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref,
-      encoded.retainedRef(),
-      attributes.rawValue,
-      &error
-    )
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
   }
 
   public func setProperty<C: JSValueEncoder>(
@@ -163,13 +150,8 @@ extension JSValue {
     using converter: C.Type,
     in context: isolated JSContext = #isolation
   ) {
-    var error: JSValueRef?
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetPropertyAtIndex(
-      context.globalContextRef, self.ref, index,
-      encoded.retainedRef(),
-      &error
-    )
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    setProperty(value, at: index, using: converter, in: callbackContext)
   }
 
   public func getProperty(
@@ -194,18 +176,34 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSValue {
-    let result = JSObjectGetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, nil)!
-    return JSValue(ref: result, ctx: context)
+    let rawContext = context.driverContext
+    switch JavaScriptCoreBackendDriver.getProperty(
+      key.rawValue(in: rawContext),
+      on: rawValue(in: rawContext),
+      in: rawContext
+    ) {
+    case .value(let value):
+      return JSValue(rawValue: value)
+    case .exception:
+      return JSValue(undefinedIn: context)
+    }
   }
 
   public func getProperty(
     at index: UInt32,
     in context: borrowing JSInstantContext
   ) -> JSValue {
-    let result = JSObjectGetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, nil)!
-    return JSValue(ref: result, ctx: context)
+    let rawContext = context.driverContext
+    switch JavaScriptCoreBackendDriver.getProperty(
+      at: index,
+      on: rawValue(in: rawContext),
+      in: rawContext
+    ) {
+    case .value(let value):
+      return JSValue(rawValue: value)
+    case .exception:
+      return JSValue(undefinedIn: context)
+    }
   }
 
   public func getProperty(
@@ -220,18 +218,16 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let result = JSObjectGetPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, nil)!
-    return JSValue(ref: result, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return getProperty(forKey: key, in: callbackContext)
   }
 
   public func getProperty(
     at index: UInt32,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let result = JSObjectGetPropertyAtIndex(
-      context.globalContextRef, self.ref, index, nil)!
-    return JSValue(ref: result, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return getProperty(at: index, in: callbackContext)
   }
 
   public func getProperty<C: JSValueDecoder>(
@@ -304,9 +300,12 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) {
-    var error: JSValueRef?
-    JSObjectDeletePropertyForKey(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.deleteProperty(
+      key.rawValue(in: rawContext),
+      on: rawValue(in: rawContext),
+      in: rawContext
+    )
   }
 
   public func deleteProperty(
@@ -321,9 +320,8 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) {
-    var error: JSValueRef?
-    JSObjectDeletePropertyForKey(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    deleteProperty(forKey: key, in: callbackContext)
   }
 
   public func hasProperty(
@@ -342,9 +340,12 @@ extension JSValue {
     _ key: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    var error: JSValueRef?
-    return JSObjectHasPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let rawContext = context.driverContext
+    return JavaScriptCoreBackendDriver.hasProperty(
+      key.rawValue(in: rawContext),
+      on: rawValue(in: rawContext),
+      in: rawContext
+    )
   }
 
   public func hasProperty(
@@ -359,9 +360,8 @@ extension JSValue {
     _ key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> Bool {
-    var error: JSValueRef?
-    return JSObjectHasPropertyForKey(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return hasProperty(key, in: callbackContext)
   }
 
 }

@@ -574,7 +574,8 @@ extension JSValue {
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
     let rawContext = context.driverContext
-    return .from(driverResult: JavaScriptCoreBackendDriver.toObject(rawValue(in: rawContext), in: rawContext))
+    return .from(
+      driverResult: JavaScriptCoreBackendDriver.toObject(rawValue(in: rawContext), in: rawContext))
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -649,7 +650,9 @@ extension JSValue {
     case .exception:
       return .exception(JSValue(undefinedIn: context))
     case .value:
-      switch JavaScriptCoreBackendDriver.getProperty(key.string, on: rawValue(in: rawContext), in: rawContext) {
+      switch JavaScriptCoreBackendDriver.getProperty(
+        key.string, on: rawValue(in: rawContext), in: rawContext)
+      {
       case .exception(let exception):
         return .exception(JSValue(rawValue: exception))
       case .value(let stored):

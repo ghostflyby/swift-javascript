@@ -210,6 +210,36 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func getProperty(
+    _ key: JavaScriptCoreRawValue,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    switch objectRef(for: object, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      let valueRef = JSObjectGetPropertyForKey(context.ref, objectRef, key.ref, &exception)
+      return result(value: valueRef, exception: exception, in: context)
+    }
+  }
+
+  package static func getProperty(
+    at index: UInt32,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    switch objectRef(for: object, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      let valueRef = JSObjectGetPropertyAtIndex(context.ref, objectRef, index, &exception)
+      return result(value: valueRef, exception: exception, in: context)
+    }
+  }
+
   package static func hasProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
@@ -222,6 +252,21 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
       return withJSString(key) { keyRef in
         JSObjectHasProperty(context.ref, objectRef, keyRef)
       }
+    }
+  }
+
+  package static func hasProperty(
+    _ key: JavaScriptCoreRawValue,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> Bool {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return false
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      let result = JSObjectHasPropertyForKey(context.ref, objectRef, key.ref, &exception)
+      return exception == nil && result
     }
   }
 
@@ -242,6 +287,24 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
         }
         return .value(())
       }
+    }
+  }
+
+  package static func deleteProperty(
+    _ key: JavaScriptCoreRawValue,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<Void> {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return .exception(())
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      JSObjectDeletePropertyForKey(context.ref, objectRef, key.ref, &exception)
+      if exception != nil {
+        return .exception(())
+      }
+      return .value(())
     }
   }
 
@@ -343,7 +406,8 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
       return false
     case .object(let constructorRef):
       var exception: JSValueRef?
-      let result = JSValueIsInstanceOfConstructor(context.ref, value.ref, constructorRef, &exception)
+      let result = JSValueIsInstanceOfConstructor(
+        context.ref, value.ref, constructorRef, &exception)
       return exception == nil && result
     }
   }
@@ -374,6 +438,52 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
         }
         return .value(())
       }
+    }
+  }
+
+  package static func setProperty(
+    _ key: JavaScriptCoreRawValue,
+    on object: JavaScriptCoreRawValue,
+    to value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext,
+    attributes: JSHostMemberAttributes
+  ) -> JSDriverResult<Void> {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return .exception(())
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      JSObjectSetPropertyForKey(
+        context.ref,
+        objectRef,
+        key.ref,
+        value.ref,
+        javaScriptCorePropertyAttributes(from: attributes),
+        &exception
+      )
+      if exception != nil {
+        return .exception(())
+      }
+      return .value(())
+    }
+  }
+
+  package static func setProperty(
+    at index: UInt32,
+    on object: JavaScriptCoreRawValue,
+    to value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<Void> {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return .exception(())
+    case .object(let objectRef):
+      var exception: JSValueRef?
+      JSObjectSetPropertyAtIndex(context.ref, objectRef, index, value.ref, &exception)
+      if exception != nil {
+        return .exception(())
+      }
+      return .value(())
     }
   }
 
