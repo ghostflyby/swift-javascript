@@ -426,16 +426,14 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       let context = JSInstantContext(ctx: ctx)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
-      let result = definition.getProperty?(context, this, key).toPrivateResult()
-      switch result {
-      case .some(.value(let value)):
-        return value
-      case .some(.exception(let error)):
-        exception?.pointee = error
-        return JSValueMakeUndefined(ctx)
-      case .none:
+      guard let getProperty = definition.getProperty else {
         return JSValueMakeUndefined(ctx)
       }
+      return JavaScriptCoreBackendDriver.callbackReturnValue(
+        getProperty(context, this, key).toPrivateResult(),
+        in: ctx,
+        exception: exception
+      )
     }
   }
 
@@ -451,9 +449,14 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       let key = String(jsStringRef: propertyName)
       let this = JSValue(ref: object, ctx: context)
       let newValue = JSValue(ref: value, ctx: context)
-      if let error = definition.setProperty?(context, this, key, newValue)?.retainedRef() {
-        exception?.pointee = error
-        return false
+      guard let setProperty = definition.setProperty else {
+        return true
+      }
+      if let error = setProperty(context, this, key, newValue)?.retainedRef() {
+        return JavaScriptCoreBackendDriver.callbackSucceeded(
+          exceptionValue: error,
+          exception: exception
+        )
       }
       return true
     }

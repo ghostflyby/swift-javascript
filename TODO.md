@@ -87,3 +87,4 @@
 - [x] 将 `JSClass` 的 callback 输入准备 helper 下沉到 JavaScriptCore backend（dynamic property、function、constructor、hasInstance、convertToType 的上下文恢复与输入值组装已改由 backend 提供）
 - [x] 将 `JSClass` 的 static value/static function/propertyNames callback glue 继续下沉到 JavaScriptCore backend（相关输入准备、名称解析与基础桥接已由 backend helper 承担）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已删掉本地 `JSArguments` 包装 helper，统一复用 backend `withArguments`）
+- [x] 继续收口 `JSClassValueConvertible` dynamic property callback glue（已将 dynamic get/set 的结果/异常回写改复用 backend helper，并保留 auto storage 的 definition 解析路径）
