@@ -277,6 +277,25 @@ private func autoClassDefinition(from object: JSObjectRef) -> JSClassDefinition?
   autoClassStorage(from: object)?.definition
 }
 
+private func withAutoDynamicPropertyCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> R
+) -> R? {
+  guard let ctx, let object, let propertyName,
+    let definition = autoClassDefinition(from: object)
+  else {
+    return nil
+  }
+
+  rememberClassObjectContext(ctx, object)
+  let context = JSInstantContext(ctx: ctx)
+  let key = String(jsStringRef: propertyName)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(definition, context, thisValue, key)
+}
+
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   guard let ctx, let object, let propertyName,
@@ -417,78 +436,85 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
 
   if backing.definition.getProperty != nil {
     cls.getProperty = { ctx, object, propertyName, exception in
-      guard let ctx, let object, let propertyName,
-        let definition = autoClassDefinition(from: object)
-      else {
+      let value = withAutoDynamicPropertyCallbackInput(
+        ctx: ctx,
+        object: object,
+        propertyName: propertyName
+      ) { definition, context, thisValue, key in
+        guard let getProperty = definition.getProperty else {
+          return JSValueMakeUndefined(ctx)
+        }
+        return JavaScriptCoreBackendDriver.callbackReturnValue(
+          getProperty(context, thisValue, key).toPrivateResult(),
+          in: ctx,
+          exception: exception
+        )
+      }
+      guard let value else {
         return JSValueMakeUndefined(ctx)
       }
-      rememberClassObjectContext(ctx, object)
-      let context = JSInstantContext(ctx: ctx)
-      let key = String(jsStringRef: propertyName)
-      let this = JSValue(ref: object, ctx: context)
-      guard let getProperty = definition.getProperty else {
-        return JSValueMakeUndefined(ctx)
-      }
-      return JavaScriptCoreBackendDriver.callbackReturnValue(
-        getProperty(context, this, key).toPrivateResult(),
-        in: ctx,
-        exception: exception
-      )
+      return value
     }
   }
 
   if backing.definition.setProperty != nil {
     cls.setProperty = { ctx, object, propertyName, value, exception in
-      guard let ctx, let object, let propertyName, let value,
-        let definition = autoClassDefinition(from: object)
-      else {
+      guard let value else {
         return false
       }
-      rememberClassObjectContext(ctx, object)
-      let context = JSInstantContext(ctx: ctx)
-      let key = String(jsStringRef: propertyName)
-      let this = JSValue(ref: object, ctx: context)
-      let newValue = JSValue(ref: value, ctx: context)
-      guard let setProperty = definition.setProperty else {
+      let didSet = withAutoDynamicPropertyCallbackInput(
+        ctx: ctx,
+        object: object,
+        propertyName: propertyName
+      ) { definition, context, thisValue, key in
+        let newValue = JSValue(ref: value, ctx: context)
+        guard let setProperty = definition.setProperty else {
+          return true
+        }
+        if let error = setProperty(context, thisValue, key, newValue)?.retainedRef() {
+          return JavaScriptCoreBackendDriver.callbackSucceeded(
+            exceptionValue: error,
+            exception: exception
+          )
+        }
         return true
       }
-      if let error = setProperty(context, this, key, newValue)?.retainedRef() {
-        return JavaScriptCoreBackendDriver.callbackSucceeded(
-          exceptionValue: error,
-          exception: exception
-        )
+      guard let didSet else {
+        return false
       }
-      return true
+      return didSet
     }
   }
 
   if backing.definition.hasProperty != nil {
     cls.hasProperty = { ctx, object, propertyName in
-      guard let ctx, let object, let propertyName,
-        let definition = autoClassDefinition(from: object)
-      else {
+      let hasProperty = withAutoDynamicPropertyCallbackInput(
+        ctx: ctx,
+        object: object,
+        propertyName: propertyName
+      ) { definition, context, thisValue, key in
+        definition.hasProperty?(context, thisValue, key) ?? false
+      }
+      guard let hasProperty else {
         return false
       }
-      rememberClassObjectContext(ctx, object)
-      let context = JSInstantContext(ctx: ctx)
-      let key = String(jsStringRef: propertyName)
-      let this = JSValue(ref: object, ctx: context)
-      return definition.hasProperty?(context, this, key) ?? false
+      return hasProperty
     }
   }
 
   if backing.definition.deleteProperty != nil {
     cls.deleteProperty = { ctx, object, propertyName, exception in
-      guard let ctx, let object, let propertyName,
-        let definition = autoClassDefinition(from: object)
-      else {
+      let didDelete = withAutoDynamicPropertyCallbackInput(
+        ctx: ctx,
+        object: object,
+        propertyName: propertyName
+      ) { definition, context, thisValue, key in
+        definition.deleteProperty?(context, thisValue, key) ?? false
+      }
+      guard let didDelete else {
         return false
       }
-      rememberClassObjectContext(ctx, object)
-      let context = JSInstantContext(ctx: ctx)
-      let key = String(jsStringRef: propertyName)
-      let this = JSValue(ref: object, ctx: context)
-      return definition.deleteProperty?(context, this, key) ?? false
+      return didDelete
     }
   }
 
