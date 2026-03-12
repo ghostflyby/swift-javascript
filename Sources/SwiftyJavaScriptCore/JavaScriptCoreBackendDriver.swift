@@ -464,14 +464,16 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
 
     rememberClassObjectContext(ctx, thisObject)
-    let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
-    guard let functionName = stringProperty("name", on: function, in: rawContext),
+    let context = makeRememberedClassCallbackContext(ctx, thisObject)
+    let functionValue = JSValue(ref: function, ctx: context)
+    let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
+      .toString(in: context)
+    guard
       let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
     else {
       return nil
     }
 
-    let context = makeRememberedClassCallbackContext(ctx, thisObject)
     let thisValue = JSValue(ref: thisObject, ctx: context)
     return body(functionDefinition, context, thisValue)
   }
