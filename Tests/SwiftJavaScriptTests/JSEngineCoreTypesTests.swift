@@ -2,6 +2,184 @@ import Testing
 
 @testable import SwiftJavaScript
 
+private enum MockEngine: JSEngine {}
+
+private struct MockRuntime: Sendable, Equatable {
+  let id: String
+}
+
+private struct MockContext: Sendable, Equatable {
+  let runtimeID: String
+}
+
+private struct MockValue: Sendable, Equatable {
+  let kind: String
+  let payload: String
+}
+
+private enum MockDriver: _JSEngineDriver {
+  typealias Engine = MockEngine
+  typealias RawRuntime = MockRuntime
+  typealias RawContext = MockContext
+  typealias RawValue = MockValue
+
+  static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
+
+  static func makeRuntime() -> MockRuntime {
+    MockRuntime(id: "runtime")
+  }
+
+  static func makeContext(in runtime: MockRuntime) -> MockContext {
+    MockContext(runtimeID: runtime.id)
+  }
+
+  static func evaluateScript(
+    _ script: String,
+    in context: MockContext,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSDriverResult<MockValue> {
+    if script == "throw" {
+      return .exception(MockValue(kind: "exception", payload: "\(context.runtimeID):throw"))
+    }
+    return .value(MockValue(kind: "script", payload: "\(context.runtimeID):\(script)"))
+  }
+
+  static func makeString(_ value: String, in context: MockContext) -> MockValue {
+    MockValue(kind: "string", payload: "\(context.runtimeID):\(value)")
+  }
+
+  static func makeNumber(_ value: Double, in context: MockContext) -> MockValue {
+    MockValue(kind: "number", payload: "\(context.runtimeID):\(value)")
+  }
+
+  static func makeBoolean(_ value: Bool, in context: MockContext) -> MockValue {
+    MockValue(kind: "boolean", payload: "\(context.runtimeID):\(value)")
+  }
+
+  static func makeNull(in context: MockContext) -> MockValue {
+    MockValue(kind: "null", payload: context.runtimeID)
+  }
+
+  static func makeUndefined(in context: MockContext) -> MockValue {
+    MockValue(kind: "undefined", payload: context.runtimeID)
+  }
+
+  static func makeObject(in context: MockContext) -> JSDriverResult<MockValue> {
+    .value(MockValue(kind: "object", payload: context.runtimeID))
+  }
+
+  static func makeArray(in context: MockContext) -> JSDriverResult<MockValue> {
+    .value(MockValue(kind: "array", payload: context.runtimeID))
+  }
+
+  static func propertyNames(on object: MockValue, in context: MockContext) -> [String] {
+    [context.runtimeID, object.kind, object.payload]
+  }
+
+  static func getProperty(_ key: String, on object: MockValue, in context: MockContext)
+    -> JSDriverResult<MockValue>
+  {
+    .value(MockValue(kind: "property", payload: "\(context.runtimeID):\(object.payload):\(key)"))
+  }
+
+  static func getProperty(_ key: MockValue, on object: MockValue, in context: MockContext)
+    -> JSDriverResult<MockValue>
+  {
+    .value(
+      MockValue(kind: "property", payload: "\(context.runtimeID):\(object.payload):\(key.payload)"))
+  }
+
+  static func getProperty(at index: UInt32, on object: MockValue, in context: MockContext)
+    -> JSDriverResult<MockValue>
+  {
+    .value(MockValue(kind: "index", payload: "\(context.runtimeID):\(object.payload):\(index)"))
+  }
+
+  static func hasProperty(_ key: String, on object: MockValue, in context: MockContext) -> Bool {
+    object.payload.contains(key)
+  }
+
+  static func hasProperty(_ key: MockValue, on object: MockValue, in context: MockContext) -> Bool {
+    object.payload.contains(key.payload)
+  }
+
+  static func deleteProperty(_ key: String, on object: MockValue, in context: MockContext)
+    -> JSDriverResult<Void>
+  {
+    .value(())
+  }
+
+  static func deleteProperty(_ key: MockValue, on object: MockValue, in context: MockContext)
+    -> JSDriverResult<Void>
+  {
+    .value(())
+  }
+
+  static func callFunction(
+    _ function: MockValue,
+    this thisValue: MockValue?,
+    arguments: [MockValue],
+    in context: MockContext
+  ) -> JSDriverResult<MockValue> {
+    .value(
+      MockValue(
+        kind: "call", payload: "\(context.runtimeID):\(function.payload):\(arguments.count)"))
+  }
+
+  static func construct(_ constructor: MockValue, arguments: [MockValue], in context: MockContext)
+    -> JSDriverResult<MockValue>
+  {
+    .value(MockValue(kind: "construct", payload: "\(context.runtimeID):\(arguments.count)"))
+  }
+
+  static func toObject(_ value: MockValue, in context: MockContext) -> JSDriverResult<MockValue> {
+    .value(MockValue(kind: "object", payload: value.payload))
+  }
+
+  static func isArray(_ value: MockValue, in context: MockContext) -> Bool {
+    value.kind == "array"
+  }
+
+  static func isDate(_ value: MockValue, in context: MockContext) -> Bool {
+    value.kind == "date"
+  }
+
+  static func isInstanceOf(_ value: MockValue, constructor: MockValue, in context: MockContext)
+    -> Bool
+  {
+    value.payload == constructor.payload
+  }
+
+  static func setProperty(
+    _ key: String,
+    on object: MockValue,
+    to value: MockValue,
+    in context: MockContext,
+    attributes: JSHostMemberAttributes
+  ) -> JSDriverResult<Void> {
+    .value(())
+  }
+
+  static func setProperty(
+    _ key: MockValue,
+    on object: MockValue,
+    to value: MockValue,
+    in context: MockContext,
+    attributes: JSHostMemberAttributes
+  ) -> JSDriverResult<Void> {
+    .value(())
+  }
+
+  static func setProperty(
+    at index: UInt32, on object: MockValue, to value: MockValue, in context: MockContext
+  )
+    -> JSDriverResult<Void>
+  {
+    .value(())
+  }
+}
+
 @Test func engineCapabilitiesDefaultsToDisabled() {
   let capabilities = JSEngineCapabilities()
 
@@ -105,5 +283,67 @@ import Testing
   case .exception(let wrapped):
     let token = wrapped.opaqueHandle(as: String.self)
     #expect(token == "quickjs-error")
+  }
+}
+
+@Test func genericHandlesBridgeThroughDriverProtocol() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  let context = MockDriver.makeBorrowedContextHandleFromRuntime(runtime)
+
+  guard let context else {
+    Issue.record("Expected context handle from driver")
+    return
+  }
+
+  let stringValue = MockDriver.makeStringValueHandle("hello", context)
+  let numberValue = MockDriver.makeNumberValueHandle(42, context)
+  let evalValue = MockDriver.evaluateScriptResultHandle("1 + 2", context)
+  let evalException = MockDriver.evaluateScriptResultHandle("throw", context)
+
+  guard let stringValue, let numberValue, let evalValue, let evalException else {
+    Issue.record("Expected driver bridge operations to produce handles")
+    return
+  }
+
+  let names = MockDriver.propertyNamesForHandle(stringValue, context)
+  let property = MockDriver.getStringPropertyHandle("message", on: stringValue, context)
+  let propertySet = MockDriver.setStringPropertyHandle(
+    "message",
+    on: stringValue,
+    numberValue,
+    context,
+    attributes: [.readOnly]
+  )
+
+  #expect(propertySet)
+  #expect(names == ["runtime", "string", "runtime:hello"])
+
+  switch consume evalValue {
+  case .value(let value):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "script", payload: "runtime:1 + 2"))
+  case .exception:
+    Issue.record("Expected script evaluation to succeed")
+  }
+
+  switch consume evalException {
+  case .value:
+    Issue.record("Expected script evaluation to surface exception result")
+  case .exception(let value):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "exception", payload: "runtime:throw"))
+  }
+
+  guard let property else {
+    Issue.record("Expected property handle result")
+    return
+  }
+
+  switch consume property {
+  case .value(let value):
+    let raw = value.opaqueHandle(as: MockValue.self)
+    #expect(raw == MockValue(kind: "property", payload: "runtime:runtime:hello:message"))
+  case .exception:
+    Issue.record("Expected property access to succeed")
   }
 }

@@ -132,3 +132,123 @@ package protocol _JSEngineDriver {
     in context: RawContext
   ) -> JSDriverResult<Void>
 }
+
+package extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawValue: Sendable {
+  static func makeRuntimeHandle() -> JSRuntimeHandle<Engine> {
+    JSRuntimeHandle<Engine>(_opaqueHandle: makeRuntime())
+  }
+
+  static func makeBorrowedContextHandleFromRuntime(
+    _ runtime: JSRuntimeHandle<Engine>
+  ) -> JSBorrowedContextHandle<Engine>? {
+    guard let rawRuntime: RawRuntime = runtime.opaqueHandle() else {
+      return nil
+    }
+    return JSBorrowedContextHandle<Engine>(_opaqueHandle: makeContext(in: rawRuntime))
+  }
+
+  static func makeStringValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeString(value, in: rawContext))
+  }
+
+  static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeNumber(value, in: rawContext))
+  }
+
+  static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeBoolean(value, in: rawContext))
+  }
+
+  static func evaluateScriptResultHandle(
+    _ script: String,
+    _ context: JSBorrowedContextHandle<Engine>,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(
+      from: evaluateScript(
+        script,
+        in: rawContext,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    )
+  }
+
+  static func propertyNamesForHandle(
+    _ object: JSValueHandle<Engine>,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> [String]? {
+    guard let rawObject: RawValue = object.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+    return propertyNames(on: rawObject, in: rawContext)
+  }
+
+  static func getStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<Engine>,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSResultHandle<Engine>? {
+    guard let rawObject: RawValue = object.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return nil
+    }
+    return resultHandle(from: getProperty(key, on: rawObject, in: rawContext))
+  }
+
+  static func setStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<Engine>,
+    _ value: JSValueHandle<Engine>,
+    _ context: JSBorrowedContextHandle<Engine>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    guard let rawObject: RawValue = object.opaqueHandle(),
+      let rawValue: RawValue = value.opaqueHandle(),
+      let rawContext: RawContext = context.opaqueHandle()
+    else {
+      return false
+    }
+
+    switch setProperty(key, on: rawObject, to: rawValue, in: rawContext, attributes: attributes) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  private static func resultHandle(from result: JSDriverResult<RawValue>) -> JSResultHandle<Engine> {
+    switch result {
+    case .value(let rawValue):
+      return .value(JSValueHandle<Engine>(_opaqueHandle: rawValue))
+    case .exception(let rawValue):
+      return .exception(JSValueHandle<Engine>(_opaqueHandle: rawValue))
+    }
+  }
+}

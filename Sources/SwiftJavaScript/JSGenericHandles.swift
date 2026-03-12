@@ -6,7 +6,7 @@ package final class _JSOpaqueHandleStorage: @unchecked Sendable {
   }
 }
 
-public struct JSRuntimeHandle<E: JSEngine>: ~Copyable {
+public struct JSRuntimeHandle<E: JSEngine> {
   package let storage: _JSOpaqueHandleStorage
 
   package init(_opaqueHandle: any Sendable) {
@@ -22,7 +22,7 @@ public struct JSRuntimeHandle<E: JSEngine>: ~Copyable {
   }
 }
 
-public struct JSBorrowedContextHandle<E: JSEngine>: ~Copyable {
+public struct JSBorrowedContextHandle<E: JSEngine> {
   package let storage: _JSOpaqueHandleStorage
 
   package init(_opaqueHandle: any Sendable) {
@@ -38,7 +38,7 @@ public struct JSBorrowedContextHandle<E: JSEngine>: ~Copyable {
   }
 }
 
-public struct JSValueHandle<E: JSEngine>: ~Copyable {
+public struct JSValueHandle<E: JSEngine> {
   package let storage: _JSOpaqueHandleStorage
 
   package init(_opaqueHandle: any Sendable) {
@@ -54,7 +54,7 @@ public struct JSValueHandle<E: JSEngine>: ~Copyable {
   }
 }
 
-public enum JSResultHandle<E: JSEngine>: ~Copyable {
+public enum JSResultHandle<E: JSEngine> {
   case value(JSValueHandle<E>)
   case exception(JSValueHandle<E>)
 
