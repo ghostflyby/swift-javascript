@@ -125,10 +125,11 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         return JSCodableNode(.array(nodes))
       }
       var object: [String: JSCodableNode] = [:]
-      let names = JavaScriptCoreBackendDriver.propertyNamesForHandle(
-        on: value.valueHandle(in: context),
-        in: context.driverContextHandle
-      ) ?? []
+      let names =
+        JavaScriptCoreBackendDriver.propertyNamesForHandle(
+          on: value.valueHandle(in: context),
+          in: context.driverContextHandle
+        ) ?? []
       object.reserveCapacity(names.count)
 
       for key in names {
@@ -168,12 +169,14 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       let arrayValue = try makeDriverArrayValue(in: context)
       for (index, item) in array.enumerated() {
         let encoded = try jsValueFromNode(item, in: context)
-        guard JavaScriptCoreBackendDriver.setIndexPropertyHandle(
-          at: UInt32(index),
-          on: arrayValue.valueHandle(in: context),
-          to: encoded.valueHandle(in: context),
-          in: context.driverContextHandle
-        ) else {
+        guard
+          JavaScriptCoreBackendDriver.setIndexPropertyHandle(
+            at: UInt32(index),
+            on: arrayValue.valueHandle(in: context),
+            to: encoded.valueHandle(in: context),
+            in: context.driverContextHandle
+          )
+        else {
           throw .codable("array element write failed at index \(index)")
         }
       }
@@ -182,13 +185,15 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       let objectValue = try makeDriverObjectValue(in: context)
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
-        guard JavaScriptCoreBackendDriver.setStringPropertyHandle(
-          key,
-          on: objectValue.valueHandle(in: context),
-          to: encoded.valueHandle(in: context),
-          in: context.driverContextHandle,
-          attributes: .none
-        ) else {
+        guard
+          JavaScriptCoreBackendDriver.setStringPropertyHandle(
+            key,
+            on: objectValue.valueHandle(in: context),
+            to: encoded.valueHandle(in: context),
+            in: context.driverContextHandle,
+            attributes: .none
+          )
+        else {
           throw .codable("object property write failed for key \(key)")
         }
       }

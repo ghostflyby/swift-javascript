@@ -49,6 +49,10 @@ private enum MockDriver: _JSEngineDriver {
     MockValue(kind: "string", payload: "\(context.runtimeID):\(value)")
   }
 
+  static func makeSymbol(_ value: String, in context: MockContext) -> MockValue {
+    MockValue(kind: "symbol", payload: "\(context.runtimeID):\(value)")
+  }
+
   static func makeNumber(_ value: Double, in context: MockContext) -> MockValue {
     MockValue(kind: "number", payload: "\(context.runtimeID):\(value)")
   }
@@ -296,11 +300,12 @@ private enum MockDriver: _JSEngineDriver {
   }
 
   let stringValue = MockDriver.makeStringValueHandle("hello", context)
+  let symbolValue = MockDriver.makeSymbolValueHandle("token", context)
   let numberValue = MockDriver.makeNumberValueHandle(42, context)
   let evalValue = MockDriver.evaluateScriptResultHandle("1 + 2", context)
   let evalException = MockDriver.evaluateScriptResultHandle("throw", context)
 
-  guard let stringValue, let numberValue, let evalValue, let evalException else {
+  guard let stringValue, let symbolValue, let numberValue, let evalValue, let evalException else {
     Issue.record("Expected driver bridge operations to produce handles")
     return
   }
@@ -317,6 +322,9 @@ private enum MockDriver: _JSEngineDriver {
 
   #expect(propertySet)
   #expect(names == ["runtime", "string", "runtime:hello"])
+  #expect(
+    symbolValue.opaqueHandle(as: MockValue.self)
+      == MockValue(kind: "symbol", payload: "runtime:token"))
 
   switch consume evalValue {
   case .value(let value):

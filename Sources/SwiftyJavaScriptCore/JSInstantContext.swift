@@ -38,6 +38,14 @@ extension JSInstantContext {
     return JSValue(handleValue: handle)
   }
 
+  func makeSymbol(_ value: String) -> JSValue {
+    guard let handle = JavaScriptCoreBackendDriver.makeSymbolValueHandle(value, driverContextHandle)
+    else {
+      preconditionFailure("JSInstantContext.makeSymbol could not create handle")
+    }
+    return JSValue(handleValue: handle)
+  }
+
   public func makeNumber(_ value: Double) -> JSValue {
     guard let handle = JavaScriptCoreBackendDriver.makeNumberValueHandle(value, driverContextHandle)
     else {

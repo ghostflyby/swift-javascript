@@ -75,9 +75,8 @@ public struct JSValue: ~Copyable {
   }
 
   public init(symbol: String, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeSymbol(
-      context.globalContextRef, JSStringCreateWithCFString(symbol as CFString))
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeSymbol(symbol)
   }
 
   public init(nullIn context: isolated JSContext = #isolation) {

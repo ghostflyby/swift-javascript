@@ -22,6 +22,7 @@ package protocol _JSEngineDriver {
   ) -> JSDriverResult<RawValue>
 
   static func makeString(_ value: String, in context: RawContext) -> RawValue
+  static func makeSymbol(_ value: String, in context: RawContext) -> RawValue
   static func makeNumber(_ value: Double, in context: RawContext) -> RawValue
   static func makeBoolean(_ value: Bool, in context: RawContext) -> RawValue
   static func makeNull(in context: RawContext) -> RawValue
@@ -165,6 +166,16 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
       return nil
     }
     return JSValueHandle<Engine>(_opaqueHandle: makeNumber(value, in: rawContext))
+  }
+
+  package static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<Engine>
+  ) -> JSValueHandle<Engine>? {
+    guard let rawContext: RawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<Engine>(_opaqueHandle: makeSymbol(value, in: rawContext))
   }
 
   package static func makeBooleanValueHandle(

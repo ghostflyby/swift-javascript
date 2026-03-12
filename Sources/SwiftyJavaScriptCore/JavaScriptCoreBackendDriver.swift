@@ -528,6 +528,15 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func makeSymbol(
+    _ value: String,
+    in context: JavaScriptCoreRawContext
+  ) -> JavaScriptCoreRawValue {
+    withJSString(value) { stringRef in
+      JavaScriptCoreRawValue(ref: JSValueMakeSymbol(context.ref, stringRef)!, context: context)
+    }
+  }
+
   package static func makeNumber(
     _ value: Double,
     in context: JavaScriptCoreRawContext
