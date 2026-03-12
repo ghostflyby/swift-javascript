@@ -64,3 +64,80 @@ import Testing
     }
   }
 }
+
+@Test func typedArrayCreatesStorageAndExposesBytes() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let typedArray = JSTypedArray(type: .uint16Array, length: 4, in: context)
+
+    typedArray.withUnsafeMutableBytes { rawBuffer in
+      let words = rawBuffer.bindMemory(to: UInt16.self)
+      words[0] = 5
+      words[1] = 9
+      words[3] = 12
+    }
+
+    global.setProperty(typedArray, forKey: JSStringManaged("typedArray"), in: context)
+    let result = context.evaluateScript(
+      "typedArray.length + typedArray.byteOffset + typedArray.BYTES_PER_ELEMENT + typedArray[0] + typedArray[1] + typedArray[3]"
+    )
+
+    #expect(typedArray.kind == .uint16Array)
+    #expect(typedArray.length == 4)
+    #expect(typedArray.byteOffset == 0)
+    #expect(typedArray.byteLength == 8)
+    #expect(typedArray.buffer.byteLength == 8)
+
+    switch consume result {
+    case .value(let value):
+      #expect(value.toInt32(in: context) == 32)
+    case .exception:
+      Issue.record("Expected TypedArray bytes to be visible from JavaScript")
+    }
+  }
+}
+
+@Test func typedArrayCanWrapArrayBufferSliceAndExistingJSValue() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let buffer = JSArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: context)
+    let typedArray = JSTypedArray(
+      type: .uint8Array,
+      buffer: buffer,
+      byteOffset: 2,
+      length: 3,
+      in: context
+    )
+
+    var copiedBytes: [UInt8] = []
+    typedArray.withUnsafeBytes { rawBuffer in
+      copiedBytes = Array(rawBuffer.bindMemory(to: UInt8.self))
+    }
+
+    let evaluated = context.evaluateScript("new Uint8Array(new ArrayBuffer(5))")
+
+    #expect(typedArray.kind == .uint8Array)
+    #expect(typedArray.byteOffset == 2)
+    #expect(typedArray.length == 3)
+    #expect(typedArray.byteLength == 3)
+    #expect(typedArray.buffer.byteLength == 6)
+    #expect(copiedBytes == [30, 40, 50])
+
+    switch consume evaluated {
+    case .value(let value):
+      let isTypedArray = value.isTypedArray
+      #expect(isTypedArray)
+      if let wrapped = JSTypedArray(value: value) {
+        #expect(wrapped.kind == .uint8Array)
+        #expect(wrapped.length == 5)
+        #expect(wrapped.byteOffset == 0)
+      } else {
+        Issue.record("Expected JSValue to wrap as JSTypedArray")
+      }
+    case .exception:
+      Issue.record("Expected JavaScript TypedArray value")
+    }
+  }
+}
