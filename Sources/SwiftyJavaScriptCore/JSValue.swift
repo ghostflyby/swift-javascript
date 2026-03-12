@@ -146,11 +146,8 @@ public struct JSValue: ~Copyable {
     callback: @escaping JSFunctionCallback,
     in context: isolated JSContext = #isolation,
   ) {
-    let jsFunctionRef = JSObjectMake(
-      context.globalContextRef, context.functionClass.value,
-      Unmanaged.passRetained(Box(callback)).toOpaque())
-
-    self.init(ref: jsFunctionRef!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self.init(name: name, callback: callback, in: callbackContext)
   }
 
   public init(
@@ -158,13 +155,13 @@ public struct JSValue: ~Copyable {
     callback: @escaping JSFunctionCallback,
     in context: borrowing JSInstantContext
   ) {
-    let jsFunctionRef = JSObjectMake(
-      context.globalContextRef,
-      context.actorContext.functionClass.value,
-      Unmanaged.passRetained(Box(callback)).toOpaque()
+    let function = JavaScriptCoreBackendDriver.makeFunction(
+      named: name,
+      callback: callback,
+      in: context.driverContext,
+      functionClass: context.actorContext.functionClass.value
     )
-
-    self.init(ref: jsFunctionRef!, ctx: context)
+    self.init(rawValue: function)
   }
 
   private consuming func toSendableBox() -> SendableBoxUnsafe<JSValue> {

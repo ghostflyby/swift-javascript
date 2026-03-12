@@ -68,6 +68,59 @@ package final class JavaScriptCoreRawValue: @unchecked Sendable {
   }
 }
 
+private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
+  ctx, function, thisObject, argumentCount, arguments, exception in
+  guard let ctx, let function, let thisObject else {
+    return JSValueMakeUndefined(ctx)
+  }
+
+  let context = JSInstantContext(ctx: ctx)
+  let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(
+    JSObjectGetPrivate(function)!
+  ).takeUnretainedValue().value
+  let functionValue = JSValue(ref: function, ctx: context)
+  let thisValue = JSValue(ref: thisObject, ctx: context)
+  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
+  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
+  let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
+    callback(context, functionValue, thisValue, args).toPrivateResult()
+  }
+
+  switch result {
+  case .value(let value):
+    return value
+  case .exception(let error):
+    exception?.pointee = error
+    return JSValueMakeUndefined(ctx)
+  }
+}
+
+private func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
+  var definition = JavaScriptCore.kJSClassDefinitionEmpty
+  definition.callAsFunction = javaScriptCoreFunctionCallback
+  definition.finalize = { function in
+    guard let function, let privateData = JSObjectGetPrivate(function) else {
+      return
+    }
+    let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(privateData)
+      .takeRetainedValue()
+    _ = callback.value
+  }
+  return definition
+}
+
+private func withJavaScriptCoreArguments<R: ~Copyable>(
+  _ pointer: UnsafePointer<JSValueRef?>?,
+  count: Int,
+  _ body: (borrowing JSArguments) -> R
+) -> R {
+  var empty: JSValueRef? = nil
+  return withUnsafePointer(to: &empty) { emptyPointer in
+    let arguments = JSArguments(pointer: pointer ?? emptyPointer, count: count)
+    return body(arguments)
+  }
+}
+
 private enum JavaScriptCoreObjectLookup {
   case object(JSObjectRef)
   case exception(JavaScriptCoreRawValue)
@@ -96,6 +149,36 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     -> JavaScriptCoreRawContext
   {
     JavaScriptCoreRawContext(runtime: runtime)
+  }
+
+  package static func makeFunctionClass() -> JSClassRef {
+    var definition = makeJavaScriptCoreFunctionClassDefinition()
+    return JSClassCreate(&definition)!
+  }
+
+  package static func makeFunction(
+    named name: String,
+    callback: @escaping JSValue.JSFunctionCallback,
+    in context: JavaScriptCoreRawContext,
+    functionClass: JSClassRef
+  ) -> JavaScriptCoreRawValue {
+    let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
+    guard let functionRef = JSObjectMake(context.ref, functionClass, callbackRef) else {
+      let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(callbackRef)
+        .takeRetainedValue()
+      _ = callback.value
+      return makeUndefined(in: context)
+    }
+    if !name.isEmpty {
+      _ = setProperty(
+        "name",
+        on: JavaScriptCoreRawValue(ref: functionRef, context: context),
+        to: makeString(name, in: context),
+        in: context,
+        attributes: [.dontEnum, .readOnly]
+      )
+    }
+    return JavaScriptCoreRawValue(ref: functionRef, context: context)
   }
 
   package static func evaluateScript(

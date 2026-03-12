@@ -20,8 +20,7 @@ public actor JSContext {
     self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
 
     globalObjectRef = peer.globalObject!.jsValueRef
-    var def = functionClassDef
-    functionClass = SendableBoxUnsafe(JSClassCreate(&def))
+    functionClass = SendableBoxUnsafe(JavaScriptCoreBackendDriver.makeFunctionClass())
 
     JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(self).toOpaque())
 
@@ -245,42 +244,3 @@ extension JSContext {
     }
   }
 }
-
-private let functionCallback: JSObjectCallAsFunctionCallback = {
-  c, f, this, count, args, exception in
-  let context = JSInstantContext(ctx: c!)
-  let functionRef = f!
-  let thisRef = this!
-  let argsRef = args!
-  let function = JSValue(ref: functionRef, ctx: context)
-  let this = JSValue(ref: thisRef, ctx: context)
-  let jsArgs = JSArguments(pointer: argsRef, count: Int(count))
-  let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(
-    JSObjectGetPrivate(functionRef)!
-  )
-  .takeUnretainedValue().value
-  let v = callback(
-    context,
-    function,
-    this,
-    jsArgs
-  ).toPrivateResult()
-  switch v {
-  case .value(let r):
-    return r
-  case .exception(let e):
-    exception?.pointee = e
-    return JSValueMakeUndefined(c!)
-  }
-}
-private let functionClassDef = {
-  var def = kJSClassDefinitionEmpty
-  def.callAsFunction = functionCallback
-  def.finalize = { ref in
-    let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(JSObjectGetPrivate(ref)!)
-      .takeRetainedValue()
-    // release the callback
-    _ = callback.value
-  }
-  return def
-}()
