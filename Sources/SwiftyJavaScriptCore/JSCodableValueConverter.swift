@@ -123,19 +123,15 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         }
         return JSCodableNode(.array(nodes))
       }
-      let names = JSObjectCopyPropertyNames(context.globalContextRef, value.ref)
-      defer { JSPropertyNameArrayRelease(names) }
-
-      let count = JSPropertyNameArrayGetCount(names)
       var object: [String: JSCodableNode] = [:]
-      object.reserveCapacity(Int(count))
       let rawContext = context.driverContext
+      let names = JavaScriptCoreBackendDriver.propertyNames(
+        on: value.rawValue(in: rawContext),
+        in: rawContext
+      )
+      object.reserveCapacity(names.count)
 
-      for index in 0..<count {
-        guard let keyRef = JSPropertyNameArrayGetNameAtIndex(names, index) else {
-          continue
-        }
-        let key = String(jsStringRef: keyRef)
+      for key in names {
         switch JavaScriptCoreBackendDriver.getProperty(
           key,
           on: value.rawValue(in: rawContext),

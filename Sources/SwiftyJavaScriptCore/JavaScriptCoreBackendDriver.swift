@@ -187,6 +187,30 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return .value(makeUndefined(in: context))
   }
 
+  package static func propertyNames(
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> [String] {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return []
+    case .object(let objectRef):
+      let names = JSObjectCopyPropertyNames(context.ref, objectRef)
+      defer { JSPropertyNameArrayRelease(names) }
+
+      let count = JSPropertyNameArrayGetCount(names)
+      var result: [String] = []
+      result.reserveCapacity(Int(count))
+      for index in 0..<count {
+        guard let keyRef = JSPropertyNameArrayGetNameAtIndex(names, index) else {
+          continue
+        }
+        result.append(String(jsStringRef: keyRef))
+      }
+      return result
+    }
+  }
+
   package static func getProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,

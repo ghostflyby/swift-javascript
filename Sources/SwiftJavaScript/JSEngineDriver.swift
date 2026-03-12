@@ -28,6 +28,10 @@ package protocol _JSEngineDriver {
   static func makeUndefined(in context: RawContext) -> RawValue
   static func makeObject(in context: RawContext) -> JSDriverResult<RawValue>
   static func makeArray(in context: RawContext) -> JSDriverResult<RawValue>
+  static func propertyNames(
+    on object: RawValue,
+    in context: RawContext
+  ) -> [String]
 
   static func getProperty(
     _ key: String,

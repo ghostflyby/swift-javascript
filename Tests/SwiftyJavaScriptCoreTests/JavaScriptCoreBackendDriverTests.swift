@@ -252,3 +252,22 @@ import Testing
     }
   }
 }
+
+@Test func javaScriptCoreBackendDriverEnumeratesPropertyNames() {
+  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
+  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+
+  switch JavaScriptCoreBackendDriver.evaluateScript(
+    "({ alpha: 1, beta: 2 })",
+    in: context,
+    sourceURL: nil,
+    startingLineNumber: 1
+  ) {
+  case .exception:
+    Issue.record("expected object literal evaluation to succeed")
+  case .value(let object):
+    let names = Set(JavaScriptCoreBackendDriver.propertyNames(on: object, in: context))
+    #expect(names.contains("alpha"))
+    #expect(names.contains("beta"))
+  }
+}
