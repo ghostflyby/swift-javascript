@@ -416,96 +416,71 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
 
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
-  guard let ctx, let object, let propertyName,
-    let definition = classDefinition(from: object)
-  else {
+  let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName
+  ) { valueDefinition, context, thisValue in
+    JavaScriptCoreBackendDriver.callbackReturnValue(
+      valueDefinition.getProperty(context, thisValue).toPrivateResult(),
+      in: ctx,
+      exception: exception
+    )
+  }
+  guard let value else {
     return JSValueMakeUndefined(ctx)
   }
-  rememberClassObjectContext(ctx, object)
-
-  let name = String(jsStringRef: propertyName)
-  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
-    return JSValueMakeUndefined(ctx)
-  }
-
-  let context = JSInstantContext(ctx: ctx)
-  let this = JSValue(ref: object, ctx: context)
-  let result = valueDef.getProperty(context, this).toPrivateResult()
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
+  return value
 }
 
 private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   ctx, object, propertyName, value, exception in
-  guard let ctx, let object, let propertyName, let value,
-    let definition = classDefinition(from: object)
-  else {
+  guard let value else {
     return false
   }
-  rememberClassObjectContext(ctx, object)
-
-  let name = String(jsStringRef: propertyName)
-  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
+  let didSet = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName
+  ) { valueDefinition, context, thisValue in
+    let newValue = JSValue(ref: value, ctx: context)
+    switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
+    case .value:
+      return true
+    case .exception(let error):
+      return JavaScriptCoreBackendDriver.callbackSucceeded(
+        exceptionValue: error,
+        exception: exception
+      )
+    }
+  }
+  guard let didSet else {
     return false
   }
-
-  let context = JSInstantContext(ctx: ctx)
-  let this = JSValue(ref: object, ctx: context)
-  let newValue = JSValue(ref: value, ctx: context)
-  let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
-
-  switch result {
-  case .value:
-    return true
-  case .exception(let error):
-    exception?.pointee = error
-    return false
-  }
+  return didSet
 }
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
-  guard let ctx, let function,
-    let thisObjectRef = thisObject,
-    let definition = classDefinition(from: thisObjectRef)
-  else {
+  let value = JavaScriptCoreBackendDriver.withStaticFunctionCallbackInput(
+    ctx: ctx,
+    function: function,
+    thisObject: thisObject
+  ) { functionDefinition, context, thisValue in
+    let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
+      args in
+      functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
+    }
+    return JavaScriptCoreBackendDriver.callbackReturnValue(
+      result,
+      in: ctx,
+      exception: exception
+    )
+  }
+  guard let value else {
     return JSValueMakeUndefined(ctx)
   }
-
-  rememberClassObjectContext(ctx, thisObjectRef)
-
-  let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
-  let functionName = JavaScriptCoreBackendDriver.stringProperty(
-    "name",
-    on: function,
-    in: rawContext
-  )
-
-  guard let functionName,
-    let functionDef = inheritedStaticFunction(named: functionName, from: definition)
-  else {
-    return JSValueMakeUndefined(ctx)
-  }
-
-  let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
-  let thisValue = JSValue(ref: thisObjectRef, ctx: context)
-  let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
-    args in
-    functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
-  }
-
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
+  return value
 }
 
 extension JSClassDefinition {
@@ -653,14 +628,16 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) {
       cls.getPropertyNames = { ctx, object, accumulator in
-        guard let ctx, let object, let accumulator,
-          let type = classDefinition(from: object)
-        else {
+        let enumerated: Void? = JavaScriptCoreBackendDriver.withPropertyNamesCallbackInput(
+          ctx: ctx,
+          object: object,
+          accumulator: accumulator
+        ) { definition, context, thisValue, accumulator in
+          definition.getPropertyNames?(context, &thisValue, accumulator)
+        }
+        guard enumerated != nil else {
           return
         }
-        let context = makeRememberedClassCallbackContext(ctx, object)
-        var this = JSValue(ref: object, ctx: context)
-        type.getPropertyNames?(context, &this, accumulator)
       }
     }
 

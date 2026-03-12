@@ -379,6 +379,73 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return body(definition, context, &objectValue, jsType, &exceptionValue)
   }
 
+  static func withPropertyNamesCallbackInput<R>(
+    ctx: JSContextRef?,
+    object: JSObjectRef?,
+    accumulator: JSPropertyNameAccumulatorRef?,
+    _ body: (
+      JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSPropertyNameAccumulatorRef
+    ) -> R
+  ) -> R? {
+    guard let ctx, let object, let accumulator,
+      let definition = classDefinition(from: object)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, object)
+    var thisValue = JSValue(ref: object, ctx: context)
+    return body(definition, context, &thisValue, accumulator)
+  }
+
+  static func withStaticValueCallbackInput<R>(
+    ctx: JSContextRef?,
+    object: JSObjectRef?,
+    propertyName: JSStringRef?,
+    _ body: (JSStaticValue, borrowing JSInstantContext, borrowing JSValue) -> R
+  ) -> R? {
+    guard let ctx, let object,
+      let definition = classDefinition(from: object),
+      let propertyName = classPropertyName(propertyName)
+    else {
+      return nil
+    }
+
+    rememberClassObjectContext(ctx, object)
+    guard let valueDefinition = inheritedStaticValue(named: propertyName, from: definition) else {
+      return nil
+    }
+
+    let context = JSInstantContext(ctx: ctx)
+    let thisValue = JSValue(ref: object, ctx: context)
+    return body(valueDefinition, context, thisValue)
+  }
+
+  static func withStaticFunctionCallbackInput<R>(
+    ctx: JSContextRef?,
+    function: JSObjectRef?,
+    thisObject: JSObjectRef?,
+    _ body: (JSStaticFunction, borrowing JSInstantContext, borrowing JSValue) -> R
+  ) -> R? {
+    guard let ctx, let function, let thisObject,
+      let definition = classDefinition(from: thisObject)
+    else {
+      return nil
+    }
+
+    rememberClassObjectContext(ctx, thisObject)
+    let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
+    guard let functionName = stringProperty("name", on: function, in: rawContext),
+      let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
+    else {
+      return nil
+    }
+
+    let context = makeRememberedClassCallbackContext(ctx, thisObject)
+    let thisValue = JSValue(ref: thisObject, ctx: context)
+    return body(functionDefinition, context, thisValue)
+  }
+
   static func callbackReturnValue(
     _ result: JSPrivateResult,
     in ctx: JSContextRef?,
