@@ -249,12 +249,10 @@ private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
     return
   }
 
-  if let finalize = storage.definition.finalize,
-    let objectContext = classObjectContext(object)
-  {
-    let context = JSInstantContext(ctx: objectContext)
-    let this = JSValue(ref: object, ctx: context)
-    finalize(this)
+  if let finalize = storage.definition.finalize {
+    withStoredAutoObjectValue(object) { _, thisValue in
+      finalize(thisValue)
+    }
   }
 
   let remaining = storage.finalizeDepth - 1
@@ -288,6 +286,18 @@ private func withAutoRememberedObjectValue<R>(
   _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
 ) -> R {
   let context = makeRememberedClassCallbackContext(ctx, object)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(context, thisValue)
+}
+
+private func withStoredAutoObjectValue<R>(
+  _ object: JSObjectRef,
+  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R? {
+  guard let objectContext = classObjectContext(object) else {
+    return nil
+  }
+  let context = JSInstantContext(ctx: objectContext)
   let thisValue = JSValue(ref: object, ctx: context)
   return body(context, thisValue)
 }
