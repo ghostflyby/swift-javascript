@@ -357,20 +357,16 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
 
   rememberClassObjectContext(ctx, thisObjectRef)
 
-  let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
-  let functionName = JavaScriptCoreBackendDriver.stringProperty(
-    "name",
-    on: function,
-    in: rawContext
-  )
+  let context = JSInstantContext(ctx: ctx)
+  let functionValue = JSValue(ref: function, ctx: context)
+  let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
+    .toString(in: context)
 
-  guard let functionName,
-    let functionDef = inheritedStaticFunction(named: functionName, from: definition)
+  guard let functionDef = inheritedStaticFunction(named: functionName, from: definition)
   else {
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSInstantContext(ctx: ctx)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
