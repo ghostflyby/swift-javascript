@@ -333,33 +333,6 @@ extension JSValue {
 
 extension JSValue {
   @inline(__always)
-  private static func result(
-    value resultRef: JSValueRef?,
-    exception exceptionRef: JSValueRef?,
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    if let exceptionRef {
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    }
-
-    if let resultRef {
-      return .value(JSValue(ref: resultRef, ctx: context))
-    }
-
-    return .value(JSValue(undefinedIn: context))
-  }
-
-  @inline(__always)
-  private func objectRef(in context: borrowing JSInstantContext) -> JSPrivateResult {
-    var exception: JSValueRef?
-    guard let objectRef = JSValueToObject(context.globalContextRef, self.ref, &exception) else {
-      let exceptionValue = exception ?? JSValue(undefinedIn: context).retainedRef()
-      return .exception(exceptionValue)
-    }
-    return .value(objectRef)
-  }
-
-  @inline(__always)
   private func callInternal(
     thisRawValue: JavaScriptCoreRawValue?,
     arguments: [JavaScriptCoreRawValue],
