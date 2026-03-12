@@ -158,3 +158,36 @@ import Testing
     }
   }
 }
+
+@Test func javaScriptCoreBackendDriverSupportsObjectTypeHelpers() {
+  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
+  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+
+  switch JavaScriptCoreBackendDriver.evaluateScript("[1, 2, 3]", in: context, sourceURL: nil, startingLineNumber: 1) {
+  case .exception:
+    Issue.record("expected array evaluation to succeed")
+  case .value(let array):
+    switch JavaScriptCoreBackendDriver.evaluateScript("new Date(0)", in: context, sourceURL: nil, startingLineNumber: 1) {
+    case .exception:
+      Issue.record("expected date evaluation to succeed")
+    case .value(let date):
+      switch JavaScriptCoreBackendDriver.evaluateScript("Array", in: context, sourceURL: nil, startingLineNumber: 1) {
+      case .exception:
+        Issue.record("expected Array constructor evaluation to succeed")
+      case .value(let arrayConstructor):
+        #expect(JavaScriptCoreBackendDriver.isArray(array, in: context))
+        #expect(!JavaScriptCoreBackendDriver.isDate(array, in: context))
+        #expect(JavaScriptCoreBackendDriver.isDate(date, in: context))
+        #expect(JavaScriptCoreBackendDriver.isInstanceOf(array, constructor: arrayConstructor, in: context))
+
+        let primitive = JavaScriptCoreBackendDriver.makeNumber(42, in: context)
+        switch JavaScriptCoreBackendDriver.toObject(primitive, in: context) {
+        case .exception:
+          Issue.record("expected toObject to box primitive numbers")
+        case .value(let object):
+          #expect(object.type == .object)
+        }
+      }
+    }
+  }
+}

@@ -60,6 +60,27 @@ package protocol _JSEngineDriver {
     in context: RawContext
   ) -> JSDriverResult<RawValue>
 
+  static func toObject(
+    _ value: RawValue,
+    in context: RawContext
+  ) -> JSDriverResult<RawValue>
+
+  static func isArray(
+    _ value: RawValue,
+    in context: RawContext
+  ) -> Bool
+
+  static func isDate(
+    _ value: RawValue,
+    in context: RawContext
+  ) -> Bool
+
+  static func isInstanceOf(
+    _ value: RawValue,
+    constructor: RawValue,
+    in context: RawContext
+  ) -> Bool
+
   static func setProperty(
     _ key: String,
     on object: RawValue,

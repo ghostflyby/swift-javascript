@@ -367,7 +367,7 @@ extension JSValue {
 }
 
 extension JSPropertyAttributes {
-  fileprivate var hostMemberAttributes: JSHostMemberAttributes {
+  var hostMemberAttributes: JSHostMemberAttributes {
     var attributes: JSHostMemberAttributes = .none
     if contains(.readOnly) {
       attributes.insert(.readOnly)

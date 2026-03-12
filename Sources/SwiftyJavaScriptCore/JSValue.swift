@@ -573,12 +573,8 @@ extension JSValue {
   }
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
-    switch objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let objectRef):
-      return .value(JSValue(ref: objectRef, ctx: context))
-    }
+    let rawContext = context.driverContext
+    return .from(driverResult: JavaScriptCoreBackendDriver.toObject(rawValue(in: rawContext), in: rawContext))
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -588,7 +584,8 @@ extension JSValue {
   }
 
   public func isArray(in context: borrowing JSInstantContext) -> Bool {
-    JSValueIsArray(context.globalContextRef, ref)
+    let rawContext = context.driverContext
+    return JavaScriptCoreBackendDriver.isArray(rawValue(in: rawContext), in: rawContext)
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
@@ -598,7 +595,8 @@ extension JSValue {
   }
 
   public func isDate(in context: borrowing JSInstantContext) -> Bool {
-    JSValueIsDate(context.globalContextRef, ref)
+    let rawContext = context.driverContext
+    return JavaScriptCoreBackendDriver.isDate(rawValue(in: rawContext), in: rawContext)
   }
 
   public func isInstanceOf(
@@ -614,19 +612,12 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    switch constructor.objectRef(in: context) {
-    case .exception:
-      return false
-    case .value(let constructorRef):
-      var exception: JSValueRef?
-      let result = JSValueIsInstanceOfConstructor(
-        context.globalContextRef,
-        ref,
-        constructorRef,
-        &exception
-      )
-      return exception == nil && result
-    }
+    let rawContext = context.driverContext
+    return JavaScriptCoreBackendDriver.isInstanceOf(
+      rawValue(in: rawContext),
+      constructor: constructor.rawValue(in: rawContext),
+      in: rawContext
+    )
   }
 
   public func defineProperty<Val, Key>(
@@ -646,33 +637,24 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
-    switch objectRef(in: context) {
-    case .exception(let exceptionRef):
-      return .exception(JSValue(ref: exceptionRef, ctx: context))
-    case .value(let objectValueRef):
-      var exception: JSValueRef?
-      let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-      JSObjectSetProperty(
-        context.globalContextRef,
-        objectValueRef,
-        key.ref,
-        encoded.retainedRef(),
-        attributes.rawValue,
-        &exception
-      )
-
-      if let exception {
-        return .exception(JSValue(ref: exception, ctx: context))
+    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    let rawContext = context.driverContext
+    switch JavaScriptCoreBackendDriver.setProperty(
+      key.string,
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext,
+      attributes: attributes.hostMemberAttributes
+    ) {
+    case .exception:
+      return .exception(JSValue(undefinedIn: context))
+    case .value:
+      switch JavaScriptCoreBackendDriver.getProperty(key.string, on: rawValue(in: rawContext), in: rawContext) {
+      case .exception(let exception):
+        return .exception(JSValue(rawValue: exception))
+      case .value(let stored):
+        return .value(JSValue(rawValue: stored))
       }
-
-      let storedRef = JSObjectGetProperty(
-        context.globalContextRef,
-        objectValueRef,
-        key.ref,
-        nil
-      )
-      return .value(
-        JSValue(ref: storedRef ?? JSValueMakeUndefined(context.globalContextRef), ctx: context))
     }
   }
 }

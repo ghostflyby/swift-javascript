@@ -307,6 +307,47 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func toObject(
+    _ value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<JavaScriptCoreRawValue> {
+    switch objectRef(for: value, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .object(let objectRef):
+      return .value(JavaScriptCoreRawValue(ref: objectRef, context: context))
+    }
+  }
+
+  package static func isArray(
+    _ value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> Bool {
+    JSValueIsArray(context.ref, value.ref)
+  }
+
+  package static func isDate(
+    _ value: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> Bool {
+    JSValueIsDate(context.ref, value.ref)
+  }
+
+  package static func isInstanceOf(
+    _ value: JavaScriptCoreRawValue,
+    constructor: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> Bool {
+    switch objectRef(for: constructor, in: context) {
+    case .exception:
+      return false
+    case .object(let constructorRef):
+      var exception: JSValueRef?
+      let result = JSValueIsInstanceOfConstructor(context.ref, value.ref, constructorRef, &exception)
+      return exception == nil && result
+    }
+  }
+
   package static func setProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
