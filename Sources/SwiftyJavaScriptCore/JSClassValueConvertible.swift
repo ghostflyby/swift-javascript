@@ -226,7 +226,9 @@ extension JSValue {
 }
 
 private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, object in
-  guard let ctx, let object, let privateData = JSObjectGetPrivate(object) else {
+  guard let ctx, let object,
+    let privateData = JavaScriptCoreBackendDriver.privateData(from: object)
+  else {
     return
   }
 
@@ -239,7 +241,9 @@ private let autoClassInitializeCallback: JSObjectInitializeCallback = { ctx, obj
 }
 
 private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
-  guard let object, let privateData = JSObjectGetPrivate(object) else {
+  guard let object,
+    let privateData = JavaScriptCoreBackendDriver.privateData(from: object)
+  else {
     return
   }
 
@@ -260,7 +264,7 @@ private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
 }
 
 private func autoClassStorage(from object: JSObjectRef) -> JSClassAutoObjectStorage? {
-  guard let privateData = JSObjectGetPrivate(object) else {
+  guard let privateData = JavaScriptCoreBackendDriver.privateData(from: object) else {
     return nil
   }
   return Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
@@ -350,15 +354,12 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
 
   rememberClassObjectContext(ctx, thisObjectRef)
 
-  let nameKey = JSStringManaged("name")
-  let functionNameValue = JSObjectGetProperty(ctx, function, nameKey.ref, nil)
-  let functionName = functionNameValue.flatMap { value -> String? in
-    guard let nameRef = JSValueToStringCopy(ctx, value, nil) else {
-      return nil
-    }
-    defer { JSStringRelease(nameRef) }
-    return String(jsStringRef: nameRef)
-  }
+  let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
+  let functionName = JavaScriptCoreBackendDriver.stringProperty(
+    "name",
+    on: function,
+    in: rawContext
+  )
 
   guard let functionName,
     let functionDef = inheritedStaticFunction(named: functionName, from: definition)

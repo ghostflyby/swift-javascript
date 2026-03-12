@@ -204,6 +204,30 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func privateData(from object: JSObjectRef?) -> UnsafeMutableRawPointer? {
+    guard let object else {
+      return nil
+    }
+    return JSObjectGetPrivate(object)
+  }
+
+  package static func stringProperty(
+    _ key: String,
+    on object: JSObjectRef,
+    in context: JavaScriptCoreRawContext
+  ) -> String? {
+    switch getProperty(
+      key,
+      on: JavaScriptCoreRawValue(ref: object, context: context),
+      in: context
+    ) {
+    case .exception:
+      return nil
+    case .value(let value):
+      return value.toString()
+    }
+  }
+
   package static func evaluateScript(
     _ script: String,
     in context: JavaScriptCoreRawContext,
