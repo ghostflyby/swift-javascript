@@ -271,3 +271,47 @@ import Testing
     #expect(names.contains("beta"))
   }
 }
+
+@Test func javaScriptCoreBackendDriverConsumesJSClassHostDescriptorBindings() {
+  var definition = JSClassDefinition()
+  definition.className = "BackendProjected"
+  definition.staticValues = [
+    JSStaticValue(
+      name: "version",
+      attributes: .readOnly,
+      getProperty: { context, _ in .value(JSValue(number: 1, in: context)) },
+      setProperty: { context, _, _ in .value(JSValue(undefinedIn: context)) }
+    )
+  ]
+  definition.staticFunctions = [
+    JSStaticFunction(
+      name: "ping",
+      attributes: .dontEnum,
+      callAsFunction: { context, _, _ in .value(JSValue(string: "pong", in: context)) }
+    )
+  ]
+  definition.getProperty = { context, _, _ in .value(JSValue(undefinedIn: context)) }
+  definition.setProperty = { _, _, _, _ in nil }
+  definition.hasProperty = { _, _, _ in true }
+  definition.deleteProperty = { _, _, _ in true }
+  definition.getPropertyNames = { _, _, _ in }
+  definition.callAsFunction = { context, _, _, _ in JSValue(undefinedIn: context) }
+  definition.callAsConstructor = { context, _, _, _ in JSValue(objectIn: context) }
+  definition.hasInstance = { _, _, _ in false }
+  definition.convertToType = { context, _, _, _ in JSValue(undefinedIn: context) }
+
+  let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: definition)
+
+  #expect(descriptor.name == "BackendProjected")
+  #expect(!descriptor.properties.isEmpty)
+  #expect(!descriptor.methods.isEmpty)
+  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasConstructor(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor))
+  #expect(JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor))
+}

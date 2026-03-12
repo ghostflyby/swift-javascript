@@ -234,6 +234,53 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func hostTypeDescriptor(
+    for definition: JSClassDefinition,
+    storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
+  ) -> JSHostTypeDescriptor {
+    definition.hostTypeDescriptor(storagePolicy: storagePolicy)
+  }
+
+  package static func hasDynamicPropertyGetter(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.dynamicPropertyGetterBinding != nil
+  }
+
+  package static func hasDynamicPropertySetter(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.dynamicPropertySetterBinding != nil
+  }
+
+  package static func hasDynamicPropertyHas(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.dynamicPropertyHasBinding != nil
+  }
+
+  package static func hasDynamicPropertyDelete(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.dynamicPropertyDeleteBinding != nil
+  }
+
+  package static func hasPropertyEnumerator(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.propertyEnumeratorBinding != nil
+  }
+
+  package static func hasCallAsFunction(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.callAsFunctionBinding != nil
+  }
+
+  package static func hasConstructor(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.constructor?.binding != nil
+  }
+
+  package static func hasHasInstance(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.hasInstanceBinding != nil
+  }
+
+  package static func hasConvertToType(for descriptor: JSHostTypeDescriptor) -> Bool {
+    descriptor.convertToTypeBinding != nil
+  }
+
+  package static func propertyAttributes(from attributes: JSHostMemberAttributes) -> UInt32 {
+    javaScriptCorePropertyAttributes(from: attributes)
+  }
+
   package static func evaluateScript(
     _ script: String,
     in context: JavaScriptCoreRawContext,

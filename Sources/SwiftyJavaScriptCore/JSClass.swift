@@ -527,6 +527,7 @@ extension JSClassDefinition {
     -> JavaScriptCore.JSClassDefinition
   {
     var cls = JavaScriptCore.kJSClassDefinitionEmpty
+    let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: self)
 
     cls.version = version
     cls.attributes = attributes.rawValue
@@ -539,18 +540,19 @@ extension JSClassDefinition {
       }
     }
 
-    if !staticValues.isEmpty {
-      backing.staticValueNames = staticValues.map { $0.name.utf8CString }
+    if !descriptor.properties.isEmpty {
+      backing.staticValueNames = descriptor.properties.map { $0.name.utf8CString }
       backing.staticValues = []
-      backing.staticValues.reserveCapacity(staticValues.count + 1)
-      for (index, value) in staticValues.enumerated() {
+      backing.staticValues.reserveCapacity(descriptor.properties.count + 1)
+      for (index, property) in descriptor.properties.enumerated() {
         var staticValue = JavaScriptCore.JSStaticValue()
         backing.staticValueNames[index].withUnsafeBufferPointer {
           staticValue.name = $0.baseAddress
         }
         staticValue.getProperty = staticValueGetPropertyCallback
         staticValue.setProperty = staticValueSetPropertyCallback
-        staticValue.attributes = value.attributes.rawValue
+        staticValue.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+          from: property.attributes)
         backing.staticValues.append(staticValue)
       }
       backing.staticValues.append(JavaScriptCore.JSStaticValue())
@@ -559,17 +561,18 @@ extension JSClassDefinition {
       }
     }
 
-    if !staticFunctions.isEmpty {
-      backing.staticFunctionNames = staticFunctions.map { $0.name.utf8CString }
+    if !descriptor.methods.isEmpty {
+      backing.staticFunctionNames = descriptor.methods.map { $0.name.utf8CString }
       backing.staticFunctions = []
-      backing.staticFunctions.reserveCapacity(staticFunctions.count + 1)
-      for (index, function) in staticFunctions.enumerated() {
+      backing.staticFunctions.reserveCapacity(descriptor.methods.count + 1)
+      for (index, method) in descriptor.methods.enumerated() {
         var staticFunction = JavaScriptCore.JSStaticFunction()
         backing.staticFunctionNames[index].withUnsafeBufferPointer {
           staticFunction.name = $0.baseAddress
         }
         staticFunction.callAsFunction = staticFunctionCallAsFunctionCallback
-        staticFunction.attributes = function.attributes.rawValue
+        staticFunction.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+          from: method.attributes)
         backing.staticFunctions.append(staticFunction)
       }
       backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
@@ -581,7 +584,7 @@ extension JSClassDefinition {
     cls.initialize = classInitializeCallback
     cls.finalize = classFinalizeCallback
 
-    if getProperty != nil {
+    if JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) {
       cls.getProperty = { ctx, object, propertyName, exception in
         guard let ctx, let object, let propertyName,
           let def = classDefinition(from: object)
@@ -604,7 +607,7 @@ extension JSClassDefinition {
       }
     }
 
-    if setProperty != nil {
+    if JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) {
       cls.setProperty = { ctx, object, propertyName, value, exception in
         guard let ctx, let object, let propertyName, let value,
           let type = classDefinition(from: object)
@@ -626,7 +629,7 @@ extension JSClassDefinition {
       }
     }
 
-    if hasProperty != nil {
+    if JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor) {
       cls.hasProperty = { ctx, object, propertyName in
         guard let ctx, let object, let propertyName,
           let type = classDefinition(from: object)
@@ -640,7 +643,7 @@ extension JSClassDefinition {
       }
     }
 
-    if deleteProperty != nil {
+    if JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) {
       cls.deleteProperty = { ctx, object, propertyName, exception in
         guard let ctx, let object, let propertyName,
           let type = classDefinition(from: object)
@@ -655,7 +658,7 @@ extension JSClassDefinition {
       }
     }
 
-    if getPropertyNames != nil {
+    if JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) {
       cls.getPropertyNames = { ctx, object, accumulator in
         guard let ctx, let object, let accumulator,
           let type = classDefinition(from: object)
@@ -668,7 +671,7 @@ extension JSClassDefinition {
       }
     }
 
-    if callAsFunction != nil {
+    if JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) {
       cls.callAsFunction = {
         ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
         guard let ctx, let functionRef, let thisObjectRef,
@@ -697,7 +700,7 @@ extension JSClassDefinition {
       }
     }
 
-    if callAsConstructor != nil {
+    if JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) {
       cls.callAsConstructor = {
         ctx, constructorRef, argumentCount, arguments, exception in
         guard let ctx, let constructorRef,
@@ -732,7 +735,7 @@ extension JSClassDefinition {
       }
     }
 
-    if hasInstance != nil {
+    if JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) {
       cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
         guard let ctx, let constructorRef, let possibleInstanceRef,
           let type = classDefinition(from: constructorRef)
@@ -746,7 +749,7 @@ extension JSClassDefinition {
       }
     }
 
-    if convertToType != nil {
+    if JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) {
       cls.convertToType = { ctx, objectRef, type, exception in
         guard let ctx, let objectRef,
           let callbackOwner = classDefinition(from: objectRef)
