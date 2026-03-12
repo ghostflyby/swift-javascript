@@ -107,29 +107,31 @@ public struct JSValue: ~Copyable {
   }
 
   public init(objectIn context: isolated JSContext = #isolation) {
-    let objectRef = JSObjectMake(context.globalContextRef, nil, nil)
-    self.init(ref: objectRef!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self.init(objectIn: callbackContext)
   }
 
   public init(objectIn context: borrowing JSInstantContext) {
-    let objectRef = JSObjectMake(context.globalContextRef, nil, nil)
-    self.init(ref: objectRef!, ctx: context)
+    switch JavaScriptCoreBackendDriver.makeObject(in: context.driverContext) {
+    case .exception:
+      preconditionFailure("JSValue object creation raised exception")
+    case .value(let object):
+      self.init(rawValue: object)
+    }
   }
 
   public init(arrayIn context: isolated JSContext = #isolation) {
-    var exception: JSValueRef?
-    let arrayRef = JSObjectMakeArray(context.globalContextRef, 0, nil, &exception)
-    precondition(exception == nil, "JSValue array creation raised exception")
-    precondition(arrayRef != nil, "JSValue array creation returned nil")
-    self.init(ref: arrayRef!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self.init(arrayIn: callbackContext)
   }
 
   public init(arrayIn context: borrowing JSInstantContext) {
-    var exception: JSValueRef?
-    let arrayRef = JSObjectMakeArray(context.globalContextRef, 0, nil, &exception)
-    precondition(exception == nil, "JSValue array creation raised exception")
-    precondition(arrayRef != nil, "JSValue array creation returned nil")
-    self.init(ref: arrayRef!, ctx: context)
+    switch JavaScriptCoreBackendDriver.makeArray(in: context.driverContext) {
+    case .exception:
+      preconditionFailure("JSValue array creation raised exception")
+    case .value(let array):
+      self.init(rawValue: array)
+    }
   }
 
   public typealias JSFunctionCallback =

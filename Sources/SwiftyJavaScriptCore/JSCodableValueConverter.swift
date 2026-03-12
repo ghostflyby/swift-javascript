@@ -164,33 +164,31 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     case .string(let value):
       return JSValue(string: value, in: context)
     case .array(let array):
-      var exception: JSValueRef?
-      var elements: [JSValueRef?] = []
-      elements.reserveCapacity(array.count)
-      for item in array {
-        elements.append(try jsValueFromNode(item, in: context).ref)
-      }
-      let arrayRef = elements.withUnsafeMutableBufferPointer { buffer in
-        JSObjectMakeArray(context.globalContextRef, array.count, buffer.baseAddress, &exception)
-      }
-      if exception != nil {
-        throw .codable("array creation failed")
-      }
-      guard let arrayRef else {
-        throw .codable("array creation returned nil")
-      }
-      return JSValue(ref: arrayRef, ctx: context)
-    case .object(let object):
-      guard let objectRef = JSObjectMake(context.globalContextRef, nil, nil) else {
-        throw .codable("object creation returned nil")
-      }
+      let arrayValue = try makeDriverArrayValue(in: context)
       let rawContext = context.driverContext
-      let rawObject = JavaScriptCoreRawValue(ref: objectRef, context: rawContext)
+      for (index, item) in array.enumerated() {
+        let encoded = try jsValueFromNode(item, in: context)
+        switch JavaScriptCoreBackendDriver.setProperty(
+          at: UInt32(index),
+          on: arrayValue.rawValue(in: rawContext),
+          to: encoded.rawValue(in: rawContext),
+          in: rawContext
+        ) {
+        case .exception:
+          throw .codable("array element write failed at index \(index)")
+        case .value:
+          break
+        }
+      }
+      return arrayValue
+    case .object(let object):
+      let objectValue = try makeDriverObjectValue(in: context)
+      let rawContext = context.driverContext
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
         switch JavaScriptCoreBackendDriver.setProperty(
           key,
-          on: rawObject,
+          on: objectValue.rawValue(in: rawContext),
           to: encoded.rawValue(in: rawContext),
           in: rawContext,
           attributes: .none
@@ -201,8 +199,52 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
           break
         }
       }
-      return JSValue(ref: objectRef, ctx: context)
+      return objectValue
     }
+  }
+}
+
+private func makeDriverObjectValue(in context: borrowing JSInstantContext)
+  throws(JSValueConversionError)
+  -> JSValue
+{
+  switch JavaScriptCoreBackendDriver.makeObject(in: context.driverContext) {
+  case .exception:
+    throw .codable("object creation raised exception")
+  case .value(let object):
+    return JSValue(rawValue: object)
+  }
+}
+
+private func makeDriverArrayValue(in context: borrowing JSInstantContext)
+  throws(JSValueConversionError)
+  -> JSValue
+{
+  switch JavaScriptCoreBackendDriver.makeArray(in: context.driverContext) {
+  case .exception:
+    throw .codable("array creation failed")
+  case .value(let array):
+    return JSValue(rawValue: array)
+  }
+}
+
+private func makeDriverObjectRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
+  let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
+  switch JavaScriptCoreBackendDriver.makeObject(in: rawContext) {
+  case .exception:
+    preconditionFailure("JSCodable object creation raised exception")
+  case .value(let object):
+    return object.ref
+  }
+}
+
+private func makeDriverArrayRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
+  let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
+  switch JavaScriptCoreBackendDriver.makeArray(in: rawContext) {
+  case .exception:
+    preconditionFailure("JSCodable array creation raised exception")
+  case .value(let array):
+    return array.ref
   }
 }
 
@@ -224,7 +266,7 @@ final class _JSCodableEncoder: Encoder {
   }
 
   func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
-    let objectRef = JSObjectMake(globalContextRef, nil, nil)!
+    let objectRef = makeDriverObjectRef(in: globalContextRef)
     commit(objectRef)
     let container = _JSCodableKeyedEncodingContainer<Key>(
       globalContextRef: globalContextRef,
@@ -235,8 +277,7 @@ final class _JSCodableEncoder: Encoder {
   }
 
   func unkeyedContainer() -> any UnkeyedEncodingContainer {
-    var exception: JSValueRef?
-    let arrayRef = JSObjectMakeArray(globalContextRef, 0, nil, &exception)!
+    let arrayRef = makeDriverArrayRef(in: globalContextRef)
     commit(arrayRef)
     return _JSCodableUnkeyedEncodingContainer(
       globalContextRef: globalContextRef,
@@ -346,7 +387,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     keyedBy keyType: NestedKey.Type,
     forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-    let childRef = JSObjectMake(globalContextRef, nil, nil)!
+    let childRef = makeDriverObjectRef(in: globalContextRef)
     set(childRef, forKey: key.stringValue)
     let container = _JSCodableKeyedEncodingContainer<NestedKey>(
       globalContextRef: globalContextRef,
@@ -357,8 +398,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   func nestedUnkeyedContainer(forKey key: Key) -> any UnkeyedEncodingContainer {
-    var exception: JSValueRef?
-    let childRef = JSObjectMakeArray(globalContextRef, 0, nil, &exception)!
+    let childRef = makeDriverArrayRef(in: globalContextRef)
     set(childRef, forKey: key.stringValue)
     return _JSCodableUnkeyedEncodingContainer(
       globalContextRef: globalContextRef,
@@ -454,7 +494,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type
   ) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
-    let objectRef = JSObjectMake(globalContextRef, nil, nil)!
+    let objectRef = makeDriverObjectRef(in: globalContextRef)
     append(objectRef)
     let container = _JSCodableKeyedEncodingContainer<NestedKey>(
       globalContextRef: globalContextRef,
@@ -465,8 +505,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   }
 
   func nestedUnkeyedContainer() -> any UnkeyedEncodingContainer {
-    var exception: JSValueRef?
-    let childRef = JSObjectMakeArray(globalContextRef, 0, nil, &exception)!
+    let childRef = makeDriverArrayRef(in: globalContextRef)
     append(childRef)
     return _JSCodableUnkeyedEncodingContainer(
       globalContextRef: globalContextRef, arrayRef: childRef, codingPath: codingPath)

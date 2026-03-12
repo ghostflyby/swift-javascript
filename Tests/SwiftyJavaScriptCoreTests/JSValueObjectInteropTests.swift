@@ -68,3 +68,19 @@ import Testing
     #expect(stored.toInt32(in: context) == 7)
   }
 }
+
+@Test func jsValueObjectAndArrayInitializersCreateExpectedKinds() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let object = JSValue(objectIn: context)
+    let array = JSValue(arrayIn: context)
+    let objectIsObject = object.isObject
+    let arrayIsObject = array.isObject
+    let arrayIsArray = array.isArray(in: context)
+
+    #expect(objectIsObject)
+    #expect(arrayIsObject)
+    #expect(arrayIsArray)
+  }
+}
