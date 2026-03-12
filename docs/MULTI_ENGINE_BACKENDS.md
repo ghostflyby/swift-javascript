@@ -40,7 +40,7 @@ Responsibilities:
 
 Recommended target name:
 
-- SwiftyJSCore
+- SwiftJavaScript
 
 ### 2. Engine Backend Layer
 
@@ -359,20 +359,20 @@ The recommended final structure is:
 ```text
 Package
 |- Sources/
-|  |- SwiftyJSCore/
+|  |- SwiftJavaScript/
 |  |- SwiftyJSJavaScriptCore/
 |  |- SwiftyJSQuickJS/
 |  |- CQuickJS/
 |  `- SwiftyJSMacros/
 `- Tests/
-   |- SwiftyJSCoreTests/
+  |- SwiftJavaScriptTests/
    |- SwiftyJSJavaScriptCoreTests/
    `- SwiftyJSQuickJSTests/
 ```
 
 Recommended products:
 
-- SwiftyJSCore
+- SwiftJavaScript
 - SwiftyJSJavaScriptCore
 - SwiftyJSQuickJS
 
@@ -384,7 +384,7 @@ The recommended migration path has four phases, to avoid a full rewrite.
 
 ### Phase 1: Extract the Core Layer
 
-- Move public error types, property types, host descriptors, and conversion protocols into SwiftyJSCore.
+- Move public error types, property types, host descriptors, and conversion protocols into SwiftJavaScript.
 - Separate the public semantics of JSContext and JSValue from direct JavaScriptCore dependencies.
 
 ### Phase 2: Rebuild the Existing JavaScriptCore Backend

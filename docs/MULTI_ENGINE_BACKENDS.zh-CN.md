@@ -40,7 +40,7 @@
 
 推荐目标名：
 
-- SwiftyJSCore
+- SwiftJavaScript
 
 ### 2. Engine Backend 层
 
@@ -359,20 +359,20 @@ public protocol JSValueEncodable: ~Copyable {
 ```text
 Package
 |- Sources/
-|  |- SwiftyJSCore/
+|  |- SwiftJavaScript/
 |  |- SwiftyJSJavaScriptCore/
 |  |- SwiftyJSQuickJS/
 |  |- CQuickJS/
 |  `- SwiftyJSMacros/
 `- Tests/
-   |- SwiftyJSCoreTests/
+  |- SwiftJavaScriptTests/
    |- SwiftyJSJavaScriptCoreTests/
    `- SwiftyJSQuickJSTests/
 ```
 
 建议产品：
 
-- SwiftyJSCore
+- SwiftJavaScript
 - SwiftyJSJavaScriptCore
 - SwiftyJSQuickJS
 
@@ -384,7 +384,7 @@ Package
 
 ### 第一步：抽 Core 层
 
-- 把公共错误类型、属性类型、宿主描述符、转换协议迁入 SwiftyJSCore。
+- 把公共错误类型、属性类型、宿主描述符、转换协议迁入 SwiftJavaScript。
 - 把现有 JSContext 和 JSValue 的公共语义从 JavaScriptCore 依赖中剥离。
 
 ### 第二步：重写当前 JavaScriptCore 后端

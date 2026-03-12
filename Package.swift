@@ -12,8 +12,11 @@ let package = Package(
   products: [
     // Products define the executables and libraries a package produces, making them visible to other packages.
     .library(
+      name: "SwiftJavaScript",
+      targets: ["SwiftJavaScript"]),
+    .library(
       name: "SwiftyJavaScriptCore",
-      targets: ["SwiftyJavaScriptCore"])
+      targets: ["SwiftyJavaScriptCore"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0")
@@ -22,8 +25,14 @@ let package = Package(
     // Targets are the basic building blocks of a package, defining a module or a test suite.
     // Targets can depend on other targets in this package and products from dependencies.
     .target(
+      name: "SwiftJavaScript"
+    ),
+    .target(
       name: "SwiftyJavaScriptCore",
-      dependencies: ["SwiftyJavaScriptCoreMacrosPlugin"]
+      dependencies: [
+        "SwiftJavaScript",
+        "SwiftyJavaScriptCoreMacrosPlugin",
+      ]
     ),
     .macro(
       name: "SwiftyJavaScriptCoreMacrosPlugin",
@@ -33,6 +42,12 @@ let package = Package(
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+      ]
+    ),
+    .testTarget(
+      name: "SwiftJavaScriptTests",
+      dependencies: [
+        "SwiftJavaScript"
       ]
     ),
     .testTarget(

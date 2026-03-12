@@ -62,3 +62,8 @@
 - [x] 为 `JSValueAutoSerialization` 增加 final class 值语义自动实现（明确丢失 identity）
 - [x] 调整无关联值 RawRepresentable enum 默认语义：按 rawValue 而不是 case 名字合成
 - [x] 为 `JSClassAutoConvertible` 增加函数导出标记，支持参数/返回值/错误转换器覆盖
+
+## 8. 多引擎架构迁移（进行中）
+- [x] 抽出 `SwiftJavaScript` target，落地引擎标记、能力描述、宿主描述符与 backend driver 协议（已新增独立 product/target，并由 facade 模块 re-export）
+- [x] 为现有 JavaScriptCore 实现补第一版 backend driver，先覆盖基础值、脚本执行、属性访问（已补 `JavaScriptCoreBackendDriver` 与 smoke tests）
+- [x] 保持 `SwiftyJavaScriptCore` 现有 public API 与测试面稳定（已验证 `swift test` 67/67 通过）
