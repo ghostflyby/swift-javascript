@@ -9,6 +9,10 @@ public struct JSInstantContext: ~Copyable {
 }
 
 extension JSInstantContext {
+  var driverContext: JavaScriptCoreRawContext {
+    JavaScriptCoreRawContext(borrowing: globalContextRef)
+  }
+
   var globalObjectRef: JSObjectRef {
     JSContextGetGlobalObject(globalContextRef)!
   }
@@ -23,27 +27,27 @@ extension JSInstantContext {
   }
 
   public func makeString(_ value: String) -> JSValue {
-    JSValue(string: value, in: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeString(value, in: driverContext))
   }
 
   public func makeNumber(_ value: Double) -> JSValue {
-    JSValue(number: value, in: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNumber(value, in: driverContext))
   }
 
   public func makeNumber(_ value: some BinaryInteger) -> JSValue {
-    JSValue(number: value, in: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNumber(Double(value), in: driverContext))
   }
 
   public func makeBoolean(_ value: Bool) -> JSValue {
-    JSValue(boolean: value, in: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeBoolean(value, in: driverContext))
   }
 
   public func makeNull() -> JSValue {
-    JSValue(nullIn: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNull(in: driverContext))
   }
 
   public func makeUndefined() -> JSValue {
-    JSValue(undefinedIn: self)
+    JSValue(rawValue: JavaScriptCoreBackendDriver.makeUndefined(in: driverContext))
   }
 
   public func makeObject() -> JSValue {
@@ -134,7 +138,13 @@ extension JSInstantContext {
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
-    evaluateScript(scriptRef: script.ref, sourceURLRef: nil, startingLineNumber: startingLineNumber)
+    .from(
+      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+        script.string,
+        in: driverContext,
+        sourceURL: nil,
+        startingLineNumber: startingLineNumber
+      ))
   }
 
   public func evaluateScript<Script>(
@@ -142,9 +152,13 @@ extension JSInstantContext {
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
-    let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(
-      script, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    .from(
+      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+        script.string,
+        in: driverContext,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      ))
   }
 
   public func evaluateScript<SourceURL>(
@@ -152,9 +166,13 @@ extension JSInstantContext {
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
   ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
-    let scriptString = JSStringValue(script)
-    return evaluateScript(
-      scriptString, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+    .from(
+      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+        script,
+        in: driverContext,
+        sourceURL: sourceURL.string,
+        startingLineNumber: startingLineNumber
+      ))
   }
 
   public func evaluateScript(
@@ -162,10 +180,13 @@ extension JSInstantContext {
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult {
-    let scriptString = JSStringValue(script)
-    let sourceURLString = JSStringValue(sourceURL)
-    return evaluateScript(
-      scriptString, sourceURL: sourceURLString, startingLineNumber: startingLineNumber)
+    .from(
+      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+        script,
+        in: driverContext,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      ))
   }
 
   public func evaluateScript<Script, SourceURL>(
@@ -174,33 +195,12 @@ extension JSInstantContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    evaluateScript(
-      scriptRef: script.ref, sourceURLRef: sourceURL.ref, startingLineNumber: startingLineNumber)
-  }
-
-  private func evaluateScript(
-    scriptRef: JSStringRef,
-    sourceURLRef: JSStringRef?,
-    startingLineNumber: Int32
-  ) -> JSResult {
-    var exception: JSValueRef?
-    let result = JSEvaluateScript(
-      globalContextRef,
-      scriptRef,
-      nil,
-      sourceURLRef,
-      startingLineNumber,
-      &exception
-    )
-
-    if let exception {
-      return .exception(JSValue(ref: exception, ctx: self))
-    }
-
-    if let result {
-      return .value(JSValue(ref: result, ctx: self))
-    }
-
-    return .value(JSValue(undefinedIn: self))
+    .from(
+      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+        script.string,
+        in: driverContext,
+        sourceURL: sourceURL.string,
+        startingLineNumber: startingLineNumber
+      ))
   }
 }

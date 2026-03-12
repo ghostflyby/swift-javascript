@@ -14,16 +14,26 @@ package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
 }
 
 package final class JavaScriptCoreRawContext: @unchecked Sendable {
-  package let runtime: JavaScriptCoreRawRuntime
+  package let runtime: JavaScriptCoreRawRuntime?
   package let ref: JSGlobalContextRef
+  private let ownsContext: Bool
 
   package init(runtime: JavaScriptCoreRawRuntime) {
     self.runtime = runtime
     self.ref = JSGlobalContextCreateInGroup(runtime.ref, nil)
+    self.ownsContext = true
+  }
+
+  package init(borrowing ref: JSGlobalContextRef) {
+    self.runtime = nil
+    self.ref = ref
+    self.ownsContext = false
   }
 
   deinit {
-    JSGlobalContextRelease(ref)
+    if ownsContext {
+      JSGlobalContextRelease(ref)
+    }
   }
 }
 

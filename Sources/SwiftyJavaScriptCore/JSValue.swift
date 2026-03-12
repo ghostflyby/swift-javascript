@@ -253,6 +253,16 @@ public struct JSValue: ~Copyable {
   }
 }
 
+extension JSValue {
+  init(rawValue: JavaScriptCoreRawValue) {
+    self.init(ref: rawValue.ref, ctx: JSInstantContext(ctx: rawValue.context.ref))
+  }
+
+  func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
+    JavaScriptCoreRawValue(ref: ref, context: context)
+  }
+}
+
 extension JSResult {
   consuming func toPrivateResult() -> JSPrivateResult {
     switch consume self {
@@ -260,6 +270,17 @@ extension JSResult {
       return .value(v.retainedRef())
     case .exception(let e):
       return .exception(e.retainedRef())
+    }
+  }
+}
+
+extension JSResult {
+  static func from(driverResult: JSDriverResult<JavaScriptCoreRawValue>) -> JSResult {
+    switch driverResult {
+    case .value(let value):
+      return .value(JSValue(rawValue: value))
+    case .exception(let exception):
+      return .exception(JSValue(rawValue: exception))
     }
   }
 }

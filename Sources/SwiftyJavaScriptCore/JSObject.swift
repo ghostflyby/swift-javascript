@@ -6,11 +6,15 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    JSObjectSetProperty(
-      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
-      attributes.rawValue, &error)
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      key.string,
+      on: rawValue(in: rawContext),
+      to: encoded.rawValue(in: rawContext),
+      in: rawContext,
+      attributes: attributes.hostMemberAttributes
+    )
   }
 
   public func setProperty<Val>(
@@ -41,13 +45,8 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    var error: JSValueRef?
     let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    let encoded =
-      (try? value.tryEncode(in: callbackContext)) ?? JSValue(undefinedIn: callbackContext)
-    JSObjectSetProperty(
-      context.globalContextRef, self.ref, key.ref, encoded.retainedRef(),
-      attributes.rawValue, &error)
+    setProperty(value, forKey: key, with: attributes, in: callbackContext)
   }
   public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing JSValue,
@@ -177,9 +176,18 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: borrowing JSInstantContext
   ) -> JSValue {
-    let result = JSObjectGetProperty(
-      context.globalContextRef, self.ref, key.ref, nil)!
-    return JSValue(ref: result, ctx: context)
+    let rawContext = context.driverContext
+    let result = JavaScriptCoreBackendDriver.getProperty(
+      key.string,
+      on: rawValue(in: rawContext),
+      in: rawContext
+    )
+    switch result {
+    case .value(let value):
+      return JSValue(rawValue: value)
+    case .exception:
+      return JSValue(undefinedIn: context)
+    }
   }
 
   public func getProperty(
@@ -204,9 +212,8 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let result = JSObjectGetProperty(
-      context.globalContextRef, self.ref, key.ref, nil)!
-    return JSValue(ref: result, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return getProperty(forKey: key, in: callbackContext)
   }
 
   public func getProperty(
@@ -351,6 +358,22 @@ extension JSValue {
       context.globalContextRef, self.ref, key.ref, &error)
   }
 
+}
+
+extension JSPropertyAttributes {
+  fileprivate var hostMemberAttributes: JSHostMemberAttributes {
+    var attributes: JSHostMemberAttributes = .none
+    if contains(.readOnly) {
+      attributes.insert(.readOnly)
+    }
+    if contains(.dontEnum) {
+      attributes.insert(.dontEnum)
+    }
+    if contains(.dontDelete) {
+      attributes.insert(.dontDelete)
+    }
+    return attributes
+  }
 }
 
 public struct JSPropertyAttributes: Sendable, Hashable, OptionSet {
