@@ -37,7 +37,11 @@ import Testing
         ],
         parent: "EventTarget",
         storagePolicy: .swiftRetainedObject,
-        finalizerBinding: "timer_finalize"
+        initializerBinding: "timer_initialize",
+        finalizerBinding: "timer_finalize",
+        dynamicPropertyGetterBinding: "timer_dynamic_get",
+        propertyEnumeratorBinding: "timer_dynamic_enumerate",
+        callAsFunctionBinding: "timer_call"
       )
     ]
   )
@@ -48,4 +52,8 @@ import Testing
   #expect(descriptor.types.count == 1)
   #expect(descriptor.types[0].parent == "EventTarget")
   #expect(descriptor.types[0].methods[0].binding == "timer_start")
+  #expect(descriptor.types[0].initializerBinding == "timer_initialize")
+  #expect(descriptor.types[0].dynamicPropertyGetterBinding == "timer_dynamic_get")
+  #expect(descriptor.types[0].propertyEnumeratorBinding == "timer_dynamic_enumerate")
+  #expect(descriptor.types[0].callAsFunctionBinding == "timer_call")
 }

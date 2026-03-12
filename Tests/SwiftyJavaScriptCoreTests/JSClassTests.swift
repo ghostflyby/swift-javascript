@@ -160,7 +160,16 @@ import Testing
       callAsFunction: { context, _, _ in .value(JSValue(string: "pong", in: context)) }
     )
   ]
+  definition.initialize = { _, _ in }
+  definition.hasProperty = { _, _, name in name == "version" }
+  definition.getProperty = { context, _, _ in .value(JSValue(number: 1, in: context)) }
+  definition.setProperty = { _, _, _, _ in nil }
+  definition.deleteProperty = { _, _, _ in true }
+  definition.getPropertyNames = { _, _, _ in }
+  definition.callAsFunction = { context, _, _, _ in JSValue(undefinedIn: context) }
   definition.callAsConstructor = { context, _, _, _ in JSValue(objectIn: context) }
+  definition.hasInstance = { _, _, _ in false }
+  definition.convertToType = { context, _, _, _ in JSValue(string: "converted", in: context) }
   definition.finalize = { _ in }
 
   let descriptor = definition.hostTypeDescriptor(storagePolicy: .swiftRetainedObject)
@@ -168,8 +177,17 @@ import Testing
   #expect(descriptor.name == "ProjectedType")
   #expect(descriptor.parent == "BaseType")
   #expect(descriptor.storagePolicy == .swiftRetainedObject)
+  #expect(descriptor.initializerBinding == "ProjectedType.initialize")
   #expect(descriptor.constructor?.binding == "ProjectedType.constructor")
   #expect(descriptor.finalizerBinding == "ProjectedType.finalize")
+  #expect(descriptor.dynamicPropertyGetterBinding == "ProjectedType.dynamicProperty.get")
+  #expect(descriptor.dynamicPropertySetterBinding == "ProjectedType.dynamicProperty.set")
+  #expect(descriptor.dynamicPropertyHasBinding == "ProjectedType.dynamicProperty.has")
+  #expect(descriptor.dynamicPropertyDeleteBinding == "ProjectedType.dynamicProperty.delete")
+  #expect(descriptor.propertyEnumeratorBinding == "ProjectedType.dynamicProperty.enumerate")
+  #expect(descriptor.callAsFunctionBinding == "ProjectedType.call")
+  #expect(descriptor.hasInstanceBinding == "ProjectedType.hasInstance")
+  #expect(descriptor.convertToTypeBinding == "ProjectedType.convertToType")
   #expect(descriptor.methods.count == 1)
   #expect(descriptor.methods[0].name == "ping")
   #expect(descriptor.methods[0].binding == "ProjectedType.method.ping")

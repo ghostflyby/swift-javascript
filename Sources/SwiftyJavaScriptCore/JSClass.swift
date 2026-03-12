@@ -146,7 +146,28 @@ public struct JSClassDefinition: Sendable {
       },
       parent: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className },
       storagePolicy: storagePolicy,
-      finalizerBinding: finalize == nil ? nil : hostBindingName(suffix: "finalize")
+      initializerBinding: initialize == nil ? nil : hostBindingName(suffix: "initialize"),
+      finalizerBinding: finalize == nil ? nil : hostBindingName(suffix: "finalize"),
+      dynamicPropertyGetterBinding: getProperty == nil
+        ? nil
+        : hostBindingName(suffix: "dynamicProperty.get"),
+      dynamicPropertySetterBinding: setProperty == nil
+        ? nil
+        : hostBindingName(suffix: "dynamicProperty.set"),
+      dynamicPropertyHasBinding: hasProperty == nil
+        ? nil
+        : hostBindingName(suffix: "dynamicProperty.has"),
+      dynamicPropertyDeleteBinding: deleteProperty == nil
+        ? nil
+        : hostBindingName(suffix: "dynamicProperty.delete"),
+      propertyEnumeratorBinding: getPropertyNames == nil
+        ? nil
+        : hostBindingName(suffix: "dynamicProperty.enumerate"),
+      callAsFunctionBinding: callAsFunction == nil ? nil : hostBindingName(suffix: "call"),
+      hasInstanceBinding: hasInstance == nil ? nil : hostBindingName(suffix: "hasInstance"),
+      convertToTypeBinding: convertToType == nil
+        ? nil
+        : hostBindingName(suffix: "convertToType")
     )
   }
 
