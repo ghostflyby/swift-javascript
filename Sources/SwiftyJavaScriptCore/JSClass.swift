@@ -290,20 +290,6 @@ private let classDefinitionRegistry = JSClassDefinitionRegistry()
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
-private func withJSArguments<R>(
-  _ arguments: UnsafePointer<JSValueRef?>?,
-  count: Int,
-  _ body: (borrowing JSArguments) -> R
-) -> R {
-  if let arguments {
-    return body(JSArguments(pointer: arguments, count: count))
-  }
-  var empty: JSValueRef? = nil
-  return withUnsafePointer(to: &empty) { pointer in
-    body(JSArguments(pointer: pointer, count: count))
-  }
-}
-
 private func makeRememberedClassCallbackContext(_ ctx: JSContextRef, _ object: JSObjectRef)
   -> JSInstantContext
 {
@@ -405,48 +391,6 @@ private func withConvertToTypeCallbackInput<R>(
   var objectValue = JSValue(ref: objectRef, ctx: context)
   var exceptionValue = JSValue(undefinedIn: context)
   return body(definition, context, &objectValue, jsType, &exceptionValue)
-}
-
-private func classCallbackReturnValue(
-  _ result: JSPrivateResult,
-  ctx: JSContextRef?,
-  exception: UnsafeMutablePointer<JSValueRef?>?
-) -> JSValueRef? {
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
-}
-
-private func classCallbackSucceeded(
-  exceptionValue: JSValueRef?,
-  exception: UnsafeMutablePointer<JSValueRef?>?
-) -> Bool {
-  guard let exceptionValue else {
-    return true
-  }
-  exception?.pointee = exceptionValue
-  return false
-}
-
-private func classConstructorCallbackReturnValue(
-  _ result: JSPrivateResult,
-  ctx: JSContextRef?,
-  exception: UnsafeMutablePointer<JSValueRef?>?
-) -> JSObjectRef? {
-  switch result {
-  case .value(let value):
-    if JSValueIsObject(ctx, value) {
-      return unsafeBitCast(value, to: JSObjectRef?.self)
-    }
-    return nil
-  case .exception(let error):
-    exception?.pointee = error
-    return nil
-  }
 }
 
 private func classObjectKey(_ object: JSObjectRef) -> UInt {
@@ -639,7 +583,8 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
 
   let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
-  let result = withJSArguments(arguments, count: Int(argumentCount)) { args in
+  let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
+    args in
     functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
   }
 
@@ -722,9 +667,9 @@ extension JSClassDefinition {
           object: object,
           propertyName: propertyName
         ) { definition, context, thisValue, propertyName in
-          classCallbackReturnValue(
+          JavaScriptCoreBackendDriver.callbackReturnValue(
             definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
-            ctx: ctx,
+            in: ctx,
             exception: exception
           )
         }
@@ -746,7 +691,7 @@ extension JSClassDefinition {
           propertyName: propertyName
         ) { definition, context, thisValue, propertyName in
           let newValue = JSValue(ref: value, ctx: context)
-          return classCallbackSucceeded(
+          return JavaScriptCoreBackendDriver.callbackSucceeded(
             exceptionValue: definition.setProperty!(
               context,
               thisValue,
@@ -816,7 +761,7 @@ extension JSClassDefinition {
           functionRef: functionRef,
           thisObjectRef: thisObjectRef
         ) { definition, context, functionValue, thisValue in
-          let callbackResult: JSPrivateResult = withJSArguments(
+          let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
             arguments, count: Int(argumentCount)
           ) { args in
             let result =
@@ -824,7 +769,11 @@ extension JSClassDefinition {
               ?? JSValue(undefinedIn: context)
             return .value(result.retainedRef())
           }
-          return classCallbackReturnValue(callbackResult, ctx: ctx, exception: exception)
+          return JavaScriptCoreBackendDriver.callbackReturnValue(
+            callbackResult,
+            in: ctx,
+            exception: exception
+          )
         }
         guard let value else {
           return JSValueMakeUndefined(ctx)
@@ -840,7 +789,7 @@ extension JSClassDefinition {
           ctx: ctx,
           constructorRef: constructorRef
         ) { definition, context, constructorValue, thisValue in
-          let callbackResult: JSPrivateResult = withJSArguments(
+          let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
             arguments, count: Int(argumentCount)
           ) { args in
             let result =
@@ -851,9 +800,9 @@ extension JSClassDefinition {
             }
             return .value(result.retainedRef())
           }
-          return classConstructorCallbackReturnValue(
+          return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
             callbackResult,
-            ctx: ctx,
+            in: ctx,
             exception: exception
           )
         }
@@ -903,7 +852,11 @@ extension JSClassDefinition {
             } else {
               .value(result.retainedRef())
             }
-          return classCallbackReturnValue(conversion, ctx: ctx, exception: exception)
+          return JavaScriptCoreBackendDriver.callbackReturnValue(
+            conversion,
+            in: ctx,
+            exception: exception
+          )
         }
         guard let value else {
           return JSValueMakeUndefined(ctx)

@@ -281,6 +281,56 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     javaScriptCorePropertyAttributes(from: attributes)
   }
 
+  package static func withArguments<R: ~Copyable>(
+    _ pointer: UnsafePointer<JSValueRef?>?,
+    count: Int,
+    _ body: (borrowing JSArguments) -> R
+  ) -> R {
+    withJavaScriptCoreArguments(pointer, count: count, body)
+  }
+
+  static func callbackReturnValue(
+    _ result: JSPrivateResult,
+    in ctx: JSContextRef?,
+    exception: UnsafeMutablePointer<JSValueRef?>?
+  ) -> JSValueRef? {
+    switch result {
+    case .value(let value):
+      return value
+    case .exception(let error):
+      exception?.pointee = error
+      return JSValueMakeUndefined(ctx)
+    }
+  }
+
+  static func callbackSucceeded(
+    exceptionValue: JSValueRef?,
+    exception: UnsafeMutablePointer<JSValueRef?>?
+  ) -> Bool {
+    guard let exceptionValue else {
+      return true
+    }
+    exception?.pointee = exceptionValue
+    return false
+  }
+
+  static func constructorCallbackReturnValue(
+    _ result: JSPrivateResult,
+    in ctx: JSContextRef?,
+    exception: UnsafeMutablePointer<JSValueRef?>?
+  ) -> JSObjectRef? {
+    switch result {
+    case .value(let value):
+      if JSValueIsObject(ctx, value) {
+        return unsafeBitCast(value, to: JSObjectRef?.self)
+      }
+      return nil
+    case .exception(let error):
+      exception?.pointee = error
+      return nil
+    }
+  }
+
   package static func evaluateScript(
     _ script: String,
     in context: JavaScriptCoreRawContext,
