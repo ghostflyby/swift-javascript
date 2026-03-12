@@ -336,6 +336,77 @@ private func withDynamicPropertyCallbackInput<R>(
   return body(definition, context, thisValue, propertyName)
 }
 
+private func withFunctionCallbackInput<R>(
+  ctx: JSContextRef?,
+  functionRef: JSObjectRef?,
+  thisObjectRef: JSObjectRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+) -> R? {
+  guard let ctx, let functionRef, let thisObjectRef,
+    let definition = classDefinition(from: thisObjectRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
+  var functionValue = JSValue(ref: functionRef, ctx: context)
+  var thisValue = JSValue(ref: thisObjectRef, ctx: context)
+  return body(definition, context, &functionValue, &thisValue)
+}
+
+private func withConstructorCallbackInput<R>(
+  ctx: JSContextRef?,
+  constructorRef: JSObjectRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+) -> R? {
+  guard let ctx, let constructorRef,
+    let definition = classDefinition(from: constructorRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+  var constructorValue = JSValue(ref: constructorRef, ctx: context)
+  var thisValue = JSValue(undefinedIn: context)
+  return body(definition, context, &constructorValue, &thisValue)
+}
+
+private func withHasInstanceCallbackInput<R>(
+  ctx: JSContextRef?,
+  constructorRef: JSObjectRef?,
+  possibleInstanceRef: JSObjectRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+) -> R? {
+  guard let ctx, let constructorRef, let possibleInstanceRef,
+    let definition = classDefinition(from: constructorRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+  var constructorValue = JSValue(ref: constructorRef, ctx: context)
+  var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
+  return body(definition, context, &constructorValue, &possibleInstanceValue)
+}
+
+private func withConvertToTypeCallbackInput<R>(
+  ctx: JSContextRef?,
+  objectRef: JSObjectRef?,
+  jsType: JSType,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) -> R
+) -> R? {
+  guard let ctx, let objectRef,
+    let definition = classDefinition(from: objectRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, objectRef)
+  var objectValue = JSValue(ref: objectRef, ctx: context)
+  var exceptionValue = JSValue(undefinedIn: context)
+  return body(definition, context, &objectValue, jsType, &exceptionValue)
+}
+
 private func classCallbackReturnValue(
   _ result: JSPrivateResult,
   ctx: JSContextRef?,
@@ -359,6 +430,23 @@ private func classCallbackSucceeded(
   }
   exception?.pointee = exceptionValue
   return false
+}
+
+private func classConstructorCallbackReturnValue(
+  _ result: JSPrivateResult,
+  ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSObjectRef? {
+  switch result {
+  case .value(let value):
+    if JSValueIsObject(ctx, value) {
+      return unsafeBitCast(value, to: JSObjectRef?.self)
+    }
+    return nil
+  case .exception(let error):
+    exception?.pointee = error
+    return nil
+  }
 }
 
 private func classObjectKey(_ object: JSObjectRef) -> UInt {
@@ -723,108 +811,104 @@ extension JSClassDefinition {
     if JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) {
       cls.callAsFunction = {
         ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
-        guard let ctx, let functionRef, let thisObjectRef,
-          let type = classDefinition(from: thisObjectRef)
-        else {
+        let value = withFunctionCallbackInput(
+          ctx: ctx,
+          functionRef: functionRef,
+          thisObjectRef: thisObjectRef
+        ) { definition, context, functionValue, thisValue in
+          let callbackResult: JSPrivateResult = withJSArguments(
+            arguments, count: Int(argumentCount)
+          ) { args in
+            let result =
+              definition.callAsFunction?(context, &functionValue, &thisValue, args)
+              ?? JSValue(undefinedIn: context)
+            return .value(result.retainedRef())
+          }
+          return classCallbackReturnValue(callbackResult, ctx: ctx, exception: exception)
+        }
+        guard let value else {
           return JSValueMakeUndefined(ctx)
         }
-        let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
-        var functionValue = JSValue(ref: functionRef, ctx: context)
-        var thisValue = JSValue(ref: thisObjectRef, ctx: context)
-        let callbackResult: JSPrivateResult = withJSArguments(
-          arguments, count: Int(argumentCount)
-        ) { args in
-          let result =
-            type.callAsFunction?(context, &functionValue, &thisValue, args)
-            ?? JSValue(undefinedIn: context)
-          return .value(result.retainedRef())
-        }
-        switch callbackResult {
-        case .value(let value):
-          return value
-        case .exception(let e):
-          exception?.pointee = e
-          return JSValueMakeUndefined(ctx)
-        }
+        return value
       }
     }
 
     if JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) {
       cls.callAsConstructor = {
         ctx, constructorRef, argumentCount, arguments, exception in
-        guard let ctx, let constructorRef,
-          let type = classDefinition(from: constructorRef)
-        else {
-          return nil
-        }
-        let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-        var constructorValue = JSValue(ref: constructorRef, ctx: context)
-        var thisValue = JSValue(undefinedIn: context)
-        let callbackResult: JSPrivateResult = withJSArguments(
-          arguments, count: Int(argumentCount)
-        ) { args in
-          let result =
-            type.callAsConstructor?(context, &constructorValue, &thisValue, args)
-            ?? JSValue(undefinedIn: context)
-          guard result.isObject else {
-            return .value(JSValue(undefinedIn: context).retainedRef())
+        let object = withConstructorCallbackInput(
+          ctx: ctx,
+          constructorRef: constructorRef
+        ) { definition, context, constructorValue, thisValue in
+          let callbackResult: JSPrivateResult = withJSArguments(
+            arguments, count: Int(argumentCount)
+          ) { args in
+            let result =
+              definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
+              ?? JSValue(undefinedIn: context)
+            guard result.isObject else {
+              return .value(JSValue(undefinedIn: context).retainedRef())
+            }
+            return .value(result.retainedRef())
           }
-          return .value(result.retainedRef())
+          return classConstructorCallbackReturnValue(
+            callbackResult,
+            ctx: ctx,
+            exception: exception
+          )
         }
-        switch callbackResult {
-        case .value(let value):
-          if JSValueIsObject(ctx, value) {
-            return unsafeBitCast(value, to: JSObjectRef?.self)
-          }
-          return nil
-        case .exception(let e):
-          exception?.pointee = e
+        guard let object else {
           return nil
         }
+        return object
       }
     }
 
     if JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) {
       cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
-        guard let ctx, let constructorRef, let possibleInstanceRef,
-          let type = classDefinition(from: constructorRef)
-        else {
+        let hasInstance = withHasInstanceCallbackInput(
+          ctx: ctx,
+          constructorRef: constructorRef,
+          possibleInstanceRef: possibleInstanceRef
+        ) { definition, context, constructorValue, possibleInstanceValue in
+          definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
+        }
+        guard let hasInstance else {
           return false
         }
-        let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-        var constructorValue = JSValue(ref: constructorRef, ctx: context)
-        var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
-        return type.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
+        return hasInstance
       }
     }
 
     if JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) {
       cls.convertToType = { ctx, objectRef, type, exception in
-        guard let ctx, let objectRef,
-          let callbackOwner = classDefinition(from: objectRef)
-        else {
-          return JSValueMakeUndefined(ctx)
-        }
-        let context = makeRememberedClassCallbackContext(ctx, objectRef)
-        let jsType = JSType(type)
-        var objectValue = JSValue(ref: objectRef, ctx: context)
-        var exceptionValue = JSValue(undefinedIn: context)
-        let result =
-          callbackOwner.convertToType?(context, &objectValue, jsType, &exceptionValue)
-          ?? JSValue(undefinedIn: context)
-        let conversion: JSPrivateResult =
-          if !exceptionValue.isUndefined {
-            .exception(exceptionValue.retainedRef())
+        let value = withConvertToTypeCallbackInput(
+          ctx: ctx,
+          objectRef: objectRef,
+          jsType: JSType(type)
+        ) { definition, context, objectValue, jsType, exceptionValue in
+          let result =
+            definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
+            ?? JSValue(undefinedIn: context)
+          let exceptionRef: JSValueRef?
+          if exceptionValue.isUndefined {
+            exceptionRef = nil
           } else {
-            .value(result.retainedRef())
+            exceptionRef = exceptionValue.retainedRef()
+            exceptionValue = JSValue(undefinedIn: context)
           }
-        switch conversion {
-        case .value(let value):
-          return value
-        case .exception(let e):
-          exception?.pointee = e
+          let conversion: JSPrivateResult =
+            if let exceptionRef {
+              .exception(exceptionRef)
+            } else {
+              .value(result.retainedRef())
+            }
+          return classCallbackReturnValue(conversion, ctx: ctx, exception: exception)
+        }
+        guard let value else {
           return JSValueMakeUndefined(ctx)
         }
+        return value
       }
     }
 
