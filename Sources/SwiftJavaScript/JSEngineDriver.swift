@@ -35,6 +35,18 @@ package protocol _JSEngineDriver {
     in context: RawContext
   ) -> JSDriverResult<RawValue>
 
+  static func hasProperty(
+    _ key: String,
+    on object: RawValue,
+    in context: RawContext
+  ) -> Bool
+
+  static func deleteProperty(
+    _ key: String,
+    on object: RawValue,
+    in context: RawContext
+  ) -> JSDriverResult<Void>
+
   static func callFunction(
     _ function: RawValue,
     this thisValue: RawValue?,

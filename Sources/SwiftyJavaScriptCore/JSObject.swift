@@ -292,9 +292,12 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: borrowing JSInstantContext
   ) {
-    var error: JSValueRef?
-    JSObjectDeleteProperty(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let rawContext = context.driverContext
+    _ = JavaScriptCoreBackendDriver.deleteProperty(
+      key.string,
+      on: rawValue(in: rawContext),
+      in: rawContext
+    )
   }
 
   public func deleteProperty(
@@ -310,9 +313,8 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) {
-    var error: JSValueRef?
-    JSObjectDeleteProperty(
-      context.globalContextRef, self.ref, key.ref, &error)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    deleteProperty(forKey: key, in: callbackContext)
   }
 
   public func deleteProperty(
@@ -328,8 +330,12 @@ extension JSValue {
     _ key: borrowing some JSString,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    JSObjectHasProperty(
-      context.globalContextRef, self.ref, key.ref)
+    let rawContext = context.driverContext
+    return JavaScriptCoreBackendDriver.hasProperty(
+      key.string,
+      on: rawValue(in: rawContext),
+      in: rawContext
+    )
   }
 
   public func hasProperty(
@@ -345,8 +351,8 @@ extension JSValue {
     _ key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) -> Bool {
-    JSObjectHasProperty(
-      context.globalContextRef, self.ref, key.ref)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return hasProperty(key, in: callbackContext)
   }
 
   public func hasProperty(

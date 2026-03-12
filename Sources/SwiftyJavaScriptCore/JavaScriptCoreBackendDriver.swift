@@ -210,6 +210,41 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func hasProperty(
+    _ key: String,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> Bool {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return false
+    case .object(let objectRef):
+      return withJSString(key) { keyRef in
+        JSObjectHasProperty(context.ref, objectRef, keyRef)
+      }
+    }
+  }
+
+  package static func deleteProperty(
+    _ key: String,
+    on object: JavaScriptCoreRawValue,
+    in context: JavaScriptCoreRawContext
+  ) -> JSDriverResult<Void> {
+    switch objectRef(for: object, in: context) {
+    case .exception:
+      return .exception(())
+    case .object(let objectRef):
+      return withJSString(key) { keyRef in
+        var exception: JSValueRef?
+        JSObjectDeleteProperty(context.ref, objectRef, keyRef, &exception)
+        if exception != nil {
+          return .exception(())
+        }
+        return .value(())
+      }
+    }
+  }
+
   package static func callFunction(
     _ function: JavaScriptCoreRawValue,
     this thisValue: JavaScriptCoreRawValue?,

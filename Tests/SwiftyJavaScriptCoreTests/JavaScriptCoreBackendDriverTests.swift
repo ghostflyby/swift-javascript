@@ -125,3 +125,36 @@ import Testing
     }
   }
 }
+
+@Test func javaScriptCoreBackendDriverSupportsHasAndDeleteProperty() {
+  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
+  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+
+  switch JavaScriptCoreBackendDriver.evaluateScript(
+    "({})",
+    in: context,
+    sourceURL: nil,
+    startingLineNumber: 1
+  ) {
+  case .exception:
+    Issue.record("expected object literal evaluation to succeed")
+  case .value(let object):
+    let value = JavaScriptCoreBackendDriver.makeString("ok", in: context)
+    _ = JavaScriptCoreBackendDriver.setProperty(
+      "status",
+      on: object,
+      to: value,
+      in: context,
+      attributes: .none
+    )
+
+    #expect(JavaScriptCoreBackendDriver.hasProperty("status", on: object, in: context))
+
+    switch JavaScriptCoreBackendDriver.deleteProperty("status", on: object, in: context) {
+    case .exception:
+      Issue.record("expected property deletion to succeed")
+    case .value:
+      #expect(!JavaScriptCoreBackendDriver.hasProperty("status", on: object, in: context))
+    }
+  }
+}
