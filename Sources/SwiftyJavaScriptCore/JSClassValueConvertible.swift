@@ -277,20 +277,6 @@ private func autoClassDefinition(from object: JSObjectRef) -> JSClassDefinition?
   autoClassStorage(from: object)?.definition
 }
 
-private func withAutoJSArguments<R>(
-  _ arguments: UnsafePointer<JSValueRef?>?,
-  count: Int,
-  _ body: (borrowing JSArguments) -> R
-) -> R {
-  if let arguments {
-    return body(JSArguments(pointer: arguments, count: count))
-  }
-  var empty: JSValueRef? = nil
-  return withUnsafePointer(to: &empty) { pointer in
-    body(JSArguments(pointer: pointer, count: count))
-  }
-}
-
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   guard let ctx, let object, let propertyName,
@@ -366,7 +352,10 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = withAutoJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
+  let result = JavaScriptCoreBackendDriver.withArguments(
+    argumentsPointer, count: Int(argumentCount)
+  ) {
+    args in
     functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
   }
 
