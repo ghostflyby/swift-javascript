@@ -85,17 +85,17 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
     if value.isObject {
       if value.isArray(in: context) {
-        let rawContext = context.driverContext
         let count: Int
-        switch JavaScriptCoreBackendDriver.getProperty(
-          "length",
-          on: value.rawValue(in: rawContext),
-          in: rawContext
-        ) {
+        switch JSResult.from(
+          handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+            "length",
+            on: value.valueHandle(in: context),
+            in: context.driverContextHandle
+          ))
+        {
         case .exception:
           throw .codable("array length read raised exception")
-        case .value(let lengthRawValue):
-          let lengthValue = JSValue(rawValue: lengthRawValue)
+        case .value(let lengthValue):
           if lengthValue.isUndefined {
             throw .codable("array length missing")
           }
@@ -109,38 +109,39 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         var nodes: [JSCodableNode] = []
         nodes.reserveCapacity(count)
         for index in 0..<count {
-          switch JavaScriptCoreBackendDriver.getProperty(
-            at: UInt32(index),
-            on: value.rawValue(in: rawContext),
-            in: rawContext
-          ) {
+          switch JSResult.from(
+            handleResult: JavaScriptCoreBackendDriver.getIndexPropertyHandle(
+              at: UInt32(index),
+              on: value.valueHandle(in: context),
+              in: context.driverContextHandle
+            ))
+          {
           case .exception:
             throw .codable("array element read failed at index \(index)")
-          case .value(let elementRawValue):
-            let element = JSValue(rawValue: elementRawValue)
+          case .value(let element):
             nodes.append(try nodeFromJSValue(element, in: context))
           }
         }
         return JSCodableNode(.array(nodes))
       }
       var object: [String: JSCodableNode] = [:]
-      let rawContext = context.driverContext
-      let names = JavaScriptCoreBackendDriver.propertyNames(
-        on: value.rawValue(in: rawContext),
-        in: rawContext
-      )
+      let names = JavaScriptCoreBackendDriver.propertyNamesForHandle(
+        on: value.valueHandle(in: context),
+        in: context.driverContextHandle
+      ) ?? []
       object.reserveCapacity(names.count)
 
       for key in names {
-        switch JavaScriptCoreBackendDriver.getProperty(
-          key,
-          on: value.rawValue(in: rawContext),
-          in: rawContext
-        ) {
+        switch JSResult.from(
+          handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+            key,
+            on: value.valueHandle(in: context),
+            in: context.driverContextHandle
+          ))
+        {
         case .exception:
           throw .codable("object property read failed for key \(key)")
-        case .value(let propertyRawValue):
-          let property = JSValue(rawValue: propertyRawValue)
+        case .value(let property):
           object[key] = try nodeFromJSValue(property, in: context)
         }
       }
@@ -165,38 +166,30 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       return JSValue(string: value, in: context)
     case .array(let array):
       let arrayValue = try makeDriverArrayValue(in: context)
-      let rawContext = context.driverContext
       for (index, item) in array.enumerated() {
         let encoded = try jsValueFromNode(item, in: context)
-        switch JavaScriptCoreBackendDriver.setProperty(
+        guard JavaScriptCoreBackendDriver.setIndexPropertyHandle(
           at: UInt32(index),
-          on: arrayValue.rawValue(in: rawContext),
-          to: encoded.rawValue(in: rawContext),
-          in: rawContext
-        ) {
-        case .exception:
+          on: arrayValue.valueHandle(in: context),
+          to: encoded.valueHandle(in: context),
+          in: context.driverContextHandle
+        ) else {
           throw .codable("array element write failed at index \(index)")
-        case .value:
-          break
         }
       }
       return arrayValue
     case .object(let object):
       let objectValue = try makeDriverObjectValue(in: context)
-      let rawContext = context.driverContext
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
-        switch JavaScriptCoreBackendDriver.setProperty(
+        guard JavaScriptCoreBackendDriver.setStringPropertyHandle(
           key,
-          on: objectValue.rawValue(in: rawContext),
-          to: encoded.rawValue(in: rawContext),
-          in: rawContext,
+          on: objectValue.valueHandle(in: context),
+          to: encoded.valueHandle(in: context),
+          in: context.driverContextHandle,
           attributes: .none
-        ) {
-        case .exception:
+        ) else {
           throw .codable("object property write failed for key \(key)")
-        case .value:
-          break
         }
       }
       return objectValue
@@ -208,11 +201,13 @@ private func makeDriverObjectValue(in context: borrowing JSInstantContext)
   throws(JSValueConversionError)
   -> JSValue
 {
-  switch JavaScriptCoreBackendDriver.makeObject(in: context.driverContext) {
+  switch JSResult.from(
+    handleResult: JavaScriptCoreBackendDriver.makeObjectResultHandle(context.driverContextHandle))
+  {
   case .exception:
     throw .codable("object creation raised exception")
   case .value(let object):
-    return JSValue(rawValue: object)
+    return object
   }
 }
 
@@ -220,31 +215,31 @@ private func makeDriverArrayValue(in context: borrowing JSInstantContext)
   throws(JSValueConversionError)
   -> JSValue
 {
-  switch JavaScriptCoreBackendDriver.makeArray(in: context.driverContext) {
+  switch JSResult.from(
+    handleResult: JavaScriptCoreBackendDriver.makeArrayResultHandle(context.driverContextHandle))
+  {
   case .exception:
     throw .codable("array creation failed")
   case .value(let array):
-    return JSValue(rawValue: array)
+    return array
   }
 }
 
 private func makeDriverObjectRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
-  let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
-  switch JavaScriptCoreBackendDriver.makeObject(in: rawContext) {
-  case .exception:
+  let context = JSInstantContext(ctx: globalContextRef)
+  do {
+    return try makeDriverObjectValue(in: context).ref
+  } catch {
     preconditionFailure("JSCodable object creation raised exception")
-  case .value(let object):
-    return object.ref
   }
 }
 
 private func makeDriverArrayRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
-  let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
-  switch JavaScriptCoreBackendDriver.makeArray(in: rawContext) {
-  case .exception:
+  let context = JSInstantContext(ctx: globalContextRef)
+  do {
+    return try makeDriverArrayValue(in: context).ref
+  } catch {
     preconditionFailure("JSCodable array creation raised exception")
-  case .value(let array):
-    return array.ref
   }
 }
 
@@ -318,21 +313,23 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   func encodeNil(forKey key: Key) throws {
-    set(JSValueMakeNull(globalContextRef), forKey: key.stringValue)
+    let context = JSInstantContext(ctx: globalContextRef)
+    set(JSValue(nullIn: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Bool, forKey key: Key) throws {
-    set(JSValueMakeBoolean(globalContextRef, value)!, forKey: key.stringValue)
+    let context = JSInstantContext(ctx: globalContextRef)
+    set(JSValue(boolean: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: String, forKey key: Key) throws {
-    let stringRef = JSStringCreateWithCFString(value as CFString)
-    defer { JSStringRelease(stringRef) }
-    set(JSValueMakeString(globalContextRef, stringRef)!, forKey: key.stringValue)
+    let context = JSInstantContext(ctx: globalContextRef)
+    set(JSValue(string: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Double, forKey key: Key) throws {
-    set(JSValueMakeNumber(globalContextRef, value)!, forKey: key.stringValue)
+    let context = JSInstantContext(ctx: globalContextRef)
+    set(JSValue(number: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Float, forKey key: Key) throws {
@@ -379,7 +376,8 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     )
     try value.encode(to: child)
     if child.result == nil {
-      set(JSValueMakeUndefined(globalContextRef), forKey: key.stringValue)
+      let context = JSInstantContext(ctx: globalContextRef)
+      set(JSValue(undefinedIn: context).retainedRef(), forKey: key.stringValue)
     }
   }
 
@@ -422,16 +420,10 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   private func set(_ ref: JSValueRef, forKey key: String) {
-    let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
-    let object = JavaScriptCoreRawValue(ref: objectRef, context: rawContext)
-    let value = JavaScriptCoreRawValue(ref: ref, context: rawContext)
-    _ = JavaScriptCoreBackendDriver.setProperty(
-      key,
-      on: object,
-      to: value,
-      in: rawContext,
-      attributes: .none
-    )
+    let context = JSInstantContext(ctx: globalContextRef)
+    let object = JSValue(ref: objectRef, ctx: context)
+    let value = JSValue(ref: ref, ctx: context)
+    object.setProperty(value, forKey: JSStringManaged(key), in: context)
   }
 }
 
@@ -451,17 +443,21 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     self.codingPath = codingPath
   }
 
-  func encodeNil() throws { append(JSValueMakeNull(globalContextRef)) }
+  func encodeNil() throws {
+    let context = JSInstantContext(ctx: globalContextRef)
+    append(JSValue(nullIn: context).retainedRef())
+  }
   func encode(_ value: Bool) throws {
-    append(JSValueMakeBoolean(globalContextRef, value)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    append(JSValue(boolean: value, in: context).retainedRef())
   }
   func encode(_ value: String) throws {
-    let stringRef = JSStringCreateWithCFString(value as CFString)
-    defer { JSStringRelease(stringRef) }
-    append(JSValueMakeString(globalContextRef, stringRef)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    append(JSValue(string: value, in: context).retainedRef())
   }
   func encode(_ value: Double) throws {
-    append(JSValueMakeNumber(globalContextRef, value)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    append(JSValue(number: value, in: context).retainedRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
   func encode(_ value: Int) throws { try encode(Double(value)) }
@@ -486,7 +482,8 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     )
     try value.encode(to: child)
     if child.result == nil {
-      appendAtCurrent(JSValueMakeUndefined(globalContextRef), index: index)
+      let context = JSInstantContext(ctx: globalContextRef)
+      appendAtCurrent(JSValue(undefinedIn: context).retainedRef(), index: index)
     }
     count += 1
   }
@@ -529,15 +526,10 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   }
 
   private func appendAtCurrent(_ ref: JSValueRef, index: Int) {
-    let rawContext = JavaScriptCoreRawContext(borrowing: globalContextRef)
-    let array = JavaScriptCoreRawValue(ref: arrayRef, context: rawContext)
-    let value = JavaScriptCoreRawValue(ref: ref, context: rawContext)
-    _ = JavaScriptCoreBackendDriver.setProperty(
-      at: UInt32(index),
-      on: array,
-      to: value,
-      in: rawContext
-    )
+    let context = JSInstantContext(ctx: globalContextRef)
+    let array = JSValue(ref: arrayRef, ctx: context)
+    let value = JSValue(ref: ref, ctx: context)
+    array.setProperty(value, at: UInt32(index), in: context)
   }
 }
 
@@ -556,17 +548,21 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
     self.onCommit = onCommit
   }
 
-  func encodeNil() throws { onCommit(JSValueMakeNull(globalContextRef)) }
+  func encodeNil() throws {
+    let context = JSInstantContext(ctx: globalContextRef)
+    onCommit(JSValue(nullIn: context).retainedRef())
+  }
   func encode(_ value: Bool) throws {
-    onCommit(JSValueMakeBoolean(globalContextRef, value)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    onCommit(JSValue(boolean: value, in: context).retainedRef())
   }
   func encode(_ value: String) throws {
-    let stringRef = JSStringCreateWithCFString(value as CFString)
-    defer { JSStringRelease(stringRef) }
-    onCommit(JSValueMakeString(globalContextRef, stringRef)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    onCommit(JSValue(string: value, in: context).retainedRef())
   }
   func encode(_ value: Double) throws {
-    onCommit(JSValueMakeNumber(globalContextRef, value)!)
+    let context = JSInstantContext(ctx: globalContextRef)
+    onCommit(JSValue(number: value, in: context).retainedRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
   func encode(_ value: Int) throws { try encode(Double(value)) }
@@ -588,7 +584,8 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
     )
     try value.encode(to: child)
     if child.result == nil {
-      onCommit(JSValueMakeUndefined(globalContextRef))
+      let context = JSInstantContext(ctx: globalContextRef)
+      onCommit(JSValue(undefinedIn: context).retainedRef())
     }
   }
 }
