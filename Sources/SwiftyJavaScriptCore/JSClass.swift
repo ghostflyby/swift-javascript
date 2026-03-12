@@ -318,6 +318,49 @@ private func classPropertyName(_ propertyName: JSStringRef?) -> String? {
   return String(jsStringRef: propertyName)
 }
 
+private func withDynamicPropertyCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> R
+) -> R? {
+  guard let ctx, let object,
+    let definition = classDefinition(from: object),
+    let propertyName = classPropertyName(propertyName)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, object)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(definition, context, thisValue, propertyName)
+}
+
+private func classCallbackReturnValue(
+  _ result: JSPrivateResult,
+  ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSValueRef? {
+  switch result {
+  case .value(let value):
+    return value
+  case .exception(let error):
+    exception?.pointee = error
+    return JSValueMakeUndefined(ctx)
+  }
+}
+
+private func classCallbackSucceeded(
+  exceptionValue: JSValueRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> Bool {
+  guard let exceptionValue else {
+    return true
+  }
+  exception?.pointee = exceptionValue
+  return false
+}
+
 private func classObjectKey(_ object: JSObjectRef) -> UInt {
   UInt(bitPattern: object)
 }
@@ -586,75 +629,81 @@ extension JSClassDefinition {
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) {
       cls.getProperty = { ctx, object, propertyName, exception in
-        guard let ctx, let object, let propertyName,
-          let def = classDefinition(from: object)
-        else {
+        let value = withDynamicPropertyCallbackInput(
+          ctx: ctx,
+          object: object,
+          propertyName: propertyName
+        ) { definition, context, thisValue, propertyName in
+          classCallbackReturnValue(
+            definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
+            ctx: ctx,
+            exception: exception
+          )
+        }
+        guard let value else {
           return JSValueMakeUndefined(ctx)
         }
-        let context = makeRememberedClassCallbackContext(ctx, object)
-        let s = String(jsStringRef: propertyName)
-        let value = JSValue(ref: object, ctx: context)
-        let p = def.getProperty!(context, value, s).toPrivateResult()
-
-        switch p {
-        case .value(let v):
-          return v
-        case .exception(let e):
-          exception?.pointee = e
-          return JSValueMakeUndefined(ctx)
-        }
-
+        return value
       }
     }
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) {
       cls.setProperty = { ctx, object, propertyName, value, exception in
-        guard let ctx, let object, let propertyName, let value,
-          let type = classDefinition(from: object)
-        else {
+        guard let value else {
           return false
         }
-        let context = makeRememberedClassCallbackContext(ctx, object)
-        let s = String(jsStringRef: propertyName)
-        let this = JSValue(ref: object, ctx: context)
-        let newValue = JSValue(ref: value, ctx: context)
-        let setResult = type.setProperty!(context, this, s, newValue)
-
-        if let error = setResult?.retainedRef() {
-          exception?.pointee = error
+        let didSet = withDynamicPropertyCallbackInput(
+          ctx: ctx,
+          object: object,
+          propertyName: propertyName
+        ) { definition, context, thisValue, propertyName in
+          let newValue = JSValue(ref: value, ctx: context)
+          return classCallbackSucceeded(
+            exceptionValue: definition.setProperty!(
+              context,
+              thisValue,
+              propertyName,
+              newValue
+            )?.retainedRef(),
+            exception: exception
+          )
+        }
+        guard let didSet else {
           return false
         }
-
-        return true
+        return didSet
       }
     }
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor) {
       cls.hasProperty = { ctx, object, propertyName in
-        guard let ctx, let object, let propertyName,
-          let type = classDefinition(from: object)
-        else {
+        let hasProperty = withDynamicPropertyCallbackInput(
+          ctx: ctx,
+          object: object,
+          propertyName: propertyName
+        ) { definition, context, thisValue, propertyName in
+          definition.hasProperty!(context, thisValue, propertyName)
+        }
+        guard let hasProperty else {
           return false
         }
-        let context = makeRememberedClassCallbackContext(ctx, object)
-        let s = String(jsStringRef: propertyName)
-        let this = JSValue(ref: object, ctx: context)
-        return type.hasProperty!(context, this, s)
+        return hasProperty
       }
     }
 
     if JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) {
       cls.deleteProperty = { ctx, object, propertyName, exception in
-        guard let ctx, let object, let propertyName,
-          let type = classDefinition(from: object)
-        else {
+        let didDelete = withDynamicPropertyCallbackInput(
+          ctx: ctx,
+          object: object,
+          propertyName: propertyName
+        ) { definition, context, thisValue, propertyName in
+          definition.deleteProperty!(context, thisValue, propertyName)
+        }
+        guard let didDelete else {
           return false
         }
-        let context = makeRememberedClassCallbackContext(ctx, object)
-        let s = String(jsStringRef: propertyName)
-        let this = JSValue(ref: object, ctx: context)
-        let deleteResult = type.deleteProperty!(context, this, s)
-        return deleteResult
+        return didDelete
       }
     }
 
