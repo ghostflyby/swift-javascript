@@ -211,6 +211,12 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return JSObjectGetPrivate(object)
   }
 
+  package static func privateData(fromGlobalObjectIn context: JSContextRef)
+    -> UnsafeMutableRawPointer?
+  {
+    privateData(from: JSContextGetGlobalObject(context))
+  }
+
   package static func stringProperty(
     _ key: String,
     on object: JSObjectRef,

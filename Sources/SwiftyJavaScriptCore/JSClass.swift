@@ -401,15 +401,12 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
 
   rememberClassObjectContext(ctx, thisObjectRef)
 
-  let nameKey = JSStringManaged("name")
-  let functionNameValue = JSObjectGetProperty(ctx, function, nameKey.ref, nil)
-  let functionName = functionNameValue.flatMap { value -> String? in
-    guard let nameRef = JSValueToStringCopy(ctx, value, nil) else {
-      return nil
-    }
-    defer { JSStringRelease(nameRef) }
-    return String(jsStringRef: nameRef)
-  }
+  let rawContext = JavaScriptCoreRawContext(borrowing: ctx)
+  let functionName = JavaScriptCoreBackendDriver.stringProperty(
+    "name",
+    on: function,
+    in: rawContext
+  )
 
   guard let functionName,
     let functionDef = inheritedStaticFunction(named: functionName, from: definition)
@@ -709,9 +706,8 @@ extension JSClassDefinition {
 extension JSContext {
   internal static func borrow(ctx: JSContextRef) -> JSContext {
     let context = Unmanaged<JSContext>.fromOpaque(
-      JSObjectGetPrivate(JSContextGetGlobalObject(ctx))!
-    )
-    .takeUnretainedValue()
+      JavaScriptCoreBackendDriver.privateData(fromGlobalObjectIn: ctx)!
+    ).takeUnretainedValue()
     return context
   }
 }
