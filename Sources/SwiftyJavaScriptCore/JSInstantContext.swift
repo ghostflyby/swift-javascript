@@ -13,6 +13,10 @@ extension JSInstantContext {
     JavaScriptCoreRawContext(borrowing: globalContextRef)
   }
 
+  var driverContextHandle: JSBorrowedContextHandle<JavaScriptCoreEngine> {
+    JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: driverContext)
+  }
+
   var globalObjectRef: JSObjectRef {
     JSContextGetGlobalObject(globalContextRef)!
   }
@@ -27,44 +31,68 @@ extension JSInstantContext {
   }
 
   public func makeString(_ value: String) -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeString(value, in: driverContext))
+    guard let handle = JavaScriptCoreBackendDriver.makeStringValueHandle(value, driverContextHandle)
+    else {
+      preconditionFailure("JSInstantContext.makeString could not create handle")
+    }
+    return JSValue(handleValue: handle)
   }
 
   public func makeNumber(_ value: Double) -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNumber(value, in: driverContext))
+    guard let handle = JavaScriptCoreBackendDriver.makeNumberValueHandle(value, driverContextHandle)
+    else {
+      preconditionFailure("JSInstantContext.makeNumber could not create handle")
+    }
+    return JSValue(handleValue: handle)
   }
 
   public func makeNumber(_ value: some BinaryInteger) -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNumber(Double(value), in: driverContext))
+    makeNumber(Double(value))
   }
 
   public func makeBoolean(_ value: Bool) -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeBoolean(value, in: driverContext))
+    guard
+      let handle = JavaScriptCoreBackendDriver.makeBooleanValueHandle(value, driverContextHandle)
+    else {
+      preconditionFailure("JSInstantContext.makeBoolean could not create handle")
+    }
+    return JSValue(handleValue: handle)
   }
 
   public func makeNull() -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeNull(in: driverContext))
+    guard let handle = JavaScriptCoreBackendDriver.makeNullValueHandle(driverContextHandle) else {
+      preconditionFailure("JSInstantContext.makeNull could not create handle")
+    }
+    return JSValue(handleValue: handle)
   }
 
   public func makeUndefined() -> JSValue {
-    JSValue(rawValue: JavaScriptCoreBackendDriver.makeUndefined(in: driverContext))
+    guard let handle = JavaScriptCoreBackendDriver.makeUndefinedValueHandle(driverContextHandle)
+    else {
+      preconditionFailure("JSInstantContext.makeUndefined could not create handle")
+    }
+    return JSValue(handleValue: handle)
   }
 
   public func makeObject() -> JSValue {
-    switch JavaScriptCoreBackendDriver.makeObject(in: driverContext) {
+    switch JSResult.from(
+      handleResult: JavaScriptCoreBackendDriver.makeObjectResultHandle(driverContextHandle))
+    {
     case .value(let value):
-      return JSValue(rawValue: value)
+      return value
     case .exception(let exception):
-      return JSValue(rawValue: exception)
+      return exception
     }
   }
 
   public func makeArray() -> JSValue {
-    switch JavaScriptCoreBackendDriver.makeArray(in: driverContext) {
+    switch JSResult.from(
+      handleResult: JavaScriptCoreBackendDriver.makeArrayResultHandle(driverContextHandle))
+    {
     case .value(let value):
-      return JSValue(rawValue: value)
+      return value
     case .exception(let exception):
-      return JSValue(rawValue: exception)
+      return exception
     }
   }
 
@@ -149,9 +177,9 @@ extension JSInstantContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
     .from(
-      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script.string,
-        in: driverContext,
+        driverContextHandle,
         sourceURL: nil,
         startingLineNumber: startingLineNumber
       ))
@@ -163,9 +191,9 @@ extension JSInstantContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
     .from(
-      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script.string,
-        in: driverContext,
+        driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       ))
@@ -177,9 +205,9 @@ extension JSInstantContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
     .from(
-      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script,
-        in: driverContext,
+        driverContextHandle,
         sourceURL: sourceURL.string,
         startingLineNumber: startingLineNumber
       ))
@@ -191,9 +219,9 @@ extension JSInstantContext {
     startingLineNumber: Int32 = 1
   ) -> JSResult {
     .from(
-      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script,
-        in: driverContext,
+        driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       ))
@@ -206,9 +234,9 @@ extension JSInstantContext {
   ) -> JSResult
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
     .from(
-      driverResult: JavaScriptCoreBackendDriver.evaluateScript(
+      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script.string,
-        in: driverContext,
+        driverContextHandle,
         sourceURL: sourceURL.string,
         startingLineNumber: startingLineNumber
       ))

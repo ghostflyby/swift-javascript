@@ -253,12 +253,23 @@ public struct JSValue: ~Copyable {
 }
 
 extension JSValue {
+  init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
+    guard let rawValue: JavaScriptCoreRawValue = handleValue.opaqueHandle() else {
+      preconditionFailure("JSValue handle did not contain JavaScriptCoreRawValue")
+    }
+    self.init(rawValue: rawValue)
+  }
+
   init(rawValue: JavaScriptCoreRawValue) {
     self.init(ref: rawValue.ref, ctx: JSInstantContext(ctx: rawValue.context.ref))
   }
 
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
     JavaScriptCoreRawValue(ref: ref, context: context)
+  }
+
+  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
+    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue(in: context.driverContext))
   }
 }
 
@@ -274,6 +285,19 @@ extension JSResult {
 }
 
 extension JSResult {
+  static func from(handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
+    guard let handleResult else {
+      preconditionFailure("JSResult handle bridge unexpectedly returned nil")
+    }
+
+    switch handleResult {
+    case .value(let value):
+      return .value(JSValue(handleValue: value))
+    case .exception(let exception):
+      return .exception(JSValue(handleValue: exception))
+    }
+  }
+
   static func from(driverResult: JSDriverResult<JavaScriptCoreRawValue>) -> JSResult {
     switch driverResult {
     case .value(let value):
@@ -331,31 +355,29 @@ extension JSValue {
 extension JSValue {
   @inline(__always)
   private func callInternal(
-    thisRawValue: JavaScriptCoreRawValue?,
-    arguments: [JavaScriptCoreRawValue],
+    thisValueHandle: JSValueHandle<JavaScriptCoreEngine>?,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let rawContext = context.driverContext
-    return .from(
-      driverResult: JavaScriptCoreBackendDriver.callFunction(
-        rawValue(in: rawContext),
-        this: thisRawValue,
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
+        valueHandle(in: context),
+        this: thisValueHandle,
         arguments: arguments,
-        in: rawContext
+        in: context.driverContextHandle
       ))
   }
 
   @inline(__always)
   private func constructInternal(
-    arguments: [JavaScriptCoreRawValue],
+    arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let rawContext = context.driverContext
-    return .from(
-      driverResult: JavaScriptCoreBackendDriver.construct(
-        rawValue(in: rawContext),
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.constructHandle(
+        valueHandle(in: context),
         arguments: arguments,
-        in: rawContext
+        in: context.driverContextHandle
       ))
   }
 
@@ -363,14 +385,13 @@ extension JSValue {
   private func encodedArguments<each A: JSValueEncodable>(
     _ arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> [JavaScriptCoreRawValue] {
-    let rawContext = context.driverContext
-    var values: [JavaScriptCoreRawValue] = []
+  ) -> [JSValueHandle<JavaScriptCoreEngine>] {
+    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
     values.reserveCapacity(countTypePack(repeat (each A).self))
 
     func appendArgument<T: JSValueEncodable>(_ argument: T) {
       let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-      values.append(encoded.rawValue(in: rawContext))
+      values.append(encoded.valueHandle(in: context))
     }
 
     repeat appendArgument(each arguments)
@@ -384,7 +405,7 @@ extension JSValue {
   }
 
   public func call(in context: borrowing JSInstantContext) -> JSResult {
-    callInternal(thisRawValue: nil, arguments: [], in: context)
+    callInternal(thisValueHandle: nil, arguments: [], in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -401,7 +422,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     callInternal(
-      thisRawValue: nil, arguments: encodedArguments(repeat each arguments, in: context),
+      thisValueHandle: nil, arguments: encodedArguments(repeat each arguments, in: context),
       in: context)
   }
 
@@ -418,8 +439,7 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    callInternal(
-      thisRawValue: thisValue.rawValue(in: context.driverContext), arguments: [], in: context)
+    callInternal(thisValueHandle: thisValue.valueHandle(in: context), arguments: [], in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -438,7 +458,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     callInternal(
-      thisRawValue: thisValue.rawValue(in: context.driverContext),
+      thisValueHandle: thisValue.valueHandle(in: context),
       arguments: encodedArguments(repeat each arguments, in: context),
       in: context
     )
@@ -510,22 +530,25 @@ extension JSValue {
 
   private func invokeMethodInternal(
     _ name: String,
-    arguments: [JavaScriptCoreRawValue],
+    arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let rawContext = context.driverContext
-    switch JavaScriptCoreBackendDriver.getProperty(
-      name, on: rawValue(in: rawContext), in: rawContext)
+    switch JSResult.from(
+      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+        name,
+        on: valueHandle(in: context),
+        in: context.driverContextHandle
+      ))
     {
     case .exception(let exception):
-      return .exception(JSValue(rawValue: exception))
+      return .exception(exception)
     case .value(let method):
       return .from(
-        driverResult: JavaScriptCoreBackendDriver.callFunction(
-          method,
-          this: rawValue(in: rawContext),
+        handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
+          method.valueHandle(in: context),
+          this: valueHandle(in: context),
           arguments: arguments,
-          in: rawContext
+          in: context.driverContextHandle
         ))
     }
   }
@@ -545,9 +568,11 @@ extension JSValue {
   }
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
-    let rawContext = context.driverContext
-    return .from(
-      driverResult: JavaScriptCoreBackendDriver.toObject(rawValue(in: rawContext), in: rawContext))
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.toObjectHandle(
+        valueHandle(in: context),
+        in: context.driverContextHandle
+      ))
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -557,8 +582,10 @@ extension JSValue {
   }
 
   public func isArray(in context: borrowing JSInstantContext) -> Bool {
-    let rawContext = context.driverContext
-    return JavaScriptCoreBackendDriver.isArray(rawValue(in: rawContext), in: rawContext)
+    return JavaScriptCoreBackendDriver.isArrayHandle(
+      valueHandle(in: context),
+      in: context.driverContextHandle
+    ) ?? false
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
@@ -568,8 +595,10 @@ extension JSValue {
   }
 
   public func isDate(in context: borrowing JSInstantContext) -> Bool {
-    let rawContext = context.driverContext
-    return JavaScriptCoreBackendDriver.isDate(rawValue(in: rawContext), in: rawContext)
+    return JavaScriptCoreBackendDriver.isDateHandle(
+      valueHandle(in: context),
+      in: context.driverContextHandle
+    ) ?? false
   }
 
   public func isInstanceOf(
@@ -585,12 +614,11 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    let rawContext = context.driverContext
-    return JavaScriptCoreBackendDriver.isInstanceOf(
-      rawValue(in: rawContext),
-      constructor: constructor.rawValue(in: rawContext),
-      in: rawContext
-    )
+    return JavaScriptCoreBackendDriver.isInstanceOfHandle(
+      valueHandle(in: context),
+      constructor: constructor.valueHandle(in: context),
+      in: context.driverContextHandle
+    ) ?? false
   }
 
   public func defineProperty<Val, Key>(
@@ -611,25 +639,22 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    let rawContext = context.driverContext
-    switch JavaScriptCoreBackendDriver.setProperty(
+    let didSet = JavaScriptCoreBackendDriver.setStringPropertyHandle(
       key.string,
-      on: rawValue(in: rawContext),
-      to: encoded.rawValue(in: rawContext),
-      in: rawContext,
+      on: valueHandle(in: context),
+      to: encoded.valueHandle(in: context),
+      in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
-    ) {
-    case .exception:
+    )
+    guard didSet else {
       return .exception(JSValue(undefinedIn: context))
-    case .value:
-      switch JavaScriptCoreBackendDriver.getProperty(
-        key.string, on: rawValue(in: rawContext), in: rawContext)
-      {
-      case .exception(let exception):
-        return .exception(JSValue(rawValue: exception))
-      case .value(let stored):
-        return .value(JSValue(rawValue: stored))
-      }
     }
+
+    return .from(
+      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+        key.string,
+        on: valueHandle(in: context),
+        in: context.driverContextHandle
+      ))
   }
 }
