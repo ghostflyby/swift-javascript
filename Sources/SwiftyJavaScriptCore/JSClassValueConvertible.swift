@@ -296,93 +296,122 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   return body(definition, context, thisValue, key)
 }
 
-private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
-  ctx, object, propertyName, exception in
+private func withAutoStaticValueCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSStaticValue, borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R? {
   guard let ctx, let object, let propertyName,
     let definition = autoClassDefinition(from: object)
   else {
-    return JSValueMakeUndefined(ctx)
+    return nil
   }
-  rememberClassObjectContext(ctx, object)
 
+  rememberClassObjectContext(ctx, object)
   let name = String(jsStringRef: propertyName)
-  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
-    return JSValueMakeUndefined(ctx)
+  guard let valueDefinition = inheritedStaticValue(named: name, from: definition) else {
+    return nil
   }
 
   let context = JSInstantContext(ctx: ctx)
-  let this = JSValue(ref: object, ctx: context)
-  return JavaScriptCoreBackendDriver.callbackReturnValue(
-    valueDef.getProperty(context, this).toPrivateResult(),
-    in: ctx,
-    exception: exception
-  )
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(valueDefinition, context, thisValue)
 }
 
-private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
-  ctx, object, propertyName, value, exception in
-  guard let ctx, let object, let propertyName, let value,
-    let definition = autoClassDefinition(from: object)
+private func withAutoStaticFunctionCallbackInput<R>(
+  ctx: JSContextRef?,
+  function: JSObjectRef?,
+  thisObject: JSObjectRef?,
+  _ body: (JSStaticFunction, borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R? {
+  guard let ctx, let function, let thisObject,
+    let definition = autoClassDefinition(from: thisObject)
   else {
-    return false
-  }
-  rememberClassObjectContext(ctx, object)
-
-  let name = String(jsStringRef: propertyName)
-  guard let valueDef = inheritedStaticValue(named: name, from: definition) else {
-    return false
+    return nil
   }
 
-  let context = JSInstantContext(ctx: ctx)
-  let this = JSValue(ref: object, ctx: context)
-  let newValue = JSValue(ref: value, ctx: context)
-  switch valueDef.setProperty(context, this, newValue).toPrivateResult() {
-  case .value:
-    return true
-  case .exception(let error):
-    return JavaScriptCoreBackendDriver.callbackSucceeded(
-      exceptionValue: error,
-      exception: exception
-    )
-  }
-}
-
-private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
-  ctx, function, thisObject, argumentCount, arguments, exception in
-  guard let ctx, let function,
-    let thisObjectRef = thisObject,
-    let definition = autoClassDefinition(from: thisObjectRef)
-  else {
-    return JSValueMakeUndefined(ctx)
-  }
-
-  rememberClassObjectContext(ctx, thisObjectRef)
-
+  rememberClassObjectContext(ctx, thisObject)
   let context = JSInstantContext(ctx: ctx)
   let functionValue = JSValue(ref: function, ctx: context)
   let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
     .toString(in: context)
-
-  guard let functionDef = inheritedStaticFunction(named: functionName, from: definition)
+  guard let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
   else {
+    return nil
+  }
+
+  let thisValue = JSValue(ref: thisObject, ctx: context)
+  return body(functionDefinition, context, thisValue)
+}
+
+private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
+  ctx, object, propertyName, exception in
+  let value = withAutoStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName
+  ) { valueDefinition, context, thisValue in
+    JavaScriptCoreBackendDriver.callbackReturnValue(
+      valueDefinition.getProperty(context, thisValue).toPrivateResult(),
+      in: ctx,
+      exception: exception
+    )
+  }
+  guard let value else {
     return JSValueMakeUndefined(ctx)
   }
+  return value
+}
 
-  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-  let thisValue = JSValue(ref: thisObjectRef, ctx: context)
-  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = JavaScriptCoreBackendDriver.withArguments(
-    argumentsPointer, count: Int(argumentCount)
-  ) {
-    args in
-    functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
+private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
+  ctx, object, propertyName, value, exception in
+  guard let value else {
+    return false
   }
+  let didSet = withAutoStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName
+  ) { valueDefinition, context, thisValue in
+    let newValue = JSValue(ref: value, ctx: context)
+    switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
+    case .value:
+      return true
+    case .exception(let error):
+      return JavaScriptCoreBackendDriver.callbackSucceeded(
+        exceptionValue: error,
+        exception: exception
+      )
+    }
+  }
+  guard let didSet else {
+    return false
+  }
+  return didSet
+}
 
-  return JavaScriptCoreBackendDriver.callbackReturnValue(
-    result,
-    in: ctx,
-    exception: exception
-  )
+private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
+  ctx, function, thisObject, argumentCount, arguments, exception in
+  let value = withAutoStaticFunctionCallbackInput(
+    ctx: ctx,
+    function: function,
+    thisObject: thisObject
+  ) { functionDefinition, context, thisValue in
+    let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
+      args in
+      functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
+    }
+    return JavaScriptCoreBackendDriver.callbackReturnValue(
+      result,
+      in: ctx,
+      exception: exception
+    )
+  }
+  guard let value else {
+    return JSValueMakeUndefined(ctx)
+  }
+  return value
 }
 
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
