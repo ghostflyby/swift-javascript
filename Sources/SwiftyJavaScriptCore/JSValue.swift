@@ -34,50 +34,44 @@ public struct JSValue: ~Copyable {
   }
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeString(
-      context.globalContextRef, JSStringCreateWithCFString(value as CFString))
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeString(value)
   }
 
   public init(string value: String, in context: borrowing JSInstantContext) {
-    let s = JSValueMakeString(
-      context.globalContextRef, JSStringCreateWithCFString(value as CFString))
-    self.init(ref: s!, ctx: context)
+    self = context.makeString(value)
   }
 
   public init(string value: borrowing JSString, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeString(context.globalContextRef, value.ref)
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeString(value.string)
   }
 
   public init(number value: Double, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNumber(context.globalContextRef, value)
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeNumber(value)
   }
 
   public init(number value: Double, in context: borrowing JSInstantContext) {
-    let s = JSValueMakeNumber(context.globalContextRef, value)
-    self.init(ref: s!, ctx: context)
+    self = context.makeNumber(value)
   }
 
   public init(number value: some BinaryInteger, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNumber(context.globalContextRef, Double(value))
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeNumber(value)
   }
 
   public init(number value: some BinaryInteger, in context: borrowing JSInstantContext) {
-    let s = JSValueMakeNumber(context.globalContextRef, Double(value))
-    self.init(ref: s!, ctx: context)
+    self = context.makeNumber(value)
   }
 
   public init(boolean value: Bool, in context: isolated JSContext = #isolation) {
-    let s = JSValueMakeBoolean(context.globalContextRef, value)
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeBoolean(value)
   }
 
   public init(boolean value: Bool, in context: borrowing JSInstantContext) {
-    let s = JSValueMakeBoolean(context.globalContextRef, value)
-    self.init(ref: s!, ctx: context)
+    self = context.makeBoolean(value)
   }
 
   public init(symbol: String, in context: isolated JSContext = #isolation) {
@@ -87,23 +81,21 @@ public struct JSValue: ~Copyable {
   }
 
   public init(nullIn context: isolated JSContext = #isolation) {
-    let s = JSValueMakeNull(context.globalContextRef)
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeNull()
   }
 
   public init(nullIn context: borrowing JSInstantContext) {
-    let s = JSValueMakeNull(context.globalContextRef)
-    self.init(ref: s!, ctx: context)
+    self = context.makeNull()
   }
 
   public init(undefinedIn context: isolated JSContext = #isolation) {
-    let s = JSValueMakeUndefined(context.globalContextRef)
-    self.init(ref: s!, ctx: context)
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self = callbackContext.makeUndefined()
   }
 
   public init(undefinedIn context: borrowing JSInstantContext) {
-    let s = JSValueMakeUndefined(context.globalContextRef)
-    self.init(ref: s!, ctx: context)
+    self = context.makeUndefined()
   }
 
   public init(objectIn context: isolated JSContext = #isolation) {
@@ -112,12 +104,7 @@ public struct JSValue: ~Copyable {
   }
 
   public init(objectIn context: borrowing JSInstantContext) {
-    switch JavaScriptCoreBackendDriver.makeObject(in: context.driverContext) {
-    case .exception:
-      preconditionFailure("JSValue object creation raised exception")
-    case .value(let object):
-      self.init(rawValue: object)
-    }
+    self = context.makeObject()
   }
 
   public init(arrayIn context: isolated JSContext = #isolation) {
@@ -126,12 +113,7 @@ public struct JSValue: ~Copyable {
   }
 
   public init(arrayIn context: borrowing JSInstantContext) {
-    switch JavaScriptCoreBackendDriver.makeArray(in: context.driverContext) {
-    case .exception:
-      preconditionFailure("JSValue array creation raised exception")
-    case .value(let array):
-      self.init(rawValue: array)
-    }
+    self = context.makeArray()
   }
 
   public typealias JSFunctionCallback =
