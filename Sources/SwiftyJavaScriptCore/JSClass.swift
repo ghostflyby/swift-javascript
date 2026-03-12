@@ -226,6 +226,20 @@ private func withJSArguments<R>(
   }
 }
 
+private func makeRememberedClassCallbackContext(_ ctx: JSContextRef, _ object: JSObjectRef)
+  -> JSInstantContext
+{
+  rememberClassObjectContext(ctx, object)
+  return JSInstantContext(ctx: ctx)
+}
+
+private func classPropertyName(_ propertyName: JSStringRef?) -> String? {
+  guard let propertyName else {
+    return nil
+  }
+  return String(jsStringRef: propertyName)
+}
+
 private func classObjectKey(_ object: JSObjectRef) -> UInt {
   UInt(bitPattern: object)
 }
@@ -414,11 +428,9 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSInstantContext(ctx: ctx)
-  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
+  let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
   let thisValue = JSValue(ref: thisObjectRef, ctx: context)
-  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = withJSArguments(argumentsPointer, count: Int(argumentCount)) { args in
+  let result = withJSArguments(arguments, count: Int(argumentCount)) { args in
     functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
   }
 
@@ -498,8 +510,7 @@ extension JSClassDefinition {
         else {
           return JSValueMakeUndefined(ctx)
         }
-        rememberClassObjectContext(ctx, object)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, object)
         let s = String(jsStringRef: propertyName)
         let value = JSValue(ref: object, ctx: context)
         let p = def.getProperty!(context, value, s).toPrivateResult()
@@ -522,8 +533,7 @@ extension JSClassDefinition {
         else {
           return false
         }
-        rememberClassObjectContext(ctx, object)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, object)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         let newValue = JSValue(ref: value, ctx: context)
@@ -545,8 +555,7 @@ extension JSClassDefinition {
         else {
           return false
         }
-        rememberClassObjectContext(ctx, object)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, object)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         return type.hasProperty!(context, this, s)
@@ -560,8 +569,7 @@ extension JSClassDefinition {
         else {
           return false
         }
-        rememberClassObjectContext(ctx, object)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, object)
         let s = String(jsStringRef: propertyName)
         let this = JSValue(ref: object, ctx: context)
         let deleteResult = type.deleteProperty!(context, this, s)
@@ -576,8 +584,7 @@ extension JSClassDefinition {
         else {
           return
         }
-        rememberClassObjectContext(ctx, object)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, object)
         var this = JSValue(ref: object, ctx: context)
         type.getPropertyNames?(context, &this, accumulator)
       }
@@ -591,14 +598,11 @@ extension JSClassDefinition {
         else {
           return JSValueMakeUndefined(ctx)
         }
-        rememberClassObjectContext(ctx, thisObjectRef)
-        let context = JSInstantContext(ctx: ctx)
-        let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
+        let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
         var functionValue = JSValue(ref: functionRef, ctx: context)
         var thisValue = JSValue(ref: thisObjectRef, ctx: context)
-        let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
         let callbackResult: JSPrivateResult = withJSArguments(
-          argumentsPointer, count: Int(argumentCount)
+          arguments, count: Int(argumentCount)
         ) { args in
           let result =
             type.callAsFunction?(context, &functionValue, &thisValue, args)
@@ -623,14 +627,11 @@ extension JSClassDefinition {
         else {
           return nil
         }
-        rememberClassObjectContext(ctx, constructorRef)
-        let context = JSInstantContext(ctx: ctx)
-        let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
+        let context = makeRememberedClassCallbackContext(ctx, constructorRef)
         var constructorValue = JSValue(ref: constructorRef, ctx: context)
         var thisValue = JSValue(undefinedIn: context)
-        let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
         let callbackResult: JSPrivateResult = withJSArguments(
-          argumentsPointer, count: Int(argumentCount)
+          arguments, count: Int(argumentCount)
         ) { args in
           let result =
             type.callAsConstructor?(context, &constructorValue, &thisValue, args)
@@ -660,8 +661,7 @@ extension JSClassDefinition {
         else {
           return false
         }
-        rememberClassObjectContext(ctx, constructorRef)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, constructorRef)
         var constructorValue = JSValue(ref: constructorRef, ctx: context)
         var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
         return type.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
@@ -675,8 +675,7 @@ extension JSClassDefinition {
         else {
           return JSValueMakeUndefined(ctx)
         }
-        rememberClassObjectContext(ctx, objectRef)
-        let context = JSInstantContext(ctx: ctx)
+        let context = makeRememberedClassCallbackContext(ctx, objectRef)
         let jsType = JSType(type)
         var objectValue = JSValue(ref: objectRef, ctx: context)
         var exceptionValue = JSValue(undefinedIn: context)
