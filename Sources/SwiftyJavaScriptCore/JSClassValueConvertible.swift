@@ -307,15 +307,11 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
 
   let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
-  let result = valueDef.getProperty(context, this).toPrivateResult()
-
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
+  return JavaScriptCoreBackendDriver.callbackReturnValue(
+    valueDef.getProperty(context, this).toPrivateResult(),
+    in: ctx,
+    exception: exception
+  )
 }
 
 private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -335,14 +331,14 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   let context = JSInstantContext(ctx: ctx)
   let this = JSValue(ref: object, ctx: context)
   let newValue = JSValue(ref: value, ctx: context)
-  let result = valueDef.setProperty(context, this, newValue).toPrivateResult()
-
-  switch result {
+  switch valueDef.setProperty(context, this, newValue).toPrivateResult() {
   case .value:
     return true
   case .exception(let error):
-    exception?.pointee = error
-    return false
+    return JavaScriptCoreBackendDriver.callbackSucceeded(
+      exceptionValue: error,
+      exception: exception
+    )
   }
 }
 
@@ -374,13 +370,11 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
     functionDef.callAsFunction(context, thisValue, args).toPrivateResult()
   }
 
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
+  return JavaScriptCoreBackendDriver.callbackReturnValue(
+    result,
+    in: ctx,
+    exception: exception
+  )
 }
 
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
