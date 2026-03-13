@@ -366,6 +366,62 @@ private func withAutoDynamicPropertyBoolCallback(
   return autoCallbackSucceededOrFalse(value)
 }
 
+private func autoDynamicGetPropertyCallbackValue(
+  definition: JSClassDefinition,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  key: String,
+  ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSValueRef? {
+  guard let getProperty = definition.getProperty else {
+    return JSValueMakeUndefined(ctx)
+  }
+  return JavaScriptCoreBackendDriver.callbackReturnValue(
+    getProperty(context, thisValue, key).toPrivateResult(),
+    in: ctx,
+    exception: exception
+  )
+}
+
+private func autoDynamicSetPropertyCallbackResult(
+  definition: JSClassDefinition,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  key: String,
+  newValue: borrowing JSValue,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> Bool {
+  guard let setProperty = definition.setProperty else {
+    return true
+  }
+  if let error = setProperty(context, thisValue, key, newValue)?.retainedRef() {
+    return JavaScriptCoreBackendDriver.callbackSucceeded(
+      exceptionValue: error,
+      exception: exception
+    )
+  }
+  return true
+}
+
+private func autoDynamicHasPropertyCallbackResult(
+  definition: JSClassDefinition,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  key: String
+) -> Bool {
+  definition.hasProperty?(context, thisValue, key) ?? false
+}
+
+private func autoDynamicDeletePropertyCallbackResult(
+  definition: JSClassDefinition,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  key: String
+) -> Bool {
+  definition.deleteProperty?(context, thisValue, key) ?? false
+}
+
 private func withAutoStaticValueCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -570,12 +626,12 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        guard let getProperty = definition.getProperty else {
-          return JSValueMakeUndefined(ctx)
-        }
-        return JavaScriptCoreBackendDriver.callbackReturnValue(
-          getProperty(context, thisValue, key).toPrivateResult(),
-          in: ctx,
+        autoDynamicGetPropertyCallbackValue(
+          definition: definition,
+          context: context,
+          thisValue: thisValue,
+          key: key,
+          ctx: ctx,
           exception: exception
         )
       }
@@ -593,16 +649,14 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         propertyName: propertyName
       ) { definition, context, thisValue, key in
         let newValue = JSValue(ref: value, ctx: context)
-        guard let setProperty = definition.setProperty else {
-          return true
-        }
-        if let error = setProperty(context, thisValue, key, newValue)?.retainedRef() {
-          return JavaScriptCoreBackendDriver.callbackSucceeded(
-            exceptionValue: error,
-            exception: exception
-          )
-        }
-        return true
+        return autoDynamicSetPropertyCallbackResult(
+          definition: definition,
+          context: context,
+          thisValue: thisValue,
+          key: key,
+          newValue: newValue,
+          exception: exception
+        )
       }
     }
   }
@@ -614,7 +668,12 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        definition.hasProperty?(context, thisValue, key) ?? false
+        autoDynamicHasPropertyCallbackResult(
+          definition: definition,
+          context: context,
+          thisValue: thisValue,
+          key: key
+        )
       }
     }
   }
@@ -626,7 +685,12 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        definition.deleteProperty?(context, thisValue, key) ?? false
+        autoDynamicDeletePropertyCallbackResult(
+          definition: definition,
+          context: context,
+          thisValue: thisValue,
+          key: key
+        )
       }
     }
   }
