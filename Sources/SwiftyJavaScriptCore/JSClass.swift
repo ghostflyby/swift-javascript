@@ -414,6 +414,14 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 }
 
+private func callbackValueOrUndefined(_ value: JSValueRef?, in ctx: JSContextRef?) -> JSValueRef? {
+  value ?? JSValueMakeUndefined(ctx)
+}
+
+private func callbackValueOrUndefined(_ value: JSValueRef??, in ctx: JSContextRef?) -> JSValueRef? {
+  value ?? JSValueMakeUndefined(ctx)
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -427,7 +435,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  return value ?? JSValueMakeUndefined(ctx)
+  return callbackValueOrUndefined(value, in: ctx)
 }
 
 private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -471,7 +479,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
       exception: exception
     )
   }
-  return value ?? JSValueMakeUndefined(ctx)
+  return callbackValueOrUndefined(value, in: ctx)
 }
 
 extension JSClassDefinition {
@@ -550,7 +558,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        return value ?? JSValueMakeUndefined(ctx)
+        return callbackValueOrUndefined(value, in: ctx)
       }
     }
 
@@ -651,7 +659,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        return value ?? JSValueMakeUndefined(ctx)
+        return callbackValueOrUndefined(value, in: ctx)
       }
     }
 
@@ -731,7 +739,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        return value ?? JSValueMakeUndefined(ctx)
+        return callbackValueOrUndefined(value, in: ctx)
       }
     }
 
