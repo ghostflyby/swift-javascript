@@ -388,6 +388,36 @@ private func withAutoStaticValueCallbackInput<R>(
   }
 }
 
+private func withAutoStaticValuePropertyCallback(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSStaticValue, borrowing JSInstantContext, borrowing JSValue) -> JSValueRef?
+) -> JSValueRef? {
+  let value = withAutoStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName,
+    body
+  )
+  return autoCallbackValueOrUndefined(value, in: ctx)
+}
+
+private func withAutoStaticValueBooleanCallback(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSStaticValue, borrowing JSInstantContext, borrowing JSValue) -> Bool
+) -> Bool {
+  let value = withAutoStaticValueCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName,
+    body
+  )
+  return autoCallbackSucceededOrFalse(value)
+}
+
 private func withAutoStaticFunctionCallbackInput<R>(
   ctx: JSContextRef?,
   function: JSObjectRef?,
@@ -412,9 +442,24 @@ private func withAutoStaticFunctionCallbackInput<R>(
   }
 }
 
+private func withAutoStaticFunctionValueCallback(
+  ctx: JSContextRef?,
+  function: JSObjectRef?,
+  thisObject: JSObjectRef?,
+  _ body: (JSStaticFunction, borrowing JSInstantContext, borrowing JSValue) -> JSValueRef?
+) -> JSValueRef? {
+  let value = withAutoStaticFunctionCallbackInput(
+    ctx: ctx,
+    function: function,
+    thisObject: thisObject,
+    body
+  )
+  return autoCallbackValueOrUndefined(value, in: ctx)
+}
+
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
-  let value = withAutoStaticValueCallbackInput(
+  withAutoStaticValuePropertyCallback(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -425,7 +470,6 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  return autoCallbackValueOrUndefined(value, in: ctx)
 }
 
 private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -433,7 +477,7 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   guard let value else {
     return false
   }
-  let didSet = withAutoStaticValueCallbackInput(
+  return withAutoStaticValueBooleanCallback(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -449,12 +493,11 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  return autoCallbackSucceededOrFalse(didSet)
 }
 
 private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
-  let value = withAutoStaticFunctionCallbackInput(
+  withAutoStaticFunctionValueCallback(
     ctx: ctx,
     function: function,
     thisObject: thisObject
@@ -469,7 +512,6 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
       exception: exception
     )
   }
-  return autoCallbackValueOrUndefined(value, in: ctx)
 }
 
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
