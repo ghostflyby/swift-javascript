@@ -98,3 +98,5 @@
 - [x] 继续收口 `JSClassValueConvertible` static callback 模板（已抽 static value/function 专用 helper，统一调用模板与默认回退）
 - [x] 继续收口 `JSClassValueConvertible` dynamic callback 具体动作（已抽 get/set/has/delete 文件级 helper，进一步瘦身 autoNativeDefinition）
 - [x] 继续收口 `JSClassValueConvertible` static callback 具体动作（已抽 static get/set/function 文件级 helper，进一步瘦身 callback 本体）
+- [x] 继续收口 `JSClassValueConvertible` autoNativeDefinition 动态 callback 安装（已抽集中安装 helper，减少函数内重复条件分支）
+- [x] 继续收口 `JSClassValueConvertible` autoNativeDefinition 静态成员安装（已抽 staticValues/staticFunctions 安装 helper，进一步精简主函数）

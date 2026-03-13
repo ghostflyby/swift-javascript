@@ -621,56 +621,11 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
   }
 }
 
-private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
-  -> JavaScriptCore.JSClassDefinition
-{
-  var cls = JavaScriptCore.kJSClassDefinitionEmpty
-  cls.version = backing.definition.version
-  cls.attributes = backing.definition.attributes.rawValue
-  cls.parentClass = backing.definition.parentClass?.ref
-  cls.initialize = autoClassInitializeCallback
-  cls.finalize = autoClassFinalizeCallback
-
-  if !backing.definition.staticValues.isEmpty {
-    backing.staticValueNames = backing.definition.staticValues.map { $0.name.utf8CString }
-    backing.staticValues = []
-    backing.staticValues.reserveCapacity(backing.definition.staticValues.count + 1)
-    for (index, value) in backing.definition.staticValues.enumerated() {
-      var staticValue = JavaScriptCore.JSStaticValue()
-      backing.staticValueNames[index].withUnsafeBufferPointer {
-        staticValue.name = $0.baseAddress
-      }
-      staticValue.getProperty = autoStaticValueGetPropertyCallback
-      staticValue.setProperty = autoStaticValueSetPropertyCallback
-      staticValue.attributes = value.attributes.rawValue
-      backing.staticValues.append(staticValue)
-    }
-    backing.staticValues.append(JavaScriptCore.JSStaticValue())
-    backing.staticValues.withUnsafeBufferPointer {
-      cls.staticValues = $0.baseAddress
-    }
-  }
-
-  if !backing.definition.staticFunctions.isEmpty {
-    backing.staticFunctionNames = backing.definition.staticFunctions.map { $0.name.utf8CString }
-    backing.staticFunctions = []
-    backing.staticFunctions.reserveCapacity(backing.definition.staticFunctions.count + 1)
-    for (index, function) in backing.definition.staticFunctions.enumerated() {
-      var staticFunction = JavaScriptCore.JSStaticFunction()
-      backing.staticFunctionNames[index].withUnsafeBufferPointer {
-        staticFunction.name = $0.baseAddress
-      }
-      staticFunction.callAsFunction = autoStaticFunctionCallAsFunctionCallback
-      staticFunction.attributes = function.attributes.rawValue
-      backing.staticFunctions.append(staticFunction)
-    }
-    backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
-    backing.staticFunctions.withUnsafeBufferPointer {
-      cls.staticFunctions = $0.baseAddress
-    }
-  }
-
-  if backing.definition.getProperty != nil {
+private func installAutoDynamicCallbacks(
+  _ definition: JSClassDefinition,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  if definition.getProperty != nil {
     cls.getProperty = { ctx, object, propertyName, exception in
       withAutoDynamicPropertyValueCallback(
         ctx: ctx,
@@ -689,7 +644,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
     }
   }
 
-  if backing.definition.setProperty != nil {
+  if definition.setProperty != nil {
     cls.setProperty = { ctx, object, propertyName, value, exception in
       guard let value else {
         return false
@@ -712,7 +667,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
     }
   }
 
-  if backing.definition.hasProperty != nil {
+  if definition.hasProperty != nil {
     cls.hasProperty = { ctx, object, propertyName in
       withAutoDynamicPropertyBoolCallback(
         ctx: ctx,
@@ -729,7 +684,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
     }
   }
 
-  if backing.definition.deleteProperty != nil {
+  if definition.deleteProperty != nil {
     cls.deleteProperty = { ctx, object, propertyName, exception in
       withAutoDynamicPropertyBoolCallback(
         ctx: ctx,
@@ -745,6 +700,77 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       }
     }
   }
+}
+
+private func installAutoStaticValueMembers(
+  _ definition: JSClassDefinition,
+  backing: JSClassAutoNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard !definition.staticValues.isEmpty else {
+    return
+  }
+
+  backing.staticValueNames = definition.staticValues.map { $0.name.utf8CString }
+  backing.staticValues = []
+  backing.staticValues.reserveCapacity(definition.staticValues.count + 1)
+  for (index, value) in definition.staticValues.enumerated() {
+    var staticValue = JavaScriptCore.JSStaticValue()
+    backing.staticValueNames[index].withUnsafeBufferPointer {
+      staticValue.name = $0.baseAddress
+    }
+    staticValue.getProperty = autoStaticValueGetPropertyCallback
+    staticValue.setProperty = autoStaticValueSetPropertyCallback
+    staticValue.attributes = value.attributes.rawValue
+    backing.staticValues.append(staticValue)
+  }
+  backing.staticValues.append(JavaScriptCore.JSStaticValue())
+  backing.staticValues.withUnsafeBufferPointer {
+    cls.staticValues = $0.baseAddress
+  }
+}
+
+private func installAutoStaticFunctionMembers(
+  _ definition: JSClassDefinition,
+  backing: JSClassAutoNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard !definition.staticFunctions.isEmpty else {
+    return
+  }
+
+  backing.staticFunctionNames = definition.staticFunctions.map { $0.name.utf8CString }
+  backing.staticFunctions = []
+  backing.staticFunctions.reserveCapacity(definition.staticFunctions.count + 1)
+  for (index, function) in definition.staticFunctions.enumerated() {
+    var staticFunction = JavaScriptCore.JSStaticFunction()
+    backing.staticFunctionNames[index].withUnsafeBufferPointer {
+      staticFunction.name = $0.baseAddress
+    }
+    staticFunction.callAsFunction = autoStaticFunctionCallAsFunctionCallback
+    staticFunction.attributes = function.attributes.rawValue
+    backing.staticFunctions.append(staticFunction)
+  }
+  backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
+  backing.staticFunctions.withUnsafeBufferPointer {
+    cls.staticFunctions = $0.baseAddress
+  }
+}
+
+private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
+  -> JavaScriptCore.JSClassDefinition
+{
+  var cls = JavaScriptCore.kJSClassDefinitionEmpty
+  cls.version = backing.definition.version
+  cls.attributes = backing.definition.attributes.rawValue
+  cls.parentClass = backing.definition.parentClass?.ref
+  cls.initialize = autoClassInitializeCallback
+  cls.finalize = autoClassFinalizeCallback
+
+  installAutoStaticValueMembers(backing.definition, backing: backing, into: &cls)
+  installAutoStaticFunctionMembers(backing.definition, backing: backing, into: &cls)
+
+  installAutoDynamicCallbacks(backing.definition, into: &cls)
 
   return cls
 }
