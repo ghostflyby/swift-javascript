@@ -513,6 +513,57 @@ private func withAutoStaticFunctionValueCallback(
   return autoCallbackValueOrUndefined(value, in: ctx)
 }
 
+private func autoStaticGetPropertyCallbackValue(
+  valueDefinition: JSStaticValue,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSValueRef? {
+  JavaScriptCoreBackendDriver.callbackReturnValue(
+    valueDefinition.getProperty(context, thisValue).toPrivateResult(),
+    in: ctx,
+    exception: exception
+  )
+}
+
+private func autoStaticSetPropertyCallbackResult(
+  valueDefinition: JSStaticValue,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  newValue: borrowing JSValue,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> Bool {
+  switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
+  case .value:
+    return true
+  case .exception(let error):
+    return JavaScriptCoreBackendDriver.callbackSucceeded(
+      exceptionValue: error,
+      exception: exception
+    )
+  }
+}
+
+private func autoStaticFunctionCallCallbackValue(
+  functionDefinition: JSStaticFunction,
+  context: borrowing JSInstantContext,
+  thisValue: borrowing JSValue,
+  argumentCount: Int,
+  arguments: UnsafePointer<JSValueRef?>?,
+  ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSValueRef? {
+  let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: argumentCount) { args in
+    functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
+  }
+  return JavaScriptCoreBackendDriver.callbackReturnValue(
+    result,
+    in: ctx,
+    exception: exception
+  )
+}
+
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   withAutoStaticValuePropertyCallback(
@@ -520,9 +571,11 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    JavaScriptCoreBackendDriver.callbackReturnValue(
-      valueDefinition.getProperty(context, thisValue).toPrivateResult(),
-      in: ctx,
+    autoStaticGetPropertyCallbackValue(
+      valueDefinition: valueDefinition,
+      context: context,
+      thisValue: thisValue,
+      ctx: ctx,
       exception: exception
     )
   }
@@ -539,15 +592,13 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
     let newValue = JSValue(ref: value, ctx: context)
-    switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
-    case .value:
-      return true
-    case .exception(let error):
-      return JavaScriptCoreBackendDriver.callbackSucceeded(
-        exceptionValue: error,
-        exception: exception
-      )
-    }
+    return autoStaticSetPropertyCallbackResult(
+      valueDefinition: valueDefinition,
+      context: context,
+      thisValue: thisValue,
+      newValue: newValue,
+      exception: exception
+    )
   }
 }
 
@@ -558,13 +609,13 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
     function: function,
     thisObject: thisObject
   ) { functionDefinition, context, thisValue in
-    let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
-      args in
-      functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
-    }
-    return JavaScriptCoreBackendDriver.callbackReturnValue(
-      result,
-      in: ctx,
+    autoStaticFunctionCallCallbackValue(
+      functionDefinition: functionDefinition,
+      context: context,
+      thisValue: thisValue,
+      argumentCount: Int(argumentCount),
+      arguments: arguments,
+      ctx: ctx,
       exception: exception
     )
   }
