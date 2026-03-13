@@ -422,6 +422,10 @@ private func callbackValueOrUndefined(_ value: JSValueRef??, in ctx: JSContextRe
   value ?? JSValueMakeUndefined(ctx)
 }
 
+private func callbackBoolOrFalse(_ value: Bool?) -> Bool {
+  value ?? false
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -459,7 +463,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  return didSet ?? false
+  return callbackBoolOrFalse(didSet)
 }
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
@@ -583,10 +587,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        guard let didSet else {
-          return false
-        }
-        return didSet
+        return callbackBoolOrFalse(didSet)
       }
     }
 
@@ -599,10 +600,7 @@ extension JSClassDefinition {
         ) { definition, context, thisValue, propertyName in
           definition.hasProperty!(context, thisValue, propertyName)
         }
-        guard let hasProperty else {
-          return false
-        }
-        return hasProperty
+        return callbackBoolOrFalse(hasProperty)
       }
     }
 
@@ -615,10 +613,7 @@ extension JSClassDefinition {
         ) { definition, context, thisValue, propertyName in
           definition.deleteProperty!(context, thisValue, propertyName)
         }
-        guard let didDelete else {
-          return false
-        }
-        return didDelete
+        return callbackBoolOrFalse(didDelete)
       }
     }
 
@@ -703,10 +698,7 @@ extension JSClassDefinition {
         ) { definition, context, constructorValue, possibleInstanceValue in
           definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
         }
-        guard let hasInstance else {
-          return false
-        }
-        return hasInstance
+        return callbackBoolOrFalse(hasInstance)
       }
     }
 

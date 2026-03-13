@@ -103,3 +103,4 @@
 - [x] 收口 `JSClass` callback 内 guard-return 样板（已将 5 处 `guard let value else { return JSValueMakeUndefined }; return value` 与 1 处 bool 版本简化为单行 `?? ` 表达式）
 - [x] 收口 `JSCodableValueConverter` 编码容器内 `JSInstantContext(ctx: globalContextRef)` 重复（已统一改为容器级 `instantContext` 属性，显著减少重复上下文构造）
 - [x] 继续收口 `JSClass` callback 默认返回（已抽文件级 helper 与双层 optional overload，统一 5 处 undefined fallback 回退）
+- [x] 继续收口 `JSClass` callback 布尔默认返回（已抽 `Bool? -> false` helper，统一 didSet/has/delete/hasInstance 回退）
