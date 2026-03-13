@@ -302,6 +302,22 @@ private func withStoredAutoObjectValue<R>(
   return body(context, thisValue)
 }
 
+private func autoCallbackValueOrUndefined(_ value: JSValueRef?, in ctx: JSContextRef?)
+  -> JSValueRef?
+{
+  value ?? JSValueMakeUndefined(ctx)
+}
+
+private func autoCallbackValueOrUndefined(_ value: JSValueRef??, in ctx: JSContextRef?)
+  -> JSValueRef?
+{
+  value ?? JSValueMakeUndefined(ctx)
+}
+
+private func autoCallbackSucceededOrFalse(_ value: Bool?) -> Bool {
+  value ?? false
+}
+
 private func withAutoDynamicPropertyCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -379,10 +395,7 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  guard let value else {
-    return JSValueMakeUndefined(ctx)
-  }
-  return value
+  return autoCallbackValueOrUndefined(value, in: ctx)
 }
 
 private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -406,10 +419,7 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  guard let didSet else {
-    return false
-  }
-  return didSet
+  return autoCallbackSucceededOrFalse(didSet)
 }
 
 private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
@@ -429,10 +439,7 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
       exception: exception
     )
   }
-  guard let value else {
-    return JSValueMakeUndefined(ctx)
-  }
-  return value
+  return autoCallbackValueOrUndefined(value, in: ctx)
 }
 
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
@@ -500,10 +507,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
           exception: exception
         )
       }
-      guard let value else {
-        return JSValueMakeUndefined(ctx)
-      }
-      return value
+      return autoCallbackValueOrUndefined(value, in: ctx)
     }
   }
 
@@ -529,10 +533,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         }
         return true
       }
-      guard let didSet else {
-        return false
-      }
-      return didSet
+      return autoCallbackSucceededOrFalse(didSet)
     }
   }
 
@@ -545,10 +546,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       ) { definition, context, thisValue, key in
         definition.hasProperty?(context, thisValue, key) ?? false
       }
-      guard let hasProperty else {
-        return false
-      }
-      return hasProperty
+      return autoCallbackSucceededOrFalse(hasProperty)
     }
   }
 
@@ -561,10 +559,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       ) { definition, context, thisValue, key in
         definition.deleteProperty?(context, thisValue, key) ?? false
       }
-      guard let didDelete else {
-        return false
-      }
-      return didDelete
+      return autoCallbackSucceededOrFalse(didDelete)
     }
   }
 
