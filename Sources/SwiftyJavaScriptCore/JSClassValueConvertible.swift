@@ -336,6 +336,36 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   }
 }
 
+private func withAutoDynamicPropertyValueCallback(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> JSValueRef?
+) -> JSValueRef? {
+  let value = withAutoDynamicPropertyCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName,
+    body
+  )
+  return autoCallbackValueOrUndefined(value, in: ctx)
+}
+
+private func withAutoDynamicPropertyBoolCallback(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> Bool
+) -> Bool {
+  let value = withAutoDynamicPropertyCallbackInput(
+    ctx: ctx,
+    object: object,
+    propertyName: propertyName,
+    body
+  )
+  return autoCallbackSucceededOrFalse(value)
+}
+
 private func withAutoStaticValueCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -493,7 +523,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
 
   if backing.definition.getProperty != nil {
     cls.getProperty = { ctx, object, propertyName, exception in
-      let value = withAutoDynamicPropertyCallbackInput(
+      withAutoDynamicPropertyValueCallback(
         ctx: ctx,
         object: object,
         propertyName: propertyName
@@ -507,7 +537,6 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
           exception: exception
         )
       }
-      return autoCallbackValueOrUndefined(value, in: ctx)
     }
   }
 
@@ -516,7 +545,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
       guard let value else {
         return false
       }
-      let didSet = withAutoDynamicPropertyCallbackInput(
+      return withAutoDynamicPropertyBoolCallback(
         ctx: ctx,
         object: object,
         propertyName: propertyName
@@ -533,33 +562,30 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
         }
         return true
       }
-      return autoCallbackSucceededOrFalse(didSet)
     }
   }
 
   if backing.definition.hasProperty != nil {
     cls.hasProperty = { ctx, object, propertyName in
-      let hasProperty = withAutoDynamicPropertyCallbackInput(
+      withAutoDynamicPropertyBoolCallback(
         ctx: ctx,
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
         definition.hasProperty?(context, thisValue, key) ?? false
       }
-      return autoCallbackSucceededOrFalse(hasProperty)
     }
   }
 
   if backing.definition.deleteProperty != nil {
     cls.deleteProperty = { ctx, object, propertyName, exception in
-      let didDelete = withAutoDynamicPropertyCallbackInput(
+      withAutoDynamicPropertyBoolCallback(
         ctx: ctx,
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
         definition.deleteProperty?(context, thisValue, key) ?? false
       }
-      return autoCallbackSucceededOrFalse(didDelete)
     }
   }
 

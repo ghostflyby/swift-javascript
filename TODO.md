@@ -94,3 +94,4 @@
 - [x] 继续收口 `JSClassValueConvertible` object/context 准备（已抽本地 helper，统一 remembered context 与 this 值组装）
 - [x] 继续收口 `JSClassValueConvertible` finalize context 恢复（已抽本地 helper，统一从 stored object context 恢复 this 值）
 - [x] 继续收口 `JSClassValueConvertible` callback 默认返回（已抽文件级 helper，统一 optional 结果到 undefined/false 的回退）
+- [x] 继续收口 `JSClassValueConvertible` dynamic callback 模板（已抽 dynamic value/bool 专用 helper，减少 autoNativeDefinition 内重复调用样板）
