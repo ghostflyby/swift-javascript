@@ -307,6 +307,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   let objectRef: JSObjectRef
   var codingPath: [any CodingKey]
 
+  private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
     globalContextRef: JSGlobalContextRef,
     objectRef: JSObjectRef,
@@ -318,22 +319,22 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   func encodeNil(forKey key: Key) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     set(JSValue(nullIn: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Bool, forKey key: Key) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     set(JSValue(boolean: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: String, forKey key: Key) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     set(JSValue(string: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Double, forKey key: Key) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     set(JSValue(number: value, in: context).retainedRef(), forKey: key.stringValue)
   }
 
@@ -373,7 +374,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
 
   func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
     let child = _JSCodableEncoder(
-      context: JSInstantContext(ctx: globalContextRef),
+      context: instantContext,
       codingPath: codingPath + [key],
       onCommit: { ref in
         self.set(ref, forKey: key.stringValue)
@@ -381,7 +382,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     )
     try value.encode(to: child)
     if child.result == nil {
-      let context = JSInstantContext(ctx: globalContextRef)
+      let context = instantContext
       set(JSValue(undefinedIn: context).retainedRef(), forKey: key.stringValue)
     }
   }
@@ -411,12 +412,12 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   func superEncoder() -> any Encoder {
-    _JSCodableEncoder(context: JSInstantContext(ctx: globalContextRef), codingPath: codingPath)
+    _JSCodableEncoder(context: instantContext, codingPath: codingPath)
   }
 
   func superEncoder(forKey key: Key) -> any Encoder {
     return _JSCodableEncoder(
-      context: JSInstantContext(ctx: globalContextRef),
+      context: instantContext,
       codingPath: codingPath + [key],
       onCommit: { ref in
         self.set(ref, forKey: key.stringValue)
@@ -425,7 +426,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
   }
 
   private func set(_ ref: JSValueRef, forKey key: String) {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     let object = JSValue(ref: objectRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
     object.setProperty(value, forKey: JSStringManaged(key), in: context)
@@ -438,6 +439,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   var codingPath: [any CodingKey]
   var count: Int = 0
 
+  private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
     globalContextRef: JSGlobalContextRef,
     arrayRef: JSObjectRef,
@@ -449,19 +451,19 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   }
 
   func encodeNil() throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     append(JSValue(nullIn: context).retainedRef())
   }
   func encode(_ value: Bool) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     append(JSValue(boolean: value, in: context).retainedRef())
   }
   func encode(_ value: String) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     append(JSValue(string: value, in: context).retainedRef())
   }
   func encode(_ value: Double) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     append(JSValue(number: value, in: context).retainedRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
@@ -479,7 +481,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   func encode<T>(_ value: T) throws where T: Encodable {
     let index = count
     let child = _JSCodableEncoder(
-      context: JSInstantContext(ctx: globalContextRef),
+      context: instantContext,
       codingPath: codingPath,
       onCommit: { ref in
         self.appendAtCurrent(ref, index: index)
@@ -487,7 +489,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     )
     try value.encode(to: child)
     if child.result == nil {
-      let context = JSInstantContext(ctx: globalContextRef)
+      let context = instantContext
       appendAtCurrent(JSValue(undefinedIn: context).retainedRef(), index: index)
     }
     count += 1
@@ -517,7 +519,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     let index = count
     count += 1
     return _JSCodableEncoder(
-      context: JSInstantContext(ctx: globalContextRef),
+      context: instantContext,
       codingPath: codingPath,
       onCommit: { ref in
         self.appendAtCurrent(ref, index: index)
@@ -531,7 +533,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
   }
 
   private func appendAtCurrent(_ ref: JSValueRef, index: Int) {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     let array = JSValue(ref: arrayRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
     array.setProperty(value, at: UInt32(index), in: context)
@@ -543,6 +545,7 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
   var codingPath: [any CodingKey]
   let onCommit: (JSValueRef) -> Void
 
+  private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
     globalContextRef: JSGlobalContextRef,
     codingPath: [any CodingKey],
@@ -554,19 +557,19 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
   }
 
   func encodeNil() throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     onCommit(JSValue(nullIn: context).retainedRef())
   }
   func encode(_ value: Bool) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     onCommit(JSValue(boolean: value, in: context).retainedRef())
   }
   func encode(_ value: String) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     onCommit(JSValue(string: value, in: context).retainedRef())
   }
   func encode(_ value: Double) throws {
-    let context = JSInstantContext(ctx: globalContextRef)
+    let context = instantContext
     onCommit(JSValue(number: value, in: context).retainedRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
@@ -583,13 +586,13 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
 
   func encode<T>(_ value: T) throws where T: Encodable {
     let child = _JSCodableEncoder(
-      context: JSInstantContext(ctx: globalContextRef),
+      context: instantContext,
       codingPath: codingPath,
       onCommit: onCommit
     )
     try value.encode(to: child)
     if child.result == nil {
-      let context = JSInstantContext(ctx: globalContextRef)
+      let context = instantContext
       onCommit(JSValue(undefinedIn: context).retainedRef())
     }
   }

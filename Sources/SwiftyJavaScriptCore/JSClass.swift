@@ -427,10 +427,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  guard let value else {
-    return JSValueMakeUndefined(ctx)
-  }
-  return value
+  return value ?? JSValueMakeUndefined(ctx)
 }
 
 private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -454,10 +451,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  guard let didSet else {
-    return false
-  }
-  return didSet
+  return didSet ?? false
 }
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
@@ -477,10 +471,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
       exception: exception
     )
   }
-  guard let value else {
-    return JSValueMakeUndefined(ctx)
-  }
-  return value
+  return value ?? JSValueMakeUndefined(ctx)
 }
 
 extension JSClassDefinition {
@@ -559,10 +550,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        guard let value else {
-          return JSValueMakeUndefined(ctx)
-        }
-        return value
+        return value ?? JSValueMakeUndefined(ctx)
       }
     }
 
@@ -663,10 +651,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        guard let value else {
-          return JSValueMakeUndefined(ctx)
-        }
-        return value
+        return value ?? JSValueMakeUndefined(ctx)
       }
     }
 
@@ -746,10 +731,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        guard let value else {
-          return JSValueMakeUndefined(ctx)
-        }
-        return value
+        return value ?? JSValueMakeUndefined(ctx)
       }
     }
 

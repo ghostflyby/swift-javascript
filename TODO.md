@@ -100,3 +100,5 @@
 - [x] 继续收口 `JSClassValueConvertible` static callback 具体动作（已抽 static get/set/function 文件级 helper，进一步瘦身 callback 本体）
 - [x] 继续收口 `JSClassValueConvertible` autoNativeDefinition 动态 callback 安装（已抽集中安装 helper，减少函数内重复条件分支）
 - [x] 继续收口 `JSClassValueConvertible` autoNativeDefinition 静态成员安装（已抽 staticValues/staticFunctions 安装 helper，进一步精简主函数）
+- [x] 收口 `JSClass` callback 内 guard-return 样板（已将 5 处 `guard let value else { return JSValueMakeUndefined }; return value` 与 1 处 bool 版本简化为单行 `?? ` 表达式）
+- [x] 收口 `JSCodableValueConverter` 编码容器内 `JSInstantContext(ctx: globalContextRef)` 重复（已统一改为容器级 `instantContext` 属性，显著减少重复上下文构造）
