@@ -2,6 +2,8 @@ import JavaScriptCore
 import SwiftJavaScript
 
 package typealias JavaScriptCoreValueRef = JSValueRef
+package typealias JavaScriptCoreObjectRef = JSObjectRef
+package typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
 
 package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
   package let ref: JSContextGroupRef

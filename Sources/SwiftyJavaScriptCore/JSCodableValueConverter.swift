@@ -1,5 +1,3 @@
-import JavaScriptCore
-
 final class JSCodableNode {
   enum Kind {
     case object([String: JSCodableNode])
@@ -230,7 +228,9 @@ private func makeDriverArrayValue(in context: borrowing JSInstantContext)
   }
 }
 
-private func makeDriverObjectRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
+private func makeDriverObjectRef(in globalContextRef: JavaScriptCoreGlobalContextRef)
+  -> JavaScriptCoreObjectRef
+{
   let context = JSInstantContext(ctx: globalContextRef)
   do {
     return try makeDriverObjectValue(in: context).ref
@@ -239,7 +239,9 @@ private func makeDriverObjectRef(in globalContextRef: JSGlobalContextRef) -> JSO
   }
 }
 
-private func makeDriverArrayRef(in globalContextRef: JSGlobalContextRef) -> JSObjectRef {
+private func makeDriverArrayRef(in globalContextRef: JavaScriptCoreGlobalContextRef)
+  -> JavaScriptCoreObjectRef
+{
   let context = JSInstantContext(ctx: globalContextRef)
   do {
     return try makeDriverArrayValue(in: context).ref
@@ -249,16 +251,16 @@ private func makeDriverArrayRef(in globalContextRef: JSGlobalContextRef) -> JSOb
 }
 
 final class _JSCodableEncoder: Encoder {
-  let globalContextRef: JSGlobalContextRef
+  let globalContextRef: JavaScriptCoreGlobalContextRef
   var codingPath: [any CodingKey]
   var userInfo: [CodingUserInfoKey: Any] = [:]
-  var result: JSValueRef?
-  private let onCommit: ((JSValueRef) -> Void)?
+  var result: JavaScriptCoreValueRef?
+  private let onCommit: ((JavaScriptCoreValueRef) -> Void)?
 
   init(
     context: borrowing JSInstantContext,
     codingPath: [any CodingKey],
-    onCommit: ((JSValueRef) -> Void)? = nil
+    onCommit: ((JavaScriptCoreValueRef) -> Void)? = nil
   ) {
     self.globalContextRef = context.globalContextRef
     self.codingPath = codingPath
@@ -296,21 +298,21 @@ final class _JSCodableEncoder: Encoder {
     )
   }
 
-  private func commit(_ ref: JSValueRef) {
+  private func commit(_ ref: JavaScriptCoreValueRef) {
     result = ref
     onCommit?(ref)
   }
 }
 
 final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
-  let globalContextRef: JSGlobalContextRef
-  let objectRef: JSObjectRef
+  let globalContextRef: JavaScriptCoreGlobalContextRef
+  let objectRef: JavaScriptCoreObjectRef
   var codingPath: [any CodingKey]
 
   private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
-    globalContextRef: JSGlobalContextRef,
-    objectRef: JSObjectRef,
+    globalContextRef: JavaScriptCoreGlobalContextRef,
+    objectRef: JavaScriptCoreObjectRef,
     codingPath: [any CodingKey]
   ) {
     self.globalContextRef = globalContextRef
@@ -425,7 +427,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     )
   }
 
-  private func set(_ ref: JSValueRef, forKey key: String) {
+  private func set(_ ref: JavaScriptCoreValueRef, forKey key: String) {
     let context = instantContext
     let object = JSValue(ref: objectRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
@@ -434,15 +436,15 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
 }
 
 final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
-  let globalContextRef: JSGlobalContextRef
-  let arrayRef: JSObjectRef
+  let globalContextRef: JavaScriptCoreGlobalContextRef
+  let arrayRef: JavaScriptCoreObjectRef
   var codingPath: [any CodingKey]
   var count: Int = 0
 
   private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
-    globalContextRef: JSGlobalContextRef,
-    arrayRef: JSObjectRef,
+    globalContextRef: JavaScriptCoreGlobalContextRef,
+    arrayRef: JavaScriptCoreObjectRef,
     codingPath: [any CodingKey]
   ) {
     self.globalContextRef = globalContextRef
@@ -527,12 +529,12 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     )
   }
 
-  private func append(_ ref: JSValueRef) {
+  private func append(_ ref: JavaScriptCoreValueRef) {
     appendAtCurrent(ref, index: count)
     count += 1
   }
 
-  private func appendAtCurrent(_ ref: JSValueRef, index: Int) {
+  private func appendAtCurrent(_ ref: JavaScriptCoreValueRef, index: Int) {
     let context = instantContext
     let array = JSValue(ref: arrayRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
@@ -541,15 +543,15 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
 }
 
 final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer {
-  let globalContextRef: JSGlobalContextRef
+  let globalContextRef: JavaScriptCoreGlobalContextRef
   var codingPath: [any CodingKey]
-  let onCommit: (JSValueRef) -> Void
+  let onCommit: (JavaScriptCoreValueRef) -> Void
 
   private var instantContext: JSInstantContext { JSInstantContext(ctx: globalContextRef) }
   init(
-    globalContextRef: JSGlobalContextRef,
+    globalContextRef: JavaScriptCoreGlobalContextRef,
     codingPath: [any CodingKey],
-    onCommit: @escaping (JSValueRef) -> Void
+    onCommit: @escaping (JavaScriptCoreValueRef) -> Void
   ) {
     self.globalContextRef = globalContextRef
     self.codingPath = codingPath
@@ -883,7 +885,7 @@ struct _JSCodableSingleValueDecodingContainer: SingleValueDecodingContainer {
 
   private func integer<T: FixedWidthInteger>(_ type: T.Type) throws -> T {
     let value = try decode(Double.self)
-    guard value.isFinite, floor(value) == value else {
+    guard value.isFinite, value.rounded(.towardZero) == value else {
       throw DecodingError.typeMismatch(
         type, .init(codingPath: codingPath, debugDescription: "Expected integer number"))
     }
