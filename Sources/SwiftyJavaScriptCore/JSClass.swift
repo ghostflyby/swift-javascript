@@ -500,6 +500,38 @@ private func installDeletePropertyCallbackIfNeeded(
   }
 }
 
+private func installSetPropertyCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) else {
+    return
+  }
+
+  cls.setProperty = { ctx, object, propertyName, value, exception in
+    guard let value else {
+      return false
+    }
+    let didSet = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+      ctx: ctx,
+      object: object,
+      propertyName: propertyName
+    ) { definition, context, thisValue, propertyName in
+      let newValue = JSValue(ref: value, ctx: context)
+      return JavaScriptCoreBackendDriver.callbackSucceeded(
+        exceptionValue: definition.setProperty!(
+          context,
+          thisValue,
+          propertyName,
+          newValue
+        )?.retainedRef(),
+        exception: exception
+      )
+    }
+    return callbackBoolOrFalse(didSet)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -640,30 +672,7 @@ extension JSClassDefinition {
       }
     }
 
-    if JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) {
-      cls.setProperty = { ctx, object, propertyName, value, exception in
-        guard let value else {
-          return false
-        }
-        let didSet = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
-          ctx: ctx,
-          object: object,
-          propertyName: propertyName
-        ) { definition, context, thisValue, propertyName in
-          let newValue = JSValue(ref: value, ctx: context)
-          return JavaScriptCoreBackendDriver.callbackSucceeded(
-            exceptionValue: definition.setProperty!(
-              context,
-              thisValue,
-              propertyName,
-              newValue
-            )?.retainedRef(),
-            exception: exception
-          )
-        }
-        return callbackBoolOrFalse(didSet)
-      }
-    }
+    installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
 
     installHasPropertyCallbackIfNeeded(descriptor, into: &cls)
 
