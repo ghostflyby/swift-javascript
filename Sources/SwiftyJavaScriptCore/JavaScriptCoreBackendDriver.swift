@@ -75,7 +75,7 @@ package final class JavaScriptCoreRawValue: @unchecked Sendable {
     JSValueUnprotect(context.ref, ref)
   }
 
-  package var type: JSType {
+  package var type: SwiftJavaScript.JSType {
     JavaScriptCoreBackendDriver.valueType(of: ref, in: context.ref)
   }
 
@@ -292,7 +292,7 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     JSValueToBoolean(context, value)
   }
 
-  package static func jsType(from rawType: JavaScriptCore.JSType) -> JSType {
+  package static func jsType(from rawType: JavaScriptCore.JSType) -> SwiftJavaScript.JSType {
     switch rawType {
     case kJSTypeUndefined:
       return .undefined
@@ -315,7 +315,9 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
-  package static func valueType(of value: JSValueRef, in context: JSContextRef) -> JSType {
+  package static func valueType(of value: JSValueRef, in context: JSContextRef)
+    -> SwiftJavaScript.JSType
+  {
     jsType(from: JSValueGetType(context, value))
   }
 
@@ -798,8 +800,14 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   static func withConvertToTypeCallbackInput<R>(
     ctx: JSContextRef?,
     objectRef: JSObjectRef?,
-    jsType: JSType,
-    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) ->
+    jsType: SwiftJavaScript.JSType,
+    _ body: (
+      JSClassDefinition,
+      borrowing JSInstantContext,
+      inout JSValue,
+      SwiftJavaScript.JSType,
+      inout JSValue
+    ) ->
       R
   ) -> R? {
     guard let ctx, let objectRef,

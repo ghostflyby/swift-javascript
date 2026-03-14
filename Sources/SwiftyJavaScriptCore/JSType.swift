@@ -1,14 +1,3 @@
-public enum JSType: Sendable {
-  case undefined
-  case null
-  case boolean
-  case number
-  case string
-  case symbol
-  case object
-  case bigInt
-}
-
 extension JSValue {
   public var type: JSType {
     JavaScriptCoreBackendDriver.valueType(of: ref, in: ctx)
