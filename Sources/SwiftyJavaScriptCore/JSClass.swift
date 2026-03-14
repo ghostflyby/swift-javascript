@@ -426,6 +426,14 @@ private func callbackBoolOrFalse(_ value: Bool?) -> Bool {
   value ?? false
 }
 
+private func callbackObjectOrNil(_ value: JSObjectRef?) -> JSObjectRef? {
+  value
+}
+
+private func callbackObjectOrNil(_ value: JSObjectRef??) -> JSObjectRef? {
+  value ?? nil
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -682,10 +690,7 @@ extension JSClassDefinition {
             exception: exception
           )
         }
-        guard let object else {
-          return nil
-        }
-        return object
+        return callbackObjectOrNil(object)
       }
     }
 
