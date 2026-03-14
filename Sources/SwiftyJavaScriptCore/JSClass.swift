@@ -705,9 +705,39 @@ private func installStaticFunctionMembers(
   }
 }
 
+private func installStaticMembers(
+  _ descriptor: JSHostTypeDescriptor,
+  backing: JSManualNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  installStaticValueMembers(descriptor, backing: backing, into: &cls)
+  installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
+}
+
 private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDefinition) {
   cls.initialize = classInitializeCallback
   cls.finalize = classFinalizeCallback
+}
+
+private func installDynamicPropertyCallbacks(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
+  installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
+  installHasPropertyCallbackIfNeeded(descriptor, into: &cls)
+  installDeletePropertyCallbackIfNeeded(descriptor, into: &cls)
+  installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
+}
+
+private func installCallableCallbacks(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
+  installCallAsConstructorCallbackIfNeeded(descriptor, into: &cls)
+  installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
+  installConvertToTypeCallbackIfNeeded(descriptor, into: &cls)
 }
 
 private func installClassName(
@@ -732,6 +762,15 @@ private func installClassMetadata(
   cls.version = definition.version
   cls.attributes = definition.attributes.rawValue
   cls.parentClass = definition.parentClass?.ref
+}
+
+private func installClassCallbacks(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  installLifecycleCallbacks(into: &cls)
+  installDynamicPropertyCallbacks(descriptor, into: &cls)
+  installCallableCallbacks(descriptor, into: &cls)
 }
 
 private func installConvertToTypeCallbackIfNeeded(
@@ -846,29 +885,9 @@ extension JSClassDefinition {
 
     installClassName(className, backing: backing, into: &cls)
 
-    installStaticValueMembers(descriptor, backing: backing, into: &cls)
+    installStaticMembers(descriptor, backing: backing, into: &cls)
 
-    installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
-
-    installLifecycleCallbacks(into: &cls)
-
-    installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
-
-    installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
-
-    installHasPropertyCallbackIfNeeded(descriptor, into: &cls)
-
-    installDeletePropertyCallbackIfNeeded(descriptor, into: &cls)
-
-    installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
-
-    installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
-
-    installCallAsConstructorCallbackIfNeeded(descriptor, into: &cls)
-
-    installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
-
-    installConvertToTypeCallbackIfNeeded(descriptor, into: &cls)
+    installClassCallbacks(descriptor, into: &cls)
 
     return cls
   }

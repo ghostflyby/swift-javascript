@@ -120,6 +120,8 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` 生命周期安装分支（已抽 initialize/finalize 安装 helper）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 顶部元数据安装分支（已抽 className 安装 helper）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 顶部元数据安装分支（已抽 version/attributes/parentClass 安装 helper）
+- [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装顺序分组（已抽 dynamic/callable 分组安装 helper）
+- [x] 继续收口 `JSClass.manualNativeDefinition` 主流程分组（已抽 staticMembers/classCallbacks 聚合 helper）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
@@ -144,3 +146,4 @@
 - [ ] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `11` 降到 `0`
 - [ ] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
 - [ ] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`81` tests passed）
+
