@@ -136,6 +136,7 @@
 - [x] 继续收口 `JSClass` facade/raw JSC callback/class-definition 直连（已将 class/ref/callback 类型、class attribute 常量、undefined/class create/retain/release 调用改走 backend 别名/helper，并移除本文件 `import JavaScriptCore`）
 - [x] 开始迁移通用类型到 `SwiftJavaScript`（已迁 `JSPropertyAttributes` 基础声明，并在 `JSObject` 侧保留 JSC 常量 extension）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSClassAttributes` 基础声明，并在 `JSClass` 侧保留 JSC 常量 extension）
+- [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSTypedArrayKind` 基础声明，并在 `JSArrayBuffer` 侧保留 typed array type 映射 extension）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
