@@ -705,6 +705,11 @@ private func installStaticFunctionMembers(
   }
 }
 
+private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDefinition) {
+  cls.initialize = classInitializeCallback
+  cls.finalize = classFinalizeCallback
+}
+
 private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCore.JSClassDefinition
@@ -828,8 +833,7 @@ extension JSClassDefinition {
 
     installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
 
-    cls.initialize = classInitializeCallback
-    cls.finalize = classFinalizeCallback
+    installLifecycleCallbacks(into: &cls)
 
     installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
 
