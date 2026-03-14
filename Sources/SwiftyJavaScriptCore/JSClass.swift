@@ -480,6 +480,26 @@ private func installHasPropertyCallbackIfNeeded(
   }
 }
 
+private func installDeletePropertyCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) else {
+    return
+  }
+
+  cls.deleteProperty = { ctx, object, propertyName, exception in
+    let didDelete = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+      ctx: ctx,
+      object: object,
+      propertyName: propertyName
+    ) { definition, context, thisValue, propertyName in
+      definition.deleteProperty!(context, thisValue, propertyName)
+    }
+    return callbackBoolOrFalse(didDelete)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -647,18 +667,7 @@ extension JSClassDefinition {
 
     installHasPropertyCallbackIfNeeded(descriptor, into: &cls)
 
-    if JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) {
-      cls.deleteProperty = { ctx, object, propertyName, exception in
-        let didDelete = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
-          ctx: ctx,
-          object: object,
-          propertyName: propertyName
-        ) { definition, context, thisValue, propertyName in
-          definition.deleteProperty!(context, thisValue, propertyName)
-        }
-        return callbackBoolOrFalse(didDelete)
-      }
-    }
+    installDeletePropertyCallbackIfNeeded(descriptor, into: &cls)
 
     installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
 

@@ -108,3 +108,4 @@
 - [x] 继续收口 `JSClass` propertyNames callback 回退样板（已抽 `Void?` 回退 helper，统一 getPropertyNames 分支）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 propertyNames 安装 helper，减小主函数体复杂度）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 hasProperty 安装 helper，继续压缩主函数）
+- [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 deleteProperty 安装 helper，继续压缩主函数）
