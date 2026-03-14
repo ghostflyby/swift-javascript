@@ -610,6 +610,42 @@ private func installHasInstanceCallbackIfNeeded(
   }
 }
 
+private func installCallAsConstructorCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) else {
+    return
+  }
+
+  cls.callAsConstructor = {
+    ctx, constructorRef, argumentCount, arguments, exception in
+    let object = JavaScriptCoreBackendDriver.withConstructorCallbackInput(
+      ctx: ctx,
+      constructorRef: constructorRef
+    ) { definition, context, constructorValue, thisValue in
+      let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
+        arguments,
+        count: Int(argumentCount)
+      ) { args in
+        let result =
+          definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
+          ?? JSValue(undefinedIn: context)
+        guard result.isObject else {
+          return .value(JSValue(undefinedIn: context).retainedRef())
+        }
+        return .value(result.retainedRef())
+      }
+      return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
+        callbackResult,
+        in: ctx,
+        exception: exception
+      )
+    }
+    return callbackObjectOrNil(object)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -745,33 +781,7 @@ extension JSClassDefinition {
 
     installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
 
-    if JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) {
-      cls.callAsConstructor = {
-        ctx, constructorRef, argumentCount, arguments, exception in
-        let object = JavaScriptCoreBackendDriver.withConstructorCallbackInput(
-          ctx: ctx,
-          constructorRef: constructorRef
-        ) { definition, context, constructorValue, thisValue in
-          let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
-            arguments, count: Int(argumentCount)
-          ) { args in
-            let result =
-              definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
-              ?? JSValue(undefinedIn: context)
-            guard result.isObject else {
-              return .value(JSValue(undefinedIn: context).retainedRef())
-            }
-            return .value(result.retainedRef())
-          }
-          return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
-            callbackResult,
-            in: ctx,
-            exception: exception
-          )
-        }
-        return callbackObjectOrNil(object)
-      }
-    }
+    installCallAsConstructorCallbackIfNeeded(descriptor, into: &cls)
 
     installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
 
