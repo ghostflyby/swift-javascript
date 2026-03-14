@@ -676,6 +676,35 @@ private func installStaticValueMembers(
   }
 }
 
+private func installStaticFunctionMembers(
+  _ descriptor: JSHostTypeDescriptor,
+  backing: JSManualNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard !descriptor.methods.isEmpty else {
+    return
+  }
+
+  backing.staticFunctionNames = descriptor.methods.map { $0.name.utf8CString }
+  backing.staticFunctions = []
+  backing.staticFunctions.reserveCapacity(descriptor.methods.count + 1)
+  for (index, method) in descriptor.methods.enumerated() {
+    var staticFunction = JavaScriptCore.JSStaticFunction()
+    backing.staticFunctionNames[index].withUnsafeBufferPointer {
+      staticFunction.name = $0.baseAddress
+    }
+    staticFunction.callAsFunction = staticFunctionCallAsFunctionCallback
+    staticFunction.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+      from: method.attributes
+    )
+    backing.staticFunctions.append(staticFunction)
+  }
+  backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
+  backing.staticFunctions.withUnsafeBufferPointer {
+    cls.staticFunctions = $0.baseAddress
+  }
+}
+
 private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCore.JSClassDefinition
@@ -797,25 +826,7 @@ extension JSClassDefinition {
 
     installStaticValueMembers(descriptor, backing: backing, into: &cls)
 
-    if !descriptor.methods.isEmpty {
-      backing.staticFunctionNames = descriptor.methods.map { $0.name.utf8CString }
-      backing.staticFunctions = []
-      backing.staticFunctions.reserveCapacity(descriptor.methods.count + 1)
-      for (index, method) in descriptor.methods.enumerated() {
-        var staticFunction = JavaScriptCore.JSStaticFunction()
-        backing.staticFunctionNames[index].withUnsafeBufferPointer {
-          staticFunction.name = $0.baseAddress
-        }
-        staticFunction.callAsFunction = staticFunctionCallAsFunctionCallback
-        staticFunction.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
-          from: method.attributes)
-        backing.staticFunctions.append(staticFunction)
-      }
-      backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
-      backing.staticFunctions.withUnsafeBufferPointer {
-        cls.staticFunctions = $0.baseAddress
-      }
-    }
+    installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
 
     cls.initialize = classInitializeCallback
     cls.finalize = classFinalizeCallback
