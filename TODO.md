@@ -105,3 +105,4 @@
 - [x] 继续收口 `JSClass` callback 默认返回（已抽文件级 helper 与双层 optional overload，统一 5 处 undefined fallback 回退）
 - [x] 继续收口 `JSClass` callback 布尔默认返回（已抽 `Bool? -> false` helper，统一 didSet/has/delete/hasInstance 回退）
 - [x] 继续收口 `JSClass` constructor callback 回退样板（已抽 object fallback helper，统一 `callAsConstructor` 的可选对象返回路径）
+- [ ] 继续收口 `JSClass` propertyNames callback 回退样板（进行中：抽 `Void?` 回退 helper，统一 getPropertyNames 分支）

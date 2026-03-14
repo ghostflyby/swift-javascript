@@ -434,6 +434,10 @@ private func callbackObjectOrNil(_ value: JSObjectRef??) -> JSObjectRef? {
   value ?? nil
 }
 
+private func callbackDidRun(_ value: Void?) -> Bool {
+  value != nil
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -634,7 +638,7 @@ extension JSClassDefinition {
         ) { definition, context, thisValue, accumulator in
           definition.getPropertyNames?(context, &thisValue, accumulator)
         }
-        guard enumerated != nil else {
+        guard callbackDidRun(enumerated) else {
           return
         }
       }
