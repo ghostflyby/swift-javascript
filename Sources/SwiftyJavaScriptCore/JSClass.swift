@@ -556,6 +556,40 @@ private func installGetPropertyCallbackIfNeeded(
   }
 }
 
+private func installCallAsFunctionCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) else {
+    return
+  }
+
+  cls.callAsFunction = {
+    ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
+    let value = JavaScriptCoreBackendDriver.withFunctionCallbackInput(
+      ctx: ctx,
+      functionRef: functionRef,
+      thisObjectRef: thisObjectRef
+    ) { definition, context, functionValue, thisValue in
+      let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
+        arguments,
+        count: Int(argumentCount)
+      ) { args in
+        let result =
+          definition.callAsFunction?(context, &functionValue, &thisValue, args)
+          ?? JSValue(undefinedIn: context)
+        return .value(result.retainedRef())
+      }
+      return JavaScriptCoreBackendDriver.callbackReturnValue(
+        callbackResult,
+        in: ctx,
+        exception: exception
+      )
+    }
+    return callbackValueOrUndefined(value, in: ctx)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -689,31 +723,7 @@ extension JSClassDefinition {
 
     installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
 
-    if JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) {
-      cls.callAsFunction = {
-        ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
-        let value = JavaScriptCoreBackendDriver.withFunctionCallbackInput(
-          ctx: ctx,
-          functionRef: functionRef,
-          thisObjectRef: thisObjectRef
-        ) { definition, context, functionValue, thisValue in
-          let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
-            arguments, count: Int(argumentCount)
-          ) { args in
-            let result =
-              definition.callAsFunction?(context, &functionValue, &thisValue, args)
-              ?? JSValue(undefinedIn: context)
-            return .value(result.retainedRef())
-          }
-          return JavaScriptCoreBackendDriver.callbackReturnValue(
-            callbackResult,
-            in: ctx,
-            exception: exception
-          )
-        }
-        return callbackValueOrUndefined(value, in: ctx)
-      }
-    }
+    installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
 
     if JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) {
       cls.callAsConstructor = {
