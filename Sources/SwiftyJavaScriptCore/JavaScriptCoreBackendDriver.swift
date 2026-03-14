@@ -6,6 +6,8 @@ public typealias JavaScriptCoreObjectRef = JSObjectRef
 public typealias JavaScriptCoreContextRef = JSContextRef
 public typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
 public typealias JavaScriptCoreStringRef = JSStringRef
+public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
+public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
 package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
   package let ref: JSContextGroupRef
@@ -382,6 +384,206 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     in context: JavaScriptCoreGlobalContextRef
   ) -> JavaScriptCoreObjectRef? {
     JSContextGetGlobalObject(context)
+  }
+
+  package static var typedArrayTypeArrayBuffer: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeArrayBuffer
+  }
+
+  package static var typedArrayTypeInt8Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeInt8Array
+  }
+
+  package static var typedArrayTypeUint8Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeUint8Array
+  }
+
+  package static var typedArrayTypeUint8ClampedArray: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeUint8ClampedArray
+  }
+
+  package static var typedArrayTypeInt16Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeInt16Array
+  }
+
+  package static var typedArrayTypeUint16Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeUint16Array
+  }
+
+  package static var typedArrayTypeInt32Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeInt32Array
+  }
+
+  package static var typedArrayTypeUint32Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeUint32Array
+  }
+
+  package static var typedArrayTypeFloat32Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeFloat32Array
+  }
+
+  package static var typedArrayTypeFloat64Array: JavaScriptCoreTypedArrayType {
+    kJSTypedArrayTypeFloat64Array
+  }
+
+  package static func makeArrayBufferWithBytesNoCopy(
+    in context: JavaScriptCoreGlobalContextRef,
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: JavaScriptCoreTypedArrayBytesDeallocator?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JavaScriptCoreObjectRef? {
+    var exception: JSValueRef?
+    let ref = JSObjectMakeArrayBufferWithBytesNoCopy(
+      context,
+      bytes,
+      byteLength,
+      bytesDeallocator,
+      deallocatorContext,
+      &exception
+    )
+    guard exception == nil else {
+      return nil
+    }
+    return ref
+  }
+
+  package static func arrayBufferByteLength(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Int? {
+    var exception: JSValueRef?
+    let length = JSObjectGetArrayBufferByteLength(context, object, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return length
+  }
+
+  package static func arrayBufferBytesPtr(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    var exception: JSValueRef?
+    let bytes = JSObjectGetArrayBufferBytesPtr(context, object, &exception)
+    return (bytes, exception != nil)
+  }
+
+  package static func makeTypedArray(
+    in context: JavaScriptCoreGlobalContextRef,
+    type: JavaScriptCoreTypedArrayType,
+    length: Int
+  ) -> JavaScriptCoreObjectRef? {
+    var exception: JSValueRef?
+    let ref = JSObjectMakeTypedArray(context, type, length, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return ref
+  }
+
+  package static func makeTypedArrayWithArrayBuffer(
+    in context: JavaScriptCoreGlobalContextRef,
+    type: JavaScriptCoreTypedArrayType,
+    arrayBuffer: JavaScriptCoreObjectRef
+  ) -> JavaScriptCoreObjectRef? {
+    var exception: JSValueRef?
+    let ref = JSObjectMakeTypedArrayWithArrayBuffer(context, type, arrayBuffer, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return ref
+  }
+
+  package static func makeTypedArrayWithArrayBufferAndOffset(
+    in context: JavaScriptCoreGlobalContextRef,
+    type: JavaScriptCoreTypedArrayType,
+    arrayBuffer: JavaScriptCoreObjectRef,
+    byteOffset: Int,
+    length: Int
+  ) -> JavaScriptCoreObjectRef? {
+    var exception: JSValueRef?
+    let ref = JSObjectMakeTypedArrayWithArrayBufferAndOffset(
+      context,
+      type,
+      arrayBuffer,
+      byteOffset,
+      length,
+      &exception
+    )
+    guard exception == nil else {
+      return nil
+    }
+    return ref
+  }
+
+  package static func typedArrayLength(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Int? {
+    var exception: JSValueRef?
+    let length = JSObjectGetTypedArrayLength(context, object, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return length
+  }
+
+  package static func typedArrayByteLength(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Int? {
+    var exception: JSValueRef?
+    let length = JSObjectGetTypedArrayByteLength(context, object, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return length
+  }
+
+  package static func typedArrayByteOffset(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Int? {
+    var exception: JSValueRef?
+    let offset = JSObjectGetTypedArrayByteOffset(context, object, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return offset
+  }
+
+  package static func typedArrayBuffer(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> JavaScriptCoreObjectRef? {
+    var exception: JSValueRef?
+    let buffer = JSObjectGetTypedArrayBuffer(context, object, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return buffer
+  }
+
+  package static func typedArrayBytesPtr(
+    of object: JavaScriptCoreObjectRef,
+    in context: JavaScriptCoreContextRef
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    var exception: JSValueRef?
+    let bytes = JSObjectGetTypedArrayBytesPtr(context, object, &exception)
+    return (bytes, exception != nil)
+  }
+
+  package static func typedArrayType(
+    of value: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreContextRef
+  ) -> JavaScriptCoreTypedArrayType? {
+    var exception: JSValueRef?
+    let type = JSValueGetTypedArrayType(context, value, &exception)
+    guard exception == nil else {
+      return nil
+    }
+    return type
   }
 
   package static func toNumber(_ value: JSValueRef, in context: JSContextRef) -> Double {
