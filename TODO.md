@@ -122,6 +122,7 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` 顶部元数据安装分支（已抽 version/attributes/parentClass 安装 helper）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装顺序分组（已抽 dynamic/callable 分组安装 helper）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 主流程分组（已抽 staticMembers/classCallbacks 聚合 helper）
+- [x] 继续收口 `JSValueConversion` 数值解码校验样板（已抽 Int32/UInt32 共享整数校验 helper）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 

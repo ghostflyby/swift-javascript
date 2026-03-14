@@ -168,6 +168,23 @@ public enum JSDefaultConverter<T: JSValueCodable>: JSValueConverter {
   }
 }
 
+private func validateIntegerDecode(
+  _ number: Double,
+  target: String,
+  minValue: Double,
+  maxValue: Double
+) throws(JSValueConversionError) {
+  guard number.isFinite else {
+    throw .nonFiniteNumber(target: target)
+  }
+  guard floor(number) == number else {
+    throw .nonInteger(target: target, value: number)
+  }
+  guard number >= minValue && number <= maxValue else {
+    throw .outOfRange(target: target, value: number)
+  }
+}
+
 extension JSValue: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
     self.init(ref: value.ref, ctx: context)
@@ -253,17 +270,12 @@ extension Int32 {
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Int32 {
     let number = try Double.tryDecode(value, in: context)
-    guard number.isFinite else {
-      throw .nonFiniteNumber(target: "Int32")
-    }
-    guard floor(number) == number else {
-      throw .nonInteger(target: "Int32", value: number)
-    }
-    let minValue = Double(Int32.min)
-    let maxValue = Double(Int32.max)
-    guard number >= minValue && number <= maxValue else {
-      throw .outOfRange(target: "Int32", value: number)
-    }
+    try validateIntegerDecode(
+      number,
+      target: "Int32",
+      minValue: Double(Int32.min),
+      maxValue: Double(Int32.max)
+    )
     return Int32(number)
   }
 }
@@ -285,17 +297,12 @@ extension UInt32 {
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> UInt32 {
     let number = try Double.tryDecode(value, in: context)
-    guard number.isFinite else {
-      throw .nonFiniteNumber(target: "UInt32")
-    }
-    guard floor(number) == number else {
-      throw .nonInteger(target: "UInt32", value: number)
-    }
-    let minValue = 0.0
-    let maxValue = Double(UInt32.max)
-    guard number >= minValue && number <= maxValue else {
-      throw .outOfRange(target: "UInt32", value: number)
-    }
+    try validateIntegerDecode(
+      number,
+      target: "UInt32",
+      minValue: 0.0,
+      maxValue: Double(UInt32.max)
+    )
     return UInt32(number)
   }
 }
