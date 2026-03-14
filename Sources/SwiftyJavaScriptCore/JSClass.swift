@@ -532,6 +532,30 @@ private func installSetPropertyCallbackIfNeeded(
   }
 }
 
+private func installGetPropertyCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) else {
+    return
+  }
+
+  cls.getProperty = { ctx, object, propertyName, exception in
+    let value = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+      ctx: ctx,
+      object: object,
+      propertyName: propertyName
+    ) { definition, context, thisValue, propertyName in
+      JavaScriptCoreBackendDriver.callbackReturnValue(
+        definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
+        in: ctx,
+        exception: exception
+      )
+    }
+    return callbackValueOrUndefined(value, in: ctx)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -655,22 +679,7 @@ extension JSClassDefinition {
     cls.initialize = classInitializeCallback
     cls.finalize = classFinalizeCallback
 
-    if JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) {
-      cls.getProperty = { ctx, object, propertyName, exception in
-        let value = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
-          ctx: ctx,
-          object: object,
-          propertyName: propertyName
-        ) { definition, context, thisValue, propertyName in
-          JavaScriptCoreBackendDriver.callbackReturnValue(
-            definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
-            in: ctx,
-            exception: exception
-          )
-        }
-        return callbackValueOrUndefined(value, in: ctx)
-      }
-    }
+    installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
 
     installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
 

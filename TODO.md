@@ -110,3 +110,4 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 hasProperty 安装 helper，继续压缩主函数）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 deleteProperty 安装 helper，继续压缩主函数）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 setProperty 安装 helper，继续压缩主函数）
+- [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 getProperty 安装 helper，补齐动态属性安装四件套）
