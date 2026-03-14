@@ -438,6 +438,28 @@ private func callbackDidRun(_ value: Void?) -> Bool {
   value != nil
 }
 
+private func installPropertyNamesCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) else {
+    return
+  }
+
+  cls.getPropertyNames = { ctx, object, accumulator in
+    let enumerated: Void? = JavaScriptCoreBackendDriver.withPropertyNamesCallbackInput(
+      ctx: ctx,
+      object: object,
+      accumulator: accumulator
+    ) { definition, context, thisValue, accumulator in
+      definition.getPropertyNames?(context, &thisValue, accumulator)
+    }
+    guard callbackDidRun(enumerated) else {
+      return
+    }
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -629,20 +651,7 @@ extension JSClassDefinition {
       }
     }
 
-    if JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) {
-      cls.getPropertyNames = { ctx, object, accumulator in
-        let enumerated: Void? = JavaScriptCoreBackendDriver.withPropertyNamesCallbackInput(
-          ctx: ctx,
-          object: object,
-          accumulator: accumulator
-        ) { definition, context, thisValue, accumulator in
-          definition.getPropertyNames?(context, &thisValue, accumulator)
-        }
-        guard callbackDidRun(enumerated) else {
-          return
-        }
-      }
-    }
+    installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
 
     if JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) {
       cls.callAsFunction = {
