@@ -128,7 +128,7 @@ extension JSContext {
 
   public func installGlobalFunction(
     named name: String,
-    with attributes: JSPropertyAttributes = .none,
+    with attributes: SwiftJavaScript.JSPropertyAttributes = .none,
     callback: @escaping JSValue.JSFunctionCallback
   ) {
     withInstantContext { instantContext in
@@ -139,7 +139,7 @@ extension JSContext {
   public func setGlobalProperty<Val>(
     _ value: borrowing Val,
     forKey key: String,
-    with attributes: JSPropertyAttributes = .none
+    with attributes: SwiftJavaScript.JSPropertyAttributes = .none
   ) where Val: JSValueEncodable, Val: ~Copyable {
     withInstantContext { instantContext in
       instantContext.setGlobalProperty(value, forKey: key, with: attributes)
@@ -150,7 +150,7 @@ extension JSContext {
     _ value: C.SwiftType,
     forKey key: String,
     using converter: C.Type,
-    with attributes: JSPropertyAttributes = .none
+    with attributes: SwiftJavaScript.JSPropertyAttributes = .none
   ) {
     withInstantContext { instantContext in
       instantContext.setGlobalProperty(value, forKey: key, using: converter, with: attributes)

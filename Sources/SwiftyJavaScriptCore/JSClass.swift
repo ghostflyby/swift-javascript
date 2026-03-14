@@ -1,12 +1,6 @@
 import Foundation
 
-public struct JSClassAttributes: OptionSet, Sendable {
-  public let rawValue: UInt32
-
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
+extension JSClassAttributes {
   public static let none = JSClassAttributes(
     rawValue: UInt32(JavaScriptCoreBackendDriver.classAttributeNoneRawValue))
   public static let noAutomaticPrototype = JSClassAttributes(

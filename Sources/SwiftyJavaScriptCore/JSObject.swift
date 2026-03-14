@@ -373,13 +373,7 @@ extension JSPropertyAttributes {
   }
 }
 
-public struct JSPropertyAttributes: Sendable, Hashable, OptionSet {
-  public let rawValue: UInt32
-
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
+extension JSPropertyAttributes {
   public static let none = JSPropertyAttributes(
     rawValue: JavaScriptCoreBackendDriver.propertyAttributeNoneRawValue)
   public static let dontEnum = JSPropertyAttributes(
@@ -388,5 +382,4 @@ public struct JSPropertyAttributes: Sendable, Hashable, OptionSet {
     rawValue: JavaScriptCoreBackendDriver.propertyAttributeReadOnlyRawValue)
   public static let dontDelete = JSPropertyAttributes(
     rawValue: JavaScriptCoreBackendDriver.propertyAttributeDontDeleteRawValue)
-
 }
