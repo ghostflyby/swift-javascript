@@ -590,6 +590,26 @@ private func installCallAsFunctionCallbackIfNeeded(
   }
 }
 
+private func installHasInstanceCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) else {
+    return
+  }
+
+  cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
+    let hasInstance = JavaScriptCoreBackendDriver.withHasInstanceCallbackInput(
+      ctx: ctx,
+      constructorRef: constructorRef,
+      possibleInstanceRef: possibleInstanceRef
+    ) { definition, context, constructorValue, possibleInstanceValue in
+      definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
+    }
+    return callbackBoolOrFalse(hasInstance)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -753,18 +773,7 @@ extension JSClassDefinition {
       }
     }
 
-    if JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) {
-      cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
-        let hasInstance = JavaScriptCoreBackendDriver.withHasInstanceCallbackInput(
-          ctx: ctx,
-          constructorRef: constructorRef,
-          possibleInstanceRef: possibleInstanceRef
-        ) { definition, context, constructorValue, possibleInstanceValue in
-          definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
-        }
-        return callbackBoolOrFalse(hasInstance)
-      }
-    }
+    installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
 
     if JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) {
       cls.convertToType = { ctx, objectRef, type, exception in
