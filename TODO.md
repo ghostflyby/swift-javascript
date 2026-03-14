@@ -115,3 +115,28 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 hasInstance 安装 helper，压缩调用类分支）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 callAsConstructor 安装 helper，压缩调用类分支）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 convertToType 安装 helper，完成调用类分支结构化）
+- [x] 继续收口 `JSClass.manualNativeDefinition` 静态成员安装分支（已抽 staticValues 安装 helper，压缩主函数）
+
+## 9. JavaScriptCore 导入消除基线（进行中）
+
+### 9.1 当前基线（2026-03-14）
+- 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`12` 处
+- backend 适配层保留导入：`1` 处
+	- `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift`
+- 需在重构中彻底消除导入（目标清单）：`11` 处
+	- `Sources/SwiftyJavaScriptCore/JSInstantContext.swift`
+	- `Sources/SwiftyJavaScriptCore/JSValue.swift`
+	- `Sources/SwiftyJavaScriptCore/JSCodableValueConverter.swift`
+	- `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift`
+	- `Sources/SwiftyJavaScriptCore/JSClass.swift`
+	- `Sources/SwiftyJavaScriptCore/JSArrayBuffer.swift`
+	- `Sources/SwiftyJavaScriptCore/JSArguments.swift`
+	- `Sources/SwiftyJavaScriptCore/JSObject.swift`
+	- `Sources/SwiftyJavaScriptCore/JSValueConversion.swift`
+	- `Sources/SwiftyJavaScriptCore/JSType.swift`
+	- `Sources/SwiftyJavaScriptCore/String.swift`
+
+### 9.2 阶段性指标（消除导入且保持功能）
+- [ ] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `11` 降到 `0`
+- [ ] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
+- [ ] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`81` tests passed）

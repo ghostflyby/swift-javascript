@@ -646,6 +646,36 @@ private func installCallAsConstructorCallbackIfNeeded(
   }
 }
 
+private func installStaticValueMembers(
+  _ descriptor: JSHostTypeDescriptor,
+  backing: JSManualNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard !descriptor.properties.isEmpty else {
+    return
+  }
+
+  backing.staticValueNames = descriptor.properties.map { $0.name.utf8CString }
+  backing.staticValues = []
+  backing.staticValues.reserveCapacity(descriptor.properties.count + 1)
+  for (index, property) in descriptor.properties.enumerated() {
+    var staticValue = JavaScriptCore.JSStaticValue()
+    backing.staticValueNames[index].withUnsafeBufferPointer {
+      staticValue.name = $0.baseAddress
+    }
+    staticValue.getProperty = staticValueGetPropertyCallback
+    staticValue.setProperty = staticValueSetPropertyCallback
+    staticValue.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+      from: property.attributes
+    )
+    backing.staticValues.append(staticValue)
+  }
+  backing.staticValues.append(JavaScriptCore.JSStaticValue())
+  backing.staticValues.withUnsafeBufferPointer {
+    cls.staticValues = $0.baseAddress
+  }
+}
+
 private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCore.JSClassDefinition
@@ -765,26 +795,7 @@ extension JSClassDefinition {
       }
     }
 
-    if !descriptor.properties.isEmpty {
-      backing.staticValueNames = descriptor.properties.map { $0.name.utf8CString }
-      backing.staticValues = []
-      backing.staticValues.reserveCapacity(descriptor.properties.count + 1)
-      for (index, property) in descriptor.properties.enumerated() {
-        var staticValue = JavaScriptCore.JSStaticValue()
-        backing.staticValueNames[index].withUnsafeBufferPointer {
-          staticValue.name = $0.baseAddress
-        }
-        staticValue.getProperty = staticValueGetPropertyCallback
-        staticValue.setProperty = staticValueSetPropertyCallback
-        staticValue.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
-          from: property.attributes)
-        backing.staticValues.append(staticValue)
-      }
-      backing.staticValues.append(JavaScriptCore.JSStaticValue())
-      backing.staticValues.withUnsafeBufferPointer {
-        cls.staticValues = $0.baseAddress
-      }
-    }
+    installStaticValueMembers(descriptor, backing: backing, into: &cls)
 
     if !descriptor.methods.isEmpty {
       backing.staticFunctionNames = descriptor.methods.map { $0.name.utf8CString }
