@@ -1,9 +1,11 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-package typealias JavaScriptCoreValueRef = JSValueRef
-package typealias JavaScriptCoreObjectRef = JSObjectRef
-package typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
+public typealias JavaScriptCoreValueRef = JSValueRef
+public typealias JavaScriptCoreObjectRef = JSObjectRef
+public typealias JavaScriptCoreContextRef = JSContextRef
+public typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
+public typealias JavaScriptCoreStringRef = JSStringRef
 
 package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
   package let ref: JSContextGroupRef
@@ -345,6 +347,41 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
 
   package static var propertyAttributeDontDeleteRawValue: UInt32 {
     UInt32(kJSPropertyAttributeDontDelete)
+  }
+
+  package static func stringLength(_ stringRef: JavaScriptCoreStringRef) -> Int {
+    JSStringGetLength(stringRef)
+  }
+
+  package static func stringCharacters(
+    _ stringRef: JavaScriptCoreStringRef
+  ) -> UnsafePointer<UInt16>? {
+    JSStringGetCharactersPtr(stringRef)
+  }
+
+  package static func retain(_ stringRef: JavaScriptCoreStringRef) -> JavaScriptCoreStringRef {
+    JSStringRetain(stringRef)
+  }
+
+  package static func release(_ stringRef: JavaScriptCoreStringRef) {
+    JSStringRelease(stringRef)
+  }
+
+  package static func makeJSString(_ value: String) -> JavaScriptCoreStringRef {
+    JSStringCreateWithCFString(value as CFString)
+  }
+
+  package static func stringEquals(
+    _ lhs: JavaScriptCoreStringRef,
+    _ rhs: JavaScriptCoreStringRef
+  ) -> Bool {
+    JSStringIsEqual(lhs, rhs)
+  }
+
+  package static func globalObject(
+    in context: JavaScriptCoreGlobalContextRef
+  ) -> JavaScriptCoreObjectRef? {
+    JSContextGetGlobalObject(context)
   }
 
   package static func toNumber(_ value: JSValueRef, in context: JSContextRef) -> Double {

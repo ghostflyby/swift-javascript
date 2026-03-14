@@ -1,9 +1,7 @@
-import JavaScriptCore
-
 public struct JSInstantContext: ~Copyable {
-  public let globalContextRef: JSGlobalContextRef
+  public let globalContextRef: JavaScriptCoreGlobalContextRef
 
-  init(ctx: JSContextRef) {
+  init(ctx: JavaScriptCoreContextRef) {
     self.globalContextRef = ctx
   }
 }
@@ -17,8 +15,8 @@ extension JSInstantContext {
     JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: driverContext)
   }
 
-  var globalObjectRef: JSObjectRef {
-    JSContextGetGlobalObject(globalContextRef)!
+  var globalObjectRef: JavaScriptCoreObjectRef {
+    JavaScriptCoreBackendDriver.globalObject(in: globalContextRef)!
   }
 
   var actorContext: JSContext {
