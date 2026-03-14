@@ -1,5 +1,3 @@
-import JavaScriptCore
-
 extension JSValue {
   public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing some JSString,
@@ -383,12 +381,12 @@ public struct JSPropertyAttributes: Sendable, Hashable, OptionSet {
   }
 
   public static let none = JSPropertyAttributes(
-    rawValue: UInt32(JavaScriptCore.kJSPropertyAttributeNone))
+    rawValue: JavaScriptCoreBackendDriver.propertyAttributeNoneRawValue)
   public static let dontEnum = JSPropertyAttributes(
-    rawValue: UInt32(JavaScriptCore.kJSPropertyAttributeDontEnum))
+    rawValue: JavaScriptCoreBackendDriver.propertyAttributeDontEnumRawValue)
   public static let readOnly = JSPropertyAttributes(
-    rawValue: UInt32(JavaScriptCore.kJSPropertyAttributeReadOnly))
+    rawValue: JavaScriptCoreBackendDriver.propertyAttributeReadOnlyRawValue)
   public static let dontDelete = JSPropertyAttributes(
-    rawValue: UInt32(JavaScriptCore.kJSPropertyAttributeDontDelete))
+    rawValue: JavaScriptCoreBackendDriver.propertyAttributeDontDeleteRawValue)
 
 }

@@ -1,7 +1,5 @@
-import JavaScriptCore
-
 public struct JSArguments: ~Copyable {
-  let pointer: UnsafePointer<JSValueRef?>
+  let pointer: UnsafePointer<JavaScriptCoreValueRef?>
   let count: Int
 
   public func unpack<R: ~Copyable>(

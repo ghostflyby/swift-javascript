@@ -785,7 +785,7 @@ private func installConvertToTypeCallbackIfNeeded(
     let value = JavaScriptCoreBackendDriver.withConvertToTypeCallbackInput(
       ctx: ctx,
       objectRef: objectRef,
-      jsType: JSType(type)
+      jsType: JavaScriptCoreBackendDriver.jsType(from: type)
     ) { definition, context, objectValue, jsType, exceptionValue in
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)

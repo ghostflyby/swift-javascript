@@ -1,6 +1,8 @@
 import JavaScriptCore
 import SwiftJavaScript
 
+package typealias JavaScriptCoreValueRef = JSValueRef
+
 package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
   package let ref: JSContextGroupRef
 
@@ -52,7 +54,7 @@ package final class JavaScriptCoreRawValue: @unchecked Sendable {
   }
 
   package var type: JSType {
-    JSType(JSValueGetType(context.ref, ref))
+    JavaScriptCoreBackendDriver.valueType(of: ref, in: context.ref)
   }
 
   package func toDouble() -> Double {
@@ -266,6 +268,81 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
 
   package static func toBoolean(_ value: JSValueRef, in context: JSContextRef) -> Bool {
     JSValueToBoolean(context, value)
+  }
+
+  package static func jsType(from rawType: JavaScriptCore.JSType) -> JSType {
+    switch rawType {
+    case kJSTypeUndefined:
+      return .undefined
+    case kJSTypeNull:
+      return .null
+    case kJSTypeBoolean:
+      return .boolean
+    case kJSTypeNumber:
+      return .number
+    case kJSTypeString:
+      return .string
+    case kJSTypeSymbol:
+      return .symbol
+    case kJSTypeObject:
+      return .object
+    case kJSTypeBigInt:
+      return .bigInt
+    default:
+      fatalError("Unknown JSType raw value: \(rawType)")
+    }
+  }
+
+  package static func valueType(of value: JSValueRef, in context: JSContextRef) -> JSType {
+    jsType(from: JSValueGetType(context, value))
+  }
+
+  package static func isUndefined(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsUndefined(context, value)
+  }
+
+  package static func isNull(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsNull(context, value)
+  }
+
+  package static func isBoolean(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsBoolean(context, value)
+  }
+
+  package static func isNumber(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsNumber(context, value)
+  }
+
+  package static func isString(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsString(context, value)
+  }
+
+  package static func isSymbol(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsSymbol(context, value)
+  }
+
+  package static func isObject(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsObject(context, value)
+  }
+
+  package static func isBigInt(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueIsBigInt(context, value)
+  }
+
+  package static var propertyAttributeNoneRawValue: UInt32 {
+    UInt32(kJSPropertyAttributeNone)
+  }
+
+  package static var propertyAttributeDontEnumRawValue: UInt32 {
+    UInt32(kJSPropertyAttributeDontEnum)
+  }
+
+  package static var propertyAttributeReadOnlyRawValue: UInt32 {
+    UInt32(kJSPropertyAttributeReadOnly)
+  }
+
+  package static var propertyAttributeDontDeleteRawValue: UInt32 {
+    UInt32(kJSPropertyAttributeDontDelete)
   }
 
   package static func toNumber(_ value: JSValueRef, in context: JSContextRef) -> Double {

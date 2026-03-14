@@ -1,5 +1,3 @@
-import JavaScriptCore
-
 public enum JSType: Sendable {
   case undefined
   case null
@@ -11,89 +9,42 @@ public enum JSType: Sendable {
   case bigInt
 }
 
-@available(macOS 15.0, *)
-extension JSType {
-  init(_ rawValue: JavaScriptCore.JSType) {
-    switch rawValue {
-    case kJSTypeUndefined:
-      self = .undefined
-    case kJSTypeNull:
-      self = .null
-    case kJSTypeBoolean:
-      self = .boolean
-    case kJSTypeNumber:
-      self = .number
-    case kJSTypeString:
-      self = .string
-    case kJSTypeSymbol:
-      self = .symbol
-    case kJSTypeObject:
-      self = .object
-    case kJSTypeBigInt:
-      self = .bigInt
-    default:
-      fatalError("Unknown JSType raw value: \(rawValue)")
-    }
-  }
-
-  var rawValue: JavaScriptCore.JSType {
-    switch self {
-    case .undefined:
-      return kJSTypeUndefined
-    case .null:
-      return kJSTypeNull
-    case .boolean:
-      return kJSTypeBoolean
-    case .number:
-      return kJSTypeNumber
-    case .string:
-      return kJSTypeString
-    case .symbol:
-      return kJSTypeSymbol
-    case .object:
-      return kJSTypeObject
-    case .bigInt:
-      return kJSTypeBigInt
-    }
-  }
-}
-
 extension JSValue {
   public var type: JSType {
-    JSType(JSValueGetType(ctx, ref))
+    JavaScriptCoreBackendDriver.valueType(of: ref, in: ctx)
   }
 }
 
 extension JSValue {
   public var isUndefined: Bool {
-    JSValueIsUndefined(ctx, ref)
+    JavaScriptCoreBackendDriver.isUndefined(ref, in: ctx)
   }
 
   public var isNull: Bool {
-    JSValueIsNull(ctx, ref)
+    JavaScriptCoreBackendDriver.isNull(ref, in: ctx)
   }
 
   public var isBoolean: Bool {
-    JSValueIsBoolean(ctx, ref)
+    JavaScriptCoreBackendDriver.isBoolean(ref, in: ctx)
   }
 
   public var isNumber: Bool {
-    JSValueIsNumber(ctx, ref)
+    JavaScriptCoreBackendDriver.isNumber(ref, in: ctx)
   }
 
   public var isString: Bool {
-    JSValueIsString(ctx, ref)
+    JavaScriptCoreBackendDriver.isString(ref, in: ctx)
   }
 
   public var isSymbol: Bool {
-    JSValueIsSymbol(ctx, ref)
+    JavaScriptCoreBackendDriver.isSymbol(ref, in: ctx)
   }
 
   public var isObject: Bool {
-    JSValueIsObject(ctx, ref)
+    JavaScriptCoreBackendDriver.isObject(ref, in: ctx)
   }
 
   public var isBigInt: Bool {
-    JSValueIsBigInt(ctx, ref)
+    JavaScriptCoreBackendDriver.isBigInt(ref, in: ctx)
   }
 }
