@@ -118,6 +118,8 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` 静态成员安装分支（已抽 staticValues 安装 helper，压缩主函数）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 静态成员安装分支（已抽 staticFunctions 安装 helper，与 staticValues 对称）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 生命周期安装分支（已抽 initialize/finalize 安装 helper）
+- [x] 继续收口 `JSClass.manualNativeDefinition` 顶部元数据安装分支（已抽 className 安装 helper）
+- [x] 继续收口 `JSClass.manualNativeDefinition` 顶部元数据安装分支（已抽 version/attributes/parentClass 安装 helper）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 

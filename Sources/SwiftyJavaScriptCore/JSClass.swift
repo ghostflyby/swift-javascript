@@ -710,6 +710,30 @@ private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDef
   cls.finalize = classFinalizeCallback
 }
 
+private func installClassName(
+  _ className: String?,
+  backing: JSManualNativeClassBacking,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard let className else {
+    return
+  }
+
+  backing.className = className.utf8CString
+  backing.className?.withUnsafeBufferPointer {
+    cls.className = $0.baseAddress
+  }
+}
+
+private func installClassMetadata(
+  from definition: JSClassDefinition,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  cls.version = definition.version
+  cls.attributes = definition.attributes.rawValue
+  cls.parentClass = definition.parentClass?.ref
+}
+
 private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCore.JSClassDefinition
@@ -818,16 +842,9 @@ extension JSClassDefinition {
     var cls = JavaScriptCore.kJSClassDefinitionEmpty
     let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: self)
 
-    cls.version = version
-    cls.attributes = attributes.rawValue
-    cls.parentClass = parentClass?.ref
+    installClassMetadata(from: self, into: &cls)
 
-    if let className {
-      backing.className = className.utf8CString
-      backing.className?.withUnsafeBufferPointer {
-        cls.className = $0.baseAddress
-      }
-    }
+    installClassName(className, backing: backing, into: &cls)
 
     installStaticValueMembers(descriptor, backing: backing, into: &cls)
 
