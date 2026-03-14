@@ -14,3 +14,6 @@ featuring Swift specefic API surfaces like `Actor` and `~Copyable`.
 ## test writing
 1. use swift test
 2. DO NOT use XCTest
+
+## Code Style
+1. run `swift format` for modified files
