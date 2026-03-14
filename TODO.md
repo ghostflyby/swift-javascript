@@ -123,14 +123,15 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装顺序分组（已抽 dynamic/callable 分组安装 helper）
 - [x] 继续收口 `JSClass.manualNativeDefinition` 主流程分组（已抽 staticMembers/classCallbacks 聚合 helper）
 - [x] 继续收口 `JSValueConversion` 数值解码校验样板（已抽 Int32/UInt32 共享整数校验 helper）
+- [x] 继续收口 `JSValueConversion` facade/raw JSC 直连（已把 Bool/Double/String 解码改走 backend helper，并移除本文件 `import JavaScriptCore`）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
 ### 9.1 当前基线（2026-03-14）
-- 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`12` 处
+- 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`11` 处
 - backend 适配层保留导入：`1` 处
 	- `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift`
-- 需在重构中彻底消除导入（目标清单）：`11` 处
+- 需在重构中彻底消除导入（目标清单）：`10` 处
 	- `Sources/SwiftyJavaScriptCore/JSInstantContext.swift`
 	- `Sources/SwiftyJavaScriptCore/JSValue.swift`
 	- `Sources/SwiftyJavaScriptCore/JSCodableValueConverter.swift`
@@ -139,12 +140,11 @@
 	- `Sources/SwiftyJavaScriptCore/JSArrayBuffer.swift`
 	- `Sources/SwiftyJavaScriptCore/JSArguments.swift`
 	- `Sources/SwiftyJavaScriptCore/JSObject.swift`
-	- `Sources/SwiftyJavaScriptCore/JSValueConversion.swift`
 	- `Sources/SwiftyJavaScriptCore/JSType.swift`
 	- `Sources/SwiftyJavaScriptCore/String.swift`
 
 ### 9.2 阶段性指标（消除导入且保持功能）
-- [ ] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `11` 降到 `0`
+- [ ] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `10` 降到 `0`
 - [ ] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
 - [ ] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`81` tests passed）
 

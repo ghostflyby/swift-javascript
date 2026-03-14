@@ -264,6 +264,22 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     }
   }
 
+  package static func toBoolean(_ value: JSValueRef, in context: JSContextRef) -> Bool {
+    JSValueToBoolean(context, value)
+  }
+
+  package static func toNumber(_ value: JSValueRef, in context: JSContextRef) -> Double {
+    JSValueToNumber(context, value, nil)
+  }
+
+  package static func toString(_ value: JSValueRef, in context: JSContextRef) -> String? {
+    guard let stringRef = JSValueToStringCopy(context, value, nil) else {
+      return nil
+    }
+    defer { JSStringRelease(stringRef) }
+    return String(jsStringRef: stringRef)
+  }
+
   package static func hostTypeDescriptor(
     for definition: JSClassDefinition,
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer

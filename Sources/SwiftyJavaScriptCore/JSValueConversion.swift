@@ -1,5 +1,3 @@
-import JavaScriptCore
-
 public enum JSValueConversionError: Error {
   case typeMismatch(expected: String, actual: JSType)
   case nonFiniteNumber(target: String)
@@ -177,7 +175,7 @@ private func validateIntegerDecode(
   guard number.isFinite else {
     throw .nonFiniteNumber(target: target)
   }
-  guard floor(number) == number else {
+  guard number.rounded(.towardZero) == number else {
     throw .nonInteger(target: target, value: number)
   }
   guard number >= minValue && number <= maxValue else {
@@ -210,7 +208,7 @@ extension JSValue: JSValueCodable {
 
 extension Bool: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self = JSValueToBoolean(context.globalContextRef, value.ref)
+    self = JavaScriptCoreBackendDriver.toBoolean(value.ref, in: context.globalContextRef)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -232,8 +230,7 @@ extension Bool {
 
 extension Double: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    var exception: JSValueRef?
-    self = JSValueToNumber(context.globalContextRef, value.ref, &exception)
+    self = JavaScriptCoreBackendDriver.toNumber(value.ref, in: context.globalContextRef)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -309,13 +306,7 @@ extension UInt32 {
 
 extension String: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    var exception: JSValueRef?
-    if let stringRef = JSValueToStringCopy(context.globalContextRef, value.ref, &exception) {
-      defer { JSStringRelease(stringRef) }
-      self = String(jsStringRef: stringRef)
-      return
-    }
-    self = ""
+    self = JavaScriptCoreBackendDriver.toString(value.ref, in: context.globalContextRef) ?? ""
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
