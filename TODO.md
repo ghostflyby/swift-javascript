@@ -131,20 +131,20 @@
 - [x] 继续收口 `String` facade/raw JSC 字符串直连（已将 JSString 操作改走 backend helper 与公开别名，并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `JSInstantContext` facade/raw JSC 上下文直连（已改用 backend 暴露的 context/object 别名与 globalObject helper，并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `JSArrayBuffer` facade/raw JSC typed-array 直连（已将 ArrayBuffer/TypedArray C API 调用与常量改走 backend helper，并移除本文件 `import JavaScriptCore`）
+- [x] 继续收口 `JSValue` facade/raw JSC 值语义直连（已将 unprotect/equality 严格等价判断改走 backend helper，并移除本文件 `import JavaScriptCore`）
+- [x] 继续收口 `JSClassValueConvertible` facade/raw JSC callback 类型直连（已将 class/callback/ref 类型与 undefined fallback 改走 backend 别名/helper，并移除本文件 `import JavaScriptCore`）
+- [x] 继续收口 `JSClass` facade/raw JSC callback/class-definition 直连（已将 class/ref/callback 类型、class attribute 常量、undefined/class create/retain/release 调用改走 backend 别名/helper，并移除本文件 `import JavaScriptCore`）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
 ### 9.1 当前基线（2026-03-14）
-- 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`4` 处
+- 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`1` 处
 - backend 适配层保留导入：`1` 处
 	- `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift`
-- 需在重构中彻底消除导入（目标清单）：`3` 处
-	- `Sources/SwiftyJavaScriptCore/JSValue.swift`
-	- `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift`
-	- `Sources/SwiftyJavaScriptCore/JSClass.swift`
+- 需在重构中彻底消除导入（目标清单）：`0` 处（已清零）
 
 ### 9.2 阶段性指标（消除导入且保持功能）
-- [ ] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `3` 降到 `0`
-- [ ] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
-- [ ] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`81` tests passed）
+- [x] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `1` 降到 `0`
+- [x] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
+- [x] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`81` tests passed）
 

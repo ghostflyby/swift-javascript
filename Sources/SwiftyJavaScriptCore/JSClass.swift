@@ -1,5 +1,4 @@
 import Foundation
-import JavaScriptCore
 
 public struct JSClassAttributes: OptionSet, Sendable {
   public let rawValue: UInt32
@@ -8,9 +7,10 @@ public struct JSClassAttributes: OptionSet, Sendable {
     self.rawValue = rawValue
   }
 
-  public static let none = JSClassAttributes(rawValue: UInt32(kJSClassAttributeNone))
+  public static let none = JSClassAttributes(
+    rawValue: UInt32(JavaScriptCoreBackendDriver.classAttributeNoneRawValue))
   public static let noAutomaticPrototype = JSClassAttributes(
-    rawValue: UInt32(kJSClassAttributeNoAutomaticPrototype))
+    rawValue: UInt32(JavaScriptCoreBackendDriver.classAttributeNoAutomaticPrototypeRawValue))
 }
 
 public struct JSStaticValue: Sendable {
@@ -99,7 +99,11 @@ public struct JSClassDefinition: Sendable {
       nil
 
   public var getPropertyNames:
-    (@Sendable (borrowing JSInstantContext, inout JSValue, JSPropertyNameAccumulatorRef) -> Void)? =
+    (
+      @Sendable (
+        borrowing JSInstantContext, inout JSValue, JavaScriptCorePropertyNameAccumulatorRef
+      ) -> Void
+    )? =
       nil
 
   public var callAsFunction:
@@ -182,29 +186,29 @@ public struct JSClassDefinition: Sendable {
 final class JSManualNativeClassBacking {
   var className: ContiguousArray<CChar>? = nil
   var staticValueNames: [ContiguousArray<CChar>] = []
-  var staticValues: [JavaScriptCore.JSStaticValue] = []
+  var staticValues: [JavaScriptCoreStaticValue] = []
   var staticFunctionNames: [ContiguousArray<CChar>] = []
-  var staticFunctions: [JavaScriptCore.JSStaticFunction] = []
+  var staticFunctions: [JavaScriptCoreStaticFunction] = []
 }
 
 private final class JSClassObjectContextRegistry: @unchecked Sendable {
   private let lock = NSLock()
-  private var map: [UInt: JSContextRef] = [:]
+  private var map: [UInt: JavaScriptCoreContextRef] = [:]
 
-  func set(_ object: JSObjectRef, context: JSContextRef) {
+  func set(_ object: JavaScriptCoreObjectRef, context: JavaScriptCoreContextRef) {
     lock.lock()
     map[classObjectKey(object)] = context
     lock.unlock()
   }
 
-  func get(_ object: JSObjectRef) -> JSContextRef? {
+  func get(_ object: JavaScriptCoreObjectRef) -> JavaScriptCoreContextRef? {
     lock.lock()
     let value = map[classObjectKey(object)]
     lock.unlock()
     return value
   }
 
-  func remove(_ object: JSObjectRef) {
+  func remove(_ object: JavaScriptCoreObjectRef) {
     lock.lock()
     map.removeValue(forKey: classObjectKey(object))
     lock.unlock()
@@ -217,13 +221,13 @@ private final class JSClassDefinitionRegistry: @unchecked Sendable {
   private let lock = NSLock()
   private var map: [UInt: JSClassDefinition] = [:]
 
-  func set(_ jsClass: JSClassRef, definition: JSClassDefinition) {
+  func set(_ jsClass: JavaScriptCoreClassRef, definition: JSClassDefinition) {
     lock.lock()
     map[classKey(jsClass)] = definition
     lock.unlock()
   }
 
-  func get(_ jsClass: JSClassRef) -> JSClassDefinition? {
+  func get(_ jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? {
     lock.lock()
     let value = map[classKey(jsClass)]
     lock.unlock()
@@ -235,7 +239,7 @@ private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
   private let lock = NSLock()
   private var map: [UInt: (definition: JSClassDefinition, depth: Int)] = [:]
 
-  func set(_ object: JSObjectRef, definition: JSClassDefinition, depth: Int) {
+  func set(_ object: JavaScriptCoreObjectRef, definition: JSClassDefinition, depth: Int) {
     lock.lock()
     let key = classObjectKey(object)
     if let current = map[key], current.depth > depth {
@@ -246,14 +250,14 @@ private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
     lock.unlock()
   }
 
-  func get(_ object: JSObjectRef) -> JSClassDefinition? {
+  func get(_ object: JavaScriptCoreObjectRef) -> JSClassDefinition? {
     lock.lock()
     let value = map[classObjectKey(object)]?.definition
     lock.unlock()
     return value
   }
 
-  func remove(_ object: JSObjectRef) {
+  func remove(_ object: JavaScriptCoreObjectRef) {
     lock.lock()
     map.removeValue(forKey: classObjectKey(object))
     lock.unlock()
@@ -264,14 +268,14 @@ private final class JSClassObjectFinalizeCounterRegistry: @unchecked Sendable {
   private let lock = NSLock()
   private var map: [UInt: Int] = [:]
 
-  func setMax(_ object: JSObjectRef, count: Int) {
+  func setMax(_ object: JavaScriptCoreObjectRef, count: Int) {
     lock.lock()
     let key = classObjectKey(object)
     map[key] = max(count, map[key] ?? 0)
     lock.unlock()
   }
 
-  func decrement(_ object: JSObjectRef) -> Int {
+  func decrement(_ object: JavaScriptCoreObjectRef) -> Int {
     lock.lock()
     let key = classObjectKey(object)
     let current = map[key] ?? 1
@@ -290,45 +294,48 @@ private let classDefinitionRegistry = JSClassDefinitionRegistry()
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
-func makeRememberedClassCallbackContext(_ ctx: JSContextRef, _ object: JSObjectRef)
+func makeRememberedClassCallbackContext(
+  _ ctx: JavaScriptCoreContextRef, _ object: JavaScriptCoreObjectRef
+)
   -> JSInstantContext
 {
   rememberClassObjectContext(ctx, object)
   return JSInstantContext(ctx: ctx)
 }
 
-func classPropertyName(_ propertyName: JSStringRef?) -> String? {
+func classPropertyName(_ propertyName: JavaScriptCoreStringRef?) -> String? {
   guard let propertyName else {
     return nil
   }
   return String(jsStringRef: propertyName)
 }
 
-private func classObjectKey(_ object: JSObjectRef) -> UInt {
+private func classObjectKey(_ object: JavaScriptCoreObjectRef) -> UInt {
   UInt(bitPattern: object)
 }
 
-private func classKey(_ jsClass: JSClassRef) -> UInt {
+private func classKey(_ jsClass: JavaScriptCoreClassRef) -> UInt {
   UInt(bitPattern: jsClass)
 }
 
-func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
+func rememberClassObjectContext(_ ctx: JavaScriptCoreContextRef, _ object: JavaScriptCoreObjectRef)
+{
   classObjectContextRegistry.set(object, context: ctx)
 }
 
-func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
+func classObjectContext(_ object: JavaScriptCoreObjectRef) -> JavaScriptCoreContextRef? {
   classObjectContextRegistry.get(object)
 }
 
-func removeClassObjectContext(_ object: JSObjectRef) {
+func removeClassObjectContext(_ object: JavaScriptCoreObjectRef) {
   classObjectContextRegistry.remove(object)
 }
 
-func classDefinition(from object: JSObjectRef) -> JSClassDefinition? {
+func classDefinition(from object: JavaScriptCoreObjectRef) -> JSClassDefinition? {
   classObjectDefinitionRegistry.get(object)
 }
 
-func classDefinition(for jsClass: JSClassRef) -> JSClassDefinition? {
+func classDefinition(for jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? {
   classDefinitionRegistry.get(jsClass)
 }
 
@@ -341,7 +348,8 @@ private func definitionDepth(_ definition: JSClassDefinition) -> Int {
   return 1 + definitionDepth(parentDefinition)
 }
 
-func rememberClassObjectDefinition(_ object: JSObjectRef, definition: JSClassDefinition) {
+func rememberClassObjectDefinition(_ object: JavaScriptCoreObjectRef, definition: JSClassDefinition)
+{
   classObjectDefinitionRegistry.set(
     object, definition: definition, depth: definitionDepth(definition))
 }
@@ -355,15 +363,19 @@ func exportedDefinitionCount(_ definition: JSClassDefinition) -> Int {
   return 1 + exportedDefinitionCount(parentDefinition)
 }
 
-func rememberClassObjectFinalizeCount(_ object: JSObjectRef, definition: JSClassDefinition) {
+func rememberClassObjectFinalizeCount(
+  _ object: JavaScriptCoreObjectRef, definition: JSClassDefinition
+) {
   classObjectFinalizeCounterRegistry.setMax(object, count: exportedDefinitionCount(definition))
 }
 
-private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
+private func finalizeCountAfterDecrement(_ object: JavaScriptCoreObjectRef) -> Int {
   classObjectFinalizeCounterRegistry.decrement(object)
 }
 
-private func rememberClassDefinition(_ definition: JSClassDefinition, for jsClass: JSClassRef) {
+private func rememberClassDefinition(
+  _ definition: JSClassDefinition, for jsClass: JavaScriptCoreClassRef
+) {
   classDefinitionRegistry.set(jsClass, definition: definition)
 }
 
@@ -395,7 +407,7 @@ func inheritedStaticFunction(named name: String, from definition: JSClassDefinit
   return inheritedStaticFunction(named: name, from: parentDefinition)
 }
 
-private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
+private let classInitializeCallback: JavaScriptCoreObjectInitializeCallback = { ctx, object in
   guard let ctx, let object else {
     return
   }
@@ -403,7 +415,7 @@ private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object 
   rememberClassObjectContext(ctx, object)
 }
 
-private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
+private let classFinalizeCallback: JavaScriptCoreObjectFinalizeCallback = { object in
   guard let object else {
     return
   }
@@ -414,23 +426,27 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 }
 
-private func callbackValueOrUndefined(_ value: JSValueRef?, in ctx: JSContextRef?) -> JSValueRef? {
-  value ?? JSValueMakeUndefined(ctx)
+private func callbackValueOrUndefined(
+  _ value: JavaScriptCoreValueRef?, in ctx: JavaScriptCoreContextRef?
+) -> JavaScriptCoreValueRef? {
+  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
 }
 
-private func callbackValueOrUndefined(_ value: JSValueRef??, in ctx: JSContextRef?) -> JSValueRef? {
-  value ?? JSValueMakeUndefined(ctx)
+private func callbackValueOrUndefined(
+  _ value: JavaScriptCoreValueRef??, in ctx: JavaScriptCoreContextRef?
+) -> JavaScriptCoreValueRef? {
+  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
 }
 
 private func callbackBoolOrFalse(_ value: Bool?) -> Bool {
   value ?? false
 }
 
-private func callbackObjectOrNil(_ value: JSObjectRef?) -> JSObjectRef? {
+private func callbackObjectOrNil(_ value: JavaScriptCoreObjectRef?) -> JavaScriptCoreObjectRef? {
   value
 }
 
-private func callbackObjectOrNil(_ value: JSObjectRef??) -> JSObjectRef? {
+private func callbackObjectOrNil(_ value: JavaScriptCoreObjectRef??) -> JavaScriptCoreObjectRef? {
   value ?? nil
 }
 
@@ -440,7 +456,7 @@ private func callbackDidRun(_ value: Void?) -> Bool {
 
 private func installPropertyNamesCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) else {
     return
@@ -462,7 +478,7 @@ private func installPropertyNamesCallbackIfNeeded(
 
 private func installHasPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor) else {
     return
@@ -482,7 +498,7 @@ private func installHasPropertyCallbackIfNeeded(
 
 private func installDeletePropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) else {
     return
@@ -502,7 +518,7 @@ private func installDeletePropertyCallbackIfNeeded(
 
 private func installSetPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) else {
     return
@@ -534,7 +550,7 @@ private func installSetPropertyCallbackIfNeeded(
 
 private func installGetPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) else {
     return
@@ -558,7 +574,7 @@ private func installGetPropertyCallbackIfNeeded(
 
 private func installCallAsFunctionCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) else {
     return
@@ -592,7 +608,7 @@ private func installCallAsFunctionCallbackIfNeeded(
 
 private func installHasInstanceCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) else {
     return
@@ -612,7 +628,7 @@ private func installHasInstanceCallbackIfNeeded(
 
 private func installCallAsConstructorCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) else {
     return
@@ -649,7 +665,7 @@ private func installCallAsConstructorCallbackIfNeeded(
 private func installStaticValueMembers(
   _ descriptor: JSHostTypeDescriptor,
   backing: JSManualNativeClassBacking,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard !descriptor.properties.isEmpty else {
     return
@@ -659,7 +675,7 @@ private func installStaticValueMembers(
   backing.staticValues = []
   backing.staticValues.reserveCapacity(descriptor.properties.count + 1)
   for (index, property) in descriptor.properties.enumerated() {
-    var staticValue = JavaScriptCore.JSStaticValue()
+    var staticValue = JavaScriptCoreStaticValue()
     backing.staticValueNames[index].withUnsafeBufferPointer {
       staticValue.name = $0.baseAddress
     }
@@ -670,7 +686,7 @@ private func installStaticValueMembers(
     )
     backing.staticValues.append(staticValue)
   }
-  backing.staticValues.append(JavaScriptCore.JSStaticValue())
+  backing.staticValues.append(JavaScriptCoreStaticValue())
   backing.staticValues.withUnsafeBufferPointer {
     cls.staticValues = $0.baseAddress
   }
@@ -679,7 +695,7 @@ private func installStaticValueMembers(
 private func installStaticFunctionMembers(
   _ descriptor: JSHostTypeDescriptor,
   backing: JSManualNativeClassBacking,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard !descriptor.methods.isEmpty else {
     return
@@ -689,7 +705,7 @@ private func installStaticFunctionMembers(
   backing.staticFunctions = []
   backing.staticFunctions.reserveCapacity(descriptor.methods.count + 1)
   for (index, method) in descriptor.methods.enumerated() {
-    var staticFunction = JavaScriptCore.JSStaticFunction()
+    var staticFunction = JavaScriptCoreStaticFunction()
     backing.staticFunctionNames[index].withUnsafeBufferPointer {
       staticFunction.name = $0.baseAddress
     }
@@ -699,7 +715,7 @@ private func installStaticFunctionMembers(
     )
     backing.staticFunctions.append(staticFunction)
   }
-  backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
+  backing.staticFunctions.append(JavaScriptCoreStaticFunction())
   backing.staticFunctions.withUnsafeBufferPointer {
     cls.staticFunctions = $0.baseAddress
   }
@@ -708,20 +724,20 @@ private func installStaticFunctionMembers(
 private func installStaticMembers(
   _ descriptor: JSHostTypeDescriptor,
   backing: JSManualNativeClassBacking,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   installStaticValueMembers(descriptor, backing: backing, into: &cls)
   installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
 }
 
-private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDefinition) {
+private func installLifecycleCallbacks(into cls: inout JavaScriptCoreClassDefinition) {
   cls.initialize = classInitializeCallback
   cls.finalize = classFinalizeCallback
 }
 
 private func installDynamicPropertyCallbacks(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
   installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
@@ -732,7 +748,7 @@ private func installDynamicPropertyCallbacks(
 
 private func installCallableCallbacks(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
   installCallAsConstructorCallbackIfNeeded(descriptor, into: &cls)
@@ -743,7 +759,7 @@ private func installCallableCallbacks(
 private func installClassName(
   _ className: String?,
   backing: JSManualNativeClassBacking,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard let className else {
     return
@@ -757,7 +773,7 @@ private func installClassName(
 
 private func installClassMetadata(
   from definition: JSClassDefinition,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   cls.version = definition.version
   cls.attributes = definition.attributes.rawValue
@@ -766,7 +782,7 @@ private func installClassMetadata(
 
 private func installClassCallbacks(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   installLifecycleCallbacks(into: &cls)
   installDynamicPropertyCallbacks(descriptor, into: &cls)
@@ -775,7 +791,7 @@ private func installClassCallbacks(
 
 private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
-  into cls: inout JavaScriptCore.JSClassDefinition
+  into cls: inout JavaScriptCoreClassDefinition
 ) {
   guard JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) else {
     return
@@ -790,7 +806,7 @@ private func installConvertToTypeCallbackIfNeeded(
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
         ?? JSValue(undefinedIn: context)
-      let exceptionRef: JSValueRef?
+      let exceptionRef: JavaScriptCoreValueRef?
       if exceptionValue.isUndefined {
         exceptionRef = nil
       } else {
@@ -813,7 +829,7 @@ private func installConvertToTypeCallbackIfNeeded(
   }
 }
 
-private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
+private let staticValueGetPropertyCallback: JavaScriptCoreObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
     ctx: ctx,
@@ -829,7 +845,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   return callbackValueOrUndefined(value, in: ctx)
 }
 
-private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
+private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallback = {
   ctx, object, propertyName, value, exception in
   guard let value else {
     return false
@@ -853,7 +869,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   return callbackBoolOrFalse(didSet)
 }
 
-private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
+private let staticFunctionCallAsFunctionCallback: JavaScriptCoreObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
   let value = JavaScriptCoreBackendDriver.withStaticFunctionCallbackInput(
     ctx: ctx,
@@ -876,9 +892,9 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
 extension JSClassDefinition {
 
   fileprivate func manualNativeDefinition(backing: JSManualNativeClassBacking)
-    -> JavaScriptCore.JSClassDefinition
+    -> JavaScriptCoreClassDefinition
   {
-    var cls = JavaScriptCore.kJSClassDefinitionEmpty
+    var cls = JavaScriptCoreBackendDriver.emptyClassDefinition
     let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: self)
 
     installClassMetadata(from: self, into: &cls)
@@ -894,7 +910,7 @@ extension JSClassDefinition {
 }
 
 extension JSContext {
-  internal static func borrow(ctx: JSContextRef) -> JSContext {
+  internal static func borrow(ctx: JavaScriptCoreContextRef) -> JSContext {
     let context = Unmanaged<JSContext>.fromOpaque(
       JavaScriptCoreBackendDriver.privateData(fromGlobalObjectIn: ctx)!
     ).takeUnretainedValue()
@@ -903,29 +919,29 @@ extension JSContext {
 }
 
 public class JSClass: @unchecked Sendable {
-  public let ref: JSClassRef
+  public let ref: JavaScriptCoreClassRef
   private let nativeBacking: AnyObject?
 
-  public init(ref: JSClassRef) {
-    self.ref = JSClassRetain(ref)
+  public init(ref: JavaScriptCoreClassRef) {
+    self.ref = JavaScriptCoreBackendDriver.retainClass(ref)
     self.nativeBacking = nil
   }
 
   public init(defination: JSClassDefinition) {
     let backing = JSManualNativeClassBacking()
     var copy = defination.manualNativeDefinition(backing: backing)
-    self.ref = JSClassCreate(&copy)
+    self.ref = JavaScriptCoreBackendDriver.createClass(&copy)
     self.nativeBacking = backing
     rememberClassDefinition(defination, for: ref)
   }
 
   init(
-    nativeDefinition: JavaScriptCore.JSClassDefinition,
+    nativeDefinition: JavaScriptCoreClassDefinition,
     retainedBacking: AnyObject?,
     rememberedDefinition: JSClassDefinition? = nil
   ) {
     var copy = nativeDefinition
-    self.ref = JSClassCreate(&copy)
+    self.ref = JavaScriptCoreBackendDriver.createClass(&copy)
     self.nativeBacking = retainedBacking
     if let rememberedDefinition {
       rememberClassDefinition(rememberedDefinition, for: ref)
@@ -933,6 +949,6 @@ public class JSClass: @unchecked Sendable {
   }
 
   deinit {
-    JSClassRelease(ref)
+    JavaScriptCoreBackendDriver.releaseClass(ref)
   }
 }

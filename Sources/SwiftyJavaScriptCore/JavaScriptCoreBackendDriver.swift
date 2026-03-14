@@ -6,6 +6,22 @@ public typealias JavaScriptCoreObjectRef = JSObjectRef
 public typealias JavaScriptCoreContextRef = JSContextRef
 public typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
 public typealias JavaScriptCoreStringRef = JSStringRef
+public typealias JavaScriptCoreClassRef = JSClassRef
+public typealias JavaScriptCorePropertyNameAccumulatorRef = JSPropertyNameAccumulatorRef
+public typealias JavaScriptCoreObjectInitializeCallback = JSObjectInitializeCallback
+public typealias JavaScriptCoreObjectFinalizeCallback = JSObjectFinalizeCallback
+public typealias JavaScriptCoreObjectGetPropertyCallback = JSObjectGetPropertyCallback
+public typealias JavaScriptCoreObjectSetPropertyCallback = JSObjectSetPropertyCallback
+public typealias JavaScriptCoreObjectHasPropertyCallback = JSObjectHasPropertyCallback
+public typealias JavaScriptCoreObjectDeletePropertyCallback = JSObjectDeletePropertyCallback
+public typealias JavaScriptCoreObjectGetPropertyNamesCallback = JSObjectGetPropertyNamesCallback
+public typealias JavaScriptCoreObjectCallAsFunctionCallback = JSObjectCallAsFunctionCallback
+public typealias JavaScriptCoreObjectCallAsConstructorCallback = JSObjectCallAsConstructorCallback
+public typealias JavaScriptCoreObjectHasInstanceCallback = JSObjectHasInstanceCallback
+public typealias JavaScriptCoreObjectConvertToTypeCallback = JSObjectConvertToTypeCallback
+public typealias JavaScriptCoreClassDefinition = JavaScriptCore.JSClassDefinition
+public typealias JavaScriptCoreStaticValue = JavaScriptCore.JSStaticValue
+public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
 public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
 public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
@@ -386,6 +402,32 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     JSContextGetGlobalObject(context)
   }
 
+  package static var emptyClassDefinition: JavaScriptCoreClassDefinition {
+    JavaScriptCore.kJSClassDefinitionEmpty
+  }
+
+  package static var classAttributeNoneRawValue: UInt32 {
+    UInt32(kJSClassAttributeNone)
+  }
+
+  package static var classAttributeNoAutomaticPrototypeRawValue: UInt32 {
+    UInt32(kJSClassAttributeNoAutomaticPrototype)
+  }
+
+  package static func retainClass(_ jsClass: JavaScriptCoreClassRef) -> JavaScriptCoreClassRef {
+    JSClassRetain(jsClass)
+  }
+
+  package static func createClass(
+    _ definition: inout JavaScriptCoreClassDefinition
+  ) -> JavaScriptCoreClassRef {
+    JSClassCreate(&definition)
+  }
+
+  package static func releaseClass(_ jsClass: JavaScriptCoreClassRef) {
+    JSClassRelease(jsClass)
+  }
+
   package static var typedArrayTypeArrayBuffer: JavaScriptCoreTypedArrayType {
     kJSTypedArrayTypeArrayBuffer
   }
@@ -584,6 +626,35 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
       return nil
     }
     return type
+  }
+
+  package static func unprotect(
+    _ value: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreContextRef
+  ) {
+    JSValueUnprotect(context, value)
+  }
+
+  package static func valueEquals(
+    _ lhs: JavaScriptCoreValueRef,
+    _ rhs: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Bool {
+    JSValueIsEqual(context, lhs, rhs, nil)
+  }
+
+  package static func valueStrictEquals(
+    _ lhs: JavaScriptCoreValueRef,
+    _ rhs: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreContextRef
+  ) -> Bool {
+    JSValueIsStrictEqual(context, lhs, rhs)
+  }
+
+  package static func undefinedValue(
+    in context: JavaScriptCoreContextRef?
+  ) -> JavaScriptCoreValueRef? {
+    JSValueMakeUndefined(context)
   }
 
   package static func toNumber(_ value: JSValueRef, in context: JSContextRef) -> Double {

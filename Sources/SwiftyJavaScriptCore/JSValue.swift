@@ -4,8 +4,6 @@
 //
 //  Created by ghostflyby pan on 2025/9/12.
 //
-import JavaScriptCore
-
 @inline(__always)
 func countTypePack<each T>(_ types: repeat (each T).Type) -> Int {
   var count = 0
@@ -16,19 +14,19 @@ func countTypePack<each T>(_ types: repeat (each T).Type) -> Int {
 }
 
 public struct JSValue: ~Copyable {
-  let ref: JSValueRef
-  let ctx: JSContextRef
+  let ref: JavaScriptCoreValueRef
+  let ctx: JavaScriptCoreContextRef
 
   /// Wrap the `ref` **without retaining**
   /// - Parameters:
-  ///   - ref: The JSValueRef to wrap
+  ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
-  init(ref: JSValueRef, ctx: isolated JSContext = #isolation) {
+  init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
     self.ref = ref
     self.ctx = ctx.globalContextRef
   }
 
-  init(ref: JSValueRef, ctx: borrowing JSInstantContext) {
+  init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
     self.ref = ref
     self.ctx = ctx.globalContextRef
   }
@@ -149,7 +147,7 @@ public struct JSValue: ~Copyable {
     return SendableBoxUnsafe(self)
   }
 
-  consuming func retainedRef() -> JSValueRef {
+  consuming func retainedRef() -> JavaScriptCoreValueRef {
     let ref = ref
     discard self
     return ref
@@ -229,7 +227,7 @@ public struct JSValue: ~Copyable {
   }
 
   deinit {
-    JSValueUnprotect(ctx, ref)
+    JavaScriptCoreBackendDriver.unprotect(ref, in: ctx)
   }
 }
 
@@ -294,8 +292,8 @@ public enum JSResult: ~Copyable {
 }
 
 enum JSPrivateResult: @unchecked Sendable {
-  case value(JSValueRef)
-  case exception(JSValueRef)
+  case value(JavaScriptCoreValueRef)
+  case exception(JavaScriptCoreValueRef)
 }
 
 class Box<T: ~Copyable> {
@@ -317,7 +315,7 @@ extension SendableBoxUnsafe: Copyable where T: Copyable {}
 extension JSValue {
   public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
     return lhs.ctx == rhs.ctx
-      && JSValueIsEqual(lhs.ctx, lhs.ref, rhs.ref, nil)
+      && JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: lhs.ctx)
   }
 
   public static func != (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
@@ -325,7 +323,8 @@ extension JSValue {
   }
 
   public static func === (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return lhs.ctx == rhs.ctx && JSValueIsStrictEqual(lhs.ctx, lhs.ref, rhs.ref)
+    return lhs.ctx == rhs.ctx
+      && JavaScriptCoreBackendDriver.valueStrictEquals(lhs.ref, rhs.ref, in: lhs.ctx)
   }
 
   public static func !== (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
