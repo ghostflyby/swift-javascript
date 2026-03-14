@@ -646,6 +646,46 @@ private func installCallAsConstructorCallbackIfNeeded(
   }
 }
 
+private func installConvertToTypeCallbackIfNeeded(
+  _ descriptor: JSHostTypeDescriptor,
+  into cls: inout JavaScriptCore.JSClassDefinition
+) {
+  guard JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) else {
+    return
+  }
+
+  cls.convertToType = { ctx, objectRef, type, exception in
+    let value = JavaScriptCoreBackendDriver.withConvertToTypeCallbackInput(
+      ctx: ctx,
+      objectRef: objectRef,
+      jsType: JSType(type)
+    ) { definition, context, objectValue, jsType, exceptionValue in
+      let result =
+        definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
+        ?? JSValue(undefinedIn: context)
+      let exceptionRef: JSValueRef?
+      if exceptionValue.isUndefined {
+        exceptionRef = nil
+      } else {
+        exceptionRef = exceptionValue.retainedRef()
+        exceptionValue = JSValue(undefinedIn: context)
+      }
+      let conversion: JSPrivateResult =
+        if let exceptionRef {
+          .exception(exceptionRef)
+        } else {
+          .value(result.retainedRef())
+        }
+      return JavaScriptCoreBackendDriver.callbackReturnValue(
+        conversion,
+        in: ctx,
+        exception: exception
+      )
+    }
+    return callbackValueOrUndefined(value, in: ctx)
+  }
+}
+
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
@@ -785,38 +825,7 @@ extension JSClassDefinition {
 
     installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
 
-    if JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) {
-      cls.convertToType = { ctx, objectRef, type, exception in
-        let value = JavaScriptCoreBackendDriver.withConvertToTypeCallbackInput(
-          ctx: ctx,
-          objectRef: objectRef,
-          jsType: JSType(type)
-        ) { definition, context, objectValue, jsType, exceptionValue in
-          let result =
-            definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
-            ?? JSValue(undefinedIn: context)
-          let exceptionRef: JSValueRef?
-          if exceptionValue.isUndefined {
-            exceptionRef = nil
-          } else {
-            exceptionRef = exceptionValue.retainedRef()
-            exceptionValue = JSValue(undefinedIn: context)
-          }
-          let conversion: JSPrivateResult =
-            if let exceptionRef {
-              .exception(exceptionRef)
-            } else {
-              .value(result.retainedRef())
-            }
-          return JavaScriptCoreBackendDriver.callbackReturnValue(
-            conversion,
-            in: ctx,
-            exception: exception
-          )
-        }
-        return callbackValueOrUndefined(value, in: ctx)
-      }
-    }
+    installConvertToTypeCallbackIfNeeded(descriptor, into: &cls)
 
     return cls
   }

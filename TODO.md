@@ -114,3 +114,4 @@
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 callAsFunction 安装 helper，压缩调用类分支）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 hasInstance 安装 helper，压缩调用类分支）
 - [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 callAsConstructor 安装 helper，压缩调用类分支）
+- [x] 继续收口 `JSClass.manualNativeDefinition` callback 安装分支（已抽 convertToType 安装 helper，完成调用类分支结构化）
