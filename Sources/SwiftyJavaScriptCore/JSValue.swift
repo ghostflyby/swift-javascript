@@ -293,22 +293,6 @@ enum JSPrivateResult: @unchecked Sendable {
   case exception(JavaScriptCoreValueRef)
 }
 
-class Box<T: ~Copyable> {
-  let value: T
-  init(_ value: consuming T) {
-    self.value = value
-  }
-}
-
-struct SendableBoxUnsafe<T: ~Copyable>: @unchecked Sendable, ~Copyable {
-  let value: T
-  init(_ value: consuming T) {
-    self.value = value
-  }
-}
-
-extension SendableBoxUnsafe: Copyable where T: Copyable {}
-
 extension JSValue {
   public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
     return lhs.ctx == rhs.ctx
