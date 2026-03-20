@@ -145,6 +145,7 @@
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 host descriptor/attributes 核心语义测试）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSHostTypeDescriptor` 可选绑定字段语义测试）
 - [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `JSDriverResult` 为独立文件）
+- [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `_JSEngineDriver` 协议声明为独立文件）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
