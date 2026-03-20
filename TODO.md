@@ -153,6 +153,7 @@
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `_JSOpaqueHandleStorage` 为独立 core 文件）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `JSResultHandle` 为独立 core 文件）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `JSRuntimeHandle` 为独立 core 文件）
+- [ ] 继续迁移通用实现细节离开 JSC 到 SJS（进行中：拆分 `JSBorrowedContextHandle` 为独立 core 文件）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
