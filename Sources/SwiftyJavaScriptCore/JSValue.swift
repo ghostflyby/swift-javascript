@@ -286,10 +286,7 @@ extension JSResult {
     }
   }
 }
-public enum JSResult: ~Copyable {
-  case value(JSValue)
-  case exception(JSValue)
-}
+public typealias JSResult = SwiftJavaScript.JSResultPayload<JSValue>
 
 enum JSPrivateResult: @unchecked Sendable {
   case value(JavaScriptCoreValueRef)
