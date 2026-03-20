@@ -43,3 +43,40 @@ import Testing
     Issue.record("Expected typeMismatch error case")
   }
 }
+
+@Test func hostMemberAttributesOptionSetCombinesAndPreservesFlags() {
+  let attributes: JSHostMemberAttributes = [.readOnly, .dontDelete]
+
+  #expect(attributes.contains(.readOnly))
+  #expect(!attributes.contains(.dontEnum))
+  #expect(attributes.contains(.dontDelete))
+  #expect(
+    attributes.rawValue
+      == (JSHostMemberAttributes.readOnly.rawValue | JSHostMemberAttributes.dontDelete.rawValue))
+}
+
+@Test func hostDescriptorsUseDocumentedDefaults() {
+  let function = JSHostFunctionDescriptor(name: "f")
+  let property = JSHostPropertyDescriptor(name: "p")
+  let constant = JSHostConstantDescriptor(name: "k", value: 1)
+  let type = JSHostTypeDescriptor(name: "T")
+  let module = JSHostModuleDescriptor(name: "M")
+
+  #expect(function.attributes == .none)
+  #expect(function.binding == nil)
+
+  #expect(property.attributes == .none)
+  #expect(property.getterBinding == nil)
+  #expect(property.setterBinding == nil)
+
+  #expect(constant.attributes == .none)
+
+  #expect(type.storagePolicy == .swiftRetainedObject)
+  #expect(type.methods.isEmpty)
+  #expect(type.staticMethods.isEmpty)
+  #expect(type.properties.isEmpty)
+
+  #expect(module.functions.isEmpty)
+  #expect(module.constants.isEmpty)
+  #expect(module.types.isEmpty)
+}
