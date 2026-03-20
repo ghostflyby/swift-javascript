@@ -151,6 +151,7 @@
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已迁移 `countTypePack` 到 `SwiftJavaScript` 并保持 `package` 可见性）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSResultPayload`/`Box`/`SendableBoxUnsafe` 核心语义测试）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `_JSOpaqueHandleStorage` 为独立 core 文件）
+- [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `JSResultHandle` 为独立 core 文件）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 

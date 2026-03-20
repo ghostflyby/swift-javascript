@@ -45,17 +45,3 @@ public struct JSValueHandle<E: JSEngine> {
     storage.base as? T
   }
 }
-
-public enum JSResultHandle<E: JSEngine> {
-  case value(JSValueHandle<E>)
-  case exception(JSValueHandle<E>)
-
-  public var isException: Bool {
-    switch self {
-    case .value:
-      return false
-    case .exception:
-      return true
-    }
-  }
-}
