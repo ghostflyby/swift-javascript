@@ -141,6 +141,7 @@
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSValueConversionError`，保留 `JSValueConversion` 协议与实现在 JSC facade）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `TransferableCopy` 基础协议）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已迁 `TransferableCopyTests`）
+- [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补已下沉 core 类型语义测试）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
