@@ -143,6 +143,7 @@
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已迁 `TransferableCopyTests`）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补已下沉 core 类型语义测试）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 host descriptor/attributes 核心语义测试）
+- [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSHostTypeDescriptor` 可选绑定字段语义测试）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 

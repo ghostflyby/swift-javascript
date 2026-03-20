@@ -80,3 +80,30 @@ import Testing
   #expect(module.constants.isEmpty)
   #expect(module.types.isEmpty)
 }
+
+@Test func hostTypeDescriptorRetainsOptionalBindings() {
+  let descriptor = JSHostTypeDescriptor(
+    name: "Widget",
+    constructor: JSHostConstructorDescriptor(binding: "widget_ctor"),
+    dynamicPropertyHasBinding: "widget_dynamic_has",
+    dynamicPropertyDeleteBinding: "widget_dynamic_delete",
+    hasInstanceBinding: "widget_has_instance",
+    convertToTypeBinding: "widget_convert_to_type"
+  )
+
+  #expect(descriptor.constructor?.binding == "widget_ctor")
+  #expect(descriptor.hasInstanceBinding == "widget_has_instance")
+  #expect(descriptor.convertToTypeBinding == "widget_convert_to_type")
+  #expect(descriptor.dynamicPropertyHasBinding == "widget_dynamic_has")
+  #expect(descriptor.dynamicPropertyDeleteBinding == "widget_dynamic_delete")
+}
+
+@Test func hostTypeDescriptorDefaultsOptionalBindingsToNil() {
+  let descriptor = JSHostTypeDescriptor(name: "Defaults")
+
+  #expect(descriptor.constructor == nil)
+  #expect(descriptor.hasInstanceBinding == nil)
+  #expect(descriptor.convertToTypeBinding == nil)
+  #expect(descriptor.dynamicPropertyHasBinding == nil)
+  #expect(descriptor.dynamicPropertyDeleteBinding == nil)
+}
