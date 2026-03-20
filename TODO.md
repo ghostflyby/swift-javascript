@@ -156,6 +156,7 @@
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `JSBorrowedContextHandle` 为独立 core 文件）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已拆分 `JSValueHandle` 为独立 core 文件）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已删除空壳 `JSGenericHandles.swift`）
+- [x] 继续迁移 core 描述类型到 SJS（已拆分 `JSHostModuleDescriptor` 与 `JSNativeModule` 为独立文件）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
