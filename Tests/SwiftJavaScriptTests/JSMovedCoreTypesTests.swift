@@ -107,3 +107,30 @@ import Testing
   #expect(descriptor.dynamicPropertyHasBinding == nil)
   #expect(descriptor.dynamicPropertyDeleteBinding == nil)
 }
+
+@Test func jsResultPayloadKeepsValueAndExceptionCases() {
+  let ok = JSResultPayload<Int>.value(42)
+  let failure = JSResultPayload<Int>.exception(7)
+
+  switch ok {
+  case .value(let value):
+    #expect(value == 42)
+  case .exception:
+    Issue.record("Expected value case")
+  }
+
+  switch failure {
+  case .value:
+    Issue.record("Expected exception case")
+  case .exception(let value):
+    #expect(value == 7)
+  }
+}
+
+@Test func utilityBoxesStoreAndExposePayload() {
+  let boxed = Box(123)
+  let sendableBox = SendableBoxUnsafe("payload")
+
+  #expect(boxed.value == 123)
+  #expect(sendableBox.value == "payload")
+}

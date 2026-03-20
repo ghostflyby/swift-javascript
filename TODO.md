@@ -149,6 +149,7 @@
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已抽离 `JSResult` 通用容器到 `SwiftJavaScript` 并在 facade 保留 `JSValue` 特化别名）
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已迁移 `Box` 与 `SendableBoxUnsafe` 到 `SwiftJavaScript`，并收敛为 `package` 可见性）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已迁移 `countTypePack` 到 `SwiftJavaScript` 并保持 `package` 可见性）
+- [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSResultPayload`/`Box`/`SendableBoxUnsafe` 核心语义测试）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
