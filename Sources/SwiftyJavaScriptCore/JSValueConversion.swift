@@ -1,11 +1,3 @@
-public enum JSValueConversionError: Error {
-  case typeMismatch(expected: String, actual: JSType)
-  case nonFiniteNumber(target: String)
-  case outOfRange(target: String, value: Double)
-  case nonInteger(target: String, value: Double)
-  case codable(String)
-}
-
 public protocol JSValueDecodable: ~Copyable {
   init(value: borrowing JSValue, in context: borrowing JSInstantContext)
   static func tryDecode(

@@ -1,4 +1,4 @@
-protocol TransferableCopy where Self: ~Copyable & Sendable {
+public protocol TransferableCopy where Self: ~Copyable & Sendable {
   init(copying other: borrowing Self)
 }
 
