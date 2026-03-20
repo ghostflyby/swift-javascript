@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftyJavaScriptCore
+@testable import SwiftJavaScript
 
 struct CopyableValue: Sendable, TransferableCopy {
   let value: Int
