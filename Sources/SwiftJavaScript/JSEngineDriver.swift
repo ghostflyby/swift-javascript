@@ -1,8 +1,3 @@
-package enum JSDriverResult<Value> {
-  case value(Value)
-  case exception(Value)
-}
-
 package protocol _JSEngineDriver {
   associatedtype Engine: JSEngine
   associatedtype RawRuntime
