@@ -1,0 +1,27 @@
+package protocol _JSEngineRuntimeDriver {
+  associatedtype Engine: JSEngine
+  associatedtype RawRuntime
+  associatedtype RawContext
+  associatedtype RawValue
+
+  static var capabilities: JSEngineCapabilities { get }
+
+  static func makeRuntime() -> RawRuntime
+  static func makeContext(in runtime: RawRuntime) -> RawContext
+
+  static func evaluateScript(
+    _ script: String,
+    in context: RawContext,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSDriverResult<RawValue>
+
+  static func makeString(_ value: String, in context: RawContext) -> RawValue
+  static func makeSymbol(_ value: String, in context: RawContext) -> RawValue
+  static func makeNumber(_ value: Double, in context: RawContext) -> RawValue
+  static func makeBoolean(_ value: Bool, in context: RawContext) -> RawValue
+  static func makeNull(in context: RawContext) -> RawValue
+  static func makeUndefined(in context: RawContext) -> RawValue
+  static func makeObject(in context: RawContext) -> JSDriverResult<RawValue>
+  static func makeArray(in context: RawContext) -> JSDriverResult<RawValue>
+}
