@@ -20,7 +20,7 @@ import Testing
 
     let hasBeforeDelete = global.hasProperty(key, in: context)
     let read = global.getProperty(forKey: key, in: context)
-    let readIsNumber = read.isNumber
+    let readIsNumber = read.isNumber(in: context)
 
     #expect(hasBeforeDelete)
     #expect(readIsNumber)
@@ -40,7 +40,7 @@ import Testing
 
     let hasBeforeDelete = global.hasProperty(key, in: context)
     let read = global.getProperty(forKey: key, in: context)
-    let readIsString = read.isString
+    let readIsString = read.isString(in: context)
 
     #expect(hasBeforeDelete)
     #expect(readIsString)
@@ -57,7 +57,7 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(TestBoolMarshal(true), at: 2, in: context)
     let read = global.getProperty(at: 2, in: context)
-    let readIsBoolean = read.isBoolean
+    let readIsBoolean = read.isBoolean(in: context)
     #expect(readIsBoolean)
   }
 }

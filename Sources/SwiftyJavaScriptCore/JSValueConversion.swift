@@ -213,8 +213,8 @@ extension Bool {
     _ value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Bool {
-    guard value.isBoolean else {
-      throw .typeMismatch(expected: "boolean", actual: value.type)
+    guard value.isBoolean(in: context) else {
+      throw .typeMismatch(expected: "boolean", actual: value.type(in: context))
     }
     return Bool(value: value, in: context)
   }
@@ -235,8 +235,8 @@ extension Double {
     _ value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Double {
-    guard value.isNumber else {
-      throw .typeMismatch(expected: "number", actual: value.type)
+    guard value.isNumber(in: context) else {
+      throw .typeMismatch(expected: "number", actual: value.type(in: context))
     }
     return Double(value: value, in: context)
   }
@@ -311,8 +311,8 @@ extension String {
     _ value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> String {
-    guard value.isString else {
-      throw .typeMismatch(expected: "string", actual: value.type)
+    guard value.isString(in: context) else {
+      throw .typeMismatch(expected: "string", actual: value.type(in: context))
     }
     return String(value: value, in: context)
   }

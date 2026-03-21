@@ -69,19 +69,19 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     _ value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> JSCodableNode {
-    if value.isUndefined || value.isNull {
+    if value.isUndefined(in: context) || value.isNull(in: context) {
       return JSCodableNode(.null)
     }
-    if value.isBoolean {
+    if value.isBoolean(in: context) {
       return JSCodableNode(.bool(value.toBool(in: context)))
     }
-    if value.isNumber {
+    if value.isNumber(in: context) {
       return JSCodableNode(.number(value.toDouble(in: context)))
     }
-    if value.isString {
+    if value.isString(in: context) {
       return JSCodableNode(.string(value.toString(in: context)))
     }
-    if value.isObject {
+    if value.isObject(in: context) {
       if value.isArray(in: context) {
         let count: Int
         switch JSResult.from(
@@ -94,7 +94,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         case .exception:
           throw .codable("array length read raised exception")
         case .value(let lengthValue):
-          if lengthValue.isUndefined {
+          if lengthValue.isUndefined(in: context) {
             throw .codable("array length missing")
           }
           let lengthNumber = lengthValue.toDouble(in: context)
@@ -147,7 +147,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       return JSCodableNode(.object(object))
     }
 
-    throw .typeMismatch(expected: "codable compatible JSValue", actual: value.type)
+    throw .typeMismatch(expected: "codable compatible JSValue", actual: value.type(in: context))
   }
 
   static func jsValueFromNode(

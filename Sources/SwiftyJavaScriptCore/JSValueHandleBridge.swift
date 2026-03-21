@@ -13,10 +13,12 @@ extension JSValue {
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
     self._rawValue = _JSValueRawStorage(ref: ref)
+    _ = ctx
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
     self._rawValue = _JSValueRawStorage(ref: ref)
+    _ = ctx
   }
 
   consuming func retainedRef() -> JavaScriptCoreValueRef {

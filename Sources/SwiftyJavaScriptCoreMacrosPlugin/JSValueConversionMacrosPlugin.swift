@@ -766,7 +766,7 @@ private func makeEnumDecodeCase(
       "case \"\(enumCase.name)\":",
       "  let __payload = value.getProperty(forKey: __payloadKey, in: context)",
       "  guard __payload.isArray(in: context) else {",
-      "    throw .typeMismatch(expected: \"array\", actual: __payload.type)",
+      "    throw .typeMismatch(expected: \"array\", actual: __payload.type(in: context))",
       "  }",
     ]
     var arguments: [String] = []
@@ -788,8 +788,9 @@ private func makeEnumDecodeCase(
     if flattenedLabeledPayload {
     } else {
       lines.append("  let __payload = value.getProperty(forKey: __payloadKey, in: context)")
-      lines.append("  guard __payload.isObject else {")
-      lines.append("    throw .typeMismatch(expected: \"object\", actual: __payload.type)")
+      lines.append("  guard __payload.isObject(in: context) else {")
+      lines.append(
+        "    throw .typeMismatch(expected: \"object\", actual: __payload.type(in: context))")
       lines.append("  }")
     }
     let payloadSource = flattenedLabeledPayload ? "value" : "__payload"
@@ -955,8 +956,8 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       let properties = collectStoredProperties(from: structDecl.memberBlock.members)
 
       var decodeLines: [String] = [
-        "guard value.isObject else {",
-        "  throw .typeMismatch(expected: \"object\", actual: value.type)",
+        "guard value.isObject(in: context) else {",
+        "  throw .typeMismatch(expected: \"object\", actual: value.type(in: context))",
         "}",
       ]
 
@@ -1017,8 +1018,8 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       let properties = collectStoredProperties(from: classDecl.memberBlock.members)
 
       var decodeLines: [String] = [
-        "guard value.isObject else {",
-        "  throw .typeMismatch(expected: \"object\", actual: value.type)",
+        "guard value.isObject(in: context) else {",
+        "  throw .typeMismatch(expected: \"object\", actual: value.type(in: context))",
         "}",
       ]
 
@@ -1143,8 +1144,8 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }
 
         decodeBody = """
-          guard value.isObject else {
-            throw .typeMismatch(expected: "object", actual: value.type)
+          guard value.isObject(in: context) else {
+            throw .typeMismatch(expected: "object", actual: value.type(in: context))
           }
           let __tagKey = JSStringManaged("\(options.tagKey)")
           \(payloadKeyDeclaration)

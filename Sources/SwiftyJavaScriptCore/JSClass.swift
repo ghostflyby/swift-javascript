@@ -641,7 +641,7 @@ private func installCallAsConstructorCallbackIfNeeded(
         let result =
           definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
           ?? JSValue(undefinedIn: context)
-        guard result.isObject else {
+        guard result.isObject(in: context) else {
           return .value(JSValue(undefinedIn: context).retainedRef())
         }
         return .value(result.retainedRef())
@@ -801,7 +801,7 @@ private func installConvertToTypeCallbackIfNeeded(
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
         ?? JSValue(undefinedIn: context)
       let exceptionRef: JavaScriptCoreValueRef?
-      if exceptionValue.isUndefined {
+      if exceptionValue.isUndefined(in: context) {
         exceptionRef = nil
       } else {
         exceptionRef = exceptionValue.retainedRef()

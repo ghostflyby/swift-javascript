@@ -48,7 +48,7 @@ import Testing
     case .value:
       Issue.record("Expected JavaScript exception")
     case .exception(let exception):
-      let isObject = exception.isObject
+      let isObject = exception.isObject(in: context)
       #expect(isObject)
     }
   }

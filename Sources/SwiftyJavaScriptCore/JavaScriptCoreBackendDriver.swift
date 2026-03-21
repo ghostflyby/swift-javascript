@@ -1,3 +1,4 @@
+import Foundation
 import JavaScriptCore
 import SwiftJavaScript
 
@@ -322,35 +323,35 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   }
 
   package static func isUndefined(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsUndefined(context, value)
+    valueType(of: value, in: context) == .undefined
   }
 
   package static func isNull(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsNull(context, value)
+    valueType(of: value, in: context) == .null
   }
 
   package static func isBoolean(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsBoolean(context, value)
+    valueType(of: value, in: context) == .boolean
   }
 
   package static func isNumber(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsNumber(context, value)
+    valueType(of: value, in: context) == .number
   }
 
   package static func isString(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsString(context, value)
+    valueType(of: value, in: context) == .string
   }
 
   package static func isSymbol(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsSymbol(context, value)
+    valueType(of: value, in: context) == .symbol
   }
 
   package static func isObject(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsObject(context, value)
+    valueType(of: value, in: context) == .object
   }
 
   package static func isBigInt(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    JSValueIsBigInt(context, value)
+    valueType(of: value, in: context) == .bigInt
   }
 
   package static var propertyAttributeNoneRawValue: UInt32 {

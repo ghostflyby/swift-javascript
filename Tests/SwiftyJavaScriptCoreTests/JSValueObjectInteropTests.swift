@@ -29,7 +29,7 @@ import Testing
           let objectResult = primitive.toObject(in: context)
           switch consume objectResult {
           case .value(let object):
-            let isObject = object.isObject
+            let isObject = object.isObject(in: context)
             #expect(isObject)
           case .exception:
             Issue.record("Expected toObject to box primitive numbers")
@@ -121,8 +121,8 @@ import Testing
   await context.withIsolatedGlobalObject { context, _ in
     let object = JSValue(objectIn: context)
     let array = JSValue(arrayIn: context)
-    let objectIsObject = object.isObject
-    let arrayIsObject = array.isObject
+    let objectIsObject = object.isObject(in: context)
+    let arrayIsObject = array.isObject(in: context)
     let arrayIsArray = array.isArray(in: context)
 
     #expect(objectIsObject)

@@ -19,9 +19,9 @@ import Testing
   #expect(context1 == context1)
   #expect(context1 != context2)
 
-  await context1.withIsolatedGlobalObject { _, global in
-    let isObject = global.isObject
-    let type = global.type
+  await context1.withIsolatedGlobalObject { context, global in
+    let isObject = global.isObject(in: context)
+    let type = global.type(in: context)
     #expect(isObject)
     #expect(type == .object)
   }
@@ -39,38 +39,38 @@ import Testing
     let symbol = JSValue(symbol: "s", in: context)
     let intNumber = JSValue(number: 7 as Int, in: context)
 
-    let undefinedIsUndefined = undefined.isUndefined
-    let undefinedType = undefined.type
+    let undefinedIsUndefined = undefined.isUndefined(in: context)
+    let undefinedType = undefined.type(in: context)
     #expect(undefinedIsUndefined)
     #expect(undefinedType == .undefined)
 
-    let nullIsNull = null.isNull
-    let nullType = null.type
+    let nullIsNull = null.isNull(in: context)
+    let nullType = null.type(in: context)
     #expect(nullIsNull)
     #expect(nullType == .null)
 
-    let boolIsBoolean = bool.isBoolean
-    let boolType = bool.type
+    let boolIsBoolean = bool.isBoolean(in: context)
+    let boolType = bool.type(in: context)
     #expect(boolIsBoolean)
     #expect(boolType == .boolean)
 
-    let numberIsNumber = number.isNumber
-    let numberType = number.type
+    let numberIsNumber = number.isNumber(in: context)
+    let numberType = number.type(in: context)
     #expect(numberIsNumber)
     #expect(numberType == .number)
 
-    let stringIsString = string.isString
-    let stringType = string.type
+    let stringIsString = string.isString(in: context)
+    let stringType = string.type(in: context)
     #expect(stringIsString)
     #expect(stringType == .string)
 
-    let symbolIsSymbol = symbol.isSymbol
-    let symbolType = symbol.type
+    let symbolIsSymbol = symbol.isSymbol(in: context)
+    let symbolType = symbol.type(in: context)
     #expect(symbolIsSymbol)
     #expect(symbolType == .symbol)
 
-    let intIsNumber = intNumber.isNumber
-    let intIsBigInt = intNumber.isBigInt
+    let intIsNumber = intNumber.isNumber(in: context)
+    let intIsBigInt = intNumber.isBigInt(in: context)
     #expect(intIsNumber)
     #expect(!intIsBigInt)
   }

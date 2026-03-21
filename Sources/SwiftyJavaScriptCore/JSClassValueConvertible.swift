@@ -132,8 +132,8 @@ extension JSClassValueConvertible {
     _ value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) throws(JSValueConversionError) -> Self {
-    guard value.isObject else {
-      throw .typeMismatch(expected: "object", actual: value.type)
+    guard value.isObject(in: context) else {
+      throw .typeMismatch(expected: "object", actual: value.type(in: context))
     }
     let privateData: UnsafeMutableRawPointer?
     switch JavaScriptCoreBackendDriver.privateData(

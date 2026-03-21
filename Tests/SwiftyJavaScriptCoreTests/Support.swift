@@ -10,7 +10,7 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
   }
 
   init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self.value = value.isNumber ? 1 : 0
+    self.value = value.isNumber(in: context) ? 1 : 0
   }
 
   func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -26,7 +26,7 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
   }
 
   init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self.value = value.isString ? "string" : "other"
+    self.value = value.isString(in: context) ? "string" : "other"
   }
 
   func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -42,7 +42,7 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
   }
 
   init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self.value = value.isBoolean
+    self.value = value.isBoolean(in: context)
   }
 
   func toJSValue(in context: borrowing JSInstantContext) -> JSValue {

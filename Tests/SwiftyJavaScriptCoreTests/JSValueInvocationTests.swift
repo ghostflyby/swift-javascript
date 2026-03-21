@@ -39,7 +39,7 @@ import Testing
       let constructResult = constructor.construct(arguments: "alice", in: context)
       switch consume constructResult {
       case .value(let instance):
-        let isObject = instance.isObject
+        let isObject = instance.isObject(in: context)
         let name = instance.getProperty(forKey: JSStringManaged("name"), in: context).toString(
           in: context)
         let kind = instance.getProperty(forKey: JSStringManaged("kind"), in: context).toString(
@@ -78,7 +78,7 @@ import Testing
       case .value:
         Issue.record("Expected missing method invocation to raise exception")
       case .exception(let exception):
-        let isObject = exception.isObject
+        let isObject = exception.isObject(in: context)
         #expect(isObject)
       }
     case .exception:
