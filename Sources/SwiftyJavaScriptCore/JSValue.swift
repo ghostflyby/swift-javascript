@@ -223,68 +223,6 @@ public struct JSValue: ~Copyable {
 }
 
 extension JSValue {
-  init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    guard let rawValue: JavaScriptCoreRawValue = handleValue.opaqueHandle() else {
-      preconditionFailure("JSValue handle did not contain JavaScriptCoreRawValue")
-    }
-    self.init(rawValue: rawValue)
-  }
-
-  init(rawValue: JavaScriptCoreRawValue) {
-    self.init(ref: rawValue.ref, ctx: JSInstantContext(ctx: rawValue.context.ref))
-  }
-
-  func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-    JavaScriptCoreRawValue(ref: ref, context: context)
-  }
-
-  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue(in: context.driverContext))
-  }
-}
-
-extension JSResult {
-  consuming func toPrivateResult() -> JSPrivateResult {
-    switch consume self {
-    case .value(let v):
-      return .value(v.retainedRef())
-    case .exception(let e):
-      return .exception(e.retainedRef())
-    }
-  }
-}
-
-extension JSResult {
-  static func from(handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
-    guard let handleResult else {
-      preconditionFailure("JSResult handle bridge unexpectedly returned nil")
-    }
-
-    switch handleResult {
-    case .value(let value):
-      return .value(JSValue(handleValue: value))
-    case .exception(let exception):
-      return .exception(JSValue(handleValue: exception))
-    }
-  }
-
-  static func from(driverResult: JSDriverResult<JavaScriptCoreRawValue>) -> JSResult {
-    switch driverResult {
-    case .value(let value):
-      return .value(JSValue(rawValue: value))
-    case .exception(let exception):
-      return .exception(JSValue(rawValue: exception))
-    }
-  }
-}
-public typealias JSResult = SwiftJavaScript.JSResultPayload<JSValue>
-
-enum JSPrivateResult: @unchecked Sendable {
-  case value(JavaScriptCoreValueRef)
-  case exception(JavaScriptCoreValueRef)
-}
-
-extension JSValue {
   public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
     return lhs.ctx == rhs.ctx
       && JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: lhs.ctx)

@@ -162,6 +162,7 @@
 - [x] 继续迁移 core 类型到 SJS（已按一次完成原则拆分 `JSEngine.swift` 中协议与引擎标记类型）
 - [x] 继续迁移 core 实现细节到 SJS（按一次完成原则拆分 `JSEngineDriver.swift` 聚合 extension）
 - [x] 继续迁移 core 协议结构到 SJS（按一次完成原则将 `_JSEngineDriver` 拆分为 runtime/property/invocation 子协议并保留组合门面）
+- [x] 继续收口 facade 结构复杂度（已将 `JSValue` 的 handle/result bridge 从主文件拆分为独立文件，行为保持不变）
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
