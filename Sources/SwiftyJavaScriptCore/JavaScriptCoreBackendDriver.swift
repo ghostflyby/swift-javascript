@@ -112,9 +112,9 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
 
   switch result {
   case .value(let value):
-    return value.ref
+    return value
   case .exception(let error):
-    exception?.pointee = error.ref
+    exception?.pointee = error
     return JSValueMakeUndefined(ctx)
   }
 }
@@ -905,9 +905,9 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   ) -> JSValueRef? {
     switch result {
     case .value(let value):
-      return value.ref
+      return value
     case .exception(let error):
-      exception?.pointee = error.ref
+      exception?.pointee = error
       return JSValueMakeUndefined(ctx)
     }
   }
@@ -930,12 +930,12 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   ) -> JSObjectRef? {
     switch result {
     case .value(let value):
-      if JSValueIsObject(ctx, value.ref) {
-        return unsafeBitCast(value.ref, to: JSObjectRef?.self)
+      if JSValueIsObject(ctx, value) {
+        return unsafeBitCast(value, to: JSObjectRef?.self)
       }
       return nil
     case .exception(let error):
-      exception?.pointee = error.ref
+      exception?.pointee = error
       return nil
     }
   }

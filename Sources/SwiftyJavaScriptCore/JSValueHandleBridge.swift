@@ -1,40 +1,10 @@
-import Foundation
-
 struct _JSValueRawStorage: ~Copyable {
   let ref: JavaScriptCoreValueRef
-}
-
-private final class _JSValueContextRegistry: @unchecked Sendable {
-  static let shared = _JSValueContextRegistry()
-
-  private let lock = NSLock()
-  private var contextRefs: [UInt: JavaScriptCoreContextRef] = [:]
-
-  func register(ref: JavaScriptCoreValueRef, contextRef: JavaScriptCoreContextRef) {
-    lock.lock()
-    contextRefs[UInt(bitPattern: ref)] = contextRef
-    lock.unlock()
-  }
-
-  func contextRef(for ref: JavaScriptCoreValueRef) -> JavaScriptCoreContextRef? {
-    lock.lock()
-    let contextRef = contextRefs[UInt(bitPattern: ref)]
-    lock.unlock()
-    return contextRef
-  }
 }
 
 extension JSValue {
   var ref: JavaScriptCoreValueRef {
     _rawValue.ref
-  }
-
-  var ctx: JavaScriptCoreContextRef {
-    guard let contextRef = _JSValueContextRegistry.shared.contextRef(for: ref) else {
-      preconditionFailure(
-        "Missing context for JSValue; construct or bridge it with an explicit context")
-    }
-    return contextRef
   }
 
   /// Wrap a JavaScriptCore value reference into backend raw value storage.
@@ -43,12 +13,10 @@ extension JSValue {
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
     self._rawValue = _JSValueRawStorage(ref: ref)
-    _JSValueContextRegistry.shared.register(ref: ref, contextRef: ctx.globalContextRef)
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
     self._rawValue = _JSValueRawStorage(ref: ref)
-    _JSValueContextRegistry.shared.register(ref: ref, contextRef: ctx.globalContextRef)
   }
 
   consuming func retainedRef() -> JavaScriptCoreValueRef {
@@ -64,7 +32,6 @@ extension JSValue {
 
   init(rawValue: JavaScriptCoreRawValue) {
     self._rawValue = _JSValueRawStorage(ref: rawValue.ref)
-    _JSValueContextRegistry.shared.register(ref: rawValue.ref, contextRef: rawValue.context.ref)
   }
 
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {

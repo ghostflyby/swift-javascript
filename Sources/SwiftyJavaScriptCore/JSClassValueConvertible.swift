@@ -544,7 +544,7 @@ private func autoStaticSetPropertyCallbackResult(
     return true
   case .exception(let error):
     return JavaScriptCoreBackendDriver.callbackSucceeded(
-      exceptionValue: error.ref,
+      exceptionValue: error,
       exception: exception
     )
   }

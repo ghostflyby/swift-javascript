@@ -54,13 +54,16 @@ extension JSTypedArrayKind {
 
 public struct JSArrayBuffer: ~Copyable {
   let value: JSValue
+  let contextRef: JavaScriptCoreContextRef
 
   init(ref: JavaScriptCoreObjectRef, ctx: isolated JSContext = #isolation) {
     self.value = JSValue(ref: ref, ctx: ctx)
+    self.contextRef = ctx.globalContextRef
   }
 
   init(ref: JavaScriptCoreObjectRef, ctx: borrowing JSInstantContext) {
     self.value = JSValue(ref: ref, ctx: ctx)
+    self.contextRef = ctx.globalContextRef
   }
 
   public init(byteLength: Int, in context: isolated JSContext = #isolation) {
@@ -123,19 +126,25 @@ public struct JSArrayBuffer: ~Copyable {
     self.init(ref: ref, ctx: context)
   }
 
-  public init?(value: borrowing JSValue) {
-    guard value.isArrayBuffer else {
+  public init?(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self.init(value: value, in: callbackContext)
+  }
+
+  public init?(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+    guard value.isArrayBuffer(in: context) else {
       return nil
     }
 
-    self.value = JSValue(ref: value.ref, ctx: JSInstantContext(ctx: value.ctx))
+    self.value = JSValue(ref: value.ref, ctx: context)
+    self.contextRef = context.globalContextRef
   }
 
   public var byteLength: Int {
     guard
       let length = JavaScriptCoreBackendDriver.arrayBufferByteLength(
         of: value.ref,
-        in: value.ctx
+        in: contextRef
       )
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
@@ -149,7 +158,7 @@ public struct JSArrayBuffer: ~Copyable {
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
     let byteLength = self.byteLength
-    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: value.ctx)
+    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -161,7 +170,7 @@ public struct JSArrayBuffer: ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: value.ctx)
+    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -210,13 +219,16 @@ extension JSArrayBuffer: JSValueEncodable {
 
 public struct JSTypedArray: ~Copyable {
   let value: JSValue
+  let contextRef: JavaScriptCoreContextRef
 
   init(ref: JavaScriptCoreObjectRef, ctx: isolated JSContext = #isolation) {
     self.value = JSValue(ref: ref, ctx: ctx)
+    self.contextRef = ctx.globalContextRef
   }
 
   init(ref: JavaScriptCoreObjectRef, ctx: borrowing JSInstantContext) {
     self.value = JSValue(ref: ref, ctx: ctx)
+    self.contextRef = ctx.globalContextRef
   }
 
   public init(type: JSTypedArrayKind, length: Int, in context: isolated JSContext = #isolation) {
@@ -306,22 +318,28 @@ public struct JSTypedArray: ~Copyable {
     self.init(ref: ref, ctx: context)
   }
 
-  public init?(value: borrowing JSValue) {
-    guard value.typedArrayKind != nil else {
+  public init?(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    self.init(value: value, in: callbackContext)
+  }
+
+  public init?(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+    guard value.typedArrayKind(in: context) != nil else {
       return nil
     }
 
-    self.value = JSValue(ref: value.ref, ctx: JSInstantContext(ctx: value.ctx))
+    self.value = JSValue(ref: value.ref, ctx: context)
+    self.contextRef = context.globalContextRef
   }
 
   public var kind: JSTypedArrayKind {
-    let type = value.typedArrayKind
+    let type = value.typedArrayKind(in: JSInstantContext(ctx: contextRef))
     precondition(type != nil, "Wrapped JSValue is not a TypedArray")
     return type!
   }
 
   public var length: Int {
-    guard let length = JavaScriptCoreBackendDriver.typedArrayLength(of: value.ref, in: value.ctx)
+    guard let length = JavaScriptCoreBackendDriver.typedArrayLength(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -330,7 +348,7 @@ public struct JSTypedArray: ~Copyable {
 
   public var byteLength: Int {
     guard
-      let length = JavaScriptCoreBackendDriver.typedArrayByteLength(of: value.ref, in: value.ctx)
+      let length = JavaScriptCoreBackendDriver.typedArrayByteLength(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
     }
@@ -339,7 +357,7 @@ public struct JSTypedArray: ~Copyable {
 
   public var byteOffset: Int {
     guard
-      let offset = JavaScriptCoreBackendDriver.typedArrayByteOffset(of: value.ref, in: value.ctx)
+      let offset = JavaScriptCoreBackendDriver.typedArrayByteOffset(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
     }
@@ -347,11 +365,11 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public var buffer: JSArrayBuffer {
-    guard let ref = JavaScriptCoreBackendDriver.typedArrayBuffer(of: value.ref, in: value.ctx)
+    guard let ref = JavaScriptCoreBackendDriver.typedArrayBuffer(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray buffer")
     }
-    return JSArrayBuffer(ref: ref, ctx: JSInstantContext(ctx: value.ctx))
+    return JSArrayBuffer(ref: ref, ctx: JSInstantContext(ctx: contextRef))
   }
 
   public borrowing func withJSValue<R: ~Copyable>(_ body: (borrowing JSValue) -> R) -> R {
@@ -359,7 +377,7 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
-    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: value.ctx)
+    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -371,7 +389,7 @@ public struct JSTypedArray: ~Copyable {
   public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
-    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: value.ctx)
+    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }
@@ -394,21 +412,38 @@ extension JSTypedArray: JSValueEncodable {
 }
 
 extension JSValue {
-  public var isArrayBuffer: Bool {
-    guard let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: ctx) else {
+  public func isArrayBuffer(in context: isolated JSContext = #isolation) -> Bool {
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return isArrayBuffer(in: callbackContext)
+  }
+
+  public func isArrayBuffer(in context: borrowing JSInstantContext) -> Bool {
+    guard let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: context.globalContextRef)
+    else {
       return false
     }
     return type == JavaScriptCoreBackendDriver.typedArrayTypeArrayBuffer
   }
 
-  public var typedArrayKind: JSTypedArrayKind? {
-    guard let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: ctx) else {
+  public func typedArrayKind(in context: isolated JSContext = #isolation) -> JSTypedArrayKind? {
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return typedArrayKind(in: callbackContext)
+  }
+
+  public func typedArrayKind(in context: borrowing JSInstantContext) -> JSTypedArrayKind? {
+    guard let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: context.globalContextRef)
+    else {
       return nil
     }
     return JSTypedArrayKind(type)
   }
 
-  public var isTypedArray: Bool {
-    typedArrayKind != nil
+  public func isTypedArray(in context: isolated JSContext = #isolation) -> Bool {
+    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    return isTypedArray(in: callbackContext)
+  }
+
+  public func isTypedArray(in context: borrowing JSInstantContext) -> Bool {
+    typedArrayKind(in: context) != nil
   }
 }

@@ -11,7 +11,7 @@ import Testing
     switch consume result {
     case .value(let value):
       let expected = JSValue(number: 3, in: context)
-      let isStrictlyEqual = value === expected
+      let isStrictlyEqual = value.strictlyEquals(expected, in: context)
       #expect(isStrictlyEqual)
     case .exception:
       Issue.record("Expected script to evaluate successfully")
@@ -30,7 +30,7 @@ import Testing
     switch consume result {
     case .value(let value):
       let expected = JSValue(number: 42, in: context)
-      let isStrictlyEqual = value === expected
+      let isStrictlyEqual = value.strictlyEquals(expected, in: context)
       #expect(isStrictlyEqual)
     case .exception:
       Issue.record("Expected script with sourceURL to evaluate successfully")

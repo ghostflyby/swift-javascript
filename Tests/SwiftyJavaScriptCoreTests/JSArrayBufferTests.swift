@@ -52,9 +52,9 @@ import Testing
 
     switch consume evaluated {
     case .value(let value):
-      let isArrayBuffer = value.isArrayBuffer
+      let isArrayBuffer = value.isArrayBuffer(in: context)
       #expect(isArrayBuffer)
-      if let wrapped = JSArrayBuffer(value: value) {
+      if let wrapped = JSArrayBuffer(value: value, in: context) {
         #expect(wrapped.byteLength == 3)
       } else {
         Issue.record("Expected JSValue to wrap as JSArrayBuffer")
@@ -127,9 +127,9 @@ import Testing
 
     switch consume evaluated {
     case .value(let value):
-      let isTypedArray = value.isTypedArray
+      let isTypedArray = value.isTypedArray(in: context)
       #expect(isTypedArray)
-      if let wrapped = JSTypedArray(value: value) {
+      if let wrapped = JSTypedArray(value: value, in: context) {
         #expect(wrapped.kind == .uint8Array)
         #expect(wrapped.length == 5)
         #expect(wrapped.byteOffset == 0)

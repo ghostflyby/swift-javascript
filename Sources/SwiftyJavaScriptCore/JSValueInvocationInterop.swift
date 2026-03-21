@@ -1,20 +1,32 @@
 extension JSValue {
-  public static func == (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return lhs.ctx == rhs.ctx
-      && JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: lhs.ctx)
+  public func looselyEquals(
+    _ other: borrowing JSValue,
+    in context: isolated JSContext = #isolation
+  ) -> Bool {
+    context.withInstantContext { callbackContext in
+      looselyEquals(other, in: callbackContext)
+    }
   }
 
-  public static func != (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return !(lhs == rhs)
+  public func looselyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
+    -> Bool
+  {
+    JavaScriptCoreBackendDriver.valueEquals(ref, other.ref, in: context.globalContextRef)
   }
 
-  public static func === (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return lhs.ctx == rhs.ctx
-      && JavaScriptCoreBackendDriver.valueStrictEquals(lhs.ref, rhs.ref, in: lhs.ctx)
+  public func strictlyEquals(
+    _ other: borrowing JSValue,
+    in context: isolated JSContext = #isolation
+  ) -> Bool {
+    context.withInstantContext { callbackContext in
+      strictlyEquals(other, in: callbackContext)
+    }
   }
 
-  public static func !== (lhs: borrowing JSValue, rhs: borrowing JSValue) -> Bool {
-    return !(lhs === rhs)
+  public func strictlyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
+    -> Bool
+  {
+    JavaScriptCoreBackendDriver.valueStrictEquals(ref, other.ref, in: context.globalContextRef)
   }
 }
 
