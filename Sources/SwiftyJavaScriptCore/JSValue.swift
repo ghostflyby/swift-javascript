@@ -5,21 +5,32 @@
 //  Created by ghostflyby pan on 2025/9/12.
 //
 public struct JSValue: ~Copyable {
-  let ref: JavaScriptCoreValueRef
-  let ctx: JavaScriptCoreContextRef
+  let _rawValue: JavaScriptCoreRawValue
 
-  /// Wrap the `ref` **without retaining**
+  var ref: JavaScriptCoreValueRef {
+    _rawValue.ref
+  }
+
+  var ctx: JavaScriptCoreContextRef {
+    _rawValue.context.ref
+  }
+
+  /// Wrap a JavaScriptCore value reference into backend raw value storage.
   /// - Parameters:
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
-    self.ref = ref
-    self.ctx = ctx.globalContextRef
+    self._rawValue = JavaScriptCoreRawValue(
+      ref: ref,
+      context: JavaScriptCoreRawContext(borrowing: ctx.globalContextRef)
+    )
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
-    self.ref = ref
-    self.ctx = ctx.globalContextRef
+    self._rawValue = JavaScriptCoreRawValue(
+      ref: ref,
+      context: JavaScriptCoreRawContext(borrowing: ctx.globalContextRef)
+    )
   }
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
@@ -139,9 +150,7 @@ public struct JSValue: ~Copyable {
   }
 
   consuming func retainedRef() -> JavaScriptCoreValueRef {
-    let ref = ref
-    discard self
-    return ref
+    ref
   }
 
   public init<
@@ -215,9 +224,5 @@ public struct JSValue: ~Copyable {
       }
     }
     self.init(name: name, callback: callback)
-  }
-
-  deinit {
-    JavaScriptCoreBackendDriver.unprotect(ref, in: ctx)
   }
 }

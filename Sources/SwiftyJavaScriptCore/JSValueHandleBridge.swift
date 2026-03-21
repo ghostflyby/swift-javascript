@@ -7,11 +7,14 @@ extension JSValue {
   }
 
   init(rawValue: JavaScriptCoreRawValue) {
-    self.init(ref: rawValue.ref, ctx: JSInstantContext(ctx: rawValue.context.ref))
+    self._rawValue = rawValue
   }
 
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-    JavaScriptCoreRawValue(ref: ref, context: context)
+    if _rawValue.context.ref == context.ref {
+      return _rawValue
+    }
+    return JavaScriptCoreRawValue(ref: ref, context: context)
   }
 
   func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
