@@ -588,7 +588,7 @@ private func installCallAsFunctionCallbackIfNeeded(
         let result =
           definition.callAsFunction?(context, &functionValue, &thisValue, args)
           ?? JSValue(undefinedIn: context)
-        return .value(result.retainedRef())
+        return .value(result.rawValue(in: context.driverContext))
       }
       return JavaScriptCoreBackendDriver.callbackReturnValue(
         callbackResult,
@@ -642,9 +642,9 @@ private func installCallAsConstructorCallbackIfNeeded(
           definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
           ?? JSValue(undefinedIn: context)
         guard result.isObject else {
-          return .value(JSValue(undefinedIn: context).retainedRef())
+          return .value(JSValue(undefinedIn: context).rawValue(in: context.driverContext))
         }
-        return .value(result.retainedRef())
+        return .value(result.rawValue(in: context.driverContext))
       }
       return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
         callbackResult,
@@ -800,18 +800,18 @@ private func installConvertToTypeCallbackIfNeeded(
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
         ?? JSValue(undefinedIn: context)
-      let exceptionRef: JavaScriptCoreValueRef?
+      let exceptionRawValue: JavaScriptCoreRawValue?
       if exceptionValue.isUndefined {
-        exceptionRef = nil
+        exceptionRawValue = nil
       } else {
-        exceptionRef = exceptionValue.retainedRef()
+        exceptionRawValue = exceptionValue.rawValue(in: context.driverContext)
         exceptionValue = JSValue(undefinedIn: context)
       }
       let conversion: JSPrivateResult =
-        if let exceptionRef {
-          .exception(exceptionRef)
+        if let exceptionRawValue {
+          .exception(exceptionRawValue)
         } else {
-          .value(result.retainedRef())
+          .value(result.rawValue(in: context.driverContext))
         }
       return JavaScriptCoreBackendDriver.callbackReturnValue(
         conversion,
@@ -855,7 +855,7 @@ private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallb
       return true
     case .exception(let error):
       return JavaScriptCoreBackendDriver.callbackSucceeded(
-        exceptionValue: error,
+        exceptionValue: error.ref,
         exception: exception
       )
     }

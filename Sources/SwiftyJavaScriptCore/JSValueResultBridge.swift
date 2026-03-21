@@ -1,17 +1,17 @@
 public typealias JSResult = SwiftJavaScript.JSResultPayload<JSValue>
 
 enum JSPrivateResult: @unchecked Sendable {
-  case value(JavaScriptCoreValueRef)
-  case exception(JavaScriptCoreValueRef)
+  case value(JavaScriptCoreRawValue)
+  case exception(JavaScriptCoreRawValue)
 }
 
 extension JSResult {
   consuming func toPrivateResult() -> JSPrivateResult {
     switch consume self {
     case .value(let v):
-      return .value(v.retainedRef())
+      return .value(v.rawValue(in: JavaScriptCoreRawContext(borrowing: v.ctx)))
     case .exception(let e):
-      return .exception(e.retainedRef())
+      return .exception(e.rawValue(in: JavaScriptCoreRawContext(borrowing: e.ctx)))
     }
   }
 }

@@ -166,6 +166,7 @@
 - [x] 继续收口 facade 结构复杂度（已将 `JSValue` 的调用/对象互操作 extension 拆分到独立文件，便于后续移动类型位置）
 - [x] 中期解耦推进：`JSValue` 内部存储已由直接 `ref/ctx` 切换为 backend raw value 持有（对外 API 与行为保持兼容）
 - [x] 中期解耦推进：`JSValue` 主文件已移除 `JavaScriptCore*Ref` 桥接字段/初始化器声明，集中到 bridge 文件承载
+- [x] 中期解耦推进：`JSPrivateResult` 已由裸 `JavaScriptCoreValueRef` 切换为 `JavaScriptCoreRawValue`，callback 结果流改走 raw value
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）

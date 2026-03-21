@@ -112,9 +112,9 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
 
   switch result {
   case .value(let value):
-    return value
+    return value.ref
   case .exception(let error):
-    exception?.pointee = error
+    exception?.pointee = error.ref
     return JSValueMakeUndefined(ctx)
   }
 }
@@ -637,6 +637,13 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     JSValueUnprotect(context, value)
   }
 
+  package static func protect(
+    _ value: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreContextRef
+  ) {
+    JSValueProtect(context, value)
+  }
+
   package static func valueEquals(
     _ lhs: JavaScriptCoreValueRef,
     _ rhs: JavaScriptCoreValueRef,
@@ -898,9 +905,9 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   ) -> JSValueRef? {
     switch result {
     case .value(let value):
-      return value
+      return value.ref
     case .exception(let error):
-      exception?.pointee = error
+      exception?.pointee = error.ref
       return JSValueMakeUndefined(ctx)
     }
   }
@@ -923,12 +930,12 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   ) -> JSObjectRef? {
     switch result {
     case .value(let value):
-      if JSValueIsObject(ctx, value) {
-        return unsafeBitCast(value, to: JSObjectRef?.self)
+      if JSValueIsObject(ctx, value.ref) {
+        return unsafeBitCast(value.ref, to: JSObjectRef?.self)
       }
       return nil
     case .exception(let error):
-      exception?.pointee = error
+      exception?.pointee = error.ref
       return nil
     }
   }
