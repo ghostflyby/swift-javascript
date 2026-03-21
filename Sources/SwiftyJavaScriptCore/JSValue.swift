@@ -7,32 +7,6 @@
 public struct JSValue: ~Copyable {
   let _rawValue: JavaScriptCoreRawValue
 
-  var ref: JavaScriptCoreValueRef {
-    _rawValue.ref
-  }
-
-  var ctx: JavaScriptCoreContextRef {
-    _rawValue.context.ref
-  }
-
-  /// Wrap a JavaScriptCore value reference into backend raw value storage.
-  /// - Parameters:
-  ///   - ref: The JavaScriptCoreValueRef to wrap
-  ///   - ctx: The JSContext in which the value exists
-  init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
-    self._rawValue = JavaScriptCoreRawValue(
-      ref: ref,
-      context: JavaScriptCoreRawContext(borrowing: ctx.globalContextRef)
-    )
-  }
-
-  init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
-    self._rawValue = JavaScriptCoreRawValue(
-      ref: ref,
-      context: JavaScriptCoreRawContext(borrowing: ctx.globalContextRef)
-    )
-  }
-
   public init(string value: String, in context: isolated JSContext = #isolation) {
     let callbackContext = JSInstantContext(ctx: context.globalContextRef)
     self = callbackContext.makeString(value)
@@ -147,10 +121,6 @@ public struct JSValue: ~Copyable {
 
   private consuming func toSendableBox() -> SendableBoxUnsafe<JSValue> {
     return SendableBoxUnsafe(self)
-  }
-
-  consuming func retainedRef() -> JavaScriptCoreValueRef {
-    ref
   }
 
   public init<
