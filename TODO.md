@@ -174,5 +174,5 @@
 ### 9.2 阶段性指标（消除导入且保持功能）
 - [x] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `1` 降到 `0`
 - [x] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
-- [x] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`90` tests passed）
+- [x] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`91` tests passed）
 

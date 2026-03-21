@@ -69,6 +69,52 @@ import Testing
   }
 }
 
+@Test func jsValueDefinePropertyRespectsDontEnumAndDontDelete() async {
+  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+
+  await context.withIsolatedGlobalObject { context, global in
+    let hiddenKey = JSStringManaged("hiddenFlag")
+    let pinnedKey = JSStringManaged("pinnedFlag")
+
+    _ = global.defineProperty(true, forKey: hiddenKey, with: [.dontEnum], in: context)
+    _ = global.defineProperty(1, forKey: pinnedKey, with: [.dontDelete], in: context)
+
+    let hiddenEnumerated = context.evaluateScript(
+      "Object.keys(globalThis).includes('hiddenFlag')"
+    )
+    let pinnedDeleted = context.evaluateScript(
+      "delete globalThis.pinnedFlag"
+    )
+    let pinnedStillPresent = context.evaluateScript(
+      "'pinnedFlag' in globalThis"
+    )
+
+    switch consume hiddenEnumerated {
+    case .value(let value):
+      let isEnumerated = value.toBool(in: context)
+      #expect(!isEnumerated)
+    case .exception:
+      Issue.record("Expected Object.keys check for hiddenFlag")
+    }
+
+    switch consume pinnedDeleted {
+    case .value(let value):
+      let didDelete = value.toBool(in: context)
+      #expect(!didDelete)
+    case .exception:
+      Issue.record("Expected delete operator check for pinnedFlag")
+    }
+
+    switch consume pinnedStillPresent {
+    case .value(let value):
+      let stillPresent = value.toBool(in: context)
+      #expect(stillPresent)
+    case .exception:
+      Issue.record("Expected membership check for pinnedFlag")
+    }
+  }
+}
+
 @Test func jsValueObjectAndArrayInitializersCreateExpectedKinds() async {
   let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
 
