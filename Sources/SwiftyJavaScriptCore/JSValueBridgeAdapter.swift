@@ -12,6 +12,70 @@ protocol _JSValueBridgeAdapter {
 struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   typealias Engine = JavaScriptCoreEngine
 
+  func type(of value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSType {
+    JavaScriptCoreBackendDriver.valueType(of: value.ref, in: context.globalContextRef)
+  }
+
+  func isUndefined(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isUndefined(value.ref, in: context.globalContextRef)
+  }
+
+  func isNull(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isNull(value.ref, in: context.globalContextRef)
+  }
+
+  func isBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isBoolean(value.ref, in: context.globalContextRef)
+  }
+
+  func isNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isNumber(value.ref, in: context.globalContextRef)
+  }
+
+  func isString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isString(value.ref, in: context.globalContextRef)
+  }
+
+  func isSymbol(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isSymbol(value.ref, in: context.globalContextRef)
+  }
+
+  func isObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isObject(value.ref, in: context.globalContextRef)
+  }
+
+  func isBigInt(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.isBigInt(value.ref, in: context.globalContextRef)
+  }
+
+  func toBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
+    JavaScriptCoreBackendDriver.toBoolean(value.ref, in: context.globalContextRef)
+  }
+
+  func toNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Double {
+    JavaScriptCoreBackendDriver.toNumber(value.ref, in: context.globalContextRef)
+  }
+
+  func toString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> String {
+    JavaScriptCoreBackendDriver.toString(value.ref, in: context.globalContextRef) ?? ""
+  }
+
+  func looselyEquals(
+    _ lhs: borrowing JSValue,
+    _ rhs: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) -> Bool {
+    JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
+  }
+
+  func strictlyEquals(
+    _ lhs: borrowing JSValue,
+    _ rhs: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) -> Bool {
+    JavaScriptCoreBackendDriver.valueStrictEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
+  }
+
   func encodeArguments<each A: JSValueEncodable>(
     _ arguments: repeat each A,
     in context: borrowing JSInstantContext
@@ -83,6 +147,32 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     )
   }
 
+  func call<each A: JSValueEncodable>(
+    function: borrowing JSValue,
+    arguments: repeat each A,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    call(
+      function: function,
+      arguments: encodeArguments(repeat each arguments, in: context),
+      in: context
+    )
+  }
+
+  func call<each A: JSValueEncodable>(
+    function: borrowing JSValue,
+    this thisValue: borrowing JSValue,
+    arguments: repeat each A,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    call(
+      function: function,
+      this: thisValue,
+      arguments: encodeArguments(repeat each arguments, in: context),
+      in: context
+    )
+  }
+
   func construct(
     constructor: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
@@ -101,6 +191,18 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     construct(constructor: constructor, arguments: [], in: context)
+  }
+
+  func construct<each A: JSValueEncodable>(
+    constructor: borrowing JSValue,
+    arguments: repeat each A,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    construct(
+      constructor: constructor,
+      arguments: encodeArguments(repeat each arguments, in: context),
+      in: context
+    )
   }
 
   func getStringProperty(
@@ -157,6 +259,20 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     invokeMethod(name, on: object, arguments: [], in: context)
+  }
+
+  func invokeMethod<each A: JSValueEncodable>(
+    _ name: String,
+    on object: borrowing JSValue,
+    arguments: repeat each A,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    invokeMethod(
+      name,
+      on: object,
+      arguments: encodeArguments(repeat each arguments, in: context),
+      in: context
+    )
   }
 
   func toObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSResult {

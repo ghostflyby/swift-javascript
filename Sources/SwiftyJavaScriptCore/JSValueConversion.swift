@@ -200,7 +200,7 @@ extension JSValue: JSValueCodable {
 
 extension Bool: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self = JavaScriptCoreBackendDriver.toBoolean(value.ref, in: context.globalContextRef)
+    self = context.valueBridgeAdapter.toBoolean(value, in: context)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -222,7 +222,7 @@ extension Bool {
 
 extension Double: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self = JavaScriptCoreBackendDriver.toNumber(value.ref, in: context.globalContextRef)
+    self = context.valueBridgeAdapter.toNumber(value, in: context)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
@@ -298,7 +298,7 @@ extension UInt32 {
 
 extension String: JSValueCodable {
   public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
-    self = JavaScriptCoreBackendDriver.toString(value.ref, in: context.globalContextRef) ?? ""
+    self = context.valueBridgeAdapter.toString(value, in: context)
   }
 
   public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {

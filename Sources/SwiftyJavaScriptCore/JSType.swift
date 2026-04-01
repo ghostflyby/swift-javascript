@@ -4,7 +4,7 @@ extension JSValue {
   }
 
   public func type(in context: borrowing JSInstantContext) -> JSType {
-    JavaScriptCoreBackendDriver.valueType(of: ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.type(of: self, in: context)
   }
 
   public func isUndefined(in context: borrowing JSContext) -> Bool {
@@ -12,7 +12,7 @@ extension JSValue {
   }
 
   public func isUndefined(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isUndefined(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isUndefined(self, in: context)
   }
 
   public func isNull(in context: borrowing JSContext) -> Bool {
@@ -20,7 +20,7 @@ extension JSValue {
   }
 
   public func isNull(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isNull(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isNull(self, in: context)
   }
 
   public func isBoolean(in context: borrowing JSContext) -> Bool {
@@ -28,7 +28,7 @@ extension JSValue {
   }
 
   public func isBoolean(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isBoolean(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isBoolean(self, in: context)
   }
 
   public func isNumber(in context: borrowing JSContext) -> Bool {
@@ -36,7 +36,7 @@ extension JSValue {
   }
 
   public func isNumber(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isNumber(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isNumber(self, in: context)
   }
 
   public func isString(in context: borrowing JSContext) -> Bool {
@@ -44,7 +44,7 @@ extension JSValue {
   }
 
   public func isString(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isString(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isString(self, in: context)
   }
 
   public func isSymbol(in context: borrowing JSContext) -> Bool {
@@ -52,7 +52,7 @@ extension JSValue {
   }
 
   public func isSymbol(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isSymbol(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isSymbol(self, in: context)
   }
 
   public func isObject(in context: borrowing JSContext) -> Bool {
@@ -60,7 +60,7 @@ extension JSValue {
   }
 
   public func isObject(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isObject(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isObject(self, in: context)
   }
 
   public func isBigInt(in context: borrowing JSContext) -> Bool {
@@ -68,6 +68,6 @@ extension JSValue {
   }
 
   public func isBigInt(in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isBigInt(ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.isBigInt(self, in: context)
   }
 }

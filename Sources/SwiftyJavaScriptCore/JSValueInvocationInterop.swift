@@ -11,7 +11,7 @@ extension JSValue {
   public func looselyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    JavaScriptCoreBackendDriver.valueEquals(ref, other.ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.looselyEquals(self, other, in: context)
   }
 
   public func strictlyEquals(
@@ -26,39 +26,11 @@ extension JSValue {
   public func strictlyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    JavaScriptCoreBackendDriver.valueStrictEquals(ref, other.ref, in: context.globalContextRef)
+    context.valueBridgeAdapter.strictlyEquals(self, other, in: context)
   }
 }
 
 extension JSValue {
-  @inline(__always)
-  private func callInternal(
-    thisValueHandle: JSValueHandle<JavaScriptCoreEngine>?,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return adapter.call(
-      function: self,
-      this: thisValueHandle,
-      arguments: arguments,
-      in: context
-    )
-  }
-
-  @inline(__always)
-  private func constructInternal(
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return adapter.construct(
-      constructor: self,
-      arguments: arguments,
-      in: context
-    )
-  }
-
   public func call(in context: isolated JSContext = #isolation) -> JSResult {
     context.withInstantContext { callbackContext in
       call(in: callbackContext)
@@ -82,11 +54,7 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return callInternal(
-      thisValueHandle: nil,
-      arguments: adapter.encodeArguments(repeat each arguments, in: context),
-      in: context)
+    context.valueBridgeAdapter.call(function: self, arguments: repeat each arguments, in: context)
   }
 
   public func call(
@@ -120,10 +88,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return callInternal(
-      thisValueHandle: adapter.valueHandle(for: thisValue, in: context),
-      arguments: adapter.encodeArguments(repeat each arguments, in: context),
+    context.valueBridgeAdapter.call(
+      function: self,
+      this: thisValue,
+      arguments: repeat each arguments,
       in: context
     )
   }
@@ -151,9 +119,9 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return constructInternal(
-      arguments: adapter.encodeArguments(repeat each arguments, in: context),
+    context.valueBridgeAdapter.construct(
+      constructor: self,
+      arguments: repeat each arguments,
       in: context
     )
   }
@@ -189,20 +157,12 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    let adapter = context.valueBridgeAdapter
-    return invokeMethodInternal(
+    context.valueBridgeAdapter.invokeMethod(
       name.string,
-      arguments: adapter.encodeArguments(repeat each arguments, in: context),
+      on: self,
+      arguments: repeat each arguments,
       in: context
     )
-  }
-
-  private func invokeMethodInternal(
-    _ name: String,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    context.valueBridgeAdapter.invokeMethod(name, on: self, arguments: arguments, in: context)
   }
 
   public func toNumber(in context: isolated JSContext = #isolation) -> Double {
