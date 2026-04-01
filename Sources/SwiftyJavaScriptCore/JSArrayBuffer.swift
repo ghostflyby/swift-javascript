@@ -76,7 +76,8 @@ public struct JSArrayBuffer: ~Copyable {
     precondition(byteLength >= 0, "ArrayBuffer byteLength must be non-negative")
 
     let bytes = Self.allocateZeroedBytes(byteLength: byteLength)
-    let ref = context.makeArrayBufferWithBytesNoCopy(
+    let ref = JavaScriptCoreBackendDriver.makeArrayBufferWithBytesNoCopy(
+      in: context.globalContextRef,
       bytes: bytes,
       byteLength: byteLength,
       bytesDeallocator: arrayBufferBytesDeallocator,
@@ -109,7 +110,8 @@ public struct JSArrayBuffer: ~Copyable {
 
   public init(copying bytes: UnsafeRawBufferPointer, in context: borrowing JSInstantContext) {
     let copiedBytes = Self.allocateCopy(of: bytes)
-    let ref = context.makeArrayBufferWithBytesNoCopy(
+    let ref = JavaScriptCoreBackendDriver.makeArrayBufferWithBytesNoCopy(
+      in: context.globalContextRef,
       bytes: copiedBytes,
       byteLength: bytes.count,
       bytesDeallocator: arrayBufferBytesDeallocator,
@@ -139,9 +141,11 @@ public struct JSArrayBuffer: ~Copyable {
   }
 
   public var byteLength: Int {
-    let context = JSInstantContext(ctx: contextRef)
     guard
-      let length = context.arrayBufferByteLength(of: value)
+      let length = JavaScriptCoreBackendDriver.arrayBufferByteLength(
+        of: value.ref,
+        in: contextRef
+      )
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
     }
@@ -154,8 +158,7 @@ public struct JSArrayBuffer: ~Copyable {
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
     let byteLength = self.byteLength
-    let context = JSInstantContext(ctx: contextRef)
-    let access = context.arrayBufferBytesAccess(of: value)
+    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -167,8 +170,7 @@ public struct JSArrayBuffer: ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let context = JSInstantContext(ctx: contextRef)
-    let access = context.arrayBufferBytesAccess(of: value)
+    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }

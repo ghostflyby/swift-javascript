@@ -4,7 +4,7 @@ extension JSValue {
   }
 
   public func type(in context: borrowing JSInstantContext) -> JSType {
-    context.valueType(of: self)
+    JavaScriptCoreBackendDriver.valueType(of: ref, in: context.globalContextRef)
   }
 
   public func isUndefined(in context: borrowing JSContext) -> Bool {
@@ -12,7 +12,7 @@ extension JSValue {
   }
 
   public func isUndefined(in context: borrowing JSInstantContext) -> Bool {
-    context.isUndefined(self)
+    JavaScriptCoreBackendDriver.isUndefined(ref, in: context.globalContextRef)
   }
 
   public func isNull(in context: borrowing JSContext) -> Bool {
@@ -20,7 +20,7 @@ extension JSValue {
   }
 
   public func isNull(in context: borrowing JSInstantContext) -> Bool {
-    context.isNull(self)
+    JavaScriptCoreBackendDriver.isNull(ref, in: context.globalContextRef)
   }
 
   public func isBoolean(in context: borrowing JSContext) -> Bool {
@@ -28,7 +28,7 @@ extension JSValue {
   }
 
   public func isBoolean(in context: borrowing JSInstantContext) -> Bool {
-    context.isBoolean(self)
+    JavaScriptCoreBackendDriver.isBoolean(ref, in: context.globalContextRef)
   }
 
   public func isNumber(in context: borrowing JSContext) -> Bool {
@@ -36,7 +36,7 @@ extension JSValue {
   }
 
   public func isNumber(in context: borrowing JSInstantContext) -> Bool {
-    context.isNumber(self)
+    JavaScriptCoreBackendDriver.isNumber(ref, in: context.globalContextRef)
   }
 
   public func isString(in context: borrowing JSContext) -> Bool {
@@ -44,7 +44,7 @@ extension JSValue {
   }
 
   public func isString(in context: borrowing JSInstantContext) -> Bool {
-    context.isString(self)
+    JavaScriptCoreBackendDriver.isString(ref, in: context.globalContextRef)
   }
 
   public func isSymbol(in context: borrowing JSContext) -> Bool {
@@ -52,7 +52,7 @@ extension JSValue {
   }
 
   public func isSymbol(in context: borrowing JSInstantContext) -> Bool {
-    context.isSymbol(self)
+    JavaScriptCoreBackendDriver.isSymbol(ref, in: context.globalContextRef)
   }
 
   public func isObject(in context: borrowing JSContext) -> Bool {
@@ -60,7 +60,7 @@ extension JSValue {
   }
 
   public func isObject(in context: borrowing JSInstantContext) -> Bool {
-    context.isObject(self)
+    JavaScriptCoreBackendDriver.isObject(ref, in: context.globalContextRef)
   }
 
   public func isBigInt(in context: borrowing JSContext) -> Bool {
@@ -68,6 +68,6 @@ extension JSValue {
   }
 
   public func isBigInt(in context: borrowing JSInstantContext) -> Bool {
-    context.isBigInt(self)
+    JavaScriptCoreBackendDriver.isBigInt(ref, in: context.globalContextRef)
   }
 }
