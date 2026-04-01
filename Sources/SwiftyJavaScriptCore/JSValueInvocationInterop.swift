@@ -66,7 +66,7 @@ extension JSValue {
   }
 
   public func call(in context: borrowing JSInstantContext) -> JSResult {
-    callInternal(thisValueHandle: nil, arguments: [], in: context)
+    context.valueBridgeAdapter.call(function: self, in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -102,12 +102,7 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    return callInternal(
-      thisValueHandle: adapter.valueHandle(for: thisValue, in: context),
-      arguments: [],
-      in: context
-    )
+    context.valueBridgeAdapter.call(function: self, this: thisValue, in: context)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -140,7 +135,7 @@ extension JSValue {
   }
 
   public func construct(in context: borrowing JSInstantContext) -> JSResult {
-    constructInternal(arguments: [], in: context)
+    context.valueBridgeAdapter.construct(constructor: self, in: context)
   }
 
   public func construct<each A: JSValueEncodable>(
@@ -176,7 +171,7 @@ extension JSValue {
     _ name: borrowing Name,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    invokeMethodInternal(name.string, arguments: [], in: context)
+    context.valueBridgeAdapter.invokeMethod(name.string, on: self, in: context)
   }
 
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(

@@ -54,23 +54,33 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
       ))
   }
 
-  func invokeMethod(
-    _ name: String,
-    on object: borrowing JSValue,
+  func call(
+    function: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    call(function: function, this: nil, arguments: [], in: context)
+  }
+
+  func call(
+    function: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch getStringProperty(name, on: object, in: context) {
-    case .exception(let exception):
-      return .exception(exception)
-    case .value(let method):
-      return call(
-        function: method,
-        this: valueHandle(for: object, in: context),
-        arguments: arguments,
-        in: context
-      )
-    }
+    call(function: function, this: nil, arguments: arguments, in: context)
+  }
+
+  func call(
+    function: borrowing JSValue,
+    this thisValue: borrowing JSValue,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    call(
+      function: function,
+      this: valueHandle(for: thisValue, in: context),
+      arguments: arguments,
+      in: context
+    )
   }
 
   func construct(
@@ -84,6 +94,13 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
         arguments: arguments,
         in: context.driverContextHandle
       ))
+  }
+
+  func construct(
+    constructor: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    construct(constructor: constructor, arguments: [], in: context)
   }
 
   func getStringProperty(
@@ -113,6 +130,33 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
       in: context.driverContextHandle,
       attributes: attributes
     )
+  }
+
+  func invokeMethod(
+    _ name: String,
+    on object: borrowing JSValue,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>],
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    switch getStringProperty(name, on: object, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return call(
+        function: method,
+        this: valueHandle(for: object, in: context),
+        arguments: arguments,
+        in: context
+      )
+    }
+  }
+
+  func invokeMethod(
+    _ name: String,
+    on object: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    invokeMethod(name, on: object, arguments: [], in: context)
   }
 
   func toObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSResult {
