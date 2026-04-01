@@ -8,8 +8,9 @@ public struct JSValue: ~Copyable {
   let _rawValue: _JSValueRawStorage
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeString(value)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeString(value)
+    }
   }
 
   public init(string value: String, in context: borrowing JSInstantContext) {
@@ -17,13 +18,16 @@ public struct JSValue: ~Copyable {
   }
 
   public init(string value: borrowing JSString, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeString(value.string)
+    let stringValue = value.string
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeString(stringValue)
+    }
   }
 
   public init(number value: Double, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeNumber(value)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeNumber(value)
+    }
   }
 
   public init(number value: Double, in context: borrowing JSInstantContext) {
@@ -31,8 +35,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init(number value: some BinaryInteger, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeNumber(value)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeNumber(value)
+    }
   }
 
   public init(number value: some BinaryInteger, in context: borrowing JSInstantContext) {
@@ -40,8 +45,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init(boolean value: Bool, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeBoolean(value)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeBoolean(value)
+    }
   }
 
   public init(boolean value: Bool, in context: borrowing JSInstantContext) {
@@ -49,13 +55,15 @@ public struct JSValue: ~Copyable {
   }
 
   public init(symbol: String, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeSymbol(symbol)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeSymbol(symbol)
+    }
   }
 
   public init(nullIn context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeNull()
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeNull()
+    }
   }
 
   public init(nullIn context: borrowing JSInstantContext) {
@@ -63,8 +71,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init(undefinedIn context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self = callbackContext.makeUndefined()
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeUndefined()
+    }
   }
 
   public init(undefinedIn context: borrowing JSInstantContext) {
@@ -72,8 +81,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init(objectIn context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self.init(objectIn: callbackContext)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeObject()
+    }
   }
 
   public init(objectIn context: borrowing JSInstantContext) {
@@ -81,8 +91,9 @@ public struct JSValue: ~Copyable {
   }
 
   public init(arrayIn context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self.init(arrayIn: callbackContext)
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeArray()
+    }
   }
 
   public init(arrayIn context: borrowing JSInstantContext) {
@@ -103,8 +114,9 @@ extension JSValue {
     callback: @escaping JSFunctionCallback,
     in context: isolated JSContext = #isolation,
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
-    self.init(name: name, callback: callback, in: callbackContext)
+    self = context.withInstantContext { callbackContext in
+      JSValue(name: name, callback: callback, in: callbackContext)
+    }
   }
 
   public init(
@@ -119,10 +131,6 @@ extension JSValue {
       functionClass: context.actorContext.functionClass.value
     )
     self.init(rawValue: function)
-  }
-
-  private consuming func toSendableBox() -> SendableBoxUnsafe<JSValue> {
-    return SendableBoxUnsafe(self)
   }
 
   public init<
@@ -156,7 +164,7 @@ extension JSValue {
         return .exception(JSValue(undefinedIn: context))
       }
     }
-    self.init(name: name, callback: callback)
+    self.init(name: name, callback: callback, in: context)
   }
 
   public init<
@@ -195,6 +203,6 @@ extension JSValue {
         return .exception(JSValue(undefinedIn: context))
       }
     }
-    self.init(name: name, callback: callback)
+    self.init(name: name, callback: callback, in: context)
   }
 }
