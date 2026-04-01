@@ -297,6 +297,28 @@ func makeRememberedClassCallbackContext(
   return JSInstantContext(ctx: ctx)
 }
 
+func withRememberedClassObjectValue<R>(
+  _ ctx: JavaScriptCoreContextRef,
+  object: JavaScriptCoreObjectRef,
+  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R {
+  let context = makeRememberedClassCallbackContext(ctx, object)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(context, thisValue)
+}
+
+func withStoredClassObjectValue<R>(
+  _ object: JavaScriptCoreObjectRef,
+  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+) -> R? {
+  guard let objectContext = classObjectContext(object) else {
+    return nil
+  }
+  let context = JSInstantContext(ctx: objectContext)
+  let thisValue = JSValue(ref: object, ctx: context)
+  return body(context, thisValue)
+}
+
 func classPropertyName(_ propertyName: JavaScriptCoreStringRef?) -> String? {
   guard let propertyName else {
     return nil

@@ -186,7 +186,7 @@
 - [x] 收口 propertyNames 与脚本求值的通用包装：统一名称枚举与 evaluateScript 形态，减少分散重复（已补 `propertyNames(on:)` 并接入转换层；evaluateScript 统一包装已具备）
 
 #### P2（可选）
-- [ ] （进行中）收口 JSClass/JSClassValueConvertible callback 上下文恢复模板到共享 helper（仅收口 privateData/context 恢复等 bridge 样板）
+- [x] 收口 JSClass/JSClassValueConvertible callback 上下文恢复模板到共享 helper（仅收口 privateData/context 恢复等 bridge 样板；已抽 `withRememberedClassObjectValue` / `withStoredClassObjectValue` 并接入 auto callback 路径）
 - [ ] 评估对象/数组快速构造 builder 的收口价值，若仅单点使用则不推进
 
 #### 非收口边界（显式约束）
