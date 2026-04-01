@@ -124,13 +124,7 @@ extension JSValue {
     callback: @escaping JSFunctionCallback,
     in context: borrowing JSInstantContext
   ) {
-    let function = JavaScriptCoreBackendDriver.makeFunction(
-      named: name,
-      callback: callback,
-      in: context.driverContext,
-      functionClass: context.actorContext.functionClass.value
-    )
-    self.init(rawValue: function)
+    self = context.makeFunction(named: name, callback: callback)
   }
 
   public init<

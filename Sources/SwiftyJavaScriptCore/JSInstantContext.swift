@@ -7,6 +7,18 @@ public struct JSInstantContext: ~Copyable {
 }
 
 extension JSInstantContext {
+  private func makeFunctionRawValue(
+    named name: String,
+    callback: @escaping JSValue.JSFunctionCallback
+  ) -> JavaScriptCoreRawValue {
+    JavaScriptCoreBackendDriver.makeFunction(
+      named: name,
+      callback: callback,
+      in: driverContext,
+      functionClass: actorContext.functionClass.value
+    )
+  }
+
   var driverContext: JavaScriptCoreRawContext {
     JavaScriptCoreRawContext(borrowing: globalContextRef)
   }
@@ -106,7 +118,7 @@ extension JSInstantContext {
     named name: String,
     callback: @escaping JSValue.JSFunctionCallback
   ) -> JSValue {
-    JSValue(name: name, callback: callback, in: self)
+    JSValue(rawValue: makeFunctionRawValue(named: name, callback: callback))
   }
 
   public func installGlobalFunction(
