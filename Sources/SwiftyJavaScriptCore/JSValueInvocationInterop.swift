@@ -37,13 +37,12 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
-        valueHandle(in: context),
-        this: thisValueHandle,
-        arguments: arguments,
-        in: context.driverContextHandle
-      ))
+    context.valueBridgeAdapter.call(
+      function: self,
+      this: thisValueHandle,
+      arguments: arguments,
+      in: context
+    )
   }
 
   @inline(__always)
@@ -51,12 +50,11 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.constructHandle(
-        valueHandle(in: context),
-        arguments: arguments,
-        in: context.driverContextHandle
-      ))
+    context.valueBridgeAdapter.construct(
+      constructor: self,
+      arguments: arguments,
+      in: context
+    )
   }
 
   @inline(__always)
@@ -211,23 +209,18 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
-        name,
-        on: valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
+    let adapter = context.valueBridgeAdapter
+    switch adapter.getStringProperty(name, on: self, in: context)
     {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
-      return .from(
-        handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
-          method.valueHandle(in: context),
-          this: valueHandle(in: context),
-          arguments: arguments,
-          in: context.driverContextHandle
-        ))
+      return adapter.call(
+        function: method,
+        this: adapter.valueHandle(for: self, in: context),
+        arguments: arguments,
+        in: context
+      )
     }
   }
 
@@ -246,11 +239,7 @@ extension JSValue {
   }
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.toObjectHandle(
-        valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
+    context.valueBridgeAdapter.toObject(self, in: context)
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -260,10 +249,7 @@ extension JSValue {
   }
 
   public func isArray(in context: borrowing JSInstantContext) -> Bool {
-    return JavaScriptCoreBackendDriver.isArrayHandle(
-      valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.valueBridgeAdapter.isArray(self, in: context)
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
@@ -273,10 +259,7 @@ extension JSValue {
   }
 
   public func isDate(in context: borrowing JSInstantContext) -> Bool {
-    return JavaScriptCoreBackendDriver.isDateHandle(
-      valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.valueBridgeAdapter.isDate(self, in: context)
   }
 
   public func isInstanceOf(
@@ -292,11 +275,7 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    return JavaScriptCoreBackendDriver.isInstanceOfHandle(
-      valueHandle(in: context),
-      constructor: constructor.valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.valueBridgeAdapter.isInstanceOf(self, constructor: constructor, in: context)
   }
 
   public func defineProperty<Val, Key>(
@@ -316,23 +295,19 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+    let adapter = context.valueBridgeAdapter
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    let didSet = JavaScriptCoreBackendDriver.setStringPropertyHandle(
+    let didSet = adapter.setStringProperty(
       key.string,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
-      in: context.driverContextHandle,
+      on: self,
+      to: encoded,
+      in: context,
       attributes: attributes.hostMemberAttributes
     )
     guard didSet else {
       return .exception(JSValue(undefinedIn: context))
     }
 
-    return .from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
-        key.string,
-        on: valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
+    return adapter.getStringProperty(key.string, on: self, in: context)
   }
 }

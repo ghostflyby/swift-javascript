@@ -198,7 +198,7 @@
 
 迁移顺序（由低耦合到高耦合）：
 - [x] 第 1 步：先将函数回调签名从 `JSValue` 嵌套类型解耦为独立符号（已完成：`JSFunctionCallback` 已独立文件化并替换调用点）
-- [ ] 第 2 步：将 `JSValue` 的 handle/raw bridge 协议化（先抽 `valueHandle`/`resultHandle` 的 facade adapter）
+- [x] 第 2 步：将 `JSValue` 的 handle/raw bridge 协议化（已新增 `_JSValueBridgeAdapter` 与 JSC adapter，并接入 `JSValueInvocationInterop` 核心路径）
 - [ ] 第 3 步：将调用/构造/方法调用核心逻辑下沉到 handle 级 helper（保留 facade API 形态）
 - [ ] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装
 - [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层
