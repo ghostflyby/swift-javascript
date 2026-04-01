@@ -119,7 +119,7 @@ extension JSContext {
 
   public func makeFunction(
     named name: String,
-    callback: @escaping JSValue.JSFunctionCallback
+    callback: @escaping JSFunctionCallback
   ) -> JSValue {
     withInstantContext { instantContext in
       instantContext.makeFunction(named: name, callback: callback)
@@ -129,7 +129,7 @@ extension JSContext {
   public func installGlobalFunction(
     named name: String,
     with attributes: SwiftJavaScript.JSPropertyAttributes = .none,
-    callback: @escaping JSValue.JSFunctionCallback
+    callback: @escaping JSFunctionCallback
   ) {
     withInstantContext { instantContext in
       instantContext.installGlobalFunction(named: name, with: attributes, callback: callback)

@@ -23,7 +23,7 @@ public struct JSInstantContext: ~Copyable {
 extension JSInstantContext {
   private func makeFunctionRawValue(
     named name: String,
-    callback: @escaping JSValue.JSFunctionCallback
+    callback: @escaping JSFunctionCallback
   ) -> JavaScriptCoreRawValue {
     JavaScriptCoreBackendDriver.makeFunction(
       named: name,
@@ -130,7 +130,7 @@ extension JSInstantContext {
 
   public func makeFunction(
     named name: String,
-    callback: @escaping JSValue.JSFunctionCallback
+    callback: @escaping JSFunctionCallback
   ) -> JSValue {
     JSValue(rawValue: makeFunctionRawValue(named: name, callback: callback))
   }
@@ -138,7 +138,7 @@ extension JSInstantContext {
   public func installGlobalFunction(
     named name: String,
     with attributes: JSPropertyAttributes = .none,
-    callback: @escaping JSValue.JSFunctionCallback
+    callback: @escaping JSFunctionCallback
   ) {
     let function = makeFunction(named: name, callback: callback)
     setGlobalProperty(function, forKey: name, with: attributes)

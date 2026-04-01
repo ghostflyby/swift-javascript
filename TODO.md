@@ -194,6 +194,16 @@
 - [ ] 保持 `JSCodableValueConverter` 的业务序列化语义不下沉（树遍历与节点决策留在转换层）
 - [ ] 保持 `JSClassDefinition` 元编程组装不下沉（descriptor 组装与导出语义留在定义层）
 
+### 8.2 里程碑：将 `JSValue` 迁移到 `SwiftJavaScript`
+
+迁移顺序（由低耦合到高耦合）：
+- [x] 第 1 步：先将函数回调签名从 `JSValue` 嵌套类型解耦为独立符号（已完成：`JSFunctionCallback` 已独立文件化并替换调用点）
+- [ ] 第 2 步：将 `JSValue` 的 handle/raw bridge 协议化（先抽 `valueHandle`/`resultHandle` 的 facade adapter）
+- [ ] 第 3 步：将调用/构造/方法调用核心逻辑下沉到 handle 级 helper（保留 facade API 形态）
+- [ ] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装
+- [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层
+- [ ] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`
+
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
 ### 9.1 当前基线（2026-03-14）

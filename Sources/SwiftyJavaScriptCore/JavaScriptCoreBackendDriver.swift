@@ -100,7 +100,7 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   }
 
   let context = JSInstantContext(ctx: ctx)
-  let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(
+  let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
   let functionValue = JSValue(ref: function, ctx: context)
@@ -127,7 +127,7 @@ private func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSCla
     guard let function, let privateData = JSObjectGetPrivate(function) else {
       return
     }
-    let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(privateData)
+    let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(privateData)
       .takeRetainedValue()
     _ = callback.value
   }
@@ -183,13 +183,13 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
 
   package static func makeFunction(
     named name: String,
-    callback: @escaping JSValue.JSFunctionCallback,
+    callback: @escaping JSFunctionCallback,
     in context: JavaScriptCoreRawContext,
     functionClass: JSClassRef
   ) -> JavaScriptCoreRawValue {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
     guard let functionRef = JSObjectMake(context.ref, functionClass, callbackRef) else {
-      let callback = Unmanaged<Box<JSValue.JSFunctionCallback>>.fromOpaque(callbackRef)
+      let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(callbackRef)
         .takeRetainedValue()
       _ = callback.value
       return makeUndefined(in: context)
