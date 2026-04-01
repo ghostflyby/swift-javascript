@@ -12,6 +12,22 @@ protocol _JSValueBridgeAdapter {
 struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   typealias Engine = JavaScriptCoreEngine
 
+  func encodeArguments<each A: JSValueEncodable>(
+    _ arguments: repeat each A,
+    in context: borrowing JSInstantContext
+  ) -> [JSValueHandle<JavaScriptCoreEngine>] {
+    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
+    values.reserveCapacity(countTypePack(repeat (each A).self))
+
+    func appendArgument<T: JSValueEncodable>(_ argument: T) {
+      let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+      values.append(valueHandle(for: encoded, in: context))
+    }
+
+    repeat appendArgument(each arguments)
+    return values
+  }
+
   func valueHandle(
     for value: borrowing JSValue,
     in context: borrowing JSInstantContext
@@ -36,6 +52,25 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
         arguments: arguments,
         in: context.driverContextHandle
       ))
+  }
+
+  func invokeMethod(
+    _ name: String,
+    on object: borrowing JSValue,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>],
+    in context: borrowing JSInstantContext
+  ) -> JSResult {
+    switch getStringProperty(name, on: object, in: context) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return call(
+        function: method,
+        this: valueHandle(for: object, in: context),
+        arguments: arguments,
+        in: context
+      )
+    }
   }
 
   func construct(

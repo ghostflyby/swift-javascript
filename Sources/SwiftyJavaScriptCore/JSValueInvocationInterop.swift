@@ -37,7 +37,8 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.call(
+    let adapter = context.valueBridgeAdapter
+    return adapter.call(
       function: self,
       this: thisValueHandle,
       arguments: arguments,
@@ -50,28 +51,12 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.construct(
+    let adapter = context.valueBridgeAdapter
+    return adapter.construct(
       constructor: self,
       arguments: arguments,
       in: context
     )
-  }
-
-  @inline(__always)
-  private func encodedArguments<each A: JSValueEncodable>(
-    _ arguments: repeat each A,
-    in context: borrowing JSInstantContext
-  ) -> [JSValueHandle<JavaScriptCoreEngine>] {
-    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
-    values.reserveCapacity(countTypePack(repeat (each A).self))
-
-    func appendArgument<T: JSValueEncodable>(_ argument: T) {
-      let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-      values.append(encoded.valueHandle(in: context))
-    }
-
-    repeat appendArgument(each arguments)
-    return values
   }
 
   public func call(in context: isolated JSContext = #isolation) -> JSResult {
@@ -97,8 +82,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    callInternal(
-      thisValueHandle: nil, arguments: encodedArguments(repeat each arguments, in: context),
+    let adapter = context.valueBridgeAdapter
+    return callInternal(
+      thisValueHandle: nil,
+      arguments: adapter.encodeArguments(repeat each arguments, in: context),
       in: context)
   }
 
@@ -115,7 +102,12 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    callInternal(thisValueHandle: thisValue.valueHandle(in: context), arguments: [], in: context)
+    let adapter = context.valueBridgeAdapter
+    return callInternal(
+      thisValueHandle: adapter.valueHandle(for: thisValue, in: context),
+      arguments: [],
+      in: context
+    )
   }
 
   public func call<each A: JSValueEncodable>(
@@ -133,9 +125,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    callInternal(
-      thisValueHandle: thisValue.valueHandle(in: context),
-      arguments: encodedArguments(repeat each arguments, in: context),
+    let adapter = context.valueBridgeAdapter
+    return callInternal(
+      thisValueHandle: adapter.valueHandle(for: thisValue, in: context),
+      arguments: adapter.encodeArguments(repeat each arguments, in: context),
       in: context
     )
   }
@@ -163,7 +156,11 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    constructInternal(arguments: encodedArguments(repeat each arguments, in: context), in: context)
+    let adapter = context.valueBridgeAdapter
+    return constructInternal(
+      arguments: adapter.encodeArguments(repeat each arguments, in: context),
+      in: context
+    )
   }
 
   public func invokeMethod<Name: JSString>(
@@ -197,9 +194,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    invokeMethodInternal(
+    let adapter = context.valueBridgeAdapter
+    return invokeMethodInternal(
       name.string,
-      arguments: encodedArguments(repeat each arguments, in: context),
+      arguments: adapter.encodeArguments(repeat each arguments, in: context),
       in: context
     )
   }
@@ -209,19 +207,7 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    let adapter = context.valueBridgeAdapter
-    switch adapter.getStringProperty(name, on: self, in: context)
-    {
-    case .exception(let exception):
-      return .exception(exception)
-    case .value(let method):
-      return adapter.call(
-        function: method,
-        this: adapter.valueHandle(for: self, in: context),
-        arguments: arguments,
-        in: context
-      )
-    }
+    context.valueBridgeAdapter.invokeMethod(name, on: self, arguments: arguments, in: context)
   }
 
   public func toNumber(in context: isolated JSContext = #isolation) -> Double {
