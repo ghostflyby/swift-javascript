@@ -176,17 +176,17 @@
 ### 8.1 InstantContext 收口待办（按“仅底层 bridge 细节收口”原则）
 
 #### P0（优先）
-- [ ] 收口属性操作三路径（string key / value key / index）到 `JSInstantContext`：统一 get/set/has/delete helper，减少 `driverContextHandle` 与 backend 直连重复
-- [ ] 收口参数编码与结果桥接工厂：统一 `encodedArguments` 与 handle result -> `JSResult` 流程，消除 call/construct/invokeMethod 重复样板
-- [ ] 收口基础值转换 helper 到 `JSInstantContext`：补齐 toBoolean/toNumber/toString 入口，并让 `JSValueConversion` 改走 context helper
+- [x] 收口属性操作三路径（string key / value key / index）到 `JSInstantContext`：统一 get/set/has/delete helper，减少 `driverContextHandle` 与 backend 直连重复（已完成 `JSObject` 三路径调用改走 context helper）
+- [x] 收口参数编码与结果桥接工厂：统一 `encodedArguments` 与 handle result -> `JSResult` 流程，消除 call/construct/invokeMethod 重复样板（已新增 `JSInstantContext.encodeArgumentHandles` 与 `bridgeResult` 并替换调用点）
+- [x] 收口基础值转换 helper 到 `JSInstantContext`：补齐 toBoolean/toNumber/toString 入口，并让 `JSValueConversion` 改走 context helper
 
 #### P1（次优先）
-- [ ] 收口基础判型 helper 到 `JSInstantContext`：补齐 isBoolean/isNumber/isString/isObject/isFunction 等，统一判型入口
-- [ ] 收口 ArrayBuffer 字节操作 helper 到 `JSInstantContext`：统一 byteLength/bytes 访问与写入路径，减少 `JSArrayBuffer` 中 backend 直连细节
-- [ ] 收口 propertyNames 与脚本求值的通用包装：统一名称枚举与 evaluateScript 形态，减少分散重复
+- [x] 收口基础判型 helper 到 `JSInstantContext`：补齐 isUndefined/isNull/isBoolean/isNumber/isString/isSymbol/isObject/isBigInt 并统一 `JSType` 的 instant 分支入口
+- [x] 收口 ArrayBuffer 字节操作 helper 到 `JSInstantContext`：统一 byteLength/bytes 访问与写入路径，减少 `JSArrayBuffer` 中 backend 直连细节（已完成创建/byteLength/bytes 访问改走 context helper）
+- [x] 收口 propertyNames 与脚本求值的通用包装：统一名称枚举与 evaluateScript 形态，减少分散重复（已补 `propertyNames(on:)` 并接入转换层；evaluateScript 统一包装已具备）
 
 #### P2（可选）
-- [ ] 收口 JSClass/JSClassValueConvertible callback 上下文恢复模板到共享 helper（仅收口 privateData/context 恢复等 bridge 样板）
+- [ ] （进行中）收口 JSClass/JSClassValueConvertible callback 上下文恢复模板到共享 helper（仅收口 privateData/context 恢复等 bridge 样板）
 - [ ] 评估对象/数组快速构造 builder 的收口价值，若仅单点使用则不推进
 
 #### 非收口边界（显式约束）

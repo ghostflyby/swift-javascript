@@ -123,11 +123,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         return JSCodableNode(.array(nodes))
       }
       var object: [String: JSCodableNode] = [:]
-      let names =
-        JavaScriptCoreBackendDriver.propertyNamesForHandle(
-          on: value.valueHandle(in: context),
-          in: context.driverContextHandle
-        ) ?? []
+      let names = context.propertyNames(on: value) ?? []
       object.reserveCapacity(names.count)
 
       for key in names {

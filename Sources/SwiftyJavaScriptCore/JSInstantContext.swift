@@ -7,6 +7,27 @@ public struct JSInstantContext: ~Copyable {
 }
 
 extension JSInstantContext {
+  @inline(__always)
+  func bridgeResult(_ handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
+    .from(handleResult: handleResult)
+  }
+
+  @inline(__always)
+  func encodeArgumentHandles<each A: JSValueEncodable>(_ arguments: repeat each A)
+    -> [JSValueHandle<JavaScriptCoreEngine>]
+  {
+    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
+    values.reserveCapacity(countTypePack(repeat (each A).self))
+
+    func appendArgument<T: JSValueEncodable>(_ argument: T) {
+      let encoded = (try? argument.tryEncode(in: self)) ?? JSValue(undefinedIn: self)
+      values.append(encoded.valueHandle(in: self))
+    }
+
+    repeat appendArgument(each arguments)
+    return values
+  }
+
   private func makeFunctionRawValue(
     named name: String,
     callback: @escaping JSValue.JSFunctionCallback
@@ -93,9 +114,7 @@ extension JSInstantContext {
   }
 
   public func makeObject() -> JSValue {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.makeObjectResultHandle(driverContextHandle))
-    {
+    switch bridgeResult(JavaScriptCoreBackendDriver.makeObjectResultHandle(driverContextHandle)) {
     case .value(let value):
       return value
     case .exception(let exception):
@@ -104,9 +123,7 @@ extension JSInstantContext {
   }
 
   public func makeArray() -> JSValue {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.makeArrayResultHandle(driverContextHandle))
-    {
+    switch bridgeResult(JavaScriptCoreBackendDriver.makeArrayResultHandle(driverContextHandle)) {
     case .value(let value):
       return value
     case .exception(let exception):
@@ -134,8 +151,8 @@ extension JSInstantContext {
     this thisValue: JSValueHandle<JavaScriptCoreEngine>?,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
+    bridgeResult(
+      JavaScriptCoreBackendDriver.callFunctionHandle(
         function.valueHandle(in: self),
         this: thisValue,
         arguments: arguments,
@@ -147,8 +164,8 @@ extension JSInstantContext {
     _ constructor: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.constructHandle(
+    bridgeResult(
+      JavaScriptCoreBackendDriver.constructHandle(
         constructor.valueHandle(in: self),
         arguments: arguments,
         in: driverContextHandle
@@ -156,9 +173,27 @@ extension JSInstantContext {
   }
 
   func getStringProperty(_ name: String, on object: borrowing JSValue) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+    bridgeResult(
+      JavaScriptCoreBackendDriver.getStringPropertyHandle(
         name,
+        on: object.valueHandle(in: self),
+        in: driverContextHandle
+      ))
+  }
+
+  func getValueProperty(_ key: borrowing JSValue, on object: borrowing JSValue) -> JSResult {
+    bridgeResult(
+      JavaScriptCoreBackendDriver.getValuePropertyHandle(
+        key.valueHandle(in: self),
+        on: object.valueHandle(in: self),
+        in: driverContextHandle
+      ))
+  }
+
+  func getIndexProperty(at index: UInt32, on object: borrowing JSValue) -> JSResult {
+    bridgeResult(
+      JavaScriptCoreBackendDriver.getIndexPropertyHandle(
+        at: index,
         on: object.valueHandle(in: self),
         in: driverContextHandle
       ))
@@ -179,9 +214,76 @@ extension JSInstantContext {
     )
   }
 
+  func setValueProperty(
+    _ key: borrowing JSValue,
+    on object: borrowing JSValue,
+    to value: borrowing JSValue,
+    attributes: JSPropertyAttributes
+  ) -> Bool {
+    JavaScriptCoreBackendDriver.setValuePropertyHandle(
+      key.valueHandle(in: self),
+      on: object.valueHandle(in: self),
+      to: value.valueHandle(in: self),
+      in: driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
+  }
+
+  func setIndexProperty(
+    at index: UInt32,
+    on object: borrowing JSValue,
+    to value: borrowing JSValue
+  ) -> Bool {
+    JavaScriptCoreBackendDriver.setIndexPropertyHandle(
+      at: index,
+      on: object.valueHandle(in: self),
+      to: value.valueHandle(in: self),
+      in: driverContextHandle
+    )
+  }
+
+  func deleteStringProperty(_ name: String, on object: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.deleteStringPropertyHandle(
+      name,
+      on: object.valueHandle(in: self),
+      in: driverContextHandle
+    )
+  }
+
+  func deleteValueProperty(_ key: borrowing JSValue, on object: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.deleteValuePropertyHandle(
+      key.valueHandle(in: self),
+      on: object.valueHandle(in: self),
+      in: driverContextHandle
+    )
+  }
+
+  func hasStringProperty(_ name: String, on object: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.hasStringPropertyHandle(
+      name,
+      on: object.valueHandle(in: self),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func hasValueProperty(_ key: borrowing JSValue, on object: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.hasValuePropertyHandle(
+      key.valueHandle(in: self),
+      on: object.valueHandle(in: self),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func propertyNames(on object: borrowing JSValue) -> [String]? {
+    JavaScriptCoreBackendDriver.propertyNamesForHandle(
+      on: object.valueHandle(in: self),
+      in: driverContextHandle
+    )
+  }
+
   func toObject(_ value: borrowing JSValue) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.toObjectHandle(
+    bridgeResult(
+      JavaScriptCoreBackendDriver.toObjectHandle(
         value.valueHandle(in: self),
         in: driverContextHandle
       ))
@@ -207,6 +309,79 @@ extension JSInstantContext {
       constructor: constructor.valueHandle(in: self),
       in: driverContextHandle
     ) ?? false
+  }
+
+  func valueType(of value: borrowing JSValue) -> JSType {
+    JavaScriptCoreBackendDriver.valueType(of: value.ref, in: globalContextRef)
+  }
+
+  func isUndefined(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isUndefined(value.ref, in: globalContextRef)
+  }
+
+  func isNull(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isNull(value.ref, in: globalContextRef)
+  }
+
+  func isBoolean(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isBoolean(value.ref, in: globalContextRef)
+  }
+
+  func isNumber(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isNumber(value.ref, in: globalContextRef)
+  }
+
+  func isString(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isString(value.ref, in: globalContextRef)
+  }
+
+  func isSymbol(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isSymbol(value.ref, in: globalContextRef)
+  }
+
+  func isObject(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isObject(value.ref, in: globalContextRef)
+  }
+
+  func isBigInt(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isBigInt(value.ref, in: globalContextRef)
+  }
+
+  func toBoolean(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.toBoolean(value.ref, in: globalContextRef)
+  }
+
+  func toNumber(_ value: borrowing JSValue) -> Double {
+    JavaScriptCoreBackendDriver.toNumber(value.ref, in: globalContextRef)
+  }
+
+  func toString(_ value: borrowing JSValue) -> String? {
+    JavaScriptCoreBackendDriver.toString(value.ref, in: globalContextRef)
+  }
+
+  func makeArrayBufferWithBytesNoCopy(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: JavaScriptCoreTypedArrayBytesDeallocator?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JavaScriptCoreObjectRef? {
+    JavaScriptCoreBackendDriver.makeArrayBufferWithBytesNoCopy(
+      in: globalContextRef,
+      bytes: bytes,
+      byteLength: byteLength,
+      bytesDeallocator: bytesDeallocator,
+      deallocatorContext: deallocatorContext
+    )
+  }
+
+  func arrayBufferByteLength(of value: borrowing JSValue) -> Int? {
+    JavaScriptCoreBackendDriver.arrayBufferByteLength(of: value.ref, in: globalContextRef)
+  }
+
+  func arrayBufferBytesAccess(of value: borrowing JSValue)
+    -> (bytes: UnsafeMutableRawPointer?, hadException: Bool)
+  {
+    JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: globalContextRef)
   }
 
   public func installGlobalFunction(
@@ -282,8 +457,8 @@ extension JSInstantContext {
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
   ) -> JSResult where Script: JSString, Script: ~Copyable {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
+    bridgeResult(
+      JavaScriptCoreBackendDriver.evaluateScriptResultHandle(
         script.string,
         driverContextHandle,
         sourceURL: nil,
