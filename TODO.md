@@ -170,7 +170,29 @@
 - [x] 中期解耦推进：`JSValue` 基础类型判定统一改为显式 `in context` 调用，并移除基于注册表/隐式上下文的判型推断路径（补齐 `JSContext` 与 `JSInstantContext` 显式重载，源码/宏模板/测试已全量迁移）
 - [x] 中期解耦推进：`JSValue` 在 `isolated JSContext` 分支下不再直接构造 `JSInstantContext(ctx:)`，统一改走 `withInstantContext` 转发（并修复 `borrowing JSString` 闭包捕获）
 - [x] 中期解耦推进：`JSValue(name:callback:in:)` 不再直接依赖 `JavaScriptCoreBackendDriver.makeFunction` 与 `functionClass` 细节，改由 `JSInstantContext.makeFunction` 统一收口
+- [x] 中期解耦推进：`JSValueInvocationInterop` 的比较/调用/toObject/类型辅助与 defineProperty 流程不再直接调用 backend，改由 `JSInstantContext` 提供统一收口方法
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
+
+### 8.1 InstantContext 收口待办（按“仅底层 bridge 细节收口”原则）
+
+#### P0（优先）
+- [ ] 收口属性操作三路径（string key / value key / index）到 `JSInstantContext`：统一 get/set/has/delete helper，减少 `driverContextHandle` 与 backend 直连重复
+- [ ] 收口参数编码与结果桥接工厂：统一 `encodedArguments` 与 handle result -> `JSResult` 流程，消除 call/construct/invokeMethod 重复样板
+- [ ] 收口基础值转换 helper 到 `JSInstantContext`：补齐 toBoolean/toNumber/toString 入口，并让 `JSValueConversion` 改走 context helper
+
+#### P1（次优先）
+- [ ] 收口基础判型 helper 到 `JSInstantContext`：补齐 isBoolean/isNumber/isString/isObject/isFunction 等，统一判型入口
+- [ ] 收口 ArrayBuffer 字节操作 helper 到 `JSInstantContext`：统一 byteLength/bytes 访问与写入路径，减少 `JSArrayBuffer` 中 backend 直连细节
+- [ ] 收口 propertyNames 与脚本求值的通用包装：统一名称枚举与 evaluateScript 形态，减少分散重复
+
+#### P2（可选）
+- [ ] 收口 JSClass/JSClassValueConvertible callback 上下文恢复模板到共享 helper（仅收口 privateData/context 恢复等 bridge 样板）
+- [ ] 评估对象/数组快速构造 builder 的收口价值，若仅单点使用则不推进
+
+#### 非收口边界（显式约束）
+- [ ] 保持 `JSValue`/`JSObject` 的用户语义 API 不下沉（初始化器形态、转换器选择、错误映射等）
+- [ ] 保持 `JSCodableValueConverter` 的业务序列化语义不下沉（树遍历与节点决策留在转换层）
+- [ ] 保持 `JSClassDefinition` 元编程组装不下沉（descriptor 组装与导出语义留在定义层）
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 

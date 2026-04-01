@@ -11,7 +11,7 @@ extension JSValue {
   public func looselyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    JavaScriptCoreBackendDriver.valueEquals(ref, other.ref, in: context.globalContextRef)
+    context.looselyEquals(self, other)
   }
 
   public func strictlyEquals(
@@ -26,7 +26,7 @@ extension JSValue {
   public func strictlyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    JavaScriptCoreBackendDriver.valueStrictEquals(ref, other.ref, in: context.globalContextRef)
+    context.strictlyEquals(self, other)
   }
 }
 
@@ -37,13 +37,11 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
-        valueHandle(in: context),
-        this: thisValueHandle,
-        arguments: arguments,
-        in: context.driverContextHandle
-      ))
+    context.callFunction(
+      self,
+      this: thisValueHandle,
+      arguments: arguments
+    )
   }
 
   @inline(__always)
@@ -51,12 +49,10 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.constructHandle(
-        valueHandle(in: context),
-        arguments: arguments,
-        in: context.driverContextHandle
-      ))
+    context.constructFunction(
+      self,
+      arguments: arguments
+    )
   }
 
   @inline(__always)
@@ -211,23 +207,15 @@ extension JSValue {
     arguments: [JSValueHandle<JavaScriptCoreEngine>],
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
-        name,
-        on: valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
-    {
+    switch context.getStringProperty(name, on: self) {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
-      return .from(
-        handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
-          method.valueHandle(in: context),
-          this: valueHandle(in: context),
-          arguments: arguments,
-          in: context.driverContextHandle
-        ))
+      return context.callFunction(
+        method,
+        this: valueHandle(in: context),
+        arguments: arguments
+      )
     }
   }
 
@@ -246,11 +234,7 @@ extension JSValue {
   }
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
-    .from(
-      handleResult: JavaScriptCoreBackendDriver.toObjectHandle(
-        valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
+    context.toObject(self)
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -260,10 +244,7 @@ extension JSValue {
   }
 
   public func isArray(in context: borrowing JSInstantContext) -> Bool {
-    return JavaScriptCoreBackendDriver.isArrayHandle(
-      valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.isArray(self)
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
@@ -273,10 +254,7 @@ extension JSValue {
   }
 
   public func isDate(in context: borrowing JSInstantContext) -> Bool {
-    return JavaScriptCoreBackendDriver.isDateHandle(
-      valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.isDate(self)
   }
 
   public func isInstanceOf(
@@ -292,11 +270,7 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    return JavaScriptCoreBackendDriver.isInstanceOfHandle(
-      valueHandle(in: context),
-      constructor: constructor.valueHandle(in: context),
-      in: context.driverContextHandle
-    ) ?? false
+    context.isInstanceOf(self, constructor: constructor)
   }
 
   public func defineProperty<Val, Key>(
@@ -317,22 +291,19 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    let didSet = JavaScriptCoreBackendDriver.setStringPropertyHandle(
+    let didSet = context.setStringProperty(
       key.string,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
-      in: context.driverContextHandle,
-      attributes: attributes.hostMemberAttributes
+      on: self,
+      to: encoded,
+      attributes: attributes
     )
     guard didSet else {
       return .exception(JSValue(undefinedIn: context))
     }
 
-    return .from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
-        key.string,
-        on: valueHandle(in: context),
-        in: context.driverContextHandle
-      ))
+    return context.getStringProperty(
+      key.string,
+      on: self
+    )
   }
 }

@@ -121,6 +121,94 @@ extension JSInstantContext {
     JSValue(rawValue: makeFunctionRawValue(named: name, callback: callback))
   }
 
+  func looselyEquals(_ lhs: borrowing JSValue, _ rhs: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: globalContextRef)
+  }
+
+  func strictlyEquals(_ lhs: borrowing JSValue, _ rhs: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.valueStrictEquals(lhs.ref, rhs.ref, in: globalContextRef)
+  }
+
+  func callFunction(
+    _ function: borrowing JSValue,
+    this thisValue: JSValueHandle<JavaScriptCoreEngine>?,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
+  ) -> JSResult {
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.callFunctionHandle(
+        function.valueHandle(in: self),
+        this: thisValue,
+        arguments: arguments,
+        in: driverContextHandle
+      ))
+  }
+
+  func constructFunction(
+    _ constructor: borrowing JSValue,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
+  ) -> JSResult {
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.constructHandle(
+        constructor.valueHandle(in: self),
+        arguments: arguments,
+        in: driverContextHandle
+      ))
+  }
+
+  func getStringProperty(_ name: String, on object: borrowing JSValue) -> JSResult {
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+        name,
+        on: object.valueHandle(in: self),
+        in: driverContextHandle
+      ))
+  }
+
+  func setStringProperty(
+    _ name: String,
+    on object: borrowing JSValue,
+    to value: borrowing JSValue,
+    attributes: JSPropertyAttributes
+  ) -> Bool {
+    JavaScriptCoreBackendDriver.setStringPropertyHandle(
+      name,
+      on: object.valueHandle(in: self),
+      to: value.valueHandle(in: self),
+      in: driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
+  }
+
+  func toObject(_ value: borrowing JSValue) -> JSResult {
+    .from(
+      handleResult: JavaScriptCoreBackendDriver.toObjectHandle(
+        value.valueHandle(in: self),
+        in: driverContextHandle
+      ))
+  }
+
+  func isArray(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isArrayHandle(
+      value.valueHandle(in: self),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func isDate(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isDateHandle(
+      value.valueHandle(in: self),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func isInstanceOf(_ value: borrowing JSValue, constructor: borrowing JSValue) -> Bool {
+    JavaScriptCoreBackendDriver.isInstanceOfHandle(
+      value.valueHandle(in: self),
+      constructor: constructor.valueHandle(in: self),
+      in: driverContextHandle
+    ) ?? false
+  }
+
   public func installGlobalFunction(
     named name: String,
     with attributes: JSPropertyAttributes = .none,
