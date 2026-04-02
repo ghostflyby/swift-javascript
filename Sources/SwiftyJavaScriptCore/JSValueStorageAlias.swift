@@ -1,3 +1,32 @@
+struct _JSValueRawStorage: ~Copyable {
+	let ref: JavaScriptCoreValueRef
+
+	init(ref: JavaScriptCoreValueRef) {
+		self.ref = ref
+	}
+
+	init(rawValue: JavaScriptCoreRawValue) {
+		self.ref = rawValue.ref
+	}
+
+	static func fromHandle(
+		_ handle: JSValueHandle<JavaScriptCoreEngine>
+	) -> _JSValueRawStorage? {
+		guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
+			return nil
+		}
+		return _JSValueRawStorage(rawValue: rawValue)
+	}
+
+	func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
+		JavaScriptCoreRawValue(ref: ref, context: context)
+	}
+
+	func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
+		JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue(in: context.driverContext))
+	}
+}
+
 struct _JSValueStorage: ~Copyable {
 	private let rawStorage: _JSValueRawStorage
 
@@ -29,5 +58,4 @@ struct _JSValueStorage: ~Copyable {
 	func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
 		rawStorage.valueHandle(in: context)
 	}
-
 }

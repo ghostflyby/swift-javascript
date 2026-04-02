@@ -201,7 +201,7 @@
 - [x] 第 2 步：将 `JSValue` 的 handle/raw bridge 协议化（已新增 `_JSValueBridgeAdapter` 与 JSC adapter，并接入 `JSValueInvocationInterop` 核心路径）
 - [x] 第 3 步：将调用/构造/方法调用核心逻辑下沉到 handle 级 helper（已将参数编码与 call/construct/invokeMethod 编排下沉到 adapter，interop 侧仅保留 facade API 转发）
 - [x] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装（已完成：`looselyEquals`/`strictlyEquals`、`JSType`（instant 与 JSContext 统一入口）以及 `Bool/Double/String` 基础转换均已经 adapter 路径）
-- [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层（进行中：已将 raw/handle 转换逻辑集中到 `_JSValueRawStorage`，并将 `_JSValueStorage` 从别名升级为独立包装类型）
+- [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层（进行中：已将 raw/handle 转换逻辑集中到专用存储文件，并将 `_JSValueStorage` 升级为独立包装类型）
 - [ ] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`
 
 ### 8.3 引擎泛型标记（分阶段）
