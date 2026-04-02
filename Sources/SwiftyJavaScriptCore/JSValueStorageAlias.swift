@@ -30,6 +30,8 @@ struct _JSValueRawStorage: ~Copyable {
 private protocol _JSValueStorageBridge {
 	associatedtype Handle
 
+	func rawStorage(from ref: JavaScriptCoreValueRef) -> _JSValueRawStorage
+	func rawStorage(from rawValue: JavaScriptCoreRawValue) -> _JSValueRawStorage
 	func rawStorage(from handle: Handle) -> _JSValueRawStorage?
 	func handle(
 		from rawStorage: borrowing _JSValueRawStorage,
@@ -39,6 +41,14 @@ private protocol _JSValueStorageBridge {
 
 private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
 	typealias Handle = JSValueHandle<JavaScriptCoreEngine>
+
+	func rawStorage(from ref: JavaScriptCoreValueRef) -> _JSValueRawStorage {
+		_JSValueRawStorage(ref: ref)
+	}
+
+	func rawStorage(from rawValue: JavaScriptCoreRawValue) -> _JSValueRawStorage {
+		_JSValueRawStorage(rawValue: rawValue)
+	}
 
 	func rawStorage(from handle: Handle) -> _JSValueRawStorage? {
 		_JSValueRawStorage.fromHandle(handle)
@@ -58,11 +68,11 @@ struct _JSValueStorage: ~Copyable {
 	private let rawStorage: _JSValueRawStorage
 
 	init(ref: JavaScriptCoreValueRef) {
-		self.rawStorage = _JSValueRawStorage(ref: ref)
+		self.rawStorage = _jsValueStorageBridge.rawStorage(from: ref)
 	}
 
 	init(rawValue: JavaScriptCoreRawValue) {
-		self.rawStorage = _JSValueRawStorage(rawValue: rawValue)
+		self.rawStorage = _jsValueStorageBridge.rawStorage(from: rawValue)
 	}
 
 	static func fromHandle(
