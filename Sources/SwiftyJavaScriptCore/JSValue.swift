@@ -5,7 +5,7 @@
 //  Created by ghostflyby pan on 2025/9/12.
 //
 public struct JSValue: ~Copyable {
-  let _rawValue: _JSValueRawStorage
+  let _rawValue: _JSValueStorage
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
     self = context.withInstantContext { callbackContext in

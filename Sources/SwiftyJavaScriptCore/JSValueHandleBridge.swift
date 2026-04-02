@@ -1,5 +1,30 @@
 struct _JSValueRawStorage: ~Copyable {
   let ref: JavaScriptCoreValueRef
+
+  init(ref: JavaScriptCoreValueRef) {
+    self.ref = ref
+  }
+
+  init(rawValue: JavaScriptCoreRawValue) {
+    self.ref = rawValue.ref
+  }
+
+  static func fromHandle(
+    _ handle: JSValueHandle<JavaScriptCoreEngine>
+  ) -> _JSValueRawStorage? {
+    guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
+      return nil
+    }
+    return _JSValueRawStorage(rawValue: rawValue)
+  }
+
+  func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
+    JavaScriptCoreRawValue(ref: ref, context: context)
+  }
+
+  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
+    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue(in: context.driverContext))
+  }
 }
 
 extension JSValue {
@@ -26,21 +51,21 @@ extension JSValue {
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    guard let rawValue: JavaScriptCoreRawValue = handleValue.opaqueHandle() else {
+    guard let rawStorage = _JSValueRawStorage.fromHandle(handleValue) else {
       preconditionFailure("JSValue handle did not contain JavaScriptCoreRawValue")
     }
-    self.init(rawValue: rawValue)
+    self._rawValue = rawStorage
   }
 
   init(rawValue: JavaScriptCoreRawValue) {
-    self._rawValue = _JSValueRawStorage(ref: rawValue.ref)
+    self._rawValue = _JSValueRawStorage(rawValue: rawValue)
   }
 
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-    return JavaScriptCoreRawValue(ref: ref, context: context)
+    _rawValue.rawValue(in: context)
   }
 
   func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue(in: context.driverContext))
+    _rawValue.valueHandle(in: context)
   }
 }
