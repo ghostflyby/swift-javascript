@@ -27,6 +27,33 @@ struct _JSValueRawStorage: ~Copyable {
 	}
 }
 
+private protocol _JSValueStorageBridge {
+	associatedtype Handle
+
+	func rawStorage(from handle: Handle) -> _JSValueRawStorage?
+	func handle(
+		from rawStorage: borrowing _JSValueRawStorage,
+		in context: borrowing JSInstantContext
+	) -> Handle
+}
+
+private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
+	typealias Handle = JSValueHandle<JavaScriptCoreEngine>
+
+	func rawStorage(from handle: Handle) -> _JSValueRawStorage? {
+		_JSValueRawStorage.fromHandle(handle)
+	}
+
+	func handle(
+		from rawStorage: borrowing _JSValueRawStorage,
+		in context: borrowing JSInstantContext
+	) -> Handle {
+		rawStorage.valueHandle(in: context)
+	}
+}
+
+private let _jsValueStorageBridge = _JSCJSValueStorageBridge()
+
 struct _JSValueStorage: ~Copyable {
 	private let rawStorage: _JSValueRawStorage
 
@@ -41,7 +68,7 @@ struct _JSValueStorage: ~Copyable {
 	static func fromHandle(
 		_ handle: JSValueHandle<JavaScriptCoreEngine>
 	) -> _JSValueStorage? {
-		guard let rawStorage = _JSValueRawStorage.fromHandle(handle) else {
+		guard let rawStorage = _jsValueStorageBridge.rawStorage(from: handle) else {
 			return nil
 		}
 		return _JSValueStorage(ref: rawStorage.ref)
@@ -56,6 +83,6 @@ struct _JSValueStorage: ~Copyable {
 	}
 
 	func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-		rawStorage.valueHandle(in: context)
+		_jsValueStorageBridge.handle(from: rawStorage, in: context)
 	}
 }
