@@ -37,12 +37,12 @@ extension JSValue {
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
-    self._rawValue = _JSValueRawStorage(ref: ref)
+    self._rawValue = _JSValueStorage(ref: ref)
     _ = ctx
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
-    self._rawValue = _JSValueRawStorage(ref: ref)
+    self._rawValue = _JSValueStorage(ref: ref)
     _ = ctx
   }
 
@@ -51,14 +51,14 @@ extension JSValue {
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    guard let rawStorage = _JSValueRawStorage.fromHandle(handleValue) else {
+    guard let rawStorage = _JSValueStorage.fromHandle(handleValue) else {
       preconditionFailure("JSValue handle did not contain JavaScriptCoreRawValue")
     }
     self._rawValue = rawStorage
   }
 
   init(rawValue: JavaScriptCoreRawValue) {
-    self._rawValue = _JSValueRawStorage(rawValue: rawValue)
+    self._rawValue = _JSValueStorage(rawValue: rawValue)
   }
 
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
