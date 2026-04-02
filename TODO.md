@@ -200,7 +200,7 @@
 - [x] 第 1 步：先将函数回调签名从 `JSValue` 嵌套类型解耦为独立符号（已完成：`JSFunctionCallback` 已独立文件化并替换调用点）
 - [x] 第 2 步：将 `JSValue` 的 handle/raw bridge 协议化（已新增 `_JSValueBridgeAdapter` 与 JSC adapter，并接入 `JSValueInvocationInterop` 核心路径）
 - [x] 第 3 步：将调用/构造/方法调用核心逻辑下沉到 handle 级 helper（已将参数编码与 call/construct/invokeMethod 编排下沉到 adapter，interop 侧仅保留 facade API 转发）
-- [ ] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装（进行中：`looselyEquals`/`strictlyEquals` 已先切到 adapter 入口）
+- [ ] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装（进行中：`looselyEquals`/`strictlyEquals`、`JSType` 的 instant 分支与 JSContext 分支（经本地 instantContext）以及 `Bool/Double/String` 基础转换已切到 adapter/统一入口）
 - [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层
 - [ ] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`
 
