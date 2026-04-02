@@ -4,6 +4,11 @@
 //
 //  Created by ghostflyby pan on 2025/9/12.
 //
+/// Minimal JavaScript value mapping.
+///
+/// `JSValue` intentionally does not retain a context reference.
+/// It only carries the minimal value identity/representation and relies on
+/// explicit `in context` parameters at operation sites.
 public struct JSValue: ~Copyable {
   let _rawValue: _JSValueStorage
 
