@@ -204,6 +204,25 @@
 - [ ] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层（进行中：已将 raw/handle 转换逻辑集中到 `_JSValueRawStorage`，并将 `_JSValueStorage` 从别名升级为独立包装类型）
 - [ ] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`
 
+### 8.3 引擎泛型标记（分阶段）
+
+优先级策略（避免与 8.2 主线互相干扰）：
+- [ ] 先完成 8.2 的第 5/6 步，再展开全链路引擎泛型标记改造（避免两类大改叠加导致回归定位困难）
+
+阶段 A：先改 core，不改 facade 用户 API
+- [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名
+- [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
+
+阶段 B：按垂直切片迁移，逐段收口
+- [ ] Slice 1：`JSValue` 调用链（call/construct/invokeMethod）全链路引擎泛型化
+- [ ] Slice 2：基础判型与基础转换链路泛型化
+- [ ] Slice 3：`JSObject` 属性访问链路泛型化
+- [ ] Slice 4：`JSClass` callback 输入输出链路泛型化
+
+阶段 C：收尾
+- [ ] 删除过渡兼容层与旧路径
+- [ ] 在 `SwiftJavaScriptTests` 增加“跨引擎误用应在编译期失败”的测试样例
+
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
 ### 9.1 当前基线（2026-03-14）
