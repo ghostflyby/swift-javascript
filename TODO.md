@@ -224,6 +224,7 @@
 阶段 A：先改 core，不改 facade 用户 API
 - [x] 将 `JSInstantContext` 主类型下沉为 `SwiftJavaScript.JSEngineInstantContext<E>`，并在 JSC facade 保留 `typealias JSInstantContext = JSEngineInstantContext<JavaScriptCoreEngine>`
 - [x] 将 `JSInstantContext` 的通用扩展（值构造）下沉到 `JSEngineInstantContext` 同文件（脚本执行仍保留在 facade，待 runtime driver 结果类型统一后再继续下沉）
+- [x] 创建 `JSEngineVirtualMachine<E>` 泛型主类型，并在 facade 保留 `JSVirtualMachine` 兼容别名（`Hashable` 按 `RuntimeHandle: Hashable` 条件提供）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 

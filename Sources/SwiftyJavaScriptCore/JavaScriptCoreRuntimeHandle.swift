@@ -39,3 +39,15 @@ public struct JavaScriptCoreRuntimeHandle: JSRuntimeManualReferenceCountedHandle
     return true
   }
 }
+
+extension JavaScriptCoreRuntimeHandle: Hashable {
+  public static func == (lhs: JavaScriptCoreRuntimeHandle, rhs: JavaScriptCoreRuntimeHandle)
+    -> Bool
+  {
+    lhs.ref == rhs.ref
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ref)
+  }
+}
