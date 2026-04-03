@@ -9,11 +9,11 @@ extension JSValue {
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext) {
     let instant = JSInstantContext(ctx: ctx.globalContextRef)
-    self._rawValue = JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: instant)
+    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: instant))
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
-    self._rawValue = JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: ctx)
+    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: ctx))
   }
 
   consuming func takeRef() -> JavaScriptCoreValueRef {
@@ -25,7 +25,7 @@ extension JSValue {
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    self._rawValue = JSEngineValueStorage<JavaScriptCoreEngine>(handle: handleValue)
+    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(handle: handleValue))
   }
 
   func valueHandle() -> JSValueHandle<JavaScriptCoreEngine> {

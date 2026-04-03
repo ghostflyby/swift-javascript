@@ -9,9 +9,9 @@
 /// `JSValue` intentionally does not retain a context reference.
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
-public struct JSValue: ~Copyable {
-  let _rawValue: JSEngineValueStorage<JavaScriptCoreEngine>
+public typealias JSValue = JSEngineValue<JavaScriptCoreEngine>
 
+extension JSValue {
   public init(string value: String, in context: isolated JSContext = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeString(value)
@@ -128,10 +128,10 @@ extension JSValue {
   public init<
     each A: JSValueDecodable,
     R: JSValueEncodable,
-    E: JSValueEncodable
+    Err: JSValueEncodable
   >(
     in context: isolated JSContext = #isolation, name: String,
-    function: @escaping @Sendable (repeat each A) throws(E) -> R
+    function: @escaping @Sendable (repeat each A) throws(Err) -> R
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each A).self)
@@ -147,7 +147,7 @@ extension JSValue {
         let r: R = try swiftFunction(repeat each typedArgs)
         let encoded = try r.tryEncode(in: context)
         return .value(encoded)
-      } catch let error as E {
+      } catch let error as Err {
         if let encoded = try? error.tryEncode(in: context) {
           return .exception(encoded)
         }
