@@ -1,4 +1,4 @@
-public protocol JSManualReferenceCountedHandle {
+public protocol JSManualReferenceCountedHandle: Sendable {
   @discardableResult
   func retainReference() -> Bool
 

@@ -36,17 +36,13 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
       named: name,
       callback: callback,
       in: rawContext,
-      functionClass: actorContext.functionClass.value
+      functionClass: rawContext.functionClassRef
     )
     return JavaScriptCoreEngine.valueHandle(from: rawValue)
   }
 
   var globalObjectRef: JavaScriptCoreObjectRef {
     JavaScriptCoreEngine.globalObject(in: globalContextRef)!
-  }
-
-  var actorContext: JSContext {
-    JSContext.borrow(ctx: globalContextRef)
   }
 
   public func withGlobalObject<R: ~Copyable>(_ body: (borrowing JSValue) -> R) -> R {

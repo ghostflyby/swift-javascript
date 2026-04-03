@@ -1,32 +1,18 @@
 @preconcurrency import JavaScriptCore
 
-public actor JSContext {
-  nonisolated let peer: JavaScriptCore.JSContext
-  nonisolated let driverContextHandle: JavaScriptCoreContextHandle
-  let globalObjectRef: JSObjectRef
-  nonisolated let functionClass: SendableBoxUnsafe<JSClassRef>
-  let globalObjectClass: SendableBoxUnsafe<JSClassRef>
-  public let virtualMachine: JSVirtualMachine
-  nonisolated public let unownedExecutor: UnownedSerialExecutor
+public typealias JSContext = JSEngineContext<JavaScriptCoreEngine>
 
+extension JSEngineContext where E == JavaScriptCoreEngine {
   public init(virtualMachine: JSVirtualMachine) {
-    self.virtualMachine = virtualMachine
-    self.unownedExecutor = virtualMachine.unownedExecutor
+    guard
+      let driverContextHandle = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(
+        in: virtualMachine.driverRuntimeHandle)
+    else {
+      preconditionFailure("JSContext could not create context handle from runtime")
+    }
 
-    var kJSClassDefinitionEmpty = kJSClassDefinitionEmpty
-    let cls = JSClassCreate(&kJSClassDefinitionEmpty)!
-    let ref = JSGlobalContextCreateInGroup(virtualMachine.driverRuntimeHandle.ref, cls)!
-
-    self.driverContextHandle = JavaScriptCoreContextHandle(adopting: ref)
-    globalObjectClass = SendableBoxUnsafe(cls)
-
-    self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
-
-    globalObjectRef = peer.globalObject!.jsValueRef
-    functionClass = SendableBoxUnsafe(JavaScriptCoreEngine.makeFunctionClass())
-
-    JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(self).toOpaque())
-
+    self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
+    self.driverContextHandle.bind(owner: self)
   }
 
   public func withGlobalObject(_ body: (borrowing JSValue) -> Void) {
@@ -38,38 +24,21 @@ public actor JSContext {
   public func withIsolatedGlobalObject<R: Sendable>(
     _ body: @Sendable (isolated JSContext, borrowing JSValue) -> R
   ) -> R {
-    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
+    let globalObject = JSValue(ref: driverContextHandle.globalObjectRef, ctx: self)
     return body(self, globalObject)
   }
 
-  public func withInstantContext<R: ~Copyable, E: Error>(
-    _ body: (borrowing JSInstantContext) throws(E) -> R
-  ) throws(E) -> R {
+  public func withInstantContext<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing JSInstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R {
     let instantContext = JSInstantContext(handle: driverContextHandle)
     return try body(instantContext)
   }
-
-  deinit {
-    _ = driverContextHandle.releaseReference()
-    JSClassRelease(functionClass.value)
-    JSClassRelease(globalObjectClass.value)
-  }
-
 }
 
-extension JSContext: Hashable {
-  nonisolated public static func == (lhs: JSContext, rhs: JSContext) -> Bool {
-    lhs.globalContextRef == rhs.globalContextRef
-  }
-
-  nonisolated public func hash(into hasher: inout Hasher) {
-    hasher.combine(globalContextRef)
-  }
-}
-
-extension JSContext {
+extension JSEngineContext where E == JavaScriptCoreEngine {
   nonisolated var globalContextRef: JSGlobalContextRef {
-    peer.jsGlobalContextRef
+    driverContextHandle.ref
   }
 
   public func makeString(_ value: String) -> JSValue {
