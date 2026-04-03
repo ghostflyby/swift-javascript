@@ -1,1 +1,1 @@
-public enum JavaScriptCoreEngine: JSEngine {}
+public enum JavaScriptCoreEngine {}

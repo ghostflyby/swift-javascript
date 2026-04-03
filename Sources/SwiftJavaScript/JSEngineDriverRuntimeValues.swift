@@ -1,4 +1,14 @@
-extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawValue: Sendable {
+extension JSEngine
+where
+  Self: _JSEngineRuntimeDriver,
+  Self: _JSEnginePropertyDriver,
+  Self: _JSEngineInvocationDriver,
+  RawRuntime: Sendable,
+  RawContext: Sendable,
+  RawValue: Sendable,
+  Engine.ValueHandle: JSValueManualReferenceCountedHandle,
+  Engine.ValueHandle.RawValue == RawValue
+{
   package static func makeRuntimeHandle() -> JSRuntimeHandle<Engine> {
     JSRuntimeHandle<Engine>(_opaqueHandle: makeRuntime())
   }
@@ -19,7 +29,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeString(value, in: rawContext))
+    return Engine.ValueHandle(rawValue: makeString(value, in: rawContext))
   }
 
   package static func makeNumberValueHandle(
@@ -29,7 +39,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeNumber(value, in: rawContext))
+    return Engine.ValueHandle(rawValue: makeNumber(value, in: rawContext))
   }
 
   package static func makeSymbolValueHandle(
@@ -39,7 +49,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeSymbol(value, in: rawContext))
+    return Engine.ValueHandle(rawValue: makeSymbol(value, in: rawContext))
   }
 
   package static func makeBooleanValueHandle(
@@ -49,7 +59,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeBoolean(value, in: rawContext))
+    return Engine.ValueHandle(rawValue: makeBoolean(value, in: rawContext))
   }
 
   package static func makeNullValueHandle(
@@ -58,7 +68,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeNull(in: rawContext))
+    return Engine.ValueHandle(rawValue: makeNull(in: rawContext))
   }
 
   package static func makeUndefinedValueHandle(
@@ -67,7 +77,7 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     guard let rawContext: RawContext = context.opaqueHandle() else {
       return nil
     }
-    return JSValueHandle<Engine>(_opaqueHandle: makeUndefined(in: rawContext))
+    return Engine.ValueHandle(rawValue: makeUndefined(in: rawContext))
   }
 
   package static func makeObjectResultHandle(

@@ -10,4 +10,10 @@ package protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCounted
 
 package protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-package protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+package protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
+  associatedtype RawValue: Sendable
+
+  init(rawValue: RawValue)
+
+  var rawValue: RawValue { get }
+}

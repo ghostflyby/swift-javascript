@@ -1,1 +1,0 @@
-public enum QuickJSEngine: JSEngine {}

@@ -1,14 +1,23 @@
-extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawValue: Sendable {
+extension JSEngine
+where
+  Self: _JSEngineRuntimeDriver,
+  Self: _JSEnginePropertyDriver,
+  Self: _JSEngineInvocationDriver,
+  RawRuntime: Sendable,
+  RawContext: Sendable,
+  RawValue: Sendable,
+  Engine.ValueHandle: JSValueManualReferenceCountedHandle,
+  Engine.ValueHandle.RawValue == RawValue
+{
   package static func propertyNamesForHandle(
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> [String]? {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return propertyNames(on: rawObject, in: rawContext)
+    return propertyNames(on: object.rawValue, in: rawContext)
   }
 
   package static func getStringPropertyHandle(
@@ -16,12 +25,11 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> JSResultHandle<Engine>? {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return _resultHandle(from: getProperty(key, on: rawObject, in: rawContext))
+    return _resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
   }
 
   package static func setStringPropertyHandle(
@@ -31,14 +39,18 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     in context: JSBorrowedContextHandle<Engine>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawValue: RawValue = value.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return false
     }
 
-    switch setProperty(key, on: rawObject, to: rawValue, in: rawContext, attributes: attributes) {
+    switch setProperty(
+      key,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
     case .value:
       return true
     case .exception:
@@ -51,13 +63,11 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> JSResultHandle<Engine>? {
-    guard let rawKey: RawValue = key.opaqueHandle(),
-      let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return _resultHandle(from: getProperty(rawKey, on: rawObject, in: rawContext))
+    return _resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
   }
 
   package static func getIndexPropertyHandle(
@@ -65,12 +75,11 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> JSResultHandle<Engine>? {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return _resultHandle(from: getProperty(at: index, on: rawObject, in: rawContext))
+    return _resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
   }
 
   package static func setValuePropertyHandle(
@@ -80,16 +89,18 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     in context: JSBorrowedContextHandle<Engine>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    guard let rawKey: RawValue = key.opaqueHandle(),
-      let rawObject: RawValue = object.opaqueHandle(),
-      let rawValue: RawValue = value.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return false
     }
 
-    switch setProperty(rawKey, on: rawObject, to: rawValue, in: rawContext, attributes: attributes)
-    {
+    switch setProperty(
+      key.rawValue,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
     case .value:
       return true
     case .exception:
@@ -103,14 +114,12 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     to value: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> Bool {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawValue: RawValue = value.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return false
     }
 
-    switch setProperty(at: index, on: rawObject, to: rawValue, in: rawContext) {
+    switch setProperty(at: index, on: object.rawValue, to: value.rawValue, in: rawContext) {
     case .value:
       return true
     case .exception:
@@ -123,12 +132,11 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> Bool? {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return hasProperty(key, on: rawObject, in: rawContext)
+    return hasProperty(key, on: object.rawValue, in: rawContext)
   }
 
   package static func hasValuePropertyHandle(
@@ -136,13 +144,11 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> Bool? {
-    guard let rawKey: RawValue = key.opaqueHandle(),
-      let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return nil
     }
-    return hasProperty(rawKey, on: rawObject, in: rawContext)
+    return hasProperty(key.rawValue, on: object.rawValue, in: rawContext)
   }
 
   package static func deleteStringPropertyHandle(
@@ -150,13 +156,12 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> Bool {
-    guard let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return false
     }
 
-    switch deleteProperty(key, on: rawObject, in: rawContext) {
+    switch deleteProperty(key, on: object.rawValue, in: rawContext) {
     case .value:
       return true
     case .exception:
@@ -169,14 +174,12 @@ extension _JSEngineDriver where RawRuntime: Sendable, RawContext: Sendable, RawV
     on object: JSValueHandle<Engine>,
     in context: JSBorrowedContextHandle<Engine>
   ) -> Bool {
-    guard let rawKey: RawValue = key.opaqueHandle(),
-      let rawObject: RawValue = object.opaqueHandle(),
-      let rawContext: RawContext = context.opaqueHandle()
+    guard let rawContext: RawContext = context.opaqueHandle()
     else {
       return false
     }
 
-    switch deleteProperty(rawKey, on: rawObject, in: rawContext) {
+    switch deleteProperty(key.rawValue, on: object.rawValue, in: rawContext) {
     case .value:
       return true
     case .exception:

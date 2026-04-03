@@ -1,1 +1,3 @@
-public protocol JSEngine: Sendable {}
+public protocol JSEngine: Sendable {
+  associatedtype ValueHandle: Sendable
+}

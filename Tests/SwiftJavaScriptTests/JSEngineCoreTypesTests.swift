@@ -2,8 +2,6 @@ import Testing
 
 @testable import SwiftJavaScript
 
-private enum MockEngine: JSEngine {}
-
 private struct MockRuntime: Sendable, Equatable {
   let id: String
 }
@@ -17,7 +15,37 @@ private struct MockValue: Sendable, Equatable {
   let payload: String
 }
 
-private enum MockDriver: _JSEngineDriver {
+private struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+  typealias Engine = MockEngine
+  typealias RawValue = MockValue
+
+  let rawValue: MockValue
+
+  init(rawValue: MockValue) {
+    self.rawValue = rawValue
+  }
+
+  var engineType: MockEngine.Type {
+    MockEngine.self
+  }
+
+  func retainReference() -> Bool {
+    true
+  }
+
+  func releaseReference() -> Bool {
+    true
+  }
+}
+
+private enum MockEngine: JSEngine {
+  typealias ValueHandle = MockValueHandle
+}
+
+private enum MockDriver: JSEngine, _JSEngineRuntimeDriver, _JSEnginePropertyDriver,
+  _JSEngineInvocationDriver
+{
+  typealias ValueHandle = MockValueHandle
   typealias Engine = MockEngine
   typealias RawRuntime = MockRuntime
   typealias RawContext = MockContext
@@ -241,61 +269,66 @@ private enum MockDriver: _JSEngineDriver {
 }
 
 @Test func genericHandlesKeepOpaqueStorageAndEngineTyping() {
-  let runtime = JSRuntimeHandle<JavaScriptCoreEngine>(_opaqueHandle: "runtime-token")
-  let context = JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: 42)
-  let value = JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: "value-token")
+  let runtime = JSRuntimeHandle<MockEngine>(_opaqueHandle: "runtime-token")
+  let context = JSBorrowedContextHandle<MockEngine>(_opaqueHandle: 42)
+  let value = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "value-token"))
 
   let runtimeToken = runtime.opaqueHandle(as: String.self)
   let contextToken = context.opaqueHandle(as: Int.self)
-  let valueToken = value.opaqueHandle(as: String.self)
-  let runtimeIsJSC = runtime.engineType == JavaScriptCoreEngine.self
-  let contextIsJSC = context.engineType == JavaScriptCoreEngine.self
-  let valueIsJSC = value.engineType == JavaScriptCoreEngine.self
+  let valueToken = value.rawValue
+  let runtimeIsMock = runtime.engineType == MockEngine.self
+  let contextIsMock = context.engineType == MockEngine.self
+  let valueIsMock = value.engineType == MockEngine.self
 
   #expect(runtimeToken == "runtime-token")
   #expect(contextToken == 42)
-  #expect(valueToken == "value-token")
-  #expect(runtimeIsJSC)
-  #expect(contextIsJSC)
-  #expect(valueIsJSC)
+  #expect(valueToken == MockValue(kind: "string", payload: "value-token"))
+  #expect(runtimeIsMock)
+  #expect(contextIsMock)
+  #expect(valueIsMock)
 }
 
 @Test func engineValueStoragePreservesHandleAndEngineType() {
-  let handle = JSValueHandle<MockEngine>(_opaqueHandle: "mock-value")
-  let storage = JSEngineValueStorage(handle: handle)
+  let handle = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "mock-value"))
+  let storage = JSEngineValueStorage<MockEngine>(handle: handle)
 
   let storedHandle = storage.valueHandle()
 
-  #expect(storedHandle.opaqueHandle(as: String.self) == "mock-value")
+  #expect(storedHandle.rawValue == MockValue(kind: "string", payload: "mock-value"))
   #expect(storedHandle.engineType == MockEngine.self)
 }
 
 @Test func engineValueStorageKeepsOpaquePayloadIdentity() {
   let payload = MockValue(kind: "number", payload: "runtime:7")
-  let handle = JSValueHandle<MockEngine>(_opaqueHandle: payload)
-  let storage = JSEngineValueStorage(handle: handle)
+  let handle = JSValueHandle<MockEngine>(rawValue: payload)
+  let storage = JSEngineValueStorage<MockEngine>(handle: handle)
 
-  let roundtrip = storage.valueHandle().opaqueHandle(as: MockValue.self)
+  let roundtrip = storage.valueHandle().rawValue
 
   #expect(roundtrip == payload)
 }
 
 @Test func engineValueShellKeepsStorageAndEngineTyping() {
-  let handle = JSValueHandle<MockEngine>(_opaqueHandle: "moved-jsvalue")
-  let storage = JSEngineValueStorage(handle: handle)
+  let handle = JSValueHandle<MockEngine>(
+    rawValue: MockValue(kind: "string", payload: "moved-jsvalue"))
+  let storage = JSEngineValueStorage<MockEngine>(handle: handle)
   let value = JSEngineValue<MockEngine>(storage: storage)
 
   let roundtripHandle = value._rawValue.valueHandle()
-  #expect(roundtripHandle.opaqueHandle(as: String.self) == "moved-jsvalue")
+  #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))
   #expect(roundtripHandle.engineType == MockEngine.self)
 }
 
 @Test func genericResultHandleWrapsValueAndExceptionStates() {
-  let valueHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-value")
-  let exceptionHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-error")
+  let valueHandle = JSValueHandle<MockEngine>(
+    rawValue: MockValue(kind: "string", payload: "mock-value")
+  )
+  let exceptionHandle = JSValueHandle<MockEngine>(
+    rawValue: MockValue(kind: "exception", payload: "mock-error")
+  )
 
-  let valueResult = JSResultHandle<QuickJSEngine>.value(valueHandle)
-  let exceptionResult = JSResultHandle<QuickJSEngine>.exception(exceptionHandle)
+  let valueResult = JSResultHandle<MockEngine>.value(valueHandle)
+  let exceptionResult = JSResultHandle<MockEngine>.exception(exceptionHandle)
 
   let valueIsException = valueResult.isException
   let exceptionIsException = exceptionResult.isException
@@ -305,8 +338,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume valueResult {
   case .value(let wrapped):
-    let token = wrapped.opaqueHandle(as: String.self)
-    #expect(token == "quickjs-value")
+    #expect(wrapped.rawValue == MockValue(kind: "string", payload: "mock-value"))
   case .exception:
     Issue.record("Expected value result case")
   }
@@ -315,8 +347,7 @@ private enum MockDriver: _JSEngineDriver {
   case .value:
     Issue.record("Expected exception result case")
   case .exception(let wrapped):
-    let token = wrapped.opaqueHandle(as: String.self)
-    #expect(token == "quickjs-error")
+    #expect(wrapped.rawValue == MockValue(kind: "exception", payload: "mock-error"))
   }
 }
 
@@ -353,12 +384,12 @@ private enum MockDriver: _JSEngineDriver {
   #expect(propertySet)
   #expect(names == ["runtime", "string", "runtime:hello"])
   #expect(
-    symbolValue.opaqueHandle(as: MockValue.self)
+    symbolValue.rawValue
       == MockValue(kind: "symbol", payload: "runtime:token"))
 
   switch consume evalValue {
   case .value(let value):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "script", payload: "runtime:1 + 2"))
   case .exception:
     Issue.record("Expected script evaluation to succeed")
@@ -368,7 +399,7 @@ private enum MockDriver: _JSEngineDriver {
   case .value:
     Issue.record("Expected script evaluation to surface exception result")
   case .exception(let value):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "exception", payload: "runtime:throw"))
   }
 
@@ -379,7 +410,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume property {
   case .value(let value):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "property", payload: "runtime:runtime:hello:message"))
   case .exception:
     Issue.record("Expected property access to succeed")
@@ -420,7 +451,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume object {
   case .value(let value):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "object", payload: "runtime"))
   case .exception:
     Issue.record("Expected object creation to succeed")
@@ -428,7 +459,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume array {
   case .value(let value):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "array", payload: "runtime"))
   case .exception:
     Issue.record("Expected array creation to succeed")
@@ -436,7 +467,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume callResult {
   case .some(.value(let value)):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "call", payload: "runtime:runtime:callable:1"))
   default:
     Issue.record("Expected function call to succeed")
@@ -444,7 +475,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume constructResult {
   case .some(.value(let value)):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "construct", payload: "runtime:1"))
   default:
     Issue.record("Expected constructor call to succeed")
@@ -452,7 +483,7 @@ private enum MockDriver: _JSEngineDriver {
 
   switch consume boxedResult {
   case .some(.value(let value)):
-    let raw = value.opaqueHandle(as: MockValue.self)
+    let raw = value.rawValue
     #expect(raw == MockValue(kind: "object", payload: "runtime:boxed"))
   default:
     Issue.record("Expected toObject bridge to succeed")
@@ -461,8 +492,8 @@ private enum MockDriver: _JSEngineDriver {
   #expect(isArray == false)
   #expect(isDate == false)
   #expect(isInstanceOf == true)
-  #expect(nullValue.opaqueHandle(as: MockValue.self) == MockValue(kind: "null", payload: "runtime"))
+  #expect(nullValue.rawValue == MockValue(kind: "null", payload: "runtime"))
   #expect(
-    undefinedValue.opaqueHandle(as: MockValue.self)
+    undefinedValue.rawValue
       == MockValue(kind: "undefined", payload: "runtime"))
 }

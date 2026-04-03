@@ -44,22 +44,15 @@ where E == JavaScriptCoreEngine {
   }
 }
 
-extension JSValueHandle: JSManualReferenceCountedHandle, JSValueManualReferenceCountedHandle
-where E == JavaScriptCoreEngine {
+extension JavaScriptCoreValueHandle: JSManualReferenceCountedHandle {
   @discardableResult
-  package func retainReference() -> Bool {
-    guard let rawValue: JavaScriptCoreRawValue = opaqueHandle() else {
-      return false
-    }
+  public func retainReference() -> Bool {
     JSValueProtect(rawValue.contextRef, rawValue.ref)
     return true
   }
 
   @discardableResult
-  package func releaseReference() -> Bool {
-    guard let rawValue: JavaScriptCoreRawValue = opaqueHandle() else {
-      return false
-    }
+  public func releaseReference() -> Bool {
     JSValueUnprotect(rawValue.contextRef, rawValue.ref)
     return true
   }

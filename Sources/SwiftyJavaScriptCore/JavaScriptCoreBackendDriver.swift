@@ -187,7 +187,10 @@ private enum JavaScriptCoreObjectLookup {
   case exception(JavaScriptCoreRawValue)
 }
 
-package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
+package enum JavaScriptCoreBackendDriver: JSEngine, _JSEngineRuntimeDriver,
+  _JSEnginePropertyDriver, _JSEngineInvocationDriver
+{
+  package typealias ValueHandle = JavaScriptCoreValueHandle
   package typealias Engine = JavaScriptCoreEngine
   package typealias RawRuntime = JavaScriptCoreRawRuntime
   package typealias RawContext = JavaScriptCoreRawContext
@@ -276,9 +279,9 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
 
     switch makeObject(of: jsClass, privateData: privateData, in: rawContext) {
     case .value(let value):
-      return .value(JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: value))
+      return .value(JSValueHandle<JavaScriptCoreEngine>(rawValue: value))
     case .exception(let exception):
-      return .exception(JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: exception))
+      return .exception(JSValueHandle<JavaScriptCoreEngine>(rawValue: exception))
     }
   }
 
@@ -286,30 +289,24 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     from value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSDriverResult<UnsafeMutableRawPointer?>? {
-    guard let rawValue: JavaScriptCoreRawValue = value.opaqueHandle(),
-      let rawContext: JavaScriptCoreRawContext = context.opaqueHandle()
+    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle()
     else {
       return nil
     }
 
-    return privateData(from: rawValue, in: rawContext)
+    return privateData(from: value.rawValue, in: rawContext)
   }
 
   package static func valueRef(from handle: JSValueHandle<JavaScriptCoreEngine>)
     -> JavaScriptCoreValueRef?
   {
-    guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
-      return nil
-    }
-    return rawValue.ref
+    handle.rawValue.ref
   }
 
   package static func retainedValueRef(from handle: JSValueHandle<JavaScriptCoreEngine>)
     -> JavaScriptCoreValueRef?
   {
-    guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
-      return nil
-    }
+    let rawValue = handle.rawValue
     JSValueProtect(rawValue.contextRef, rawValue.ref)
     return rawValue.ref
   }
@@ -326,16 +323,14 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   package static func contextGroupRef(
     from value: JSValueHandle<JavaScriptCoreEngine>
   ) -> JSContextGroupRef? {
-    guard let rawValue: JavaScriptCoreRawValue = value.opaqueHandle() else {
-      return nil
-    }
+    let rawValue = value.rawValue
     return JSContextGetGroup(rawValue.contextRef)
   }
 
   package static func valueHandle(
     from rawValue: JavaScriptCoreRawValue
   ) -> JSValueHandle<JavaScriptCoreEngine> {
-    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue)
+    JSValueHandle<JavaScriptCoreEngine>(rawValue: rawValue)
   }
 
   package static func valueHandle(
@@ -346,7 +341,7 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
       return nil
     }
     let rawValue = JavaScriptCoreRawValue(ref: valueRef, contextRef: rawContext.ref)
-    return JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue)
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: rawValue)
   }
 
   package static func rawValue(
