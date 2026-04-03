@@ -87,7 +87,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         switch JSResult.from(
           handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
             "length",
-            on: value.valueHandle(in: context),
+            on: value.valueHandle(),
             in: context.driverContextHandle
           ))
         {
@@ -110,7 +110,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
           switch JSResult.from(
             handleResult: JavaScriptCoreBackendDriver.getIndexPropertyHandle(
               at: UInt32(index),
-              on: value.valueHandle(in: context),
+              on: value.valueHandle(),
               in: context.driverContextHandle
             ))
           {
@@ -125,7 +125,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       var object: [String: JSCodableNode] = [:]
       let names =
         JavaScriptCoreBackendDriver.propertyNamesForHandle(
-          on: value.valueHandle(in: context),
+          on: value.valueHandle(),
           in: context.driverContextHandle
         ) ?? []
       object.reserveCapacity(names.count)
@@ -134,7 +134,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         switch JSResult.from(
           handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
             key,
-            on: value.valueHandle(in: context),
+            on: value.valueHandle(),
             in: context.driverContextHandle
           ))
         {
@@ -170,8 +170,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         guard
           JavaScriptCoreBackendDriver.setIndexPropertyHandle(
             at: UInt32(index),
-            on: arrayValue.valueHandle(in: context),
-            to: encoded.valueHandle(in: context),
+            on: arrayValue.valueHandle(),
+            to: encoded.valueHandle(),
             in: context.driverContextHandle
           )
         else {
@@ -186,8 +186,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         guard
           JavaScriptCoreBackendDriver.setStringPropertyHandle(
             key,
-            on: objectValue.valueHandle(in: context),
-            to: encoded.valueHandle(in: context),
+            on: objectValue.valueHandle(),
+            to: encoded.valueHandle(),
             in: context.driverContextHandle,
             attributes: .none
           )

@@ -137,7 +137,7 @@ extension JSClassValueConvertible {
     }
     let privateData: UnsafeMutableRawPointer?
     switch JavaScriptCoreBackendDriver.privateData(
-      from: value.valueHandle(in: context),
+      from: value.valueHandle(),
       in: context.driverContextHandle
     ) {
     case .none:

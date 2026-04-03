@@ -28,8 +28,7 @@ extension JSValue {
     _rawValue.rawValue(in: context)
   }
 
-  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-    _ = context
+  func valueHandle() -> JSValueHandle<JavaScriptCoreEngine> {
     return _rawValue.valueHandle()
   }
 }

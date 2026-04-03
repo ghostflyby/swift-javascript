@@ -7,8 +7,8 @@ extension JSValue {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setStringPropertyHandle(
       key.string,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -21,9 +21,9 @@ extension JSValue {
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setValuePropertyHandle(
-      key.valueHandle(in: context),
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      key.valueHandle(),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -36,8 +36,8 @@ extension JSValue {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setIndexPropertyHandle(
       at: index,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle
     )
   }
@@ -76,8 +76,8 @@ extension JSValue {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setStringPropertyHandle(
       key.string,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -92,9 +92,9 @@ extension JSValue {
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setValuePropertyHandle(
-      key.valueHandle(in: context),
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      key.valueHandle(),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -109,8 +109,8 @@ extension JSValue {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
     _ = JavaScriptCoreBackendDriver.setIndexPropertyHandle(
       at: index,
-      on: valueHandle(in: context),
-      to: encoded.valueHandle(in: context),
+      on: valueHandle(),
+      to: encoded.valueHandle(),
       in: context.driverContextHandle
     )
   }
@@ -154,7 +154,7 @@ extension JSValue {
     switch JSResult.from(
       handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
         key.string,
-        on: valueHandle(in: context),
+        on: valueHandle(),
         in: context.driverContextHandle
       ))
     {
@@ -171,8 +171,8 @@ extension JSValue {
   ) -> JSValue {
     switch JSResult.from(
       handleResult: JavaScriptCoreBackendDriver.getValuePropertyHandle(
-        key.valueHandle(in: context),
-        on: valueHandle(in: context),
+        key.valueHandle(),
+        on: valueHandle(),
         in: context.driverContextHandle
       ))
     {
@@ -190,7 +190,7 @@ extension JSValue {
     switch JSResult.from(
       handleResult: JavaScriptCoreBackendDriver.getIndexPropertyHandle(
         at: index,
-        on: valueHandle(in: context),
+        on: valueHandle(),
         in: context.driverContextHandle
       ))
     {
@@ -285,7 +285,7 @@ extension JSValue {
   ) {
     _ = JavaScriptCoreBackendDriver.deleteStringPropertyHandle(
       key.string,
-      on: valueHandle(in: context),
+      on: valueHandle(),
       in: context.driverContextHandle
     )
   }
@@ -295,8 +295,8 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) {
     _ = JavaScriptCoreBackendDriver.deleteValuePropertyHandle(
-      key.valueHandle(in: context),
-      on: valueHandle(in: context),
+      key.valueHandle(),
+      on: valueHandle(),
       in: context.driverContextHandle
     )
   }
@@ -323,7 +323,7 @@ extension JSValue {
   ) -> Bool {
     return JavaScriptCoreBackendDriver.hasStringPropertyHandle(
       key.string,
-      on: valueHandle(in: context),
+      on: valueHandle(),
       in: context.driverContextHandle
     ) ?? false
   }
@@ -333,8 +333,8 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> Bool {
     return JavaScriptCoreBackendDriver.hasValuePropertyHandle(
-      key.valueHandle(in: context),
-      on: valueHandle(in: context),
+      key.valueHandle(),
+      on: valueHandle(),
       in: context.driverContextHandle
     ) ?? false
   }

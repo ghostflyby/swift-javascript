@@ -96,7 +96,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     for value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSValueHandle<JavaScriptCoreEngine> {
-    value.valueHandle(in: context)
+    value.valueHandle()
   }
 
   func bridgeResult(_ handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
