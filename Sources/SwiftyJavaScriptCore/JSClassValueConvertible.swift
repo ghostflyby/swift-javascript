@@ -377,9 +377,13 @@ private func autoDynamicSetPropertyCallbackResult(
   guard let setProperty = definition.setProperty else {
     return true
   }
-  if let error = setProperty(context, thisValue, key, newValue)?.retainedRef() {
+  if let error = setProperty(context, thisValue, key, newValue) {
+    let privateResult = JSResult.exception(error).toPrivateResult()
+    guard case .exception(let errorRef) = privateResult else {
+      return true
+    }
     return JavaScriptCoreBackendDriver.callbackSucceeded(
-      exceptionValue: error,
+      exceptionValue: errorRef,
       exception: exception
     )
   }
