@@ -322,22 +322,22 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
 
   func encodeNil(forKey key: Key) throws {
     let context = instantContext
-    set(JSValue(nullIn: context).retainedRef(), forKey: key.stringValue)
+    set(JSValue(nullIn: context).takeRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Bool, forKey key: Key) throws {
     let context = instantContext
-    set(JSValue(boolean: value, in: context).retainedRef(), forKey: key.stringValue)
+    set(JSValue(boolean: value, in: context).takeRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: String, forKey key: Key) throws {
     let context = instantContext
-    set(JSValue(string: value, in: context).retainedRef(), forKey: key.stringValue)
+    set(JSValue(string: value, in: context).takeRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Double, forKey key: Key) throws {
     let context = instantContext
-    set(JSValue(number: value, in: context).retainedRef(), forKey: key.stringValue)
+    set(JSValue(number: value, in: context).takeRef(), forKey: key.stringValue)
   }
 
   func encode(_ value: Float, forKey key: Key) throws {
@@ -385,7 +385,7 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     try value.encode(to: child)
     if child.result == nil {
       let context = instantContext
-      set(JSValue(undefinedIn: context).retainedRef(), forKey: key.stringValue)
+      set(JSValue(undefinedIn: context).takeRef(), forKey: key.stringValue)
     }
   }
 
@@ -454,19 +454,19 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
 
   func encodeNil() throws {
     let context = instantContext
-    append(JSValue(nullIn: context).retainedRef())
+    append(JSValue(nullIn: context).takeRef())
   }
   func encode(_ value: Bool) throws {
     let context = instantContext
-    append(JSValue(boolean: value, in: context).retainedRef())
+    append(JSValue(boolean: value, in: context).takeRef())
   }
   func encode(_ value: String) throws {
     let context = instantContext
-    append(JSValue(string: value, in: context).retainedRef())
+    append(JSValue(string: value, in: context).takeRef())
   }
   func encode(_ value: Double) throws {
     let context = instantContext
-    append(JSValue(number: value, in: context).retainedRef())
+    append(JSValue(number: value, in: context).takeRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
   func encode(_ value: Int) throws { try encode(Double(value)) }
@@ -492,7 +492,7 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     try value.encode(to: child)
     if child.result == nil {
       let context = instantContext
-      appendAtCurrent(JSValue(undefinedIn: context).retainedRef(), index: index)
+      appendAtCurrent(JSValue(undefinedIn: context).takeRef(), index: index)
     }
     count += 1
   }
@@ -560,19 +560,19 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
 
   func encodeNil() throws {
     let context = instantContext
-    onCommit(JSValue(nullIn: context).retainedRef())
+    onCommit(JSValue(nullIn: context).takeRef())
   }
   func encode(_ value: Bool) throws {
     let context = instantContext
-    onCommit(JSValue(boolean: value, in: context).retainedRef())
+    onCommit(JSValue(boolean: value, in: context).takeRef())
   }
   func encode(_ value: String) throws {
     let context = instantContext
-    onCommit(JSValue(string: value, in: context).retainedRef())
+    onCommit(JSValue(string: value, in: context).takeRef())
   }
   func encode(_ value: Double) throws {
     let context = instantContext
-    onCommit(JSValue(number: value, in: context).retainedRef())
+    onCommit(JSValue(number: value, in: context).takeRef())
   }
   func encode(_ value: Float) throws { try encode(Double(value)) }
   func encode(_ value: Int) throws { try encode(Double(value)) }
@@ -595,7 +595,7 @@ final class _JSCodableSingleValueEncodingContainer: SingleValueEncodingContainer
     try value.encode(to: child)
     if child.result == nil {
       let context = instantContext
-      onCommit(JSValue(undefinedIn: context).retainedRef())
+      onCommit(JSValue(undefinedIn: context).takeRef())
     }
   }
 }

@@ -16,7 +16,7 @@ extension JSValue {
     self._rawValue = _JSValueStorage(ref: ref, in: ctx)
   }
 
-  consuming func retainedRef() -> JavaScriptCoreValueRef {
+  consuming func takeRef() -> JavaScriptCoreValueRef {
     ref
   }
 

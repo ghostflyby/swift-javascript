@@ -556,7 +556,7 @@ private func installSetPropertyCallbackIfNeeded(
           thisValue,
           propertyName,
           newValue
-        )?.retainedRef(),
+        )?.takeRef(),
         exception: exception
       )
     }
@@ -826,7 +826,7 @@ private func installConvertToTypeCallbackIfNeeded(
       if exceptionValue.isUndefined(in: context) {
         exceptionRef = nil
       } else {
-        exceptionRef = exceptionValue.retainedRef()
+        exceptionRef = exceptionValue.takeRef()
         exceptionValue = JSValue(undefinedIn: context)
       }
       let conversion: JSPrivateResult =

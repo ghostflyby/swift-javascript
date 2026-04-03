@@ -5,9 +5,9 @@ extension JSResult {
   consuming func toPrivateResult() -> JSPrivateResult {
     switch consume self {
     case .value(let v):
-      return .value(v.retainedRef())
+      return .value(v.takeRef())
     case .exception(let e):
-      return .exception(e.retainedRef())
+      return .exception(e.takeRef())
     }
   }
 }
