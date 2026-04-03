@@ -1,26 +1,9 @@
-protocol _JSValueBridgeAdapter {
-  associatedtype Engine: JSEngine
-
-  func valueHandle(
-    for value: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSValueHandle<Engine>
-
-  func bridgeResult(_ handleResult: JSResultPayload<JSValueHandle<Engine>>?) -> JSResult
-}
-
-struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
-  typealias Engine = JavaScriptCoreEngine
-
-  private func ensureSameVM(
-    _ value: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) {
+extension JSInstantContext {
+  private func ensureSameVM(_ value: borrowing JSValue) {
     let valueHandle = value.valueHandle()
     guard
       let valueGroup = JavaScriptCoreEngine.contextGroupRef(from: valueHandle),
-      let contextGroup = JavaScriptCoreEngine.contextGroupRef(
-        from: context.driverContextHandle)
+      let contextGroup = JavaScriptCoreEngine.contextGroupRef(from: driverContextHandle)
     else {
       preconditionFailure("JSValue bridge could not resolve context group")
     }
@@ -30,91 +13,8 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     )
   }
 
-  func type(of value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSType {
-    JavaScriptCoreEngine.valueType(of: value.ref, in: context.globalContextRef)
-  }
-
-  func isUndefined(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isUndefined(value.ref, in: context.globalContextRef)
-  }
-
-  func isNull(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isNull(value.ref, in: context.globalContextRef)
-  }
-
-  func isBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isBoolean(value.ref, in: context.globalContextRef)
-  }
-
-  func isNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isNumber(value.ref, in: context.globalContextRef)
-  }
-
-  func isString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isString(value.ref, in: context.globalContextRef)
-  }
-
-  func isSymbol(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isSymbol(value.ref, in: context.globalContextRef)
-  }
-
-  func isObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isObject(value.ref, in: context.globalContextRef)
-  }
-
-  func isBigInt(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isBigInt(value.ref, in: context.globalContextRef)
-  }
-
-  func toBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.toBoolean(value.ref, in: context.globalContextRef)
-  }
-
-  func toNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Double {
-    JavaScriptCoreEngine.toNumber(value.ref, in: context.globalContextRef)
-  }
-
-  func toString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> String {
-    JavaScriptCoreEngine.toString(value.ref, in: context.globalContextRef) ?? ""
-  }
-
-  func looselyEquals(
-    _ lhs: borrowing JSValue,
-    _ rhs: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> Bool {
-    JavaScriptCoreEngine.valueEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
-  }
-
-  func strictlyEquals(
-    _ lhs: borrowing JSValue,
-    _ rhs: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> Bool {
-    JavaScriptCoreEngine.valueStrictEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
-  }
-
-  func encodeArguments<each A: JSValueEncodable>(
-    _ arguments: repeat each A,
-    in context: borrowing JSInstantContext
-  ) -> [JSValueHandle<JavaScriptCoreEngine>] {
-    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
-    values.reserveCapacity(countTypePack(repeat (each A).self))
-
-    func appendArgument<T: JSValueEncodable>(_ argument: T) {
-      let encoded = (try? argument.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-      values.append(valueHandle(for: encoded, in: context))
-    }
-
-    repeat appendArgument(each arguments)
-    return values
-  }
-
-  func valueHandle(
-    for value: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSValueHandle<JavaScriptCoreEngine> {
-    ensureSameVM(value, in: context)
+  func valueHandle(for value: borrowing JSValue) -> JSValueHandle<JavaScriptCoreEngine> {
+    ensureSameVM(value)
     return value.valueHandle()
   }
 
@@ -124,118 +24,126 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     .from(handleResult: handleResult)
   }
 
+  func toBoolean(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreEngine.toBoolean(value.ref, in: globalContextRef)
+  }
+
+  func toNumber(_ value: borrowing JSValue) -> Double {
+    JavaScriptCoreEngine.toNumber(value.ref, in: globalContextRef)
+  }
+
+  func toString(_ value: borrowing JSValue) -> String {
+    JavaScriptCoreEngine.toString(value.ref, in: globalContextRef) ?? ""
+  }
+
+  func looselyEquals(_ lhs: borrowing JSValue, _ rhs: borrowing JSValue) -> Bool {
+    JavaScriptCoreEngine.valueEquals(lhs.ref, rhs.ref, in: globalContextRef)
+  }
+
+  func strictlyEquals(_ lhs: borrowing JSValue, _ rhs: borrowing JSValue) -> Bool {
+    JavaScriptCoreEngine.valueStrictEquals(lhs.ref, rhs.ref, in: globalContextRef)
+  }
+
+  func encodeArguments<each A: JSValueEncodable>(
+    _ arguments: repeat each A
+  ) -> [JSValueHandle<JavaScriptCoreEngine>] {
+    var values: [JSValueHandle<JavaScriptCoreEngine>] = []
+    values.reserveCapacity(countTypePack(repeat (each A).self))
+
+    func appendArgument<T: JSValueEncodable>(_ argument: T) {
+      let encoded = (try? argument.tryEncode(in: self)) ?? JSValue(undefinedIn: self)
+      values.append(valueHandle(for: encoded))
+    }
+
+    repeat appendArgument(each arguments)
+    return values
+  }
+
   func call(
     function: borrowing JSValue,
     this thisValueHandle: JSValueHandle<JavaScriptCoreEngine>?,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
     bridgeResult(
       JavaScriptCoreEngine.callFunctionHandle(
-        valueHandle(for: function, in: context),
+        valueHandle(for: function),
         this: thisValueHandle,
         arguments: arguments,
-        in: context.driverContextHandle
+        in: driverContextHandle
       ))
   }
 
-  func call(
-    function: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    call(function: function, this: nil, arguments: [], in: context)
+  func call(function: borrowing JSValue) -> JSResult {
+    call(function: function, this: nil, arguments: [])
   }
 
   func call(
     function: borrowing JSValue,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
-    call(function: function, this: nil, arguments: arguments, in: context)
+    call(function: function, this: nil, arguments: arguments)
   }
 
   func call(
     function: borrowing JSValue,
     this thisValue: borrowing JSValue,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
-    in context: borrowing JSInstantContext
+    arguments: [JSValueHandle<JavaScriptCoreEngine>] = []
   ) -> JSResult {
     call(
       function: function,
-      this: valueHandle(for: thisValue, in: context),
-      arguments: arguments,
-      in: context
+      this: valueHandle(for: thisValue),
+      arguments: arguments
     )
   }
 
   func call<each A: JSValueEncodable>(
     function: borrowing JSValue,
-    arguments: repeat each A,
-    in context: borrowing JSInstantContext
+    arguments: repeat each A
   ) -> JSResult {
-    call(
-      function: function,
-      arguments: encodeArguments(repeat each arguments, in: context),
-      in: context
-    )
+    call(function: function, arguments: encodeArguments(repeat each arguments))
   }
 
   func call<each A: JSValueEncodable>(
     function: borrowing JSValue,
     this thisValue: borrowing JSValue,
-    arguments: repeat each A,
-    in context: borrowing JSInstantContext
+    arguments: repeat each A
   ) -> JSResult {
     call(
       function: function,
       this: thisValue,
-      arguments: encodeArguments(repeat each arguments, in: context),
-      in: context
+      arguments: encodeArguments(repeat each arguments)
     )
   }
 
   func construct(
     constructor: borrowing JSValue,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
     bridgeResult(
       JavaScriptCoreEngine.constructHandle(
-        valueHandle(for: constructor, in: context),
+        valueHandle(for: constructor),
         arguments: arguments,
-        in: context.driverContextHandle
+        in: driverContextHandle
       ))
   }
 
-  func construct(
-    constructor: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    construct(constructor: constructor, arguments: [], in: context)
+  func construct(constructor: borrowing JSValue) -> JSResult {
+    construct(constructor: constructor, arguments: [])
   }
 
   func construct<each A: JSValueEncodable>(
     constructor: borrowing JSValue,
-    arguments: repeat each A,
-    in context: borrowing JSInstantContext
+    arguments: repeat each A
   ) -> JSResult {
-    construct(
-      constructor: constructor,
-      arguments: encodeArguments(repeat each arguments, in: context),
-      in: context
-    )
+    construct(constructor: constructor, arguments: encodeArguments(repeat each arguments))
   }
 
-  func getStringProperty(
-    _ key: String,
-    on object: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
+  func getStringProperty(_ key: String, on object: borrowing JSValue) -> JSResult {
     bridgeResult(
       JavaScriptCoreEngine.getStringPropertyHandle(
         key,
-        on: valueHandle(for: object, in: context),
-        in: context.driverContextHandle
+        on: valueHandle(for: object),
+        in: driverContextHandle
       ))
   }
 
@@ -243,14 +151,13 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     _ key: String,
     on object: borrowing JSValue,
     to value: borrowing JSValue,
-    in context: borrowing JSInstantContext,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     JavaScriptCoreEngine.setStringPropertyHandle(
       key,
-      on: valueHandle(for: object, in: context),
-      to: valueHandle(for: value, in: context),
-      in: context.driverContextHandle,
+      on: valueHandle(for: object),
+      to: valueHandle(for: value),
+      in: driverContextHandle,
       attributes: attributes
     )
   }
@@ -258,81 +165,56 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   func invokeMethod(
     _ name: String,
     on object: borrowing JSValue,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>],
-    in context: borrowing JSInstantContext
+    arguments: [JSValueHandle<JavaScriptCoreEngine>]
   ) -> JSResult {
-    switch getStringProperty(name, on: object, in: context) {
+    switch getStringProperty(name, on: object) {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
       return call(
         function: method,
-        this: valueHandle(for: object, in: context),
-        arguments: arguments,
-        in: context
+        this: valueHandle(for: object),
+        arguments: arguments
       )
     }
   }
 
-  func invokeMethod(
-    _ name: String,
-    on object: borrowing JSValue,
-    in context: borrowing JSInstantContext
-  ) -> JSResult {
-    invokeMethod(name, on: object, arguments: [], in: context)
+  func invokeMethod(_ name: String, on object: borrowing JSValue) -> JSResult {
+    invokeMethod(name, on: object, arguments: [])
   }
 
   func invokeMethod<each A: JSValueEncodable>(
     _ name: String,
     on object: borrowing JSValue,
-    arguments: repeat each A,
-    in context: borrowing JSInstantContext
+    arguments: repeat each A
   ) -> JSResult {
-    invokeMethod(
-      name,
-      on: object,
-      arguments: encodeArguments(repeat each arguments, in: context),
-      in: context
-    )
+    invokeMethod(name, on: object, arguments: encodeArguments(repeat each arguments))
   }
 
-  func toObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSResult {
+  func toObject(_ value: borrowing JSValue) -> JSResult {
     bridgeResult(
       JavaScriptCoreEngine.toObjectHandle(
-        valueHandle(for: value, in: context),
-        in: context.driverContextHandle
+        valueHandle(for: value),
+        in: driverContextHandle
       ))
   }
 
-  func isArray(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isArrayHandle(
-      valueHandle(for: value, in: context),
-      in: context.driverContextHandle
-    ) ?? false
+  func isArray(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreEngine.isArrayHandle(valueHandle(for: value), in: driverContextHandle) ?? false
   }
 
-  func isDate(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreEngine.isDateHandle(
-      valueHandle(for: value, in: context),
-      in: context.driverContextHandle
-    ) ?? false
+  func isDate(_ value: borrowing JSValue) -> Bool {
+    JavaScriptCoreEngine.isDateHandle(valueHandle(for: value), in: driverContextHandle) ?? false
   }
 
   func isInstanceOf(
     _ value: borrowing JSValue,
-    constructor: borrowing JSValue,
-    in context: borrowing JSInstantContext
+    constructor: borrowing JSValue
   ) -> Bool {
     JavaScriptCoreEngine.isInstanceOfHandle(
-      valueHandle(for: value, in: context),
-      constructor: valueHandle(for: constructor, in: context),
-      in: context.driverContextHandle
+      valueHandle(for: value),
+      constructor: valueHandle(for: constructor),
+      in: driverContextHandle
     ) ?? false
-  }
-}
-
-extension JSInstantContext {
-  var valueBridgeAdapter: JavaScriptCoreValueBridgeAdapter {
-    JavaScriptCoreValueBridgeAdapter()
   }
 }

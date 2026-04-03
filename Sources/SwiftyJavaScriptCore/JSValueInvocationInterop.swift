@@ -11,7 +11,7 @@ extension JSValue {
   public func looselyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    context.valueBridgeAdapter.looselyEquals(self, other, in: context)
+    context.looselyEquals(self, other)
   }
 
   public func strictlyEquals(
@@ -26,7 +26,7 @@ extension JSValue {
   public func strictlyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
     -> Bool
   {
-    context.valueBridgeAdapter.strictlyEquals(self, other, in: context)
+    context.strictlyEquals(self, other)
   }
 }
 
@@ -38,7 +38,7 @@ extension JSValue {
   }
 
   public func call(in context: borrowing JSInstantContext) -> JSResult {
-    context.valueBridgeAdapter.call(function: self, in: context)
+    context.call(function: self)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -54,7 +54,7 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.call(function: self, arguments: repeat each arguments, in: context)
+    context.call(function: self, arguments: repeat each arguments)
   }
 
   public func call(
@@ -70,7 +70,7 @@ extension JSValue {
     this thisValue: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.call(function: self, this: thisValue, in: context)
+    context.call(function: self, this: thisValue)
   }
 
   public func call<each A: JSValueEncodable>(
@@ -88,11 +88,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.call(
+    context.call(
       function: self,
       this: thisValue,
-      arguments: repeat each arguments,
-      in: context
+      arguments: repeat each arguments
     )
   }
 
@@ -103,7 +102,7 @@ extension JSValue {
   }
 
   public func construct(in context: borrowing JSInstantContext) -> JSResult {
-    context.valueBridgeAdapter.construct(constructor: self, in: context)
+    context.construct(constructor: self)
   }
 
   public func construct<each A: JSValueEncodable>(
@@ -119,10 +118,9 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult {
-    context.valueBridgeAdapter.construct(
+    context.construct(
       constructor: self,
-      arguments: repeat each arguments,
-      in: context
+      arguments: repeat each arguments
     )
   }
 
@@ -139,7 +137,7 @@ extension JSValue {
     _ name: borrowing Name,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    context.valueBridgeAdapter.invokeMethod(name.string, on: self, in: context)
+    context.invokeMethod(name.string, on: self)
   }
 
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
@@ -157,11 +155,10 @@ extension JSValue {
     arguments: repeat each A,
     in context: borrowing JSInstantContext
   ) -> JSResult where Name: ~Copyable {
-    context.valueBridgeAdapter.invokeMethod(
+    context.invokeMethod(
       name.string,
       on: self,
-      arguments: repeat each arguments,
-      in: context
+      arguments: repeat each arguments
     )
   }
 
@@ -180,7 +177,7 @@ extension JSValue {
   }
 
   public func toObject(in context: borrowing JSInstantContext) -> JSResult {
-    context.valueBridgeAdapter.toObject(self, in: context)
+    context.toObject(self)
   }
 
   public func isArray(in context: isolated JSContext = #isolation) -> Bool {
@@ -190,7 +187,7 @@ extension JSValue {
   }
 
   public func isArray(in context: borrowing JSInstantContext) -> Bool {
-    context.valueBridgeAdapter.isArray(self, in: context)
+    context.isArray(self)
   }
 
   public func isDate(in context: isolated JSContext = #isolation) -> Bool {
@@ -200,7 +197,7 @@ extension JSValue {
   }
 
   public func isDate(in context: borrowing JSInstantContext) -> Bool {
-    context.valueBridgeAdapter.isDate(self, in: context)
+    context.isDate(self)
   }
 
   public func isInstanceOf(
@@ -216,7 +213,7 @@ extension JSValue {
     _ constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    context.valueBridgeAdapter.isInstanceOf(self, constructor: constructor, in: context)
+    context.isInstanceOf(self, constructor: constructor)
   }
 
   public func defineProperty<Val, Key>(
@@ -236,19 +233,17 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
   ) -> JSResult where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
-    let adapter = context.valueBridgeAdapter
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    let didSet = adapter.setStringProperty(
+    let didSet = context.setStringProperty(
       key.string,
       on: self,
       to: encoded,
-      in: context,
       attributes: attributes.hostMemberAttributes
     )
     guard didSet else {
       return .exception(JSValue(undefinedIn: context))
     }
 
-    return adapter.getStringProperty(key.string, on: self, in: context)
+    return context.getStringProperty(key.string, on: self)
   }
 }

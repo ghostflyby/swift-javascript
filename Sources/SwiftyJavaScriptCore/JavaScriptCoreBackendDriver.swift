@@ -265,6 +265,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     )
   }
 
+  public static func valueTypeForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> SwiftJavaScript.JSType? {
+    guard
+      let rawContext = rawContext(from: context),
+      let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
+    else {
+      return nil
+    }
+    return valueType(of: rawValueRef, in: rawContext.ref)
+  }
+
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle

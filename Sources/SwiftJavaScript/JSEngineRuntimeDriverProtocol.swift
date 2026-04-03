@@ -16,6 +16,11 @@ public protocol _JSEngineRuntimeDriver {
     startingLineNumber: Int32
   ) -> JSResultPayload<ValueHandle>?
 
+  static func valueTypeForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> JSType?
+
   static func makeStringValueHandle(
     _ value: String,
     _ context: ContextHandle
@@ -76,6 +81,13 @@ extension _JSEngineRuntimeDriver {
     fatalError(
       "_JSEngineRuntimeDriver.evaluateScriptResultHandle(_:_:sourceURL:startingLineNumber:) is not implemented"
     )
+  }
+
+  public static func valueTypeForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> JSType? {
+    fatalError("_JSEngineRuntimeDriver.valueTypeForHandle(_:in:) is not implemented")
   }
 
   public static func makeStringValueHandle(
