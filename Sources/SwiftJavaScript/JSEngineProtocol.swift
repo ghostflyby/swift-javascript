@@ -1,3 +1,5 @@
-public protocol JSEngine: Sendable {
-  associatedtype ValueHandle: Sendable
+public protocol JSEngine: Sendable, _JSEngineRuntimeDriver, _JSEnginePropertyDriver,
+  _JSEngineInvocationDriver
+{
+  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
 }

@@ -187,9 +187,7 @@ private enum JavaScriptCoreObjectLookup {
   case exception(JavaScriptCoreRawValue)
 }
 
-package enum JavaScriptCoreBackendDriver: JSEngine, _JSEngineRuntimeDriver,
-  _JSEnginePropertyDriver, _JSEngineInvocationDriver
-{
+package enum JavaScriptCoreBackendDriver: JSEngine {
   package typealias ValueHandle = JavaScriptCoreValueHandle
   package typealias Engine = JavaScriptCoreEngine
   package typealias RawRuntime = JavaScriptCoreRawRuntime
@@ -213,6 +211,368 @@ package enum JavaScriptCoreBackendDriver: JSEngine, _JSEngineRuntimeDriver,
     -> JavaScriptCoreRawContext
   {
     JavaScriptCoreRawContext(runtime: runtime)
+  }
+
+  private static func rawContext(
+    from context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JavaScriptCoreRawContext? {
+    context.opaqueHandle()
+  }
+
+  private static func resultHandle(
+    from result: JSDriverResult<JavaScriptCoreRawValue>
+  ) -> JSResultHandle<JavaScriptCoreEngine> {
+    switch result {
+    case .value(let value):
+      return .value(JSValueHandle<JavaScriptCoreEngine>(rawValue: value))
+    case .exception(let exception):
+      return .exception(JSValueHandle<JavaScriptCoreEngine>(rawValue: exception))
+    }
+  }
+
+  package static func makeRuntimeHandle() -> JSRuntimeHandle<JavaScriptCoreEngine> {
+    JSRuntimeHandle<JavaScriptCoreEngine>(_opaqueHandle: makeRuntime())
+  }
+
+  package static func makeBorrowedContextHandleFromRuntime(
+    in runtime: JSRuntimeHandle<JavaScriptCoreEngine>
+  ) -> JSBorrowedContextHandle<JavaScriptCoreEngine>? {
+    guard let rawRuntime: JavaScriptCoreRawRuntime = runtime.opaqueHandle() else {
+      return nil
+    }
+    return JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: makeContext(in: rawRuntime))
+  }
+
+  package static func makeStringValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeString(value, in: rawContext))
+  }
+
+  package static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeNumber(value, in: rawContext))
+  }
+
+  package static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeSymbol(value, in: rawContext))
+  }
+
+  package static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeBoolean(value, in: rawContext))
+  }
+
+  package static func makeNullValueHandle(
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeNull(in: rawContext))
+  }
+
+  package static func makeUndefinedValueHandle(
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeUndefined(in: rawContext))
+  }
+
+  package static func makeObjectResultHandle(
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: makeObject(in: rawContext))
+  }
+
+  package static func makeArrayResultHandle(
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: makeArray(in: rawContext))
+  }
+
+  package static func evaluateScriptResultHandle(
+    _ script: String,
+    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(
+      from: evaluateScript(
+        script,
+        in: rawContext,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    )
+  }
+
+  package static func propertyNamesForHandle(
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> [String]? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return propertyNames(on: object.rawValue, in: rawContext)
+  }
+
+  package static func getStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
+  }
+
+  package static func setStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    to value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    guard let rawContext = rawContext(from: context) else {
+      return false
+    }
+    switch setProperty(
+      key,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  package static func getValuePropertyHandle(
+    _ key: JSValueHandle<JavaScriptCoreEngine>,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
+  }
+
+  package static func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
+  }
+
+  package static func setValuePropertyHandle(
+    _ key: JSValueHandle<JavaScriptCoreEngine>,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    to value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    guard let rawContext = rawContext(from: context) else {
+      return false
+    }
+    switch setProperty(
+      key.rawValue,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  package static func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    to value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool {
+    guard let rawContext = rawContext(from: context) else {
+      return false
+    }
+    switch setProperty(at: index, on: object.rawValue, to: value.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  package static func hasStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return hasProperty(key, on: object.rawValue, in: rawContext)
+  }
+
+  package static func hasValuePropertyHandle(
+    _ key: JSValueHandle<JavaScriptCoreEngine>,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return hasProperty(key.rawValue, on: object.rawValue, in: rawContext)
+  }
+
+  package static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool {
+    guard let rawContext = rawContext(from: context) else {
+      return false
+    }
+    switch deleteProperty(key, on: object.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  package static func deleteValuePropertyHandle(
+    _ key: JSValueHandle<JavaScriptCoreEngine>,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool {
+    guard let rawContext = rawContext(from: context) else {
+      return false
+    }
+    switch deleteProperty(key.rawValue, on: object.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  package static func callFunctionHandle(
+    _ function: JSValueHandle<JavaScriptCoreEngine>,
+    this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    let rawThisValue: JavaScriptCoreRawValue? = thisValue?.rawValue
+    let rawArguments = arguments.map(\.rawValue)
+    return resultHandle(
+      from: callFunction(
+        function.rawValue,
+        this: rawThisValue,
+        arguments: rawArguments,
+        in: rawContext
+      )
+    )
+  }
+
+  package static func constructHandle(
+    _ constructor: JSValueHandle<JavaScriptCoreEngine>,
+    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    let rawArguments = arguments.map(\.rawValue)
+    return resultHandle(
+      from: construct(constructor.rawValue, arguments: rawArguments, in: rawContext))
+  }
+
+  package static func toObjectHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSResultHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return resultHandle(from: toObject(value.rawValue, in: rawContext))
+  }
+
+  package static func isArrayHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return isArray(value.rawValue, in: rawContext)
+  }
+
+  package static func isDateHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return isDate(value.rawValue, in: rawContext)
+  }
+
+  package static func isInstanceOfHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    constructor: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> Bool? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+    return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: rawContext)
   }
 
   package static func makeFunctionClass() -> JSClassRef {

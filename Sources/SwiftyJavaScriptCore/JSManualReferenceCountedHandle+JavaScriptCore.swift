@@ -4,7 +4,7 @@ import SwiftJavaScript
 extension JSRuntimeHandle: JSManualReferenceCountedHandle, JSRuntimeManualReferenceCountedHandle
 where E == JavaScriptCoreEngine {
   @discardableResult
-  package func retainReference() -> Bool {
+  public func retainReference() -> Bool {
     guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle() else {
       return false
     }
@@ -13,7 +13,7 @@ where E == JavaScriptCoreEngine {
   }
 
   @discardableResult
-  package func releaseReference() -> Bool {
+  public func releaseReference() -> Bool {
     guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle() else {
       return false
     }
@@ -26,7 +26,7 @@ extension JSBorrowedContextHandle: JSManualReferenceCountedHandle,
   JSContextManualReferenceCountedHandle
 where E == JavaScriptCoreEngine {
   @discardableResult
-  package func retainReference() -> Bool {
+  public func retainReference() -> Bool {
     guard let rawContext: JavaScriptCoreRawContext = opaqueHandle(), rawContext.ownsContext else {
       return false
     }
@@ -35,7 +35,7 @@ where E == JavaScriptCoreEngine {
   }
 
   @discardableResult
-  package func releaseReference() -> Bool {
+  public func releaseReference() -> Bool {
     guard let rawContext: JavaScriptCoreRawContext = opaqueHandle(), rawContext.ownsContext else {
       return false
     }

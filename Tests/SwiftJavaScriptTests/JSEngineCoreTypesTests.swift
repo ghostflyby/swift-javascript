@@ -42,9 +42,7 @@ private enum MockEngine: JSEngine {
   typealias ValueHandle = MockValueHandle
 }
 
-private enum MockDriver: JSEngine, _JSEngineRuntimeDriver, _JSEnginePropertyDriver,
-  _JSEngineInvocationDriver
-{
+private enum MockDriver: JSEngine {
   typealias ValueHandle = MockValueHandle
   typealias Engine = MockEngine
   typealias RawRuntime = MockRuntime
@@ -209,6 +207,354 @@ private enum MockDriver: JSEngine, _JSEngineRuntimeDriver, _JSEnginePropertyDriv
     -> JSDriverResult<Void>
   {
     .value(())
+  }
+}
+
+extension MockDriver {
+  fileprivate static func resultHandle(from result: JSDriverResult<MockValue>) -> JSResultHandle<
+    MockEngine
+  > {
+    switch result {
+    case .value(let value):
+      return .value(JSValueHandle<MockEngine>(rawValue: value))
+    case .exception(let exception):
+      return .exception(JSValueHandle<MockEngine>(rawValue: exception))
+    }
+  }
+
+  fileprivate static func makeRuntimeHandle() -> JSRuntimeHandle<MockEngine> {
+    JSRuntimeHandle<MockEngine>(_opaqueHandle: makeRuntime())
+  }
+
+  fileprivate static func makeBorrowedContextHandleFromRuntime(
+    in runtime: JSRuntimeHandle<MockEngine>
+  ) -> JSBorrowedContextHandle<MockEngine>? {
+    guard let rawRuntime: MockRuntime = runtime.opaqueHandle() else {
+      return nil
+    }
+    return JSBorrowedContextHandle<MockEngine>(_opaqueHandle: makeContext(in: rawRuntime))
+  }
+
+  fileprivate static func makeStringValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<MockEngine>(rawValue: makeString(value, in: rawContext))
+  }
+
+  fileprivate static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<MockEngine>(rawValue: makeNumber(value, in: rawContext))
+  }
+
+  fileprivate static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<MockEngine>(rawValue: makeSymbol(value, in: rawContext))
+  }
+
+  fileprivate static func makeNullValueHandle(
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<MockEngine>(rawValue: makeNull(in: rawContext))
+  }
+
+  fileprivate static func makeUndefinedValueHandle(
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSValueHandle<MockEngine>(rawValue: makeUndefined(in: rawContext))
+  }
+
+  fileprivate static func makeObjectResultHandle(
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: makeObject(in: rawContext))
+  }
+
+  fileprivate static func makeArrayResultHandle(
+    _ context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: makeArray(in: rawContext))
+  }
+
+  fileprivate static func evaluateScriptResultHandle(
+    _ script: String,
+    _ context: JSBorrowedContextHandle<MockEngine>,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(
+      from: evaluateScript(
+        script,
+        in: rawContext,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    )
+  }
+
+  fileprivate static func propertyNamesForHandle(
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> [String]? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return propertyNames(on: object.rawValue, in: rawContext)
+  }
+
+  fileprivate static func getStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
+  }
+
+  fileprivate static func setStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return false
+    }
+    switch setProperty(
+      key,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  fileprivate static func getValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
+  }
+
+  fileprivate static func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
+  }
+
+  fileprivate static func setValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return false
+    }
+    switch setProperty(
+      key.rawValue,
+      on: object.rawValue,
+      to: value.rawValue,
+      in: rawContext,
+      attributes: attributes
+    ) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  fileprivate static func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return false
+    }
+    switch setProperty(at: index, on: object.rawValue, to: value.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  fileprivate static func hasStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return hasProperty(key, on: object.rawValue, in: rawContext)
+  }
+
+  fileprivate static func hasValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return hasProperty(key.rawValue, on: object.rawValue, in: rawContext)
+  }
+
+  fileprivate static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return false
+    }
+    switch deleteProperty(key, on: object.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  fileprivate static func deleteValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return false
+    }
+    switch deleteProperty(key.rawValue, on: object.rawValue, in: rawContext) {
+    case .value:
+      return true
+    case .exception:
+      return false
+    }
+  }
+
+  fileprivate static func callFunctionHandle(
+    _ function: JSValueHandle<MockEngine>,
+    this thisValue: JSValueHandle<MockEngine>? = nil,
+    arguments: [JSValueHandle<MockEngine>] = [],
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    let rawThisValue: MockValue? = thisValue?.rawValue
+    let rawArguments = arguments.map(\.rawValue)
+    return resultHandle(
+      from: callFunction(
+        function.rawValue,
+        this: rawThisValue,
+        arguments: rawArguments,
+        in: rawContext
+      )
+    )
+  }
+
+  fileprivate static func constructHandle(
+    _ constructor: JSValueHandle<MockEngine>,
+    arguments: [JSValueHandle<MockEngine>] = [],
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    let rawArguments = arguments.map(\.rawValue)
+    return resultHandle(
+      from: construct(constructor.rawValue, arguments: rawArguments, in: rawContext))
+  }
+
+  fileprivate static func toObjectHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> JSResultHandle<MockEngine>? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return resultHandle(from: toObject(value.rawValue, in: rawContext))
+  }
+
+  fileprivate static func isArrayHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return isArray(value.rawValue, in: rawContext)
+  }
+
+  fileprivate static func isDateHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return isDate(value.rawValue, in: rawContext)
+  }
+
+  fileprivate static func isInstanceOfHandle(
+    _ value: JSValueHandle<MockEngine>,
+    constructor: JSValueHandle<MockEngine>,
+    in context: JSBorrowedContextHandle<MockEngine>
+  ) -> Bool? {
+    guard let rawContext: MockContext = context.opaqueHandle() else {
+      return nil
+    }
+    return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: rawContext)
   }
 }
 

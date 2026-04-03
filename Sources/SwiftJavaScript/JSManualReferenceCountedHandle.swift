@@ -1,4 +1,4 @@
-package protocol JSManualReferenceCountedHandle {
+public protocol JSManualReferenceCountedHandle {
   @discardableResult
   func retainReference() -> Bool
 
@@ -6,14 +6,8 @@ package protocol JSManualReferenceCountedHandle {
   func releaseReference() -> Bool
 }
 
-package protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-package protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-package protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
-  associatedtype RawValue: Sendable
-
-  init(rawValue: RawValue)
-
-  var rawValue: RawValue { get }
-}
+public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
