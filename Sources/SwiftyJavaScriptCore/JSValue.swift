@@ -10,7 +10,7 @@
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
 public struct JSValue: ~Copyable {
-  let _rawValue: _JSValueStorage
+  let _rawValue: JSEngineValueStorage<JavaScriptCoreEngine>
 
   public init(string value: String, in context: isolated JSContext = #isolation) {
     self = context.withInstantContext { callbackContext in
