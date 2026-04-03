@@ -85,6 +85,10 @@ package struct JavaScriptCoreRawContext: @unchecked Sendable {
     storage.ref
   }
 
+  package var ownsContext: Bool {
+    storage.ownsContext
+  }
+
   package init(runtime: JavaScriptCoreRawRuntime) {
     self.storage = JavaScriptCoreRawContextStorage(runtime: runtime)
   }
