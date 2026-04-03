@@ -20,6 +20,10 @@ private protocol _JSValueStorageBridge {
 		from rawStorage: borrowing _JSValueRawStorage,
 		in context: borrowing JSInstantContext
 	) -> Handle
+	func rawValue(
+		from rawStorage: borrowing _JSValueRawStorage,
+		in context: JavaScriptCoreRawContext
+	) -> JavaScriptCoreRawValue
 }
 
 private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
@@ -54,6 +58,13 @@ private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
 		}
 		return handle
 	}
+
+	func rawValue(
+		from rawStorage: borrowing _JSValueRawStorage,
+		in context: JavaScriptCoreRawContext
+	) -> JavaScriptCoreRawValue {
+		JavaScriptCoreBackendDriver.rawValue(from: rawStorage.ref, in: context)
+	}
 }
 
 private let _jsValueStorageBridge = _JSCJSValueStorageBridge()
@@ -83,7 +94,7 @@ struct _JSValueStorage: ~Copyable {
 	}
 
 	func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-		JavaScriptCoreRawValue(ref: rawStorage.ref, context: context)
+		_jsValueStorageBridge.rawValue(from: rawStorage, in: context)
 	}
 
 	func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {

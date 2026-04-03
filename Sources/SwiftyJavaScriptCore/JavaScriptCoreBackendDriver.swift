@@ -279,6 +279,13 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue)
   }
 
+  package static func rawValue(
+    from valueRef: JavaScriptCoreValueRef,
+    in context: JavaScriptCoreRawContext
+  ) -> JavaScriptCoreRawValue {
+    JavaScriptCoreRawValue(ref: valueRef, context: context)
+  }
+
   package static func privateData(from object: JSObjectRef?) -> UnsafeMutableRawPointer? {
     guard let object else {
       return nil
