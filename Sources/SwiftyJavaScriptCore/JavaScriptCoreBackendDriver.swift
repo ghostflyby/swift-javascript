@@ -268,6 +268,10 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return rawValue.ref
   }
 
+  package static func valueRef(from rawValue: JavaScriptCoreRawValue) -> JavaScriptCoreValueRef {
+    rawValue.ref
+  }
+
   package static func valueHandle(
     from valueRef: JavaScriptCoreValueRef,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>

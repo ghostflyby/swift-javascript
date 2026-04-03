@@ -1,99 +1,45 @@
-struct _JSValueRawStorage: ~Copyable {
-	let ref: JavaScriptCoreValueRef
+typealias _JSValueStorage = JSEngineValueStorage<JavaScriptCoreEngine>
 
-	init(ref: JavaScriptCoreValueRef) {
-		self.ref = ref
+extension _JSValueStorage {
+  init(ref: JavaScriptCoreValueRef, in context: borrowing JSInstantContext) {
+    guard
+      let handle = JavaScriptCoreBackendDriver.valueHandle(
+        from: ref,
+        in: context.driverContextHandle
+      )
+    else {
+      preconditionFailure("JSValue storage could not create value handle")
+    }
+    self.init(handle: handle)
   }
-}
 
-private protocol _JSValueStorageBridge {
-	associatedtype Handle
+  init(rawValue: JavaScriptCoreRawValue) {
+    let context = JSInstantContext(ctx: rawValue.context.ref)
+    self.init(ref: JavaScriptCoreBackendDriver.valueRef(from: rawValue), in: context)
+  }
 
-	func rawStorage(from ref: JavaScriptCoreValueRef) -> _JSValueRawStorage
-	func rawStorage(from rawValue: JavaScriptCoreRawValue) -> _JSValueRawStorage
-	func rawStorage(from handle: Handle) -> _JSValueRawStorage?
-	func handle(
-		from rawStorage: borrowing _JSValueRawStorage,
-		in context: borrowing JSInstantContext
-	) -> Handle
-	func rawValue(
-		from rawStorage: borrowing _JSValueRawStorage,
-		in context: JavaScriptCoreRawContext
-	) -> JavaScriptCoreRawValue
-}
+  static func fromHandle(
+    _ handle: JSValueHandle<JavaScriptCoreEngine>
+  ) -> _JSValueStorage? {
+    guard JavaScriptCoreBackendDriver.valueRef(from: handle) != nil else {
+      return nil
+    }
+    return _JSValueStorage(handle: handle)
+  }
 
-private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
-	typealias Handle = JSValueHandle<JavaScriptCoreEngine>
+  var ref: JavaScriptCoreValueRef {
+    guard let ref = JavaScriptCoreBackendDriver.valueRef(from: valueHandle()) else {
+      preconditionFailure("JSValue storage handle has no value ref")
+    }
+    return ref
+  }
 
-	func rawStorage(from ref: JavaScriptCoreValueRef) -> _JSValueRawStorage {
-		_JSValueRawStorage(ref: ref)
-	}
+  func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
+    JavaScriptCoreBackendDriver.rawValue(from: ref, in: context)
+  }
 
-	func rawStorage(from rawValue: JavaScriptCoreRawValue) -> _JSValueRawStorage {
-    _JSValueRawStorage(ref: rawValue.ref)
-	}
-
-	func rawStorage(from handle: Handle) -> _JSValueRawStorage? {
-		guard let ref = JavaScriptCoreBackendDriver.valueRef(from: handle) else {
-			return nil
-		}
-		return _JSValueRawStorage(ref: ref)
-	}
-
-	func handle(
-		from rawStorage: borrowing _JSValueRawStorage,
-		in context: borrowing JSInstantContext
-	) -> Handle {
-		guard
-			let handle = JavaScriptCoreBackendDriver.valueHandle(
-				from: rawStorage.ref,
-				in: context.driverContextHandle
-			)
-		else {
-			preconditionFailure("JSValue storage could not create value handle")
-		}
-		return handle
-	}
-
-	func rawValue(
-		from rawStorage: borrowing _JSValueRawStorage,
-		in context: JavaScriptCoreRawContext
-	) -> JavaScriptCoreRawValue {
-		JavaScriptCoreBackendDriver.rawValue(from: rawStorage.ref, in: context)
-	}
-}
-
-private let _jsValueStorageBridge = _JSCJSValueStorageBridge()
-
-struct _JSValueStorage: ~Copyable {
-	private let rawStorage: _JSValueRawStorage
-
-	init(ref: JavaScriptCoreValueRef) {
-		self.rawStorage = _jsValueStorageBridge.rawStorage(from: ref)
-	}
-
-	init(rawValue: JavaScriptCoreRawValue) {
-		self.rawStorage = _jsValueStorageBridge.rawStorage(from: rawValue)
-	}
-
-	static func fromHandle(
-		_ handle: JSValueHandle<JavaScriptCoreEngine>
-	) -> _JSValueStorage? {
-		guard let rawStorage = _jsValueStorageBridge.rawStorage(from: handle) else {
-			return nil
-		}
-		return _JSValueStorage(ref: rawStorage.ref)
-	}
-
-	var ref: JavaScriptCoreValueRef {
-		rawStorage.ref
-	}
-
-	func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-		_jsValueStorageBridge.rawValue(from: rawStorage, in: context)
-	}
-
-	func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-		_jsValueStorageBridge.handle(from: rawStorage, in: context)
-	}
+  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
+    _ = context
+    return valueHandle()
+  }
 }
