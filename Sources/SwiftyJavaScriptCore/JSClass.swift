@@ -610,7 +610,7 @@ private func installCallAsFunctionCallbackIfNeeded(
         let result =
           definition.callAsFunction?(context, &functionValue, &thisValue, args)
           ?? JSValue(undefinedIn: context)
-        return .value(result.retainedRef())
+        return JSResult.value(result).toPrivateResult()
       }
       return JavaScriptCoreBackendDriver.callbackReturnValue(
         callbackResult,
@@ -664,9 +664,9 @@ private func installCallAsConstructorCallbackIfNeeded(
           definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
           ?? JSValue(undefinedIn: context)
         guard result.isObject(in: context) else {
-          return .value(JSValue(undefinedIn: context).retainedRef())
+          return JSResult.value(JSValue(undefinedIn: context)).toPrivateResult()
         }
-        return .value(result.retainedRef())
+        return JSResult.value(result).toPrivateResult()
       }
       return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
         callbackResult,
@@ -833,7 +833,7 @@ private func installConvertToTypeCallbackIfNeeded(
         if let exceptionRef {
           .exception(exceptionRef)
         } else {
-          .value(result.retainedRef())
+          JSResult.value(result).toPrivateResult()
         }
       return JavaScriptCoreBackendDriver.callbackReturnValue(
         conversion,
