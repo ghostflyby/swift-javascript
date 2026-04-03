@@ -34,18 +34,25 @@ private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
 	}
 
 	func rawStorage(from handle: Handle) -> _JSValueRawStorage? {
-		guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
+		guard let ref = JavaScriptCoreBackendDriver.valueRef(from: handle) else {
 			return nil
 		}
-		return _JSValueRawStorage(rawValue: rawValue)
+		return _JSValueRawStorage(ref: ref)
 	}
 
 	func handle(
 		from rawStorage: borrowing _JSValueRawStorage,
 		in context: borrowing JSInstantContext
 	) -> Handle {
-		let rawValue = JavaScriptCoreRawValue(ref: rawStorage.ref, context: context.driverContext)
-		return JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue)
+		guard
+			let handle = JavaScriptCoreBackendDriver.valueHandle(
+				from: rawStorage.ref,
+				in: context.driverContextHandle
+			)
+		else {
+			preconditionFailure("JSValue storage could not create value handle")
+		}
+		return handle
 	}
 }
 
