@@ -12,17 +12,14 @@
 /// - It is not a generic low-level bridge layer.
 /// - Backend/handle/raw-context orchestration should stay in backend adapters or
 ///   local call-site helpers unless it is part of this callback-facing API surface.
-public struct JSInstantContext: ~Copyable {
-  public let driverContextHandle: JSBorrowedContextHandle<JavaScriptCoreEngine>
+public typealias JSInstantContext = JSEngineInstantContext<JavaScriptCoreEngine>
 
+extension JSEngineInstantContext where E == JavaScriptCoreEngine {
   init(ctx: JavaScriptCoreContextRef) {
-    self.driverContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>(
-      _opaqueHandle: JavaScriptCoreRawContext(borrowing: ctx)
-    )
-  }
-
-  init(handle: JSBorrowedContextHandle<JavaScriptCoreEngine>) {
-    self.driverContextHandle = handle
+    self.init(
+      handle: JSBorrowedContextHandle<JavaScriptCoreEngine>(
+        _opaqueHandle: JavaScriptCoreRawContext(borrowing: ctx)
+      ))
   }
 
   public var globalContextRef: JavaScriptCoreGlobalContextRef {
@@ -33,7 +30,7 @@ public struct JSInstantContext: ~Copyable {
   }
 }
 
-extension JSInstantContext {
+extension JSEngineInstantContext where E == JavaScriptCoreEngine {
   private func makeFunctionHandle(
     named name: String,
     callback: @escaping JSFunctionCallback

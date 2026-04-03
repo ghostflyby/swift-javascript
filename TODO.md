@@ -221,6 +221,7 @@
 - [ ] 先完成 8.2 的第 5/6 步，再展开全链路引擎泛型标记改造（避免两类大改叠加导致回归定位困难）
 
 阶段 A：先改 core，不改 facade 用户 API
+- [x] 将 `JSInstantContext` 主类型下沉为 `SwiftJavaScript.JSEngineInstantContext<E>`，并在 JSC facade 保留 `typealias JSInstantContext = JSEngineInstantContext<JavaScriptCoreEngine>`
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
