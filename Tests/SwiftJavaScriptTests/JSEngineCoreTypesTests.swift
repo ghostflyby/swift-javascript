@@ -260,6 +260,16 @@ private enum MockDriver: _JSEngineDriver {
   #expect(valueIsJSC)
 }
 
+@Test func engineValueStoragePreservesHandleAndEngineType() {
+  let handle = JSValueHandle<MockEngine>(_opaqueHandle: "mock-value")
+  let storage = JSEngineValueStorage(handle: handle)
+
+  let storedHandle = storage.valueHandle()
+
+  #expect(storedHandle.opaqueHandle(as: String.self) == "mock-value")
+  #expect(storedHandle.engineType == MockEngine.self)
+}
+
 @Test func genericResultHandleWrapsValueAndExceptionStates() {
   let valueHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-value")
   let exceptionHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-error")
