@@ -54,80 +54,6 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     return body(globalObject)
   }
 
-  public func makeString(_ value: String) -> JSValue {
-    guard let handle = JavaScriptCoreEngine.makeStringValueHandle(value, driverContextHandle)
-    else {
-      preconditionFailure("JSInstantContext.makeString could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  func makeSymbol(_ value: String) -> JSValue {
-    guard let handle = JavaScriptCoreEngine.makeSymbolValueHandle(value, driverContextHandle)
-    else {
-      preconditionFailure("JSInstantContext.makeSymbol could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  public func makeNumber(_ value: Double) -> JSValue {
-    guard let handle = JavaScriptCoreEngine.makeNumberValueHandle(value, driverContextHandle)
-    else {
-      preconditionFailure("JSInstantContext.makeNumber could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  public func makeNumber(_ value: some BinaryInteger) -> JSValue {
-    makeNumber(Double(value))
-  }
-
-  public func makeBoolean(_ value: Bool) -> JSValue {
-    guard
-      let handle = JavaScriptCoreEngine.makeBooleanValueHandle(value, driverContextHandle)
-    else {
-      preconditionFailure("JSInstantContext.makeBoolean could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  public func makeNull() -> JSValue {
-    guard let handle = JavaScriptCoreEngine.makeNullValueHandle(driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeNull could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  public func makeUndefined() -> JSValue {
-    guard let handle = JavaScriptCoreEngine.makeUndefinedValueHandle(driverContextHandle)
-    else {
-      preconditionFailure("JSInstantContext.makeUndefined could not create handle")
-    }
-    return JSValue(handleValue: handle)
-  }
-
-  public func makeObject() -> JSValue {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreEngine.makeObjectResultHandle(driverContextHandle))
-    {
-    case .value(let value):
-      return value
-    case .exception(let exception):
-      return exception
-    }
-  }
-
-  public func makeArray() -> JSValue {
-    switch JSResult.from(
-      handleResult: JavaScriptCoreEngine.makeArrayResultHandle(driverContextHandle))
-    {
-    case .value(let value):
-      return value
-    case .exception(let exception):
-      return exception
-    }
-  }
-
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback
@@ -199,50 +125,37 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     }
   }
 
+  public func makeObject() -> JSValue {
+    switch JSResult.from(
+      handleResult: JavaScriptCoreEngine.makeObjectResultHandle(driverContextHandle)
+    ) {
+    case .value(let value):
+      return value
+    case .exception(let exception):
+      return exception
+    }
+  }
+
+  public func makeArray() -> JSValue {
+    switch JSResult.from(
+      handleResult: JavaScriptCoreEngine.makeArrayResultHandle(driverContextHandle)
+    ) {
+    case .value(let value):
+      return value
+    case .exception(let exception):
+      return exception
+    }
+  }
+
   public func evaluateScript(_ script: String) -> JSResult {
-    let scriptString = JSStringValue(script)
-    return evaluateScript(scriptString, startingLineNumber: 1)
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where Script: JSString, Script: ~Copyable {
-    .from(
-      handleResult: JavaScriptCoreEngine.evaluateScriptResultHandle(
-        script.string,
-        driverContextHandle,
-        sourceURL: nil,
-        startingLineNumber: startingLineNumber
-      ))
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    sourceURL: String,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where Script: JSString, Script: ~Copyable {
-    .from(
-      handleResult: JavaScriptCoreEngine.evaluateScriptResultHandle(
-        script.string,
-        driverContextHandle,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      ))
-  }
-
-  public func evaluateScript<SourceURL>(
-    _ script: String,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
     .from(
       handleResult: JavaScriptCoreEngine.evaluateScriptResultHandle(
         script,
         driverContextHandle,
-        sourceURL: sourceURL.string,
-        startingLineNumber: startingLineNumber
-      ))
+        sourceURL: nil,
+        startingLineNumber: 1
+      )
+    )
   }
 
   public func evaluateScript(
@@ -256,7 +169,38 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
         driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
-      ))
+      )
+    )
+  }
+
+  public func evaluateScript<Script>(
+    _ script: borrowing Script,
+    startingLineNumber: Int32 = 1
+  ) -> JSResult where Script: JSString, Script: ~Copyable {
+    .from(
+      handleResult: JavaScriptCoreEngine.evaluateScriptResultHandle(
+        script.string,
+        driverContextHandle,
+        sourceURL: nil,
+        startingLineNumber: startingLineNumber
+      )
+    )
+  }
+
+  public func evaluateScript<Script>(
+    _ script: borrowing Script,
+    sourceURL: String,
+    startingLineNumber: Int32 = 1
+  ) -> JSResult where Script: JSString, Script: ~Copyable {
+    evaluateScript(script.string, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
+  }
+
+  public func evaluateScript<SourceURL>(
+    _ script: String,
+    sourceURL: borrowing SourceURL,
+    startingLineNumber: Int32 = 1
+  ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
+    evaluateScript(script, sourceURL: sourceURL.string, startingLineNumber: startingLineNumber)
   }
 
   public func evaluateScript<Script, SourceURL>(
@@ -265,12 +209,10 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     startingLineNumber: Int32 = 1
   ) -> JSResult
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    .from(
-      handleResult: JavaScriptCoreEngine.evaluateScriptResultHandle(
-        script.string,
-        driverContextHandle,
-        sourceURL: sourceURL.string,
-        startingLineNumber: startingLineNumber
-      ))
+    evaluateScript(
+      script.string,
+      sourceURL: sourceURL.string,
+      startingLineNumber: startingLineNumber
+    )
   }
 }
