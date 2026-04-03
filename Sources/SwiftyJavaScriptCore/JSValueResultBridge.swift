@@ -16,15 +16,6 @@ extension JSResult {
   static func from(
     handleResult: SwiftJavaScript.JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>?
   ) -> JSResult {
-    guard let handleResult else {
-      preconditionFailure("JSResult handle bridge unexpectedly returned nil")
-    }
-
-    switch handleResult {
-    case .value(let value):
-      return .value(JSValue(handleValue: value))
-    case .exception(let exception):
-      return .exception(JSValue(handleValue: exception))
-    }
+    SwiftJavaScript.bridgeHandleResult(handleResult)
   }
 }
