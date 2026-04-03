@@ -136,7 +136,7 @@ extension JSClassValueConvertible {
       throw .typeMismatch(expected: "object", actual: value.type(in: context))
     }
     let privateData: UnsafeMutableRawPointer?
-    switch JavaScriptCoreBackendDriver.privateData(
+    switch JavaScriptCoreEngine.privateData(
       from: value.valueHandle(),
       in: context.driverContextHandle
     ) {
@@ -180,7 +180,7 @@ extension JSClassValueConvertible {
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
-    switch JavaScriptCoreBackendDriver.makeObjectResultHandle(
+    switch JavaScriptCoreEngine.makeObjectResultHandle(
       of: Self.jsClass.ref,
       privateData: data,
       in: context.driverContextHandle
@@ -264,7 +264,7 @@ private let autoClassFinalizeCallback: JavaScriptCoreObjectFinalizeCallback = { 
 private func autoClassStorageRecord(from object: JavaScriptCoreObjectRef)
   -> (storage: JSClassAutoObjectStorage, privateData: UnsafeMutableRawPointer)?
 {
-  guard let privateData = JavaScriptCoreBackendDriver.privateData(from: object) else {
+  guard let privateData = JavaScriptCoreEngine.privateData(from: object) else {
     return nil
   }
   let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
@@ -284,7 +284,7 @@ private func autoCallbackValueOrUndefined(
 )
   -> JavaScriptCoreValueRef?
 {
-  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
+  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func autoCallbackValueOrUndefined(
@@ -292,7 +292,7 @@ private func autoCallbackValueOrUndefined(
 )
   -> JavaScriptCoreValueRef?
 {
-  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
+  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func autoCallbackSucceededOrFalse(_ value: Bool?) -> Bool {
@@ -357,9 +357,9 @@ private func autoDynamicGetPropertyCallbackValue(
   exception: UnsafeMutablePointer<JavaScriptCoreValueRef?>?
 ) -> JavaScriptCoreValueRef? {
   guard let getProperty = definition.getProperty else {
-    return JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
+    return JavaScriptCoreEngine.undefinedValue(in: ctx)
   }
-  return JavaScriptCoreBackendDriver.callbackReturnValue(
+  return JavaScriptCoreEngine.callbackReturnValue(
     getProperty(context, thisValue, key).toPrivateResult(),
     in: ctx,
     exception: exception
@@ -382,7 +382,7 @@ private func autoDynamicSetPropertyCallbackResult(
     guard case .exception(let errorRef) = privateResult else {
       return true
     }
-    return JavaScriptCoreBackendDriver.callbackSucceeded(
+    return JavaScriptCoreEngine.callbackSucceeded(
       exceptionValue: errorRef,
       exception: exception
     )
@@ -507,7 +507,7 @@ private func autoStaticGetPropertyCallbackValue(
   ctx: JavaScriptCoreContextRef?,
   exception: UnsafeMutablePointer<JavaScriptCoreValueRef?>?
 ) -> JavaScriptCoreValueRef? {
-  JavaScriptCoreBackendDriver.callbackReturnValue(
+  JavaScriptCoreEngine.callbackReturnValue(
     valueDefinition.getProperty(context, thisValue).toPrivateResult(),
     in: ctx,
     exception: exception
@@ -525,7 +525,7 @@ private func autoStaticSetPropertyCallbackResult(
   case .value:
     return true
   case .exception(let error):
-    return JavaScriptCoreBackendDriver.callbackSucceeded(
+    return JavaScriptCoreEngine.callbackSucceeded(
       exceptionValue: error,
       exception: exception
     )
@@ -541,10 +541,10 @@ private func autoStaticFunctionCallCallbackValue(
   ctx: JavaScriptCoreContextRef?,
   exception: UnsafeMutablePointer<JavaScriptCoreValueRef?>?
 ) -> JavaScriptCoreValueRef? {
-  let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: argumentCount) { args in
+  let result = JavaScriptCoreEngine.withArguments(arguments, count: argumentCount) { args in
     functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
   }
-  return JavaScriptCoreBackendDriver.callbackReturnValue(
+  return JavaScriptCoreEngine.callbackReturnValue(
     result,
     in: ctx,
     exception: exception
@@ -747,7 +747,7 @@ private func installAutoStaticFunctionMembers(
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   -> JavaScriptCoreClassDefinition
 {
-  var cls = JavaScriptCoreBackendDriver.emptyClassDefinition
+  var cls = JavaScriptCoreEngine.emptyClassDefinition
   cls.version = backing.definition.version
   cls.attributes = backing.definition.attributes.rawValue
   cls.parentClass = backing.definition.parentClass?.ref

@@ -2,9 +2,9 @@ import Foundation
 
 extension JSClassAttributes {
   public static let none = JSClassAttributes(
-    rawValue: UInt32(JavaScriptCoreBackendDriver.classAttributeNoneRawValue))
+    rawValue: UInt32(JavaScriptCoreEngine.classAttributeNoneRawValue))
   public static let noAutomaticPrototype = JSClassAttributes(
-    rawValue: UInt32(JavaScriptCoreBackendDriver.classAttributeNoAutomaticPrototypeRawValue))
+    rawValue: UInt32(JavaScriptCoreEngine.classAttributeNoAutomaticPrototypeRawValue))
 }
 
 public struct JSStaticValue: Sendable {
@@ -445,13 +445,13 @@ private let classFinalizeCallback: JavaScriptCoreObjectFinalizeCallback = { obje
 private func callbackValueOrUndefined(
   _ value: JavaScriptCoreValueRef?, in ctx: JavaScriptCoreContextRef?
 ) -> JavaScriptCoreValueRef? {
-  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
+  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func callbackValueOrUndefined(
   _ value: JavaScriptCoreValueRef??, in ctx: JavaScriptCoreContextRef?
 ) -> JavaScriptCoreValueRef? {
-  value ?? JavaScriptCoreBackendDriver.undefinedValue(in: ctx)
+  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func callbackBoolOrFalse(_ value: Bool?) -> Bool {
@@ -474,12 +474,12 @@ private func installPropertyNamesCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasPropertyEnumerator(for: descriptor) else {
     return
   }
 
   cls.getPropertyNames = { ctx, object, accumulator in
-    let enumerated: Void? = JavaScriptCoreBackendDriver.withPropertyNamesCallbackInput(
+    let enumerated: Void? = JavaScriptCoreEngine.withPropertyNamesCallbackInput(
       ctx: ctx,
       object: object,
       accumulator: accumulator
@@ -496,12 +496,12 @@ private func installHasPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasDynamicPropertyHas(for: descriptor) else {
     return
   }
 
   cls.hasProperty = { ctx, object, propertyName in
-    let hasProperty = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+    let hasProperty = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
@@ -516,12 +516,12 @@ private func installDeletePropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasDynamicPropertyDelete(for: descriptor) else {
     return
   }
 
   cls.deleteProperty = { ctx, object, propertyName, exception in
-    let didDelete = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+    let didDelete = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
@@ -536,7 +536,7 @@ private func installSetPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasDynamicPropertySetter(for: descriptor) else {
     return
   }
 
@@ -544,13 +544,13 @@ private func installSetPropertyCallbackIfNeeded(
     guard let value else {
       return false
     }
-    let didSet = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+    let didSet = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
       let newValue = JSValue(ref: value, ctx: context)
-      return JavaScriptCoreBackendDriver.callbackSucceeded(
+      return JavaScriptCoreEngine.callbackSucceeded(
         exceptionValue: definition.setProperty!(
           context,
           thisValue,
@@ -568,17 +568,17 @@ private func installGetPropertyCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasDynamicPropertyGetter(for: descriptor) else {
     return
   }
 
   cls.getProperty = { ctx, object, propertyName, exception in
-    let value = JavaScriptCoreBackendDriver.withDynamicPropertyCallbackInput(
+    let value = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
-      JavaScriptCoreBackendDriver.callbackReturnValue(
+      JavaScriptCoreEngine.callbackReturnValue(
         definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
         in: ctx,
         exception: exception
@@ -592,18 +592,18 @@ private func installCallAsFunctionCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasCallAsFunction(for: descriptor) else {
     return
   }
 
   cls.callAsFunction = {
     ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
-    let value = JavaScriptCoreBackendDriver.withFunctionCallbackInput(
+    let value = JavaScriptCoreEngine.withFunctionCallbackInput(
       ctx: ctx,
       functionRef: functionRef,
       thisObjectRef: thisObjectRef
     ) { definition, context, functionValue, thisValue in
-      let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
+      let callbackResult: JSPrivateResult = JavaScriptCoreEngine.withArguments(
         arguments,
         count: Int(argumentCount)
       ) { args in
@@ -612,7 +612,7 @@ private func installCallAsFunctionCallbackIfNeeded(
           ?? JSValue(undefinedIn: context)
         return JSResult.value(result).toPrivateResult()
       }
-      return JavaScriptCoreBackendDriver.callbackReturnValue(
+      return JavaScriptCoreEngine.callbackReturnValue(
         callbackResult,
         in: ctx,
         exception: exception
@@ -626,12 +626,12 @@ private func installHasInstanceCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasHasInstance(for: descriptor) else {
     return
   }
 
   cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
-    let hasInstance = JavaScriptCoreBackendDriver.withHasInstanceCallbackInput(
+    let hasInstance = JavaScriptCoreEngine.withHasInstanceCallbackInput(
       ctx: ctx,
       constructorRef: constructorRef,
       possibleInstanceRef: possibleInstanceRef
@@ -646,17 +646,17 @@ private func installCallAsConstructorCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasConstructor(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasConstructor(for: descriptor) else {
     return
   }
 
   cls.callAsConstructor = {
     ctx, constructorRef, argumentCount, arguments, exception in
-    let object = JavaScriptCoreBackendDriver.withConstructorCallbackInput(
+    let object = JavaScriptCoreEngine.withConstructorCallbackInput(
       ctx: ctx,
       constructorRef: constructorRef
     ) { definition, context, constructorValue, thisValue in
-      let callbackResult: JSPrivateResult = JavaScriptCoreBackendDriver.withArguments(
+      let callbackResult: JSPrivateResult = JavaScriptCoreEngine.withArguments(
         arguments,
         count: Int(argumentCount)
       ) { args in
@@ -668,7 +668,7 @@ private func installCallAsConstructorCallbackIfNeeded(
         }
         return JSResult.value(result).toPrivateResult()
       }
-      return JavaScriptCoreBackendDriver.constructorCallbackReturnValue(
+      return JavaScriptCoreEngine.constructorCallbackReturnValue(
         callbackResult,
         in: ctx,
         exception: exception
@@ -697,7 +697,7 @@ private func installStaticValueMembers(
     }
     staticValue.getProperty = staticValueGetPropertyCallback
     staticValue.setProperty = staticValueSetPropertyCallback
-    staticValue.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+    staticValue.attributes = JavaScriptCoreEngine.propertyAttributes(
       from: property.attributes
     )
     backing.staticValues.append(staticValue)
@@ -726,7 +726,7 @@ private func installStaticFunctionMembers(
       staticFunction.name = $0.baseAddress
     }
     staticFunction.callAsFunction = staticFunctionCallAsFunctionCallback
-    staticFunction.attributes = JavaScriptCoreBackendDriver.propertyAttributes(
+    staticFunction.attributes = JavaScriptCoreEngine.propertyAttributes(
       from: method.attributes
     )
     backing.staticFunctions.append(staticFunction)
@@ -809,15 +809,15 @@ private func installConvertToTypeCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
-  guard JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor) else {
+  guard JavaScriptCoreEngine.hasConvertToType(for: descriptor) else {
     return
   }
 
   cls.convertToType = { ctx, objectRef, type, exception in
-    let value = JavaScriptCoreBackendDriver.withConvertToTypeCallbackInput(
+    let value = JavaScriptCoreEngine.withConvertToTypeCallbackInput(
       ctx: ctx,
       objectRef: objectRef,
-      jsType: JavaScriptCoreBackendDriver.jsType(from: type)
+      jsType: JavaScriptCoreEngine.jsType(from: type)
     ) { definition, context, objectValue, jsType, exceptionValue in
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
@@ -835,7 +835,7 @@ private func installConvertToTypeCallbackIfNeeded(
         } else {
           JSResult.value(result).toPrivateResult()
         }
-      return JavaScriptCoreBackendDriver.callbackReturnValue(
+      return JavaScriptCoreEngine.callbackReturnValue(
         conversion,
         in: ctx,
         exception: exception
@@ -847,12 +847,12 @@ private func installConvertToTypeCallbackIfNeeded(
 
 private let staticValueGetPropertyCallback: JavaScriptCoreObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
-  let value = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
+  let value = JavaScriptCoreEngine.withStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    JavaScriptCoreBackendDriver.callbackReturnValue(
+    JavaScriptCoreEngine.callbackReturnValue(
       valueDefinition.getProperty(context, thisValue).toPrivateResult(),
       in: ctx,
       exception: exception
@@ -866,7 +866,7 @@ private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallb
   guard let value else {
     return false
   }
-  let didSet = JavaScriptCoreBackendDriver.withStaticValueCallbackInput(
+  let didSet = JavaScriptCoreEngine.withStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -876,7 +876,7 @@ private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallb
     case .value:
       return true
     case .exception(let error):
-      return JavaScriptCoreBackendDriver.callbackSucceeded(
+      return JavaScriptCoreEngine.callbackSucceeded(
         exceptionValue: error,
         exception: exception
       )
@@ -887,16 +887,16 @@ private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallb
 
 private let staticFunctionCallAsFunctionCallback: JavaScriptCoreObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
-  let value = JavaScriptCoreBackendDriver.withStaticFunctionCallbackInput(
+  let value = JavaScriptCoreEngine.withStaticFunctionCallbackInput(
     ctx: ctx,
     function: function,
     thisObject: thisObject
   ) { functionDefinition, context, thisValue in
-    let result = JavaScriptCoreBackendDriver.withArguments(arguments, count: Int(argumentCount)) {
+    let result = JavaScriptCoreEngine.withArguments(arguments, count: Int(argumentCount)) {
       args in
       functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
     }
-    return JavaScriptCoreBackendDriver.callbackReturnValue(
+    return JavaScriptCoreEngine.callbackReturnValue(
       result,
       in: ctx,
       exception: exception
@@ -910,8 +910,8 @@ extension JSClassDefinition {
   fileprivate func manualNativeDefinition(backing: JSManualNativeClassBacking)
     -> JavaScriptCoreClassDefinition
   {
-    var cls = JavaScriptCoreBackendDriver.emptyClassDefinition
-    let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: self)
+    var cls = JavaScriptCoreEngine.emptyClassDefinition
+    let descriptor = JavaScriptCoreEngine.hostTypeDescriptor(for: self)
 
     installClassMetadata(from: self, into: &cls)
 
@@ -928,7 +928,7 @@ extension JSClassDefinition {
 extension JSContext {
   internal static func borrow(ctx: JavaScriptCoreContextRef) -> JSContext {
     let context = Unmanaged<JSContext>.fromOpaque(
-      JavaScriptCoreBackendDriver.privateData(fromGlobalObjectIn: ctx)!
+      JavaScriptCoreEngine.privateData(fromGlobalObjectIn: ctx)!
     ).takeUnretainedValue()
     return context
   }
@@ -939,14 +939,14 @@ public class JSClass: @unchecked Sendable {
   private let nativeBacking: AnyObject?
 
   public init(ref: JavaScriptCoreClassRef) {
-    self.ref = JavaScriptCoreBackendDriver.retainClass(ref)
+    self.ref = JavaScriptCoreEngine.retainClass(ref)
     self.nativeBacking = nil
   }
 
   public init(defination: JSClassDefinition) {
     let backing = JSManualNativeClassBacking()
     var copy = defination.manualNativeDefinition(backing: backing)
-    self.ref = JavaScriptCoreBackendDriver.createClass(&copy)
+    self.ref = JavaScriptCoreEngine.createClass(&copy)
     self.nativeBacking = backing
     rememberClassDefinition(defination, for: ref)
   }
@@ -957,7 +957,7 @@ public class JSClass: @unchecked Sendable {
     rememberedDefinition: JSClassDefinition? = nil
   ) {
     var copy = nativeDefinition
-    self.ref = JavaScriptCoreBackendDriver.createClass(&copy)
+    self.ref = JavaScriptCoreEngine.createClass(&copy)
     self.nativeBacking = retainedBacking
     if let rememberedDefinition {
       rememberClassDefinition(rememberedDefinition, for: ref)
@@ -965,6 +965,6 @@ public class JSClass: @unchecked Sendable {
   }
 
   deinit {
-    JavaScriptCoreBackendDriver.releaseClass(ref)
+    JavaScriptCoreEngine.releaseClass(ref)
   }
 }

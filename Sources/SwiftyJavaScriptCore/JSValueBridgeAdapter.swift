@@ -18,8 +18,8 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   ) {
     let valueHandle = value.valueHandle()
     guard
-      let valueGroup = JavaScriptCoreBackendDriver.contextGroupRef(from: valueHandle),
-      let contextGroup = JavaScriptCoreBackendDriver.contextGroupRef(
+      let valueGroup = JavaScriptCoreEngine.contextGroupRef(from: valueHandle),
+      let contextGroup = JavaScriptCoreEngine.contextGroupRef(
         from: context.driverContextHandle)
     else {
       preconditionFailure("JSValue bridge could not resolve context group")
@@ -31,51 +31,51 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   }
 
   func type(of value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSType {
-    JavaScriptCoreBackendDriver.valueType(of: value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.valueType(of: value.ref, in: context.globalContextRef)
   }
 
   func isUndefined(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isUndefined(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isUndefined(value.ref, in: context.globalContextRef)
   }
 
   func isNull(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isNull(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isNull(value.ref, in: context.globalContextRef)
   }
 
   func isBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isBoolean(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isBoolean(value.ref, in: context.globalContextRef)
   }
 
   func isNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isNumber(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isNumber(value.ref, in: context.globalContextRef)
   }
 
   func isString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isString(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isString(value.ref, in: context.globalContextRef)
   }
 
   func isSymbol(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isSymbol(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isSymbol(value.ref, in: context.globalContextRef)
   }
 
   func isObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isObject(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isObject(value.ref, in: context.globalContextRef)
   }
 
   func isBigInt(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isBigInt(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.isBigInt(value.ref, in: context.globalContextRef)
   }
 
   func toBoolean(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.toBoolean(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.toBoolean(value.ref, in: context.globalContextRef)
   }
 
   func toNumber(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Double {
-    JavaScriptCoreBackendDriver.toNumber(value.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.toNumber(value.ref, in: context.globalContextRef)
   }
 
   func toString(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> String {
-    JavaScriptCoreBackendDriver.toString(value.ref, in: context.globalContextRef) ?? ""
+    JavaScriptCoreEngine.toString(value.ref, in: context.globalContextRef) ?? ""
   }
 
   func looselyEquals(
@@ -83,7 +83,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     _ rhs: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    JavaScriptCoreBackendDriver.valueEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.valueEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
   }
 
   func strictlyEquals(
@@ -91,7 +91,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     _ rhs: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    JavaScriptCoreBackendDriver.valueStrictEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
+    JavaScriptCoreEngine.valueStrictEquals(lhs.ref, rhs.ref, in: context.globalContextRef)
   }
 
   func encodeArguments<each A: JSValueEncodable>(
@@ -129,7 +129,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     bridgeResult(
-      JavaScriptCoreBackendDriver.callFunctionHandle(
+      JavaScriptCoreEngine.callFunctionHandle(
         valueHandle(for: function, in: context),
         this: thisValueHandle,
         arguments: arguments,
@@ -198,7 +198,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     bridgeResult(
-      JavaScriptCoreBackendDriver.constructHandle(
+      JavaScriptCoreEngine.constructHandle(
         valueHandle(for: constructor, in: context),
         arguments: arguments,
         in: context.driverContextHandle
@@ -230,7 +230,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSResult {
     bridgeResult(
-      JavaScriptCoreBackendDriver.getStringPropertyHandle(
+      JavaScriptCoreEngine.getStringPropertyHandle(
         key,
         on: valueHandle(for: object, in: context),
         in: context.driverContextHandle
@@ -244,7 +244,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    JavaScriptCoreBackendDriver.setStringPropertyHandle(
+    JavaScriptCoreEngine.setStringPropertyHandle(
       key,
       on: valueHandle(for: object, in: context),
       to: valueHandle(for: value, in: context),
@@ -296,21 +296,21 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
 
   func toObject(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSResult {
     bridgeResult(
-      JavaScriptCoreBackendDriver.toObjectHandle(
+      JavaScriptCoreEngine.toObjectHandle(
         valueHandle(for: value, in: context),
         in: context.driverContextHandle
       ))
   }
 
   func isArray(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isArrayHandle(
+    JavaScriptCoreEngine.isArrayHandle(
       valueHandle(for: value, in: context),
       in: context.driverContextHandle
     ) ?? false
   }
 
   func isDate(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
-    JavaScriptCoreBackendDriver.isDateHandle(
+    JavaScriptCoreEngine.isDateHandle(
       valueHandle(for: value, in: context),
       in: context.driverContextHandle
     ) ?? false
@@ -321,7 +321,7 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     constructor: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    JavaScriptCoreBackendDriver.isInstanceOfHandle(
+    JavaScriptCoreEngine.isInstanceOfHandle(
       valueHandle(for: value, in: context),
       constructor: valueHandle(for: constructor, in: context),
       in: context.driverContextHandle

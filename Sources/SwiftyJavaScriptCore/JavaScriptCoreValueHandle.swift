@@ -9,9 +9,3 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
     self.rawValue = rawValue
   }
 }
-
-extension JavaScriptCoreEngine: @unchecked Sendable, JSEngine {
-  public typealias RuntimeHandle = JSRuntimeHandle<JavaScriptCoreEngine>
-  public typealias ContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>
-  public typealias ValueHandle = JavaScriptCoreValueHandle
-}

@@ -15,7 +15,7 @@ public class JSVirtualMachine: @unchecked Sendable {
   }
 
   public init() {
-    self.driverRuntimeHandle = JavaScriptCoreBackendDriver.makeRuntimeHandle()
+    self.driverRuntimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
     let executor = SingleThreadExecutor()
     self.executor = executor
     unownedExecutor = executor.asUnownedSerialExecutor()

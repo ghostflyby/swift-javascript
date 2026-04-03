@@ -5,7 +5,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setStringPropertyHandle(
+    _ = JavaScriptCoreEngine.setStringPropertyHandle(
       key.string,
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -20,7 +20,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setValuePropertyHandle(
+    _ = JavaScriptCoreEngine.setValuePropertyHandle(
       key.valueHandle(),
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -34,7 +34,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setIndexPropertyHandle(
+    _ = JavaScriptCoreEngine.setIndexPropertyHandle(
       at: index,
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -74,7 +74,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setStringPropertyHandle(
+    _ = JavaScriptCoreEngine.setStringPropertyHandle(
       key.string,
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -91,7 +91,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setValuePropertyHandle(
+    _ = JavaScriptCoreEngine.setValuePropertyHandle(
       key.valueHandle(),
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -107,7 +107,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? JSValue(undefinedIn: context)
-    _ = JavaScriptCoreBackendDriver.setIndexPropertyHandle(
+    _ = JavaScriptCoreEngine.setIndexPropertyHandle(
       at: index,
       on: valueHandle(),
       to: encoded.valueHandle(),
@@ -152,7 +152,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSValue {
     switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+      handleResult: JavaScriptCoreEngine.getStringPropertyHandle(
         key.string,
         on: valueHandle(),
         in: context.driverContextHandle
@@ -170,7 +170,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSValue {
     switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.getValuePropertyHandle(
+      handleResult: JavaScriptCoreEngine.getValuePropertyHandle(
         key.valueHandle(),
         on: valueHandle(),
         in: context.driverContextHandle
@@ -188,7 +188,7 @@ extension JSValue {
     in context: borrowing JSInstantContext
   ) -> JSValue {
     switch JSResult.from(
-      handleResult: JavaScriptCoreBackendDriver.getIndexPropertyHandle(
+      handleResult: JavaScriptCoreEngine.getIndexPropertyHandle(
         at: index,
         on: valueHandle(),
         in: context.driverContextHandle
@@ -283,7 +283,7 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: borrowing JSInstantContext
   ) {
-    _ = JavaScriptCoreBackendDriver.deleteStringPropertyHandle(
+    _ = JavaScriptCoreEngine.deleteStringPropertyHandle(
       key.string,
       on: valueHandle(),
       in: context.driverContextHandle
@@ -294,7 +294,7 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) {
-    _ = JavaScriptCoreBackendDriver.deleteValuePropertyHandle(
+    _ = JavaScriptCoreEngine.deleteValuePropertyHandle(
       key.valueHandle(),
       on: valueHandle(),
       in: context.driverContextHandle
@@ -321,7 +321,7 @@ extension JSValue {
     _ key: borrowing some JSString,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    return JavaScriptCoreBackendDriver.hasStringPropertyHandle(
+    return JavaScriptCoreEngine.hasStringPropertyHandle(
       key.string,
       on: valueHandle(),
       in: context.driverContextHandle
@@ -332,7 +332,7 @@ extension JSValue {
     _ key: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> Bool {
-    return JavaScriptCoreBackendDriver.hasValuePropertyHandle(
+    return JavaScriptCoreEngine.hasValuePropertyHandle(
       key.valueHandle(),
       on: valueHandle(),
       in: context.driverContextHandle
@@ -375,11 +375,11 @@ extension JSPropertyAttributes {
 
 extension JSPropertyAttributes {
   public static let none = JSPropertyAttributes(
-    rawValue: JavaScriptCoreBackendDriver.propertyAttributeNoneRawValue)
+    rawValue: JavaScriptCoreEngine.propertyAttributeNoneRawValue)
   public static let dontEnum = JSPropertyAttributes(
-    rawValue: JavaScriptCoreBackendDriver.propertyAttributeDontEnumRawValue)
+    rawValue: JavaScriptCoreEngine.propertyAttributeDontEnumRawValue)
   public static let readOnly = JSPropertyAttributes(
-    rawValue: JavaScriptCoreBackendDriver.propertyAttributeReadOnlyRawValue)
+    rawValue: JavaScriptCoreEngine.propertyAttributeReadOnlyRawValue)
   public static let dontDelete = JSPropertyAttributes(
-    rawValue: JavaScriptCoreBackendDriver.propertyAttributeDontDeleteRawValue)
+    rawValue: JavaScriptCoreEngine.propertyAttributeDontDeleteRawValue)
 }

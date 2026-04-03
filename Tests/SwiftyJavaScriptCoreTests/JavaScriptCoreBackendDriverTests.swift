@@ -3,21 +3,21 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func javaScriptCoreBackendDriverSupportsPhaseOnePrimitivesAndProperties() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  #expect(JavaScriptCoreBackendDriver.capabilities.supportsHostObjects)
-  #expect(JavaScriptCoreBackendDriver.capabilities.supportsSymbol)
+  #expect(JavaScriptCoreEngine.capabilities.supportsHostObjects)
+  #expect(JavaScriptCoreEngine.capabilities.supportsSymbol)
 
-  let number = JavaScriptCoreBackendDriver.makeNumber(42, in: context)
-  let string = JavaScriptCoreBackendDriver.makeString("hello", in: context)
+  let number = JavaScriptCoreEngine.makeNumber(42, in: context)
+  let string = JavaScriptCoreEngine.makeString("hello", in: context)
 
   #expect(number.type == .number)
   #expect(number.toDouble() == 42)
   #expect(string.type == .string)
   #expect(string.toString() == "hello")
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "({})",
     in: context,
     sourceURL: "driver-test.js",
@@ -26,9 +26,9 @@ import Testing
   case .exception:
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
-    let answer = JavaScriptCoreBackendDriver.makeNumber(99, in: context)
+    let answer = JavaScriptCoreEngine.makeNumber(99, in: context)
 
-    switch JavaScriptCoreBackendDriver.setProperty(
+    switch JavaScriptCoreEngine.setProperty(
       "answer",
       on: object,
       to: answer,
@@ -41,7 +41,7 @@ import Testing
       break
     }
 
-    switch JavaScriptCoreBackendDriver.getProperty("answer", on: object, in: context) {
+    switch JavaScriptCoreEngine.getProperty("answer", on: object, in: context) {
     case .exception:
       Issue.record("expected property read to succeed")
     case .value(let property):
@@ -52,12 +52,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverHandleReferenceCountingChain() {
-  let runtimeHandle = JavaScriptCoreBackendDriver.makeRuntimeHandle()
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
   #expect(runtimeHandle.retainReference())
   #expect(runtimeHandle.releaseReference())
 
   guard
-    let contextHandle = JavaScriptCoreBackendDriver.makeBorrowedContextHandleFromRuntime(
+    let contextHandle = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(
       in: runtimeHandle)
   else {
     Issue.record("expected runtime handle to create context handle")
@@ -73,10 +73,10 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverReturnsExceptionsFromEvaluation() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "throw new Error('boom')",
     in: context,
     sourceURL: nil,
@@ -91,14 +91,14 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsObjectArrayAndCalls() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.makeObject(in: context) {
+  switch JavaScriptCoreEngine.makeObject(in: context) {
   case .exception:
     Issue.record("expected object creation to succeed")
   case .value(let object):
-    switch JavaScriptCoreBackendDriver.makeArray(in: context) {
+    switch JavaScriptCoreEngine.makeArray(in: context) {
     case .exception:
       Issue.record("expected array creation to succeed")
     case .value(let array):
@@ -107,7 +107,7 @@ import Testing
     }
   }
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "(function(a, b) { return this.base + a + b })",
     in: context,
     sourceURL: nil,
@@ -116,22 +116,22 @@ import Testing
   case .exception:
     Issue.record("expected function evaluation to succeed")
   case .value(let function):
-    switch JavaScriptCoreBackendDriver.makeObject(in: context) {
+    switch JavaScriptCoreEngine.makeObject(in: context) {
     case .exception:
       Issue.record("expected receiver object creation to succeed")
     case .value(let thisObject):
-      let base = JavaScriptCoreBackendDriver.makeNumber(10, in: context)
-      _ = JavaScriptCoreBackendDriver.setProperty(
+      let base = JavaScriptCoreEngine.makeNumber(10, in: context)
+      _ = JavaScriptCoreEngine.setProperty(
         "base",
         on: thisObject,
         to: base,
         in: context,
         attributes: .none
       )
-      let one = JavaScriptCoreBackendDriver.makeNumber(1, in: context)
-      let two = JavaScriptCoreBackendDriver.makeNumber(2, in: context)
+      let one = JavaScriptCoreEngine.makeNumber(1, in: context)
+      let two = JavaScriptCoreEngine.makeNumber(2, in: context)
 
-      switch JavaScriptCoreBackendDriver.callFunction(
+      switch JavaScriptCoreEngine.callFunction(
         function,
         this: thisObject,
         arguments: [one, two],
@@ -148,10 +148,10 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsHasAndDeleteProperty() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "({})",
     in: context,
     sourceURL: nil,
@@ -160,8 +160,8 @@ import Testing
   case .exception:
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
-    let value = JavaScriptCoreBackendDriver.makeString("ok", in: context)
-    _ = JavaScriptCoreBackendDriver.setProperty(
+    let value = JavaScriptCoreEngine.makeString("ok", in: context)
+    _ = JavaScriptCoreEngine.setProperty(
       "status",
       on: object,
       to: value,
@@ -169,48 +169,48 @@ import Testing
       attributes: .none
     )
 
-    #expect(JavaScriptCoreBackendDriver.hasProperty("status", on: object, in: context))
+    #expect(JavaScriptCoreEngine.hasProperty("status", on: object, in: context))
 
-    switch JavaScriptCoreBackendDriver.deleteProperty("status", on: object, in: context) {
+    switch JavaScriptCoreEngine.deleteProperty("status", on: object, in: context) {
     case .exception:
       Issue.record("expected property deletion to succeed")
     case .value:
-      #expect(!JavaScriptCoreBackendDriver.hasProperty("status", on: object, in: context))
+      #expect(!JavaScriptCoreEngine.hasProperty("status", on: object, in: context))
     }
   }
 }
 
 @Test func javaScriptCoreBackendDriverSupportsObjectTypeHelpers() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "[1, 2, 3]", in: context, sourceURL: nil, startingLineNumber: 1)
   {
   case .exception:
     Issue.record("expected array evaluation to succeed")
   case .value(let array):
-    switch JavaScriptCoreBackendDriver.evaluateScript(
+    switch JavaScriptCoreEngine.evaluateScript(
       "new Date(0)", in: context, sourceURL: nil, startingLineNumber: 1)
     {
     case .exception:
       Issue.record("expected date evaluation to succeed")
     case .value(let date):
-      switch JavaScriptCoreBackendDriver.evaluateScript(
+      switch JavaScriptCoreEngine.evaluateScript(
         "Array", in: context, sourceURL: nil, startingLineNumber: 1)
       {
       case .exception:
         Issue.record("expected Array constructor evaluation to succeed")
       case .value(let arrayConstructor):
-        #expect(JavaScriptCoreBackendDriver.isArray(array, in: context))
-        #expect(!JavaScriptCoreBackendDriver.isDate(array, in: context))
-        #expect(JavaScriptCoreBackendDriver.isDate(date, in: context))
+        #expect(JavaScriptCoreEngine.isArray(array, in: context))
+        #expect(!JavaScriptCoreEngine.isDate(array, in: context))
+        #expect(JavaScriptCoreEngine.isDate(date, in: context))
         #expect(
-          JavaScriptCoreBackendDriver.isInstanceOf(
+          JavaScriptCoreEngine.isInstanceOf(
             array, constructor: arrayConstructor, in: context))
 
-        let primitive = JavaScriptCoreBackendDriver.makeNumber(42, in: context)
-        switch JavaScriptCoreBackendDriver.toObject(primitive, in: context) {
+        let primitive = JavaScriptCoreEngine.makeNumber(42, in: context)
+        switch JavaScriptCoreEngine.toObject(primitive, in: context) {
         case .exception:
           Issue.record("expected toObject to box primitive numbers")
         case .value(let object):
@@ -222,17 +222,17 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsValueKeyAndIndexedProperties() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.makeObject(in: context) {
+  switch JavaScriptCoreEngine.makeObject(in: context) {
   case .exception:
     Issue.record("expected object creation to succeed")
   case .value(let object):
-    let key = JavaScriptCoreBackendDriver.makeString("driverKey", in: context)
-    let value = JavaScriptCoreBackendDriver.makeString("driverValue", in: context)
+    let key = JavaScriptCoreEngine.makeString("driverKey", in: context)
+    let value = JavaScriptCoreEngine.makeString("driverValue", in: context)
 
-    switch JavaScriptCoreBackendDriver.setProperty(
+    switch JavaScriptCoreEngine.setProperty(
       key,
       on: object,
       to: value,
@@ -242,8 +242,8 @@ import Testing
     case .exception:
       Issue.record("expected value-key property set to succeed")
     case .value:
-      #expect(JavaScriptCoreBackendDriver.hasProperty(key, on: object, in: context))
-      switch JavaScriptCoreBackendDriver.getProperty(key, on: object, in: context) {
+      #expect(JavaScriptCoreEngine.hasProperty(key, on: object, in: context))
+      switch JavaScriptCoreEngine.getProperty(key, on: object, in: context) {
       case .exception:
         Issue.record("expected value-key property get to succeed")
       case .value(let stored):
@@ -251,13 +251,13 @@ import Testing
       }
     }
 
-    let indexedValue = JavaScriptCoreBackendDriver.makeBoolean(true, in: context)
-    switch JavaScriptCoreBackendDriver.setProperty(at: 2, on: object, to: indexedValue, in: context)
+    let indexedValue = JavaScriptCoreEngine.makeBoolean(true, in: context)
+    switch JavaScriptCoreEngine.setProperty(at: 2, on: object, to: indexedValue, in: context)
     {
     case .exception:
       Issue.record("expected indexed property set to succeed")
     case .value:
-      switch JavaScriptCoreBackendDriver.getProperty(at: 2, on: object, in: context) {
+      switch JavaScriptCoreEngine.getProperty(at: 2, on: object, in: context) {
       case .exception:
         Issue.record("expected indexed property get to succeed")
       case .value(let stored):
@@ -265,20 +265,20 @@ import Testing
       }
     }
 
-    switch JavaScriptCoreBackendDriver.deleteProperty(key, on: object, in: context) {
+    switch JavaScriptCoreEngine.deleteProperty(key, on: object, in: context) {
     case .exception:
       Issue.record("expected value-key property delete to succeed")
     case .value:
-      #expect(!JavaScriptCoreBackendDriver.hasProperty(key, on: object, in: context))
+      #expect(!JavaScriptCoreEngine.hasProperty(key, on: object, in: context))
     }
   }
 }
 
 @Test func javaScriptCoreBackendDriverEnumeratesPropertyNames() {
-  let runtime = JavaScriptCoreBackendDriver.makeRuntime()
-  let context = JavaScriptCoreBackendDriver.makeContext(in: runtime)
+  let runtime = JavaScriptCoreEngine.makeRuntime()
+  let context = JavaScriptCoreEngine.makeContext(in: runtime)
 
-  switch JavaScriptCoreBackendDriver.evaluateScript(
+  switch JavaScriptCoreEngine.evaluateScript(
     "({ alpha: 1, beta: 2 })",
     in: context,
     sourceURL: nil,
@@ -287,7 +287,7 @@ import Testing
   case .exception:
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
-    let names = Set(JavaScriptCoreBackendDriver.propertyNames(on: object, in: context))
+    let names = Set(JavaScriptCoreEngine.propertyNames(on: object, in: context))
     #expect(names.contains("alpha"))
     #expect(names.contains("beta"))
   }
@@ -321,18 +321,18 @@ import Testing
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in JSValue(undefinedIn: context) }
 
-  let descriptor = JavaScriptCoreBackendDriver.hostTypeDescriptor(for: definition)
+  let descriptor = JavaScriptCoreEngine.hostTypeDescriptor(for: definition)
 
   #expect(descriptor.name == "BackendProjected")
   #expect(!descriptor.properties.isEmpty)
   #expect(!descriptor.methods.isEmpty)
-  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyGetter(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertySetter(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyHas(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasDynamicPropertyDelete(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasPropertyEnumerator(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasCallAsFunction(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasConstructor(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasHasInstance(for: descriptor))
-  #expect(JavaScriptCoreBackendDriver.hasConvertToType(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasDynamicPropertyGetter(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasDynamicPropertySetter(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasDynamicPropertyHas(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasDynamicPropertyDelete(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasPropertyEnumerator(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasCallAsFunction(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasConstructor(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasHasInstance(for: descriptor))
+  #expect(JavaScriptCoreEngine.hasConvertToType(for: descriptor))
 }

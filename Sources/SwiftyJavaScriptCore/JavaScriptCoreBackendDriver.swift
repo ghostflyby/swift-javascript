@@ -80,7 +80,7 @@ package final class JavaScriptCoreRawValue: @unchecked Sendable {
   }
 
   package var type: SwiftJavaScript.JSType {
-    JavaScriptCoreBackendDriver.valueType(of: ref, in: contextRef)
+    JavaScriptCoreEngine.valueType(of: ref, in: contextRef)
   }
 
   package func toDouble() -> Double {
@@ -154,13 +154,13 @@ private enum JavaScriptCoreObjectLookup {
   case exception(JavaScriptCoreRawValue)
 }
 
-package enum JavaScriptCoreBackendDriver: JSEngine {
-  package typealias ValueHandle = JavaScriptCoreValueHandle
-  package typealias Engine = JavaScriptCoreEngine
-  package typealias RuntimeHandle = JSRuntimeHandle<JavaScriptCoreEngine>
-  package typealias ContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>
+public enum JavaScriptCoreEngine: JSEngine {
+  public typealias ValueHandle = JavaScriptCoreValueHandle
+  public typealias Engine = JavaScriptCoreEngine
+  public typealias RuntimeHandle = JSRuntimeHandle<JavaScriptCoreEngine>
+  public typealias ContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>
 
-  package static let capabilities = JSEngineCapabilities(
+  public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
     supportsExternalArrayBuffer: true,
@@ -196,11 +196,11 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func makeRuntimeHandle() -> JSRuntimeHandle<JavaScriptCoreEngine> {
+  public static func makeRuntimeHandle() -> JSRuntimeHandle<JavaScriptCoreEngine> {
     JSRuntimeHandle<JavaScriptCoreEngine>(_opaqueHandle: makeRuntime())
   }
 
-  package static func makeBorrowedContextHandleFromRuntime(
+  public static func makeBorrowedContextHandleFromRuntime(
     in runtime: JSRuntimeHandle<JavaScriptCoreEngine>
   ) -> JSBorrowedContextHandle<JavaScriptCoreEngine>? {
     guard let rawRuntime: JavaScriptCoreRawRuntime = runtime.opaqueHandle() else {
@@ -209,7 +209,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: makeContext(in: rawRuntime))
   }
 
-  package static func makeStringValueHandle(
+  public static func makeStringValueHandle(
     _ value: String,
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
@@ -219,7 +219,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeString(value, in: rawContext))
   }
 
-  package static func makeNumberValueHandle(
+  public static func makeNumberValueHandle(
     _ value: Double,
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
@@ -229,7 +229,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeNumber(value, in: rawContext))
   }
 
-  package static func makeSymbolValueHandle(
+  public static func makeSymbolValueHandle(
     _ value: String,
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
@@ -239,7 +239,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeSymbol(value, in: rawContext))
   }
 
-  package static func makeBooleanValueHandle(
+  public static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
@@ -249,7 +249,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeBoolean(value, in: rawContext))
   }
 
-  package static func makeNullValueHandle(
+  public static func makeNullValueHandle(
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
@@ -258,7 +258,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeNull(in: rawContext))
   }
 
-  package static func makeUndefinedValueHandle(
+  public static func makeUndefinedValueHandle(
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
@@ -267,7 +267,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeUndefined(in: rawContext))
   }
 
-  package static func makeObjectResultHandle(
+  public static func makeObjectResultHandle(
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
@@ -276,7 +276,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: makeObject(in: rawContext))
   }
 
-  package static func makeArrayResultHandle(
+  public static func makeArrayResultHandle(
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
@@ -285,7 +285,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: makeArray(in: rawContext))
   }
 
-  package static func evaluateScriptResultHandle(
+  public static func evaluateScriptResultHandle(
     _ script: String,
     _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
     sourceURL: String? = nil,
@@ -304,7 +304,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     )
   }
 
-  package static func propertyNamesForHandle(
+  public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> [String]? {
@@ -314,7 +314,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return propertyNames(on: object.rawValue, in: rawContext)
   }
 
-  package static func getStringPropertyHandle(
+  public static func getStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -325,7 +325,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
   }
 
-  package static func setStringPropertyHandle(
+  public static func setStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
@@ -349,7 +349,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func getValuePropertyHandle(
+  public static func getValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -360,7 +360,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
   }
 
-  package static func getIndexPropertyHandle(
+  public static func getIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -371,7 +371,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
   }
 
-  package static func setValuePropertyHandle(
+  public static func setValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
@@ -395,7 +395,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func setIndexPropertyHandle(
+  public static func setIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
@@ -412,7 +412,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func hasStringPropertyHandle(
+  public static func hasStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -423,7 +423,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return hasProperty(key, on: object.rawValue, in: rawContext)
   }
 
-  package static func hasValuePropertyHandle(
+  public static func hasValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -434,7 +434,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return hasProperty(key.rawValue, on: object.rawValue, in: rawContext)
   }
 
-  package static func deleteStringPropertyHandle(
+  public static func deleteStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -450,7 +450,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func deleteValuePropertyHandle(
+  public static func deleteValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -466,7 +466,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     }
   }
 
-  package static func callFunctionHandle(
+  public static func callFunctionHandle(
     _ function: JSValueHandle<JavaScriptCoreEngine>,
     this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
@@ -487,7 +487,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     )
   }
 
-  package static func constructHandle(
+  public static func constructHandle(
     _ constructor: JSValueHandle<JavaScriptCoreEngine>,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
@@ -500,7 +500,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
       from: construct(constructor.rawValue, arguments: rawArguments, in: rawContext))
   }
 
-  package static func toObjectHandle(
+  public static func toObjectHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
@@ -510,7 +510,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return resultHandle(from: toObject(value.rawValue, in: rawContext))
   }
 
-  package static func isArrayHandle(
+  public static func isArrayHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> Bool? {
@@ -520,7 +520,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return isArray(value.rawValue, in: rawContext)
   }
 
-  package static func isDateHandle(
+  public static func isDateHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> Bool? {
@@ -530,7 +530,7 @@ package enum JavaScriptCoreBackendDriver: JSEngine {
     return isDate(value.rawValue, in: rawContext)
   }
 
-  package static func isInstanceOfHandle(
+  public static func isInstanceOfHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     constructor: JSValueHandle<JavaScriptCoreEngine>,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>

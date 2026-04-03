@@ -32,7 +32,7 @@ public actor JSContext {
     self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
 
     globalObjectRef = peer.globalObject!.jsValueRef
-    functionClass = SendableBoxUnsafe(JavaScriptCoreBackendDriver.makeFunctionClass())
+    functionClass = SendableBoxUnsafe(JavaScriptCoreEngine.makeFunctionClass())
 
     JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(self).toOpaque())
 

@@ -85,7 +85,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       if value.isArray(in: context) {
         let count: Int
         switch JSResult.from(
-          handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+          handleResult: JavaScriptCoreEngine.getStringPropertyHandle(
             "length",
             on: value.valueHandle(),
             in: context.driverContextHandle
@@ -108,7 +108,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         nodes.reserveCapacity(count)
         for index in 0..<count {
           switch JSResult.from(
-            handleResult: JavaScriptCoreBackendDriver.getIndexPropertyHandle(
+            handleResult: JavaScriptCoreEngine.getIndexPropertyHandle(
               at: UInt32(index),
               on: value.valueHandle(),
               in: context.driverContextHandle
@@ -124,7 +124,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       }
       var object: [String: JSCodableNode] = [:]
       let names =
-        JavaScriptCoreBackendDriver.propertyNamesForHandle(
+        JavaScriptCoreEngine.propertyNamesForHandle(
           on: value.valueHandle(),
           in: context.driverContextHandle
         ) ?? []
@@ -132,7 +132,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
       for key in names {
         switch JSResult.from(
-          handleResult: JavaScriptCoreBackendDriver.getStringPropertyHandle(
+          handleResult: JavaScriptCoreEngine.getStringPropertyHandle(
             key,
             on: value.valueHandle(),
             in: context.driverContextHandle
@@ -168,7 +168,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       for (index, item) in array.enumerated() {
         let encoded = try jsValueFromNode(item, in: context)
         guard
-          JavaScriptCoreBackendDriver.setIndexPropertyHandle(
+          JavaScriptCoreEngine.setIndexPropertyHandle(
             at: UInt32(index),
             on: arrayValue.valueHandle(),
             to: encoded.valueHandle(),
@@ -184,7 +184,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
         guard
-          JavaScriptCoreBackendDriver.setStringPropertyHandle(
+          JavaScriptCoreEngine.setStringPropertyHandle(
             key,
             on: objectValue.valueHandle(),
             to: encoded.valueHandle(),
@@ -205,7 +205,7 @@ private func makeDriverObjectValue(in context: borrowing JSInstantContext)
   -> JSValue
 {
   switch JSResult.from(
-    handleResult: JavaScriptCoreBackendDriver.makeObjectResultHandle(context.driverContextHandle))
+    handleResult: JavaScriptCoreEngine.makeObjectResultHandle(context.driverContextHandle))
   {
   case .exception:
     throw .codable("object creation raised exception")
@@ -219,7 +219,7 @@ private func makeDriverArrayValue(in context: borrowing JSInstantContext)
   -> JSValue
 {
   switch JSResult.from(
-    handleResult: JavaScriptCoreBackendDriver.makeArrayResultHandle(context.driverContextHandle))
+    handleResult: JavaScriptCoreEngine.makeArrayResultHandle(context.driverContextHandle))
   {
   case .exception:
     throw .codable("array creation failed")

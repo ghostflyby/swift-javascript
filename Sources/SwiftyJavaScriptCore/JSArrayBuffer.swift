@@ -6,45 +6,45 @@ extension JSTypedArrayKind {
   var jsType: JavaScriptCoreTypedArrayType {
     switch self {
     case .int8Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeInt8Array
+      return JavaScriptCoreEngine.typedArrayTypeInt8Array
     case .uint8Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeUint8Array
+      return JavaScriptCoreEngine.typedArrayTypeUint8Array
     case .uint8ClampedArray:
-      return JavaScriptCoreBackendDriver.typedArrayTypeUint8ClampedArray
+      return JavaScriptCoreEngine.typedArrayTypeUint8ClampedArray
     case .int16Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeInt16Array
+      return JavaScriptCoreEngine.typedArrayTypeInt16Array
     case .uint16Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeUint16Array
+      return JavaScriptCoreEngine.typedArrayTypeUint16Array
     case .int32Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeInt32Array
+      return JavaScriptCoreEngine.typedArrayTypeInt32Array
     case .uint32Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeUint32Array
+      return JavaScriptCoreEngine.typedArrayTypeUint32Array
     case .float32Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeFloat32Array
+      return JavaScriptCoreEngine.typedArrayTypeFloat32Array
     case .float64Array:
-      return JavaScriptCoreBackendDriver.typedArrayTypeFloat64Array
+      return JavaScriptCoreEngine.typedArrayTypeFloat64Array
     }
   }
 
   init?(_ jsType: JavaScriptCoreTypedArrayType) {
     switch jsType {
-    case JavaScriptCoreBackendDriver.typedArrayTypeInt8Array:
+    case JavaScriptCoreEngine.typedArrayTypeInt8Array:
       self = .int8Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeUint8Array:
+    case JavaScriptCoreEngine.typedArrayTypeUint8Array:
       self = .uint8Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeUint8ClampedArray:
+    case JavaScriptCoreEngine.typedArrayTypeUint8ClampedArray:
       self = .uint8ClampedArray
-    case JavaScriptCoreBackendDriver.typedArrayTypeInt16Array:
+    case JavaScriptCoreEngine.typedArrayTypeInt16Array:
       self = .int16Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeUint16Array:
+    case JavaScriptCoreEngine.typedArrayTypeUint16Array:
       self = .uint16Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeInt32Array:
+    case JavaScriptCoreEngine.typedArrayTypeInt32Array:
       self = .int32Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeUint32Array:
+    case JavaScriptCoreEngine.typedArrayTypeUint32Array:
       self = .uint32Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeFloat32Array:
+    case JavaScriptCoreEngine.typedArrayTypeFloat32Array:
       self = .float32Array
-    case JavaScriptCoreBackendDriver.typedArrayTypeFloat64Array:
+    case JavaScriptCoreEngine.typedArrayTypeFloat64Array:
       self = .float64Array
     default:
       return nil
@@ -76,7 +76,7 @@ public struct JSArrayBuffer: ~Copyable {
     precondition(byteLength >= 0, "ArrayBuffer byteLength must be non-negative")
 
     let bytes = Self.allocateZeroedBytes(byteLength: byteLength)
-    let ref = JavaScriptCoreBackendDriver.makeArrayBufferWithBytesNoCopy(
+    let ref = JavaScriptCoreEngine.makeArrayBufferWithBytesNoCopy(
       in: context.globalContextRef,
       bytes: bytes,
       byteLength: byteLength,
@@ -110,7 +110,7 @@ public struct JSArrayBuffer: ~Copyable {
 
   public init(copying bytes: UnsafeRawBufferPointer, in context: borrowing JSInstantContext) {
     let copiedBytes = Self.allocateCopy(of: bytes)
-    let ref = JavaScriptCoreBackendDriver.makeArrayBufferWithBytesNoCopy(
+    let ref = JavaScriptCoreEngine.makeArrayBufferWithBytesNoCopy(
       in: context.globalContextRef,
       bytes: copiedBytes,
       byteLength: bytes.count,
@@ -142,7 +142,7 @@ public struct JSArrayBuffer: ~Copyable {
 
   public var byteLength: Int {
     guard
-      let length = JavaScriptCoreBackendDriver.arrayBufferByteLength(
+      let length = JavaScriptCoreEngine.arrayBufferByteLength(
         of: value.ref,
         in: contextRef
       )
@@ -158,7 +158,7 @@ public struct JSArrayBuffer: ~Copyable {
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
     let byteLength = self.byteLength
-    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
+    let access = JavaScriptCoreEngine.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -170,7 +170,7 @@ public struct JSArrayBuffer: ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = JavaScriptCoreBackendDriver.arrayBufferBytesPtr(of: value.ref, in: contextRef)
+    let access = JavaScriptCoreEngine.arrayBufferBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -240,7 +240,7 @@ public struct JSTypedArray: ~Copyable {
   public init(type: JSTypedArrayKind, length: Int, in context: borrowing JSInstantContext) {
     precondition(length >= 0, "TypedArray length must be non-negative")
 
-    let ref = JavaScriptCoreBackendDriver.makeTypedArray(
+    let ref = JavaScriptCoreEngine.makeTypedArray(
       in: context.globalContextRef,
       type: type.jsType,
       length: length
@@ -287,7 +287,7 @@ public struct JSTypedArray: ~Copyable {
     let bufferRef = buffer.value.ref
 
     if let length {
-      ref = JavaScriptCoreBackendDriver.makeTypedArrayWithArrayBufferAndOffset(
+      ref = JavaScriptCoreEngine.makeTypedArrayWithArrayBufferAndOffset(
         in: context.globalContextRef,
         type: type.jsType,
         arrayBuffer: bufferRef,
@@ -295,14 +295,14 @@ public struct JSTypedArray: ~Copyable {
         length: length
       )
     } else if byteOffset == 0 {
-      ref = JavaScriptCoreBackendDriver.makeTypedArrayWithArrayBuffer(
+      ref = JavaScriptCoreEngine.makeTypedArrayWithArrayBuffer(
         in: context.globalContextRef,
         type: type.jsType,
         arrayBuffer: bufferRef
       )
     } else {
       let remainingLength = (buffer.byteLength - byteOffset) / type.bytesPerElement
-      ref = JavaScriptCoreBackendDriver.makeTypedArrayWithArrayBufferAndOffset(
+      ref = JavaScriptCoreEngine.makeTypedArrayWithArrayBufferAndOffset(
         in: context.globalContextRef,
         type: type.jsType,
         arrayBuffer: bufferRef,
@@ -339,7 +339,7 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public var length: Int {
-    guard let length = JavaScriptCoreBackendDriver.typedArrayLength(of: value.ref, in: contextRef)
+    guard let length = JavaScriptCoreEngine.typedArrayLength(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -348,7 +348,7 @@ public struct JSTypedArray: ~Copyable {
 
   public var byteLength: Int {
     guard
-      let length = JavaScriptCoreBackendDriver.typedArrayByteLength(of: value.ref, in: contextRef)
+      let length = JavaScriptCoreEngine.typedArrayByteLength(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
     }
@@ -357,7 +357,7 @@ public struct JSTypedArray: ~Copyable {
 
   public var byteOffset: Int {
     guard
-      let offset = JavaScriptCoreBackendDriver.typedArrayByteOffset(of: value.ref, in: contextRef)
+      let offset = JavaScriptCoreEngine.typedArrayByteOffset(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
     }
@@ -365,7 +365,7 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public var buffer: JSArrayBuffer {
-    guard let ref = JavaScriptCoreBackendDriver.typedArrayBuffer(of: value.ref, in: contextRef)
+    guard let ref = JavaScriptCoreEngine.typedArrayBuffer(of: value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray buffer")
     }
@@ -377,7 +377,7 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
-    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: contextRef)
+    let access = JavaScriptCoreEngine.typedArrayBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -389,7 +389,7 @@ public struct JSTypedArray: ~Copyable {
   public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
-    let access = JavaScriptCoreBackendDriver.typedArrayBytesPtr(of: value.ref, in: contextRef)
+    let access = JavaScriptCoreEngine.typedArrayBytesPtr(of: value.ref, in: contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }
@@ -419,11 +419,11 @@ extension JSValue {
 
   public func isArrayBuffer(in context: borrowing JSInstantContext) -> Bool {
     guard
-      let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: context.globalContextRef)
+      let type = JavaScriptCoreEngine.typedArrayType(of: ref, in: context.globalContextRef)
     else {
       return false
     }
-    return type == JavaScriptCoreBackendDriver.typedArrayTypeArrayBuffer
+    return type == JavaScriptCoreEngine.typedArrayTypeArrayBuffer
   }
 
   public func typedArrayKind(in context: isolated JSContext = #isolation) -> JSTypedArrayKind? {
@@ -433,7 +433,7 @@ extension JSValue {
 
   public func typedArrayKind(in context: borrowing JSInstantContext) -> JSTypedArrayKind? {
     guard
-      let type = JavaScriptCoreBackendDriver.typedArrayType(of: ref, in: context.globalContextRef)
+      let type = JavaScriptCoreEngine.typedArrayType(of: ref, in: context.globalContextRef)
     else {
       return nil
     }

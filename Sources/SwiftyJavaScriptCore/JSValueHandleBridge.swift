@@ -18,7 +18,7 @@ extension JSValue {
 
   consuming func takeRef() -> JavaScriptCoreValueRef {
     let handle = _rawValue.valueHandle()
-    guard let ref = JavaScriptCoreBackendDriver.retainedValueRef(from: handle) else {
+    guard let ref = JavaScriptCoreEngine.retainedValueRef(from: handle) else {
       preconditionFailure("JSValue storage handle has no value ref")
     }
     return ref
@@ -36,7 +36,7 @@ extension JSValue {
 extension JSEngineValueStorage where E == JavaScriptCoreEngine {
   init(ref: JavaScriptCoreValueRef, in context: borrowing JSInstantContext) {
     guard
-      let handle = JavaScriptCoreBackendDriver.valueHandle(
+      let handle = JavaScriptCoreEngine.valueHandle(
         from: ref,
         in: context.driverContextHandle
       )
@@ -47,7 +47,7 @@ extension JSEngineValueStorage where E == JavaScriptCoreEngine {
   }
 
   var ref: JavaScriptCoreValueRef {
-    guard let ref = JavaScriptCoreBackendDriver.valueRef(from: valueHandle()) else {
+    guard let ref = JavaScriptCoreEngine.valueRef(from: valueHandle()) else {
       preconditionFailure("JSValue storage handle has no value ref")
     }
     return ref
