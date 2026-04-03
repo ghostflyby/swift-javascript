@@ -3,11 +3,7 @@ struct _JSValueRawStorage: ~Copyable {
 
 	init(ref: JavaScriptCoreValueRef) {
 		self.ref = ref
-	}
-
-	init(rawValue: JavaScriptCoreRawValue) {
-		self.ref = rawValue.ref
-	}
+  }
 }
 
 private protocol _JSValueStorageBridge {
@@ -34,7 +30,7 @@ private struct _JSCJSValueStorageBridge: _JSValueStorageBridge {
 	}
 
 	func rawStorage(from rawValue: JavaScriptCoreRawValue) -> _JSValueRawStorage {
-		_JSValueRawStorage(rawValue: rawValue)
+    _JSValueRawStorage(ref: rawValue.ref)
 	}
 
 	func rawStorage(from handle: Handle) -> _JSValueRawStorage? {
