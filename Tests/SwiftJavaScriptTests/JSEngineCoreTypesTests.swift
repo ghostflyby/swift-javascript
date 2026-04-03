@@ -280,6 +280,16 @@ private enum MockDriver: _JSEngineDriver {
   #expect(roundtrip == payload)
 }
 
+@Test func engineValueShellKeepsStorageAndEngineTyping() {
+  let handle = JSValueHandle<MockEngine>(_opaqueHandle: "moved-jsvalue")
+  let storage = JSEngineValueStorage(handle: handle)
+  let value = JSEngineValue<MockEngine>(storage: storage)
+
+  let roundtripHandle = value._rawValue.valueHandle()
+  #expect(roundtripHandle.opaqueHandle(as: String.self) == "moved-jsvalue")
+  #expect(roundtripHandle.engineType == MockEngine.self)
+}
+
 @Test func genericResultHandleWrapsValueAndExceptionStates() {
   let valueHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-value")
   let exceptionHandle = JSValueHandle<QuickJSEngine>(_opaqueHandle: "quickjs-error")
