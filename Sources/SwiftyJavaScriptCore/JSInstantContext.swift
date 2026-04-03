@@ -17,16 +17,12 @@ public typealias JSInstantContext = JSEngineInstantContext<JavaScriptCoreEngine>
 extension JSEngineInstantContext where E == JavaScriptCoreEngine {
   init(ctx: JavaScriptCoreContextRef) {
     self.init(
-      handle: JSBorrowedContextHandle<JavaScriptCoreEngine>(
-        _opaqueHandle: JavaScriptCoreRawContext(borrowing: ctx)
-      ))
+      handle: JavaScriptCoreContextHandle(borrowing: ctx)
+    )
   }
 
   public var globalContextRef: JavaScriptCoreGlobalContextRef {
-    guard let rawContext: JavaScriptCoreRawContext = driverContextHandle.opaqueHandle() else {
-      preconditionFailure("JSInstantContext has invalid context handle")
-    }
-    return rawContext.ref
+    driverContextHandle.ref
   }
 }
 
@@ -35,9 +31,7 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     named name: String,
     callback: @escaping JSFunctionCallback
   ) -> JSValueHandle<JavaScriptCoreEngine> {
-    guard let rawContext: JavaScriptCoreRawContext = driverContextHandle.opaqueHandle() else {
-      preconditionFailure("JSInstantContext has invalid context handle")
-    }
+    let rawContext = driverContextHandle
     let rawValue = JavaScriptCoreEngine.makeFunction(
       named: name,
       callback: callback,

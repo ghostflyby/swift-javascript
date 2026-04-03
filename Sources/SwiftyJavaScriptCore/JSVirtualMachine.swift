@@ -3,15 +3,12 @@ import JavaScriptCore.JSVirtualMachine
 import SwiftJavaScript
 
 public class JSVirtualMachine: @unchecked Sendable {
-  let driverRuntimeHandle: JSRuntimeHandle<JavaScriptCoreEngine>
+  let driverRuntimeHandle: JavaScriptCoreRuntimeHandle
   private let executor: SingleThreadExecutor
   let unownedExecutor: UnownedSerialExecutor
 
   var peer: JavaScriptCore.JSContextGroupRef {
-    guard let rawRuntime: JavaScriptCoreRawRuntime = driverRuntimeHandle.opaqueHandle() else {
-      preconditionFailure("JSVirtualMachine has invalid runtime handle")
-    }
-    return rawRuntime.ref
+    driverRuntimeHandle.ref
   }
 
   public init() {

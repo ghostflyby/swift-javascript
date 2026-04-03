@@ -26,44 +26,8 @@ public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
 public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
 public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
-package struct JavaScriptCoreRawRuntime: @unchecked Sendable {
-  package let ref: JSContextGroupRef
-  package let ownsRuntime: Bool
-
-  package init(ref: JSContextGroupRef = JSContextGroupCreate()) {
-    self.ref = ref
-    self.ownsRuntime = true
-  }
-
-  package init(borrowing ref: JSContextGroupRef) {
-    self.ref = ref
-    self.ownsRuntime = false
-  }
-}
-
-package struct JavaScriptCoreRawContext: @unchecked Sendable {
-  package let runtime: JavaScriptCoreRawRuntime?
-  package let ref: JSGlobalContextRef
-  package let ownsContext: Bool
-
-  package init(runtime: JavaScriptCoreRawRuntime) {
-    self.runtime = runtime
-    self.ref = JSGlobalContextCreateInGroup(runtime.ref, nil)
-    self.ownsContext = true
-  }
-
-  package init(borrowing ref: JSGlobalContextRef) {
-    self.runtime = nil
-    self.ref = ref
-    self.ownsContext = false
-  }
-
-  package init(adopting ref: JSGlobalContextRef, runtime: JavaScriptCoreRawRuntime?) {
-    self.runtime = runtime
-    self.ref = ref
-    self.ownsContext = true
-  }
-}
+package typealias JavaScriptCoreRawRuntime = JavaScriptCoreRuntimeHandle
+package typealias JavaScriptCoreRawContext = JavaScriptCoreContextHandle
 
 package final class JavaScriptCoreRawValue: @unchecked Sendable {
   package let ref: JSValueRef
@@ -157,8 +121,8 @@ private enum JavaScriptCoreObjectLookup {
 public enum JavaScriptCoreEngine: JSEngine {
   public typealias ValueHandle = JavaScriptCoreValueHandle
   public typealias Engine = JavaScriptCoreEngine
-  public typealias RuntimeHandle = JSRuntimeHandle<JavaScriptCoreEngine>
-  public typealias ContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>
+  public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
+  public typealias ContextHandle = JavaScriptCoreContextHandle
 
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
@@ -170,19 +134,19 @@ public enum JavaScriptCoreEngine: JSEngine {
   )
 
   package static func makeRuntime() -> JavaScriptCoreRawRuntime {
-    JavaScriptCoreRawRuntime()
+    JavaScriptCoreRuntimeHandle()
   }
 
   package static func makeContext(in runtime: JavaScriptCoreRawRuntime)
     -> JavaScriptCoreRawContext
   {
-    JavaScriptCoreRawContext(runtime: runtime)
+    JavaScriptCoreContextHandle(runtime: runtime)
   }
 
   private static func rawContext(
-    from context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    from context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawContext? {
-    context.opaqueHandle()
+    context
   }
 
   private static func resultHandle(
@@ -196,22 +160,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
   }
 
-  public static func makeRuntimeHandle() -> JSRuntimeHandle<JavaScriptCoreEngine> {
-    JSRuntimeHandle<JavaScriptCoreEngine>(_opaqueHandle: makeRuntime())
+  public static func makeRuntimeHandle() -> JavaScriptCoreRuntimeHandle {
+    makeRuntime()
   }
 
   public static func makeBorrowedContextHandleFromRuntime(
-    in runtime: JSRuntimeHandle<JavaScriptCoreEngine>
-  ) -> JSBorrowedContextHandle<JavaScriptCoreEngine>? {
-    guard let rawRuntime: JavaScriptCoreRawRuntime = runtime.opaqueHandle() else {
-      return nil
-    }
-    return JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: makeContext(in: rawRuntime))
+    in runtime: JavaScriptCoreRuntimeHandle
+  ) -> JavaScriptCoreContextHandle? {
+    makeContext(in: runtime)
   }
 
   public static func makeStringValueHandle(
     _ value: String,
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -221,7 +182,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeNumberValueHandle(
     _ value: Double,
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -231,7 +192,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeSymbolValueHandle(
     _ value: String,
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -241,7 +202,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeBooleanValueHandle(
     _ value: Bool,
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -250,7 +211,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   public static func makeNullValueHandle(
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -259,7 +220,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   public static func makeUndefinedValueHandle(
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -268,7 +229,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   public static func makeObjectResultHandle(
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -277,7 +238,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   public static func makeArrayResultHandle(
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    _ context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -287,7 +248,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func evaluateScriptResultHandle(
     _ script: String,
-    _ context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    _ context: JavaScriptCoreContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
@@ -306,7 +267,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> [String]? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -317,7 +278,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func getStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -329,7 +290,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     guard let rawContext = rawContext(from: context) else {
@@ -352,7 +313,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func getValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -363,7 +324,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func getIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -375,7 +336,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     guard let rawContext = rawContext(from: context) else {
@@ -399,7 +360,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     guard let rawContext = rawContext(from: context) else {
       return false
@@ -415,7 +376,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func hasStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -426,7 +387,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func hasValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -437,7 +398,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func deleteStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     guard let rawContext = rawContext(from: context) else {
       return false
@@ -453,7 +414,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func deleteValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     guard let rawContext = rawContext(from: context) else {
       return false
@@ -470,7 +431,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ function: JSValueHandle<JavaScriptCoreEngine>,
     this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -490,7 +451,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func constructHandle(
     _ constructor: JSValueHandle<JavaScriptCoreEngine>,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -502,7 +463,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func toObjectHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -512,7 +473,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func isArrayHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -522,7 +483,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func isDateHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -533,7 +494,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func isInstanceOfHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     constructor: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> Bool? {
     guard let rawContext = rawContext(from: context) else {
       return nil
@@ -597,11 +558,9 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func makeObjectResultHandle(
     of jsClass: JSClassRef,
     privateData: UnsafeMutableRawPointer?,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSResultHandle<JavaScriptCoreEngine>? {
-    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle() else {
-      return nil
-    }
+    let rawContext = context
 
     switch makeObject(of: jsClass, privateData: privateData, in: rawContext) {
     case .value(let value):
@@ -613,12 +572,9 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func privateData(
     from value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<UnsafeMutableRawPointer?>? {
-    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle()
-    else {
-      return nil
-    }
+    let rawContext = context
 
     return privateData(from: value.rawValue, in: rawContext)
   }
@@ -638,12 +594,9 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func contextGroupRef(
-    from context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    from context: JavaScriptCoreContextHandle
   ) -> JSContextGroupRef? {
-    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle() else {
-      return nil
-    }
-    return JSContextGetGroup(rawContext.ref)
+    JSContextGetGroup(context.ref)
   }
 
   package static func contextGroupRef(
@@ -661,12 +614,9 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func valueHandle(
     from valueRef: JavaScriptCoreValueRef,
-    in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+    in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle() else {
-      return nil
-    }
-    let rawValue = JavaScriptCoreRawValue(ref: valueRef, contextRef: rawContext.ref)
+    let rawValue = JavaScriptCoreRawValue(ref: valueRef, contextRef: context.ref)
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: rawValue)
   }
 
