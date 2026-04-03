@@ -3,11 +3,11 @@ extension JSValue {
     _rawValue.ref
   }
 
-  /// Wrap a JavaScriptCore value reference into backend raw value storage.
+  /// Wrap a JavaScriptCore value reference into handle-backed value storage.
   /// - Parameters:
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
-  init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext = #isolation) {
+  init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext) {
     let instant = JSInstantContext(ctx: ctx.globalContextRef)
     self._rawValue = _JSValueStorage(ref: ref, in: instant)
   }
