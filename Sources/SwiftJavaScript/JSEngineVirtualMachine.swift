@@ -17,7 +17,7 @@ public class JSEngineVirtualMachine<E: JSEngine>: @unchecked Sendable {
   }
 }
 
-extension JSEngineVirtualMachine: Equatable where E.RuntimeHandle: Hashable {
+extension JSEngineVirtualMachine: Equatable where E.RuntimeHandle: Equatable {
   public static func == (lhs: JSEngineVirtualMachine<E>, rhs: JSEngineVirtualMachine<E>) -> Bool {
     lhs.driverRuntimeHandle == rhs.driverRuntimeHandle
   }
