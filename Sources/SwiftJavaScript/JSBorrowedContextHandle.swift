@@ -1,4 +1,4 @@
-public struct JSBorrowedContextHandle<E: JSEngine> {
+public struct JSBorrowedContextHandle<E: JSEngine>: @unchecked Sendable {
   package let storage: _JSOpaqueHandleStorage
 
   package init(_opaqueHandle: any Sendable) {

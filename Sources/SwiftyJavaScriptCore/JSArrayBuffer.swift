@@ -127,7 +127,7 @@ public struct JSArrayBuffer: ~Copyable {
   }
 
   public init?(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     self.init(value: value, in: callbackContext)
   }
 
@@ -319,7 +319,7 @@ public struct JSTypedArray: ~Copyable {
   }
 
   public init?(value: borrowing JSValue, in context: isolated JSContext = #isolation) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     self.init(value: value, in: callbackContext)
   }
 
@@ -413,7 +413,7 @@ extension JSTypedArray: JSValueEncodable {
 
 extension JSValue {
   public func isArrayBuffer(in context: isolated JSContext = #isolation) -> Bool {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return isArrayBuffer(in: callbackContext)
   }
 
@@ -427,7 +427,7 @@ extension JSValue {
   }
 
   public func typedArrayKind(in context: isolated JSContext = #isolation) -> JSTypedArrayKind? {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return typedArrayKind(in: callbackContext)
   }
 
@@ -441,7 +441,7 @@ extension JSValue {
   }
 
   public func isTypedArray(in context: isolated JSContext = #isolation) -> Bool {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return isTypedArray(in: callbackContext)
   }
 

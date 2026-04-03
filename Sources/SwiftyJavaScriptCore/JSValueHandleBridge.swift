@@ -8,7 +8,7 @@ extension JSValue {
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext) {
-    let instant = JSInstantContext(ctx: ctx.globalContextRef)
+    let instant = JSInstantContext(handle: ctx.driverContextHandle)
     self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: instant))
   }
 

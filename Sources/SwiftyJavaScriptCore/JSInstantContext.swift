@@ -13,10 +13,23 @@
 /// - Backend/handle/raw-context orchestration should stay in backend adapters or
 ///   local call-site helpers unless it is part of this callback-facing API surface.
 public struct JSInstantContext: ~Copyable {
-  public let globalContextRef: JavaScriptCoreGlobalContextRef
+  public let driverContextHandle: JSBorrowedContextHandle<JavaScriptCoreEngine>
 
   init(ctx: JavaScriptCoreContextRef) {
-    self.globalContextRef = ctx
+    self.driverContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>(
+      _opaqueHandle: JavaScriptCoreRawContext(borrowing: ctx)
+    )
+  }
+
+  init(handle: JSBorrowedContextHandle<JavaScriptCoreEngine>) {
+    self.driverContextHandle = handle
+  }
+
+  public var globalContextRef: JavaScriptCoreGlobalContextRef {
+    guard let rawContext: JavaScriptCoreRawContext = driverContextHandle.opaqueHandle() else {
+      preconditionFailure("JSInstantContext has invalid context handle")
+    }
+    return rawContext.ref
   }
 }
 
@@ -25,21 +38,16 @@ extension JSInstantContext {
     named name: String,
     callback: @escaping JSFunctionCallback
   ) -> JSValueHandle<JavaScriptCoreEngine> {
+    guard let rawContext: JavaScriptCoreRawContext = driverContextHandle.opaqueHandle() else {
+      preconditionFailure("JSInstantContext has invalid context handle")
+    }
     let rawValue = JavaScriptCoreBackendDriver.makeFunction(
       named: name,
       callback: callback,
-      in: driverContext,
+      in: rawContext,
       functionClass: actorContext.functionClass.value
     )
     return JavaScriptCoreBackendDriver.valueHandle(from: rawValue)
-  }
-
-  var driverContext: JavaScriptCoreRawContext {
-    JavaScriptCoreRawContext(borrowing: globalContextRef)
-  }
-
-  var driverContextHandle: JSBorrowedContextHandle<JavaScriptCoreEngine> {
-    JSBorrowedContextHandle<JavaScriptCoreEngine>(_opaqueHandle: driverContext)
   }
 
   var globalObjectRef: JavaScriptCoreObjectRef {

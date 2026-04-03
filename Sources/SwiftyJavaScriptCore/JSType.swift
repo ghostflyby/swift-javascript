@@ -1,6 +1,6 @@
 extension JSValue {
   public func type(in context: borrowing JSContext) -> JSType {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return type(in: instantContext)
   }
 
@@ -9,7 +9,7 @@ extension JSValue {
   }
 
   public func isUndefined(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isUndefined(in: instantContext)
   }
 
@@ -18,7 +18,7 @@ extension JSValue {
   }
 
   public func isNull(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isNull(in: instantContext)
   }
 
@@ -27,7 +27,7 @@ extension JSValue {
   }
 
   public func isBoolean(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isBoolean(in: instantContext)
   }
 
@@ -36,7 +36,7 @@ extension JSValue {
   }
 
   public func isNumber(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isNumber(in: instantContext)
   }
 
@@ -45,7 +45,7 @@ extension JSValue {
   }
 
   public func isString(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isString(in: instantContext)
   }
 
@@ -54,7 +54,7 @@ extension JSValue {
   }
 
   public func isSymbol(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isSymbol(in: instantContext)
   }
 
@@ -63,7 +63,7 @@ extension JSValue {
   }
 
   public func isObject(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isObject(in: instantContext)
   }
 
@@ -72,7 +72,7 @@ extension JSValue {
   }
 
   public func isBigInt(in context: borrowing JSContext) -> Bool {
-    let instantContext = JSInstantContext(ctx: context.globalContextRef)
+    let instantContext = JSInstantContext(handle: context.driverContextHandle)
     return isBigInt(in: instantContext)
   }
 

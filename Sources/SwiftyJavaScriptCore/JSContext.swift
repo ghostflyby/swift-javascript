@@ -2,6 +2,7 @@
 
 public actor JSContext {
   nonisolated let peer: JavaScriptCore.JSContext
+  nonisolated let driverContextHandle: JSBorrowedContextHandle<JavaScriptCoreEngine>
   let globalObjectRef: JSObjectRef
   nonisolated let functionClass: SendableBoxUnsafe<JSClassRef>
   let globalObjectClass: SendableBoxUnsafe<JSClassRef>
@@ -14,10 +15,13 @@ public actor JSContext {
 
     var kJSClassDefinitionEmpty = kJSClassDefinitionEmpty
     let cls = JSClassCreate(&kJSClassDefinitionEmpty)!
-    let ref = JSGlobalContextCreateInGroup(virtualMachine.peer, cls)
+    let ref = JSGlobalContextCreateInGroup(virtualMachine.peer, cls)!
     globalObjectClass = SendableBoxUnsafe(cls)
 
     self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
+    self.driverContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>(
+      _opaqueHandle: JavaScriptCoreRawContext(borrowing: ref)
+    )
 
     globalObjectRef = peer.globalObject!.jsValueRef
     functionClass = SendableBoxUnsafe(JavaScriptCoreBackendDriver.makeFunctionClass())
@@ -42,7 +46,7 @@ public actor JSContext {
   public func withInstantContext<R: ~Copyable, E: Error>(
     _ body: (borrowing JSInstantContext) throws(E) -> R
   ) throws(E) -> R {
-    let instantContext = JSInstantContext(ctx: globalContextRef)
+    let instantContext = JSInstantContext(handle: driverContextHandle)
     return try body(instantContext)
   }
 

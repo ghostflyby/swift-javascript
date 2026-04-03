@@ -47,7 +47,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, forKey: key, with: attributes, in: callbackContext)
   }
   public func setProperty<Val>(
@@ -55,14 +55,14 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, forKey: key, with: attributes, in: callbackContext)
   }
   public func setProperty<Val>(
     _ value: borrowing Val, at index: UInt32,
     in context: isolated JSContext = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, at: index, in: callbackContext)
   }
 
@@ -122,7 +122,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
   }
 
@@ -133,7 +133,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
   }
 
@@ -143,7 +143,7 @@ extension JSValue {
     using converter: C.Type,
     in context: isolated JSContext = #isolation
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     setProperty(value, at: index, using: converter, in: callbackContext)
   }
 
@@ -205,7 +205,7 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return getProperty(forKey: key, in: callbackContext)
   }
 
@@ -213,7 +213,7 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return getProperty(forKey: key, in: callbackContext)
   }
 
@@ -221,7 +221,7 @@ extension JSValue {
     at index: UInt32,
     in context: isolated JSContext = #isolation
   ) -> JSValue {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return getProperty(at: index, in: callbackContext)
   }
 
@@ -305,7 +305,7 @@ extension JSValue {
     forKey key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     deleteProperty(forKey: key, in: callbackContext)
   }
 
@@ -313,7 +313,7 @@ extension JSValue {
     forKey key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     deleteProperty(forKey: key, in: callbackContext)
   }
 
@@ -343,7 +343,7 @@ extension JSValue {
     _ key: borrowing some JSString,
     in context: isolated JSContext = #isolation
   ) -> Bool {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return hasProperty(key, in: callbackContext)
   }
 
@@ -351,7 +351,7 @@ extension JSValue {
     _ key: borrowing JSValue,
     in context: isolated JSContext = #isolation
   ) -> Bool {
-    let callbackContext = JSInstantContext(ctx: context.globalContextRef)
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
     return hasProperty(key, in: callbackContext)
   }
 

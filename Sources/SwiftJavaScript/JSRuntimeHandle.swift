@@ -1,4 +1,4 @@
-public struct JSRuntimeHandle<E: JSEngine> {
+public struct JSRuntimeHandle<E: JSEngine>: @unchecked Sendable {
   package let storage: _JSOpaqueHandleStorage
 
   package init(_opaqueHandle: any Sendable) {
