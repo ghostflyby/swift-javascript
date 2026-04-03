@@ -5,7 +5,7 @@ extension JSRuntimeHandle: JSManualReferenceCountedHandle, JSRuntimeManualRefere
 where E == JavaScriptCoreEngine {
   @discardableResult
   public func retainReference() -> Bool {
-    guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle() else {
+    guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle(), rawRuntime.ownsRuntime else {
       return false
     }
     JSContextGroupRetain(rawRuntime.ref)
@@ -14,7 +14,7 @@ where E == JavaScriptCoreEngine {
 
   @discardableResult
   public func releaseReference() -> Bool {
-    guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle() else {
+    guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle(), rawRuntime.ownsRuntime else {
       return false
     }
     JSContextGroupRelease(rawRuntime.ref)

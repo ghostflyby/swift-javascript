@@ -26,75 +26,42 @@ public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
 public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
 public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
-private final class JavaScriptCoreRawRuntimeStorage: @unchecked Sendable {
-  let ref: JSContextGroupRef
-
-  init(ref: JSContextGroupRef) {
-    self.ref = ref
-  }
-
-  deinit {
-    JSContextGroupRelease(ref)
-  }
-}
-
 package struct JavaScriptCoreRawRuntime: @unchecked Sendable {
-  private let storage: JavaScriptCoreRawRuntimeStorage
-
-  package var ref: JSContextGroupRef {
-    storage.ref
-  }
+  package let ref: JSContextGroupRef
+  package let ownsRuntime: Bool
 
   package init(ref: JSContextGroupRef = JSContextGroupCreate()) {
-    self.storage = JavaScriptCoreRawRuntimeStorage(ref: ref)
+    self.ref = ref
+    self.ownsRuntime = true
+  }
+
+  package init(borrowing ref: JSContextGroupRef) {
+    self.ref = ref
+    self.ownsRuntime = false
   }
 }
 
-private final class JavaScriptCoreRawContextStorage: @unchecked Sendable {
-  let runtime: JavaScriptCoreRawRuntime?
-  let ref: JSGlobalContextRef
-  let ownsContext: Bool
+package struct JavaScriptCoreRawContext: @unchecked Sendable {
+  package let runtime: JavaScriptCoreRawRuntime?
+  package let ref: JSGlobalContextRef
+  package let ownsContext: Bool
 
-  init(runtime: JavaScriptCoreRawRuntime) {
+  package init(runtime: JavaScriptCoreRawRuntime) {
     self.runtime = runtime
     self.ref = JSGlobalContextCreateInGroup(runtime.ref, nil)
     self.ownsContext = true
   }
 
-  init(borrowing ref: JSGlobalContextRef) {
+  package init(borrowing ref: JSGlobalContextRef) {
     self.runtime = nil
     self.ref = ref
     self.ownsContext = false
   }
 
-  deinit {
-    if ownsContext {
-      JSGlobalContextRelease(ref)
-    }
-  }
-}
-
-package struct JavaScriptCoreRawContext: @unchecked Sendable {
-  private let storage: JavaScriptCoreRawContextStorage
-
-  package var runtime: JavaScriptCoreRawRuntime? {
-    storage.runtime
-  }
-
-  package var ref: JSGlobalContextRef {
-    storage.ref
-  }
-
-  package var ownsContext: Bool {
-    storage.ownsContext
-  }
-
-  package init(runtime: JavaScriptCoreRawRuntime) {
-    self.storage = JavaScriptCoreRawContextStorage(runtime: runtime)
-  }
-
-  package init(borrowing ref: JSGlobalContextRef) {
-    self.storage = JavaScriptCoreRawContextStorage(borrowing: ref)
+  package init(adopting ref: JSGlobalContextRef, runtime: JavaScriptCoreRawRuntime?) {
+    self.runtime = runtime
+    self.ref = ref
+    self.ownsContext = true
   }
 }
 
@@ -190,9 +157,8 @@ private enum JavaScriptCoreObjectLookup {
 package enum JavaScriptCoreBackendDriver: JSEngine {
   package typealias ValueHandle = JavaScriptCoreValueHandle
   package typealias Engine = JavaScriptCoreEngine
-  package typealias RawRuntime = JavaScriptCoreRawRuntime
-  package typealias RawContext = JavaScriptCoreRawContext
-  package typealias RawValue = JavaScriptCoreRawValue
+  package typealias RuntimeHandle = JSRuntimeHandle<JavaScriptCoreEngine>
+  package typealias ContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>
 
   package static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,

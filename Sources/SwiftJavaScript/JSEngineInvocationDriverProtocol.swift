@@ -1,83 +1,85 @@
 public protocol _JSEngineInvocationDriver: _JSEngineRuntimeDriver {
-  static func callFunction(
-    _ function: RawValue,
-    this thisValue: RawValue?,
-    arguments: [RawValue],
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
+  static func callFunctionHandle(
+    _ function: ValueHandle,
+    this thisValue: ValueHandle?,
+    arguments: [ValueHandle],
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
 
-  static func construct(
-    _ constructor: RawValue,
-    arguments: [RawValue],
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
+  static func constructHandle(
+    _ constructor: ValueHandle,
+    arguments: [ValueHandle],
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
 
-  static func toObject(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
+  static func toObjectHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
 
-  static func isArray(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> Bool
+  static func isArrayHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
 
-  static func isDate(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> Bool
+  static func isDateHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
 
-  static func isInstanceOf(
-    _ value: RawValue,
-    constructor: RawValue,
-    in context: RawContext
-  ) -> Bool
+  static func isInstanceOfHandle(
+    _ value: ValueHandle,
+    constructor: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
 }
 
 extension _JSEngineInvocationDriver {
-  public static func callFunction(
-    _ function: RawValue,
-    this thisValue: RawValue?,
-    arguments: [RawValue],
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEngineInvocationDriver.callFunction(_:this:arguments:in:) is not implemented")
+  public static func callFunctionHandle(
+    _ function: ValueHandle,
+    this thisValue: ValueHandle?,
+    arguments: [ValueHandle],
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError(
+      "_JSEngineInvocationDriver.callFunctionHandle(_:this:arguments:in:) is not implemented")
   }
 
-  public static func construct(
-    _ constructor: RawValue,
-    arguments: [RawValue],
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEngineInvocationDriver.construct(_:arguments:in:) is not implemented")
+  public static func constructHandle(
+    _ constructor: ValueHandle,
+    arguments: [ValueHandle],
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEngineInvocationDriver.constructHandle(_:arguments:in:) is not implemented")
   }
 
-  public static func toObject(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEngineInvocationDriver.toObject(_:in:) is not implemented")
+  public static func toObjectHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEngineInvocationDriver.toObjectHandle(_:in:) is not implemented")
   }
 
-  public static func isArray(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> Bool {
-    fatalError("_JSEngineInvocationDriver.isArray(_:in:) is not implemented")
+  public static func isArrayHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool? {
+    fatalError("_JSEngineInvocationDriver.isArrayHandle(_:in:) is not implemented")
   }
 
-  public static func isDate(
-    _ value: RawValue,
-    in context: RawContext
-  ) -> Bool {
-    fatalError("_JSEngineInvocationDriver.isDate(_:in:) is not implemented")
+  public static func isDateHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool? {
+    fatalError("_JSEngineInvocationDriver.isDateHandle(_:in:) is not implemented")
   }
 
-  public static func isInstanceOf(
-    _ value: RawValue,
-    constructor: RawValue,
-    in context: RawContext
-  ) -> Bool {
-    fatalError("_JSEngineInvocationDriver.isInstanceOf(_:constructor:in:) is not implemented")
+  public static func isInstanceOfHandle(
+    _ value: ValueHandle,
+    constructor: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool? {
+    fatalError(
+      "_JSEngineInvocationDriver.isInstanceOfHandle(_:constructor:in:) is not implemented")
   }
 }

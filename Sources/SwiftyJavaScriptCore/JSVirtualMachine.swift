@@ -1,20 +1,28 @@
 import Dispatch
 import JavaScriptCore.JSVirtualMachine
+import SwiftJavaScript
 
 public class JSVirtualMachine: @unchecked Sendable {
-  let peer: JavaScriptCore.JSContextGroupRef
+  let driverRuntimeHandle: JSRuntimeHandle<JavaScriptCoreEngine>
   private let executor: SingleThreadExecutor
   let unownedExecutor: UnownedSerialExecutor
 
+  var peer: JavaScriptCore.JSContextGroupRef {
+    guard let rawRuntime: JavaScriptCoreRawRuntime = driverRuntimeHandle.opaqueHandle() else {
+      preconditionFailure("JSVirtualMachine has invalid runtime handle")
+    }
+    return rawRuntime.ref
+  }
+
   public init() {
-    self.peer = JavaScriptCore.JSContextGroupCreate()
+    self.driverRuntimeHandle = JavaScriptCoreBackendDriver.makeRuntimeHandle()
     let executor = SingleThreadExecutor()
     self.executor = executor
     unownedExecutor = executor.asUnownedSerialExecutor()
   }
 
   deinit {
-    JavaScriptCore.JSContextGroupRelease(peer)
+    _ = driverRuntimeHandle.releaseReference()
   }
 
 }

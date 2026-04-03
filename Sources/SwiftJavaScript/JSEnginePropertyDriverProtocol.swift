@@ -1,165 +1,169 @@
 public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
-  static func propertyNames(
-    on object: RawValue,
-    in context: RawContext
-  ) -> [String]
+  static func propertyNamesForHandle(
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> [String]?
 
-  static func getProperty(
+  static func getStringPropertyHandle(
     _ key: String,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
 
-  static func getProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
-
-  static func getProperty(
-    at index: UInt32,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue>
-
-  static func hasProperty(
+  static func setStringPropertyHandle(
     _ key: String,
-    on object: RawValue,
-    in context: RawContext
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle,
+    attributes: JSHostMemberAttributes
   ) -> Bool
 
-  static func hasProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
+  static func getValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
+
+  static func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
+
+  static func setValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle,
+    attributes: JSHostMemberAttributes
   ) -> Bool
 
-  static func deleteProperty(
-    _ key: String,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void>
-
-  static func deleteProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void>
-
-  static func setProperty(
-    _ key: String,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext,
-    attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void>
-
-  static func setProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext,
-    attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void>
-
-  static func setProperty(
+  static func setIndexPropertyHandle(
     at index: UInt32,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void>
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool
+
+  static func hasStringPropertyHandle(
+    _ key: String,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
+
+  static func hasValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
+
+  static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool
+
+  static func deleteValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool
 }
 
 extension _JSEnginePropertyDriver {
-  public static func propertyNames(
-    on object: RawValue,
-    in context: RawContext
-  ) -> [String] {
-    fatalError("_JSEnginePropertyDriver.propertyNames(on:in:) is not implemented")
+  public static func propertyNamesForHandle(
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> [String]? {
+    fatalError("_JSEnginePropertyDriver.propertyNamesForHandle(on:in:) is not implemented")
   }
 
-  public static func getProperty(
+  public static func getStringPropertyHandle(
     _ key: String,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEnginePropertyDriver.getProperty(_:on:in:) is not implemented")
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEnginePropertyDriver.getStringPropertyHandle(_:on:in:) is not implemented")
   }
 
-  public static func getProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEnginePropertyDriver.getProperty(_:on:in:) is not implemented")
-  }
-
-  public static func getProperty(
-    at index: UInt32,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<RawValue> {
-    fatalError("_JSEnginePropertyDriver.getProperty(at:on:in:) is not implemented")
-  }
-
-  public static func hasProperty(
+  public static func setStringPropertyHandle(
     _ key: String,
-    on object: RawValue,
-    in context: RawContext
-  ) -> Bool {
-    fatalError("_JSEnginePropertyDriver.hasProperty(_:on:in:) is not implemented")
-  }
-
-  public static func hasProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
-  ) -> Bool {
-    fatalError("_JSEnginePropertyDriver.hasProperty(_:on:in:) is not implemented")
-  }
-
-  public static func deleteProperty(
-    _ key: String,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void> {
-    fatalError("_JSEnginePropertyDriver.deleteProperty(_:on:in:) is not implemented")
-  }
-
-  public static func deleteProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void> {
-    fatalError("_JSEnginePropertyDriver.deleteProperty(_:on:in:) is not implemented")
-  }
-
-  public static func setProperty(
-    _ key: String,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext,
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle,
     attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
-    fatalError("_JSEnginePropertyDriver.setProperty(_:on:to:in:attributes:) is not implemented")
+  ) -> Bool {
+    fatalError(
+      "_JSEnginePropertyDriver.setStringPropertyHandle(_:on:to:in:attributes:) is not implemented"
+    )
   }
 
-  public static func setProperty(
-    _ key: RawValue,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext,
-    attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
-    fatalError("_JSEnginePropertyDriver.setProperty(_:on:to:in:attributes:) is not implemented")
+  public static func getValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEnginePropertyDriver.getValuePropertyHandle(_:on:in:) is not implemented")
   }
 
-  public static func setProperty(
+  public static func getIndexPropertyHandle(
     at index: UInt32,
-    on object: RawValue,
-    to value: RawValue,
-    in context: RawContext
-  ) -> JSDriverResult<Void> {
-    fatalError("_JSEnginePropertyDriver.setProperty(at:on:to:in:) is not implemented")
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEnginePropertyDriver.getIndexPropertyHandle(at:on:in:) is not implemented")
+  }
+
+  public static func setValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    fatalError(
+      "_JSEnginePropertyDriver.setValuePropertyHandle(_:on:to:in:attributes:) is not implemented"
+    )
+  }
+
+  public static func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: ValueHandle,
+    to value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool {
+    fatalError("_JSEnginePropertyDriver.setIndexPropertyHandle(at:on:to:in:) is not implemented")
+  }
+
+  public static func hasStringPropertyHandle(
+    _ key: String,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool? {
+    fatalError("_JSEnginePropertyDriver.hasStringPropertyHandle(_:on:in:) is not implemented")
+  }
+
+  public static func hasValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool? {
+    fatalError("_JSEnginePropertyDriver.hasValuePropertyHandle(_:on:in:) is not implemented")
+  }
+
+  public static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool {
+    fatalError("_JSEnginePropertyDriver.deleteStringPropertyHandle(_:on:in:) is not implemented")
+  }
+
+  public static func deleteValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool {
+    fatalError("_JSEnginePropertyDriver.deleteValuePropertyHandle(_:on:in:) is not implemented")
   }
 }

@@ -65,6 +65,8 @@
 - [x] 为 `JSClassAutoConvertible` 增加函数导出标记，支持参数/返回值/错误转换器覆盖
 
 ## 8. 多引擎架构迁移（进行中）
+- [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
+- [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
 - [x] 删除未实现的 QuickJS 迁移脚手架：移除 `QuickJSEngine` 与仅其依赖的 `_JSErasedValueHandle`，并将 core tests 的相关覆盖切换到 `MockEngine`
 - [x] 将 `_JSEngineRuntimeDriver/_JSEnginePropertyDriver/_JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与 `JSDriverResult` 公开可见性）

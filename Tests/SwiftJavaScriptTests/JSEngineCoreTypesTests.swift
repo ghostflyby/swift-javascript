@@ -2,20 +2,20 @@ import Testing
 
 @testable import SwiftJavaScript
 
-private struct MockRuntime: Sendable, Equatable {
+public struct MockRuntime: Sendable, Equatable {
   let id: String
 }
 
-private struct MockContext: Sendable, Equatable {
+public struct MockContext: Sendable, Equatable {
   let runtimeID: String
 }
 
-private struct MockValue: Sendable, Equatable {
+public struct MockValue: Sendable, Equatable {
   let kind: String
   let payload: String
 }
 
-private struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
   typealias Engine = MockEngine
   typealias RawValue = MockValue
 
@@ -29,25 +29,49 @@ private struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked 
     MockEngine.self
   }
 
-  func retainReference() -> Bool {
+  public func retainReference() -> Bool {
     true
   }
 
-  func releaseReference() -> Bool {
+  public func releaseReference() -> Bool {
     true
   }
 }
 
-private enum MockEngine: JSEngine {
-  typealias ValueHandle = MockValueHandle
+public enum MockEngine: JSEngine {
+  public typealias RuntimeHandle = JSRuntimeHandle<MockEngine>
+  public typealias ContextHandle = JSBorrowedContextHandle<MockEngine>
+  public typealias ValueHandle = MockValueHandle
+}
+
+extension JSRuntimeHandle: JSManualReferenceCountedHandle, JSRuntimeManualReferenceCountedHandle
+where E == MockEngine {
+  public func retainReference() -> Bool {
+    true
+  }
+
+  public func releaseReference() -> Bool {
+    true
+  }
+}
+
+extension JSBorrowedContextHandle: JSManualReferenceCountedHandle,
+  JSContextManualReferenceCountedHandle
+where E == MockEngine {
+  public func retainReference() -> Bool {
+    true
+  }
+
+  public func releaseReference() -> Bool {
+    true
+  }
 }
 
 private enum MockDriver: JSEngine {
   typealias ValueHandle = MockValueHandle
   typealias Engine = MockEngine
-  typealias RawRuntime = MockRuntime
-  typealias RawContext = MockContext
-  typealias RawValue = MockValue
+  typealias RuntimeHandle = JSRuntimeHandle<MockEngine>
+  typealias ContextHandle = JSBorrowedContextHandle<MockEngine>
 
   static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
 

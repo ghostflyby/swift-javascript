@@ -13,15 +13,23 @@ public actor JSContext {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
 
+    guard
+      let rawRuntime: JavaScriptCoreRawRuntime = virtualMachine.driverRuntimeHandle
+        .opaqueHandle()
+    else {
+      preconditionFailure("JSContext has invalid runtime handle")
+    }
+
     var kJSClassDefinitionEmpty = kJSClassDefinitionEmpty
     let cls = JSClassCreate(&kJSClassDefinitionEmpty)!
-    let ref = JSGlobalContextCreateInGroup(virtualMachine.peer, cls)!
+    let ref = JSGlobalContextCreateInGroup(rawRuntime.ref, cls)!
+
+    self.driverContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>(
+      _opaqueHandle: JavaScriptCoreRawContext(adopting: ref, runtime: rawRuntime)
+    )
     globalObjectClass = SendableBoxUnsafe(cls)
 
     self.peer = JavaScriptCore.JSContext(jsGlobalContextRef: ref)!
-    self.driverContextHandle = JSBorrowedContextHandle<JavaScriptCoreEngine>(
-      _opaqueHandle: JavaScriptCoreRawContext(borrowing: ref)
-    )
 
     globalObjectRef = peer.globalObject!.jsValueRef
     functionClass = SendableBoxUnsafe(JavaScriptCoreBackendDriver.makeFunctionClass())
@@ -51,7 +59,7 @@ public actor JSContext {
   }
 
   deinit {
-    JSGlobalContextRelease(peer.jsGlobalContextRef)
+    _ = driverContextHandle.releaseReference()
     JSClassRelease(functionClass.value)
     JSClassRelease(globalObjectClass.value)
   }

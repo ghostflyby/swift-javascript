@@ -1,82 +1,132 @@
 public protocol _JSEngineRuntimeDriver {
   associatedtype Engine: JSEngine = Self
-  associatedtype RawRuntime = Never
-  associatedtype RawContext = Never
-  associatedtype RawValue = Never
+  associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
+  associatedtype ContextHandle: JSContextManualReferenceCountedHandle
+  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
 
   static var capabilities: JSEngineCapabilities { get }
 
-  static func makeRuntime() -> RawRuntime
-  static func makeContext(in runtime: RawRuntime) -> RawContext
+  static func makeRuntimeHandle() -> RuntimeHandle
+  static func makeBorrowedContextHandleFromRuntime(in runtime: RuntimeHandle) -> ContextHandle?
 
-  static func evaluateScript(
+  static func evaluateScriptResultHandle(
     _ script: String,
-    in context: RawContext,
+    _ context: ContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<RawValue>
+  ) -> JSDriverResult<ValueHandle>?
 
-  static func makeString(_ value: String, in context: RawContext) -> RawValue
-  static func makeSymbol(_ value: String, in context: RawContext) -> RawValue
-  static func makeNumber(_ value: Double, in context: RawContext) -> RawValue
-  static func makeBoolean(_ value: Bool, in context: RawContext) -> RawValue
-  static func makeNull(in context: RawContext) -> RawValue
-  static func makeUndefined(in context: RawContext) -> RawValue
-  static func makeObject(in context: RawContext) -> JSDriverResult<RawValue>
-  static func makeArray(in context: RawContext) -> JSDriverResult<RawValue>
+  static func makeStringValueHandle(
+    _ value: String,
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeNullValueHandle(
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeUndefinedValueHandle(
+    _ context: ContextHandle
+  ) -> ValueHandle?
+
+  static func makeObjectResultHandle(
+    _ context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
+
+  static func makeArrayResultHandle(
+    _ context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>?
 }
 
 extension _JSEngineRuntimeDriver {
   public static var capabilities: JSEngineCapabilities { .init() }
 
-  public static func makeRuntime() -> RawRuntime {
-    fatalError("_JSEngineRuntimeDriver.makeRuntime() is not implemented")
+  public static func makeRuntimeHandle() -> RuntimeHandle {
+    fatalError("_JSEngineRuntimeDriver.makeRuntimeHandle() is not implemented")
   }
 
-  public static func makeContext(in runtime: RawRuntime) -> RawContext {
-    fatalError("_JSEngineRuntimeDriver.makeContext(in:) is not implemented")
+  public static func makeBorrowedContextHandleFromRuntime(
+    in runtime: RuntimeHandle
+  ) -> ContextHandle? {
+    fatalError(
+      "_JSEngineRuntimeDriver.makeBorrowedContextHandleFromRuntime(in:) is not implemented")
   }
 
-  public static func evaluateScript(
+  public static func evaluateScriptResultHandle(
     _ script: String,
-    in context: RawContext,
+    _ context: ContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<RawValue> {
+  ) -> JSDriverResult<ValueHandle>? {
     fatalError(
-      "_JSEngineRuntimeDriver.evaluateScript(_:in:sourceURL:startingLineNumber:) is not implemented"
+      "_JSEngineRuntimeDriver.evaluateScriptResultHandle(_:_:sourceURL:startingLineNumber:) is not implemented"
     )
   }
 
-  public static func makeString(_ value: String, in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeString(_:in:) is not implemented")
+  public static func makeStringValueHandle(
+    _ value: String,
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeStringValueHandle(_:_:) is not implemented")
   }
 
-  public static func makeSymbol(_ value: String, in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeSymbol(_:in:) is not implemented")
+  public static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeSymbolValueHandle(_:_:) is not implemented")
   }
 
-  public static func makeNumber(_ value: Double, in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeNumber(_:in:) is not implemented")
+  public static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeNumberValueHandle(_:_:) is not implemented")
   }
 
-  public static func makeBoolean(_ value: Bool, in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeBoolean(_:in:) is not implemented")
+  public static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeBooleanValueHandle(_:_:) is not implemented")
   }
 
-  public static func makeNull(in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeNull(in:) is not implemented")
+  public static func makeNullValueHandle(
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeNullValueHandle(_:) is not implemented")
   }
 
-  public static func makeUndefined(in context: RawContext) -> RawValue {
-    fatalError("_JSEngineRuntimeDriver.makeUndefined(in:) is not implemented")
+  public static func makeUndefinedValueHandle(
+    _ context: ContextHandle
+  ) -> ValueHandle? {
+    fatalError("_JSEngineRuntimeDriver.makeUndefinedValueHandle(_:) is not implemented")
   }
 
-  public static func makeObject(in context: RawContext) -> JSDriverResult<RawValue> {
-    fatalError("_JSEngineRuntimeDriver.makeObject(in:) is not implemented")
+  public static func makeObjectResultHandle(
+    _ context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEngineRuntimeDriver.makeObjectResultHandle(_:) is not implemented")
   }
 
-  public static func makeArray(in context: RawContext) -> JSDriverResult<RawValue> {
-    fatalError("_JSEngineRuntimeDriver.makeArray(in:) is not implemented")
+  public static func makeArrayResultHandle(
+    _ context: ContextHandle
+  ) -> JSDriverResult<ValueHandle>? {
+    fatalError("_JSEngineRuntimeDriver.makeArrayResultHandle(_:) is not implemented")
   }
 }
