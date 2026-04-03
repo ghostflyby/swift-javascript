@@ -1,9 +1,5 @@
 public typealias JSResult = SwiftJavaScript.JSResultPayload<JSValue>
-
-enum JSPrivateResult: @unchecked Sendable {
-  case value(JavaScriptCoreValueRef)
-  case exception(JavaScriptCoreValueRef)
-}
+typealias JSPrivateResult = SwiftJavaScript.JSResultPayload<JavaScriptCoreValueRef>
 
 extension JSResult {
   consuming func toPrivateResult() -> JSPrivateResult {

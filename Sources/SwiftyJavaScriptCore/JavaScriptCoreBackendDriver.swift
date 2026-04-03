@@ -933,7 +933,7 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   }
 
   static func callbackReturnValue(
-    _ result: JSPrivateResult,
+    _ result: borrowing JSPrivateResult,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSValueRef? {
@@ -958,7 +958,7 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   }
 
   static func constructorCallbackReturnValue(
-    _ result: JSPrivateResult,
+    _ result: borrowing JSPrivateResult,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSObjectRef? {
