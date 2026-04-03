@@ -19,8 +19,4 @@ extension _JSValueStorage {
     }
     return ref
   }
-
-  func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
-    JavaScriptCoreBackendDriver.rawValue(from: ref, in: context)
-  }
 }
