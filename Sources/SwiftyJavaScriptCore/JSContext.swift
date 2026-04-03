@@ -27,54 +27,11 @@ extension JSEngineContext where E == JavaScriptCoreEngine {
     let globalObject = JSValue(ref: driverContextHandle.globalObjectRef, ctx: self)
     return body(self, globalObject)
   }
-
-  public func withInstantContext<R: ~Copyable, Failure: Error>(
-    _ body: (borrowing JSInstantContext) throws(Failure) -> R
-  ) throws(Failure) -> R {
-    let instantContext = JSInstantContext(handle: driverContextHandle)
-    return try body(instantContext)
-  }
 }
 
 extension JSEngineContext where E == JavaScriptCoreEngine {
   nonisolated var globalContextRef: JSGlobalContextRef {
     driverContextHandle.ref
-  }
-
-  public func makeString(_ value: String) -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeString(value)
-    }
-  }
-
-  public func makeNumber(_ value: Double) -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeNumber(value)
-    }
-  }
-
-  public func makeNumber(_ value: some BinaryInteger) -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeNumber(value)
-    }
-  }
-
-  public func makeBoolean(_ value: Bool) -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeBoolean(value)
-    }
-  }
-
-  public func makeNull() -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeNull()
-    }
-  }
-
-  public func makeUndefined() -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeUndefined()
-    }
   }
 
   public func makeObject() -> JSValue {
