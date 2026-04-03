@@ -273,6 +273,12 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
   }
 
   package static func valueHandle(
+    from rawValue: JavaScriptCoreRawValue
+  ) -> JSValueHandle<JavaScriptCoreEngine> {
+    JSValueHandle<JavaScriptCoreEngine>(_opaqueHandle: rawValue)
+  }
+
+  package static func valueHandle(
     from valueRef: JavaScriptCoreValueRef,
     in context: JSBorrowedContextHandle<JavaScriptCoreEngine>
   ) -> JSValueHandle<JavaScriptCoreEngine>? {

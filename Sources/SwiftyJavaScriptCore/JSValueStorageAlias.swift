@@ -14,14 +14,7 @@ extension _JSValueStorage {
   }
 
   init(rawValue: JavaScriptCoreRawValue) {
-    let context = JSInstantContext(ctx: rawValue.context.ref)
-    self.init(ref: JavaScriptCoreBackendDriver.valueRef(from: rawValue), in: context)
-  }
-
-  static func fromHandle(
-    _ handle: JSValueHandle<JavaScriptCoreEngine>
-  ) -> _JSValueStorage {
-    _JSValueStorage(handle: handle)
+    self.init(handle: JavaScriptCoreBackendDriver.valueHandle(from: rawValue))
   }
 
   var ref: JavaScriptCoreValueRef {

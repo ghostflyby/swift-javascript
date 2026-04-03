@@ -21,7 +21,7 @@ extension JSValue {
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    self._rawValue = _JSValueStorage.fromHandle(handleValue)
+    self._rawValue = _JSValueStorage(handle: handleValue)
   }
 
   init(rawValue: JavaScriptCoreRawValue) {
