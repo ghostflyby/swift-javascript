@@ -6,7 +6,7 @@ protocol _JSValueBridgeAdapter {
     in context: borrowing JSInstantContext
   ) -> JSValueHandle<Engine>
 
-  func bridgeResult(_ handleResult: JSResultHandle<Engine>?) -> JSResult
+  func bridgeResult(_ handleResult: JSResultPayload<JSValueHandle<Engine>>?) -> JSResult
 }
 
 struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
@@ -118,7 +118,9 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     return value.valueHandle()
   }
 
-  func bridgeResult(_ handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
+  func bridgeResult(
+    _ handleResult: JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>?
+  ) -> JSResult {
     .from(handleResult: handleResult)
   }
 

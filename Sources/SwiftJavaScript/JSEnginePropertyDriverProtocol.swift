@@ -8,7 +8,7 @@ public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
     _ key: String,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func setStringPropertyHandle(
     _ key: String,
@@ -22,13 +22,13 @@ public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
     _ key: ValueHandle,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func getIndexPropertyHandle(
     at index: UInt32,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func setValuePropertyHandle(
     _ key: ValueHandle,
@@ -82,7 +82,7 @@ extension _JSEnginePropertyDriver {
     _ key: String,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEnginePropertyDriver.getStringPropertyHandle(_:on:in:) is not implemented")
   }
 
@@ -102,7 +102,7 @@ extension _JSEnginePropertyDriver {
     _ key: ValueHandle,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEnginePropertyDriver.getValuePropertyHandle(_:on:in:) is not implemented")
   }
 
@@ -110,7 +110,7 @@ extension _JSEnginePropertyDriver {
     at index: UInt32,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEnginePropertyDriver.getIndexPropertyHandle(at:on:in:) is not implemented")
   }
 

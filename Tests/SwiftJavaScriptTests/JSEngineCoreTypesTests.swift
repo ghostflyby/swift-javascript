@@ -252,9 +252,9 @@ private enum MockDriver: JSEngine {
 }
 
 extension MockDriver {
-  fileprivate static func resultHandle(from result: JSDriverResult<MockValue>) -> JSResultHandle<
-    MockEngine
-  > {
+  fileprivate static func resultHandle(from result: JSDriverResult<MockValue>)
+    -> JSResultPayload<JSValueHandle<MockEngine>>
+  {
     switch result {
     case .value(let value):
       return .value(JSValueHandle<MockEngine>(rawValue: value))
@@ -313,14 +313,14 @@ extension MockDriver {
 
   fileprivate static func makeObjectResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: makeObject(in: rawContext))
   }
 
   fileprivate static func makeArrayResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: makeArray(in: rawContext))
   }
@@ -330,7 +330,7 @@ extension MockDriver {
     _ context: MockContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(
       from: evaluateScript(
@@ -354,7 +354,7 @@ extension MockDriver {
     _ key: String,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
   }
@@ -385,7 +385,7 @@ extension MockDriver {
     _ key: JSValueHandle<MockEngine>,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
   }
@@ -394,7 +394,7 @@ extension MockDriver {
     at index: UInt32,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
   }
@@ -487,7 +487,7 @@ extension MockDriver {
     this thisValue: JSValueHandle<MockEngine>? = nil,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     let rawThisValue: MockValue? = thisValue?.rawValue
     let rawArguments = arguments.map(\.rawValue)
@@ -505,7 +505,7 @@ extension MockDriver {
     _ constructor: JSValueHandle<MockEngine>,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     let rawArguments = arguments.map(\.rawValue)
     return resultHandle(
@@ -515,7 +515,7 @@ extension MockDriver {
   fileprivate static func toObjectHandle(
     _ value: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultHandle<MockEngine>? {
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: toObject(value.rawValue, in: rawContext))
   }
@@ -661,8 +661,8 @@ extension MockDriver {
     rawValue: MockValue(kind: "exception", payload: "mock-error")
   )
 
-  let valueResult = JSResultHandle<MockEngine>.value(valueHandle)
-  let exceptionResult = JSResultHandle<MockEngine>.exception(exceptionHandle)
+  let valueResult = JSResultPayload<JSValueHandle<MockEngine>>.value(valueHandle)
+  let exceptionResult = JSResultPayload<JSValueHandle<MockEngine>>.exception(exceptionHandle)
 
   let valueIsException = valueResult.isException
   let exceptionIsException = exceptionResult.isException

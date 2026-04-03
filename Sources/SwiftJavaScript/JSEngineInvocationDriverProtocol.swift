@@ -4,18 +4,18 @@ public protocol _JSEngineInvocationDriver: _JSEngineRuntimeDriver {
     this thisValue: ValueHandle?,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func constructHandle(
     _ constructor: ValueHandle,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func toObjectHandle(
     _ value: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func isArrayHandle(
     _ value: ValueHandle,
@@ -40,7 +40,7 @@ extension _JSEngineInvocationDriver {
     this thisValue: ValueHandle?,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError(
       "_JSEngineInvocationDriver.callFunctionHandle(_:this:arguments:in:) is not implemented")
   }
@@ -49,14 +49,14 @@ extension _JSEngineInvocationDriver {
     _ constructor: ValueHandle,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEngineInvocationDriver.constructHandle(_:arguments:in:) is not implemented")
   }
 
   public static func toObjectHandle(
     _ value: ValueHandle,
     in context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEngineInvocationDriver.toObjectHandle(_:in:) is not implemented")
   }
 

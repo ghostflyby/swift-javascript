@@ -14,7 +14,7 @@ public protocol _JSEngineRuntimeDriver {
     _ context: ContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func makeStringValueHandle(
     _ value: String,
@@ -46,11 +46,11 @@ public protocol _JSEngineRuntimeDriver {
 
   static func makeObjectResultHandle(
     _ context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 
   static func makeArrayResultHandle(
     _ context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>?
+  ) -> JSResultPayload<ValueHandle>?
 }
 
 extension _JSEngineRuntimeDriver {
@@ -72,7 +72,7 @@ extension _JSEngineRuntimeDriver {
     _ context: ContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError(
       "_JSEngineRuntimeDriver.evaluateScriptResultHandle(_:_:sourceURL:startingLineNumber:) is not implemented"
     )
@@ -120,13 +120,13 @@ extension _JSEngineRuntimeDriver {
 
   public static func makeObjectResultHandle(
     _ context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEngineRuntimeDriver.makeObjectResultHandle(_:) is not implemented")
   }
 
   public static func makeArrayResultHandle(
     _ context: ContextHandle
-  ) -> JSDriverResult<ValueHandle>? {
+  ) -> JSResultPayload<ValueHandle>? {
     fatalError("_JSEngineRuntimeDriver.makeArrayResultHandle(_:) is not implemented")
   }
 }
