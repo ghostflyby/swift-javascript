@@ -95,3 +95,15 @@ import Testing
     #expect(strictlyNotEqual)
   }
 }
+
+@Test func valuesCanBeUsedAcrossContextsInSameVirtualMachine() {
+  let vm = SwiftyJavaScriptCore.JSVirtualMachine()
+  let sourceContext = JSContext(virtualMachine: vm)
+  let targetContext = JSContext(virtualMachine: vm)
+
+  let sourceInstant = JSInstantContext(ctx: sourceContext.globalContextRef)
+  let targetInstant = JSInstantContext(ctx: targetContext.globalContextRef)
+  let value = JSValue(number: 7, in: sourceInstant)
+
+  #expect(value.toDouble(in: targetInstant) == 7)
+}

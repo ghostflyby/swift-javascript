@@ -17,7 +17,11 @@ extension JSValue {
   }
 
   consuming func takeRef() -> JavaScriptCoreValueRef {
-    ref
+    let handle = _rawValue.valueHandle()
+    guard let ref = JavaScriptCoreBackendDriver.retainedValueRef(from: handle) else {
+      preconditionFailure("JSValue storage handle has no value ref")
+    }
+    return ref
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {

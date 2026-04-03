@@ -268,6 +268,34 @@ package enum JavaScriptCoreBackendDriver: _JSEngineDriver {
     return rawValue.ref
   }
 
+  package static func retainedValueRef(from handle: JSValueHandle<JavaScriptCoreEngine>)
+    -> JavaScriptCoreValueRef?
+  {
+    guard let rawValue: JavaScriptCoreRawValue = handle.opaqueHandle() else {
+      return nil
+    }
+    JSValueProtect(rawValue.context.ref, rawValue.ref)
+    return rawValue.ref
+  }
+
+  package static func contextGroupRef(
+    from context: JSBorrowedContextHandle<JavaScriptCoreEngine>
+  ) -> JSContextGroupRef? {
+    guard let rawContext: JavaScriptCoreRawContext = context.opaqueHandle() else {
+      return nil
+    }
+    return JSContextGetGroup(rawContext.ref)
+  }
+
+  package static func contextGroupRef(
+    from value: JSValueHandle<JavaScriptCoreEngine>
+  ) -> JSContextGroupRef? {
+    guard let rawValue: JavaScriptCoreRawValue = value.opaqueHandle() else {
+      return nil
+    }
+    return JSContextGetGroup(rawValue.context.ref)
+  }
+
   package static func valueHandle(
     from rawValue: JavaScriptCoreRawValue
   ) -> JSValueHandle<JavaScriptCoreEngine> {

@@ -204,6 +204,12 @@
 - [x] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层（已完成：新增 `JSEngineValueStorage<E>` 到 `SwiftJavaScript`，`SwiftyJavaScriptCore` 侧 `_JSValueStorage` 收敛为 typealias + JSC 兼容扩展，`JSValue` 主存储已不再依赖本地 raw-storage 结构）
 - [x] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`（已补 `JSEngineValueStorage` 两条 core 语义测试；移除 `_JSValueStorage` 的 `fromHandle` shim 与 alias 文件、`JSValue(rawValue:)` 入口、未使用的 `JSResult.from(driverResult:)` / `valueRef(from rawValue:)` / `rawValue(in:)` 兼容桥，将 `JSPrivateResult` 收敛为 core 的 `JSResultPayload<JavaScriptCoreValueRef>`，将全库 `valueHandle(in:)` 调用统一为无参 `valueHandle()`，移除 `JSValue(ref:ctx:)` 默认 `#isolation` 兼容参数，并将 callback 路径替换为 `takeRef()` + `JSResult.toPrivateResult()` 以保持 `consuming` 所有权转移语义）
 
+第 6 步收尾约束（context/VM 语义）
+- [ ] 约束A：区分 Home Context 与 Operation Context。Home Context 仅负责值生命周期（protect/unprotect、takeRef retain）；Operation Context 仅负责 API 执行。
+- [x] 约束B：冲突时不做隐式覆盖。生命周期逻辑永远使用 Home Context，调用/转换/属性访问永远使用显式传入的 Operation Context。（已在 bridge adapter 的 value handle 入口执行校验并保持 API 显式 `in context` 路径）
+- [x] 约束C：跨 context 操作前先校验 VM 一致性。不同 VM 直接拒绝；同 VM 的不同 context 允许交换值。（已在 adapter 接入 context-group 一致性 precondition）
+- [x] 约束D：补充同 VM 跨 context 值交换测试，固定预期行为，避免后续迁移回退。（已新增 RuntimeTests 同 VM 跨 context 用例）
+
 ### 8.3 引擎泛型标记（分阶段）
 
 优先级策略（避免与 8.2 主线互相干扰）：

@@ -12,6 +12,24 @@ protocol _JSValueBridgeAdapter {
 struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
   typealias Engine = JavaScriptCoreEngine
 
+  private func ensureSameVM(
+    _ value: borrowing JSValue,
+    in context: borrowing JSInstantContext
+  ) {
+    let valueHandle = value.valueHandle()
+    guard
+      let valueGroup = JavaScriptCoreBackendDriver.contextGroupRef(from: valueHandle),
+      let contextGroup = JavaScriptCoreBackendDriver.contextGroupRef(
+        from: context.driverContextHandle)
+    else {
+      preconditionFailure("JSValue bridge could not resolve context group")
+    }
+    precondition(
+      valueGroup == contextGroup,
+      "Cross-VM JSValue operation is not allowed; pass a context from the same JSVirtualMachine"
+    )
+  }
+
   func type(of value: borrowing JSValue, in context: borrowing JSInstantContext) -> JSType {
     JavaScriptCoreBackendDriver.valueType(of: value.ref, in: context.globalContextRef)
   }
@@ -96,7 +114,8 @@ struct JavaScriptCoreValueBridgeAdapter: _JSValueBridgeAdapter {
     for value: borrowing JSValue,
     in context: borrowing JSInstantContext
   ) -> JSValueHandle<JavaScriptCoreEngine> {
-    value.valueHandle()
+    ensureSameVM(value, in: context)
+    return value.valueHandle()
   }
 
   func bridgeResult(_ handleResult: JSResultHandle<JavaScriptCoreEngine>?) -> JSResult {
