@@ -24,10 +24,6 @@ extension JSValue {
     self._rawValue = _JSValueStorage(handle: handleValue)
   }
 
-  init(rawValue: JavaScriptCoreRawValue) {
-    self._rawValue = _JSValueStorage(rawValue: rawValue)
-  }
-
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
     _rawValue.rawValue(in: context)
   }

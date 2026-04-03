@@ -13,10 +13,6 @@ extension _JSValueStorage {
     self.init(handle: handle)
   }
 
-  init(rawValue: JavaScriptCoreRawValue) {
-    self.init(handle: JavaScriptCoreBackendDriver.valueHandle(from: rawValue))
-  }
-
   var ref: JavaScriptCoreValueRef {
     guard let ref = JavaScriptCoreBackendDriver.valueRef(from: valueHandle()) else {
       preconditionFailure("JSValue storage handle has no value ref")

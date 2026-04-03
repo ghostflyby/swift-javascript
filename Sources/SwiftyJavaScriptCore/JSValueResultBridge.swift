@@ -33,9 +33,10 @@ extension JSResult {
   static func from(driverResult: JSDriverResult<JavaScriptCoreRawValue>) -> JSResult {
     switch driverResult {
     case .value(let value):
-      return .value(JSValue(rawValue: value))
+      return .value(JSValue(handleValue: JavaScriptCoreBackendDriver.valueHandle(from: value)))
     case .exception(let exception):
-      return .exception(JSValue(rawValue: exception))
+      return .exception(
+        JSValue(handleValue: JavaScriptCoreBackendDriver.valueHandle(from: exception)))
     }
   }
 }
