@@ -21,10 +21,7 @@ extension JSValue {
   }
 
   init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    guard let rawStorage = _JSValueStorage.fromHandle(handleValue) else {
-      preconditionFailure("JSValue handle did not contain JavaScriptCoreRawValue")
-    }
-    self._rawValue = rawStorage
+    self._rawValue = _JSValueStorage.fromHandle(handleValue)
   }
 
   init(rawValue: JavaScriptCoreRawValue) {

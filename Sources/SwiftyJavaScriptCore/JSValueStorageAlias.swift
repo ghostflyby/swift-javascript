@@ -20,11 +20,8 @@ extension _JSValueStorage {
 
   static func fromHandle(
     _ handle: JSValueHandle<JavaScriptCoreEngine>
-  ) -> _JSValueStorage? {
-    guard JavaScriptCoreBackendDriver.valueRef(from: handle) != nil else {
-      return nil
-    }
-    return _JSValueStorage(handle: handle)
+  ) -> _JSValueStorage {
+    _JSValueStorage(handle: handle)
   }
 
   var ref: JavaScriptCoreValueRef {
