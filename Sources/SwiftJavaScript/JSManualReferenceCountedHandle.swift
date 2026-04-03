@@ -5,3 +5,9 @@ package protocol JSManualReferenceCountedHandle {
   @discardableResult
   func releaseReference() -> Bool
 }
+
+package protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+
+package protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+
+package protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

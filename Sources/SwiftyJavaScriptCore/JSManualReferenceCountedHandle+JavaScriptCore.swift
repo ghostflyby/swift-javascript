@@ -1,7 +1,8 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JSRuntimeHandle: JSManualReferenceCountedHandle where E == JavaScriptCoreEngine {
+extension JSRuntimeHandle: JSManualReferenceCountedHandle, JSRuntimeManualReferenceCountedHandle
+where E == JavaScriptCoreEngine {
   @discardableResult
   package func retainReference() -> Bool {
     guard let rawRuntime: JavaScriptCoreRawRuntime = opaqueHandle() else {
@@ -21,7 +22,9 @@ extension JSRuntimeHandle: JSManualReferenceCountedHandle where E == JavaScriptC
   }
 }
 
-extension JSBorrowedContextHandle: JSManualReferenceCountedHandle where E == JavaScriptCoreEngine {
+extension JSBorrowedContextHandle: JSManualReferenceCountedHandle,
+  JSContextManualReferenceCountedHandle
+where E == JavaScriptCoreEngine {
   @discardableResult
   package func retainReference() -> Bool {
     guard let rawContext: JavaScriptCoreRawContext = opaqueHandle(), rawContext.ownsContext else {
@@ -41,7 +44,8 @@ extension JSBorrowedContextHandle: JSManualReferenceCountedHandle where E == Jav
   }
 }
 
-extension JSValueHandle: JSManualReferenceCountedHandle where E == JavaScriptCoreEngine {
+extension JSValueHandle: JSManualReferenceCountedHandle, JSValueManualReferenceCountedHandle
+where E == JavaScriptCoreEngine {
   @discardableResult
   package func retainReference() -> Bool {
     guard let rawValue: JavaScriptCoreRawValue = opaqueHandle() else {
