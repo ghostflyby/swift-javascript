@@ -26,10 +26,10 @@ public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
 public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
 public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
-package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
-  package let ref: JSContextGroupRef
+private final class JavaScriptCoreRawRuntimeStorage: @unchecked Sendable {
+  let ref: JSContextGroupRef
 
-  package init(ref: JSContextGroupRef = JSContextGroupCreate()) {
+  init(ref: JSContextGroupRef) {
     self.ref = ref
   }
 
@@ -38,18 +38,30 @@ package final class JavaScriptCoreRawRuntime: @unchecked Sendable {
   }
 }
 
-package final class JavaScriptCoreRawContext: @unchecked Sendable {
-  package let runtime: JavaScriptCoreRawRuntime?
-  package let ref: JSGlobalContextRef
-  private let ownsContext: Bool
+package struct JavaScriptCoreRawRuntime: @unchecked Sendable {
+  private let storage: JavaScriptCoreRawRuntimeStorage
 
-  package init(runtime: JavaScriptCoreRawRuntime) {
+  package var ref: JSContextGroupRef {
+    storage.ref
+  }
+
+  package init(ref: JSContextGroupRef = JSContextGroupCreate()) {
+    self.storage = JavaScriptCoreRawRuntimeStorage(ref: ref)
+  }
+}
+
+private final class JavaScriptCoreRawContextStorage: @unchecked Sendable {
+  let runtime: JavaScriptCoreRawRuntime?
+  let ref: JSGlobalContextRef
+  let ownsContext: Bool
+
+  init(runtime: JavaScriptCoreRawRuntime) {
     self.runtime = runtime
     self.ref = JSGlobalContextCreateInGroup(runtime.ref, nil)
     self.ownsContext = true
   }
 
-  package init(borrowing ref: JSGlobalContextRef) {
+  init(borrowing ref: JSGlobalContextRef) {
     self.runtime = nil
     self.ref = ref
     self.ownsContext = false
@@ -59,6 +71,26 @@ package final class JavaScriptCoreRawContext: @unchecked Sendable {
     if ownsContext {
       JSGlobalContextRelease(ref)
     }
+  }
+}
+
+package struct JavaScriptCoreRawContext: @unchecked Sendable {
+  private let storage: JavaScriptCoreRawContextStorage
+
+  package var runtime: JavaScriptCoreRawRuntime? {
+    storage.runtime
+  }
+
+  package var ref: JSGlobalContextRef {
+    storage.ref
+  }
+
+  package init(runtime: JavaScriptCoreRawRuntime) {
+    self.storage = JavaScriptCoreRawContextStorage(runtime: runtime)
+  }
+
+  package init(borrowing ref: JSGlobalContextRef) {
+    self.storage = JavaScriptCoreRawContextStorage(borrowing: ref)
   }
 }
 
