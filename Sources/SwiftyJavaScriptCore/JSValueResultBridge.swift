@@ -29,14 +29,4 @@ extension JSResult {
       return .exception(JSValue(handleValue: exception))
     }
   }
-
-  static func from(driverResult: JSDriverResult<JavaScriptCoreRawValue>) -> JSResult {
-    switch driverResult {
-    case .value(let value):
-      return .value(JSValue(handleValue: JavaScriptCoreBackendDriver.valueHandle(from: value)))
-    case .exception(let exception):
-      return .exception(
-        JSValue(handleValue: JavaScriptCoreBackendDriver.valueHandle(from: exception)))
-    }
-  }
 }
