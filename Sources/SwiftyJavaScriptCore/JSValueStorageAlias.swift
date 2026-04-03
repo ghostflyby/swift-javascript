@@ -34,9 +34,4 @@ extension _JSValueStorage {
   func rawValue(in context: JavaScriptCoreRawContext) -> JavaScriptCoreRawValue {
     JavaScriptCoreBackendDriver.rawValue(from: ref, in: context)
   }
-
-  func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-    _ = context
-    return valueHandle()
-  }
 }

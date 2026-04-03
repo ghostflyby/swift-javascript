@@ -33,6 +33,7 @@ extension JSValue {
   }
 
   func valueHandle(in context: borrowing JSInstantContext) -> JSValueHandle<JavaScriptCoreEngine> {
-    _rawValue.valueHandle(in: context)
+    _ = context
+    return _rawValue.valueHandle()
   }
 }
