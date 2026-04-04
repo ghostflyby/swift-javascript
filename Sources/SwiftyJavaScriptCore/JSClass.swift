@@ -19,7 +19,9 @@ public struct JSStaticFunction: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
-    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments) -> JSResult
+    @Sendable (
+      borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments<JavaScriptCoreEngine>
+    ) -> JSResult
 }
 
 extension JSStaticValue {
@@ -102,16 +104,22 @@ public struct JSClassDefinition: Sendable {
 
   public var callAsFunction:
     (
-      @Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue, borrowing JSArguments)
-        ->
-        JSValue
+      @Sendable (
+        borrowing JSInstantContext,
+        inout JSValue,
+        inout JSValue,
+        borrowing JSArguments<JavaScriptCoreEngine>
+      ) -> JSValue
     )? = nil
 
   public var callAsConstructor:
     (
-      @Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue, borrowing JSArguments)
-        ->
-        JSValue
+      @Sendable (
+        borrowing JSInstantContext,
+        inout JSValue,
+        inout JSValue,
+        borrowing JSArguments<JavaScriptCoreEngine>
+      ) -> JSValue
     )? = nil
 
   public var hasInstance:

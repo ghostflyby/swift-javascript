@@ -47,7 +47,7 @@ import Testing
     let rawArguments = [Optional(source.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments(pointer: buffer.baseAddress!, count: 1)
+      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 1)
       let decoded = args.unpack(at: 0, using: ZeroOneBoolConverter.self, in: context)
       #expect(decoded)
     }
@@ -63,7 +63,7 @@ import Testing
     let rawArguments = [Optional(boolSource.ref), Optional(numberSource.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments(pointer: buffer.baseAddress!, count: 2)
+      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 2)
       let (decodedBool, decodedNumber): (Bool, Double) = args.unpack(
         using: ZeroOneBoolConverter.self,
         JSDefaultConverter<Double>.self,
@@ -97,7 +97,7 @@ import Testing
     let rawArguments = [Optional(source.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments(pointer: buffer.baseAddress!, count: 1)
+      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 1)
       do {
         let _: Double = try args.tryUnpack(
           at: 0, using: JSDefaultConverter<Double>.self, in: context)

@@ -104,11 +104,12 @@ private func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSCla
 private func withJavaScriptCoreArguments<R: ~Copyable>(
   _ pointer: UnsafePointer<JSValueRef?>?,
   count: Int,
-  _ body: (borrowing JSArguments) -> R
+  _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
 ) -> R {
   var empty: JSValueRef? = nil
   return withUnsafePointer(to: &empty) { emptyPointer in
-    let arguments = JSArguments(pointer: pointer ?? emptyPointer, count: count)
+    let arguments = JSArguments<JavaScriptCoreEngine>(
+      pointer: pointer ?? emptyPointer, count: count)
     return body(arguments)
   }
 }
@@ -1149,7 +1150,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func withArguments<R: ~Copyable>(
     _ pointer: UnsafePointer<JSValueRef?>?,
     count: Int,
-    _ body: (borrowing JSArguments) -> R
+    _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
   ) -> R {
     withJavaScriptCoreArguments(pointer, count: count, body)
   }
