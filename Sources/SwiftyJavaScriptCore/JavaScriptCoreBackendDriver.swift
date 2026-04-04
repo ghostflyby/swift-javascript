@@ -555,6 +555,214 @@ public enum JavaScriptCoreEngine: JSEngine {
     return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: rawContext)
   }
 
+  public static func makeArrayBufferWithBytesNoCopyHandle(
+    in context: JavaScriptCoreContextHandle,
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard
+      let objectRef = makeArrayBufferWithBytesNoCopy(
+        in: context.ref,
+        bytes: bytes,
+        byteLength: byteLength,
+        bytesDeallocator: bytesDeallocator,
+        deallocatorContext: deallocatorContext
+      )
+    else {
+      return nil
+    }
+
+    return valueHandle(from: objectRef, in: context)
+  }
+
+  public static func arrayBufferByteLengthForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Int? {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      return arrayBufferByteLength(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func arrayBufferBytesPtrForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return (nil, true)
+    case .object(let objectRef):
+      return arrayBufferBytesPtr(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: JavaScriptCoreContextHandle,
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard
+      let objectRef = makeTypedArray(
+        in: context.ref,
+        type: typedArrayTypeForKind(kind),
+        length: length
+      )
+    else {
+      return nil
+    }
+
+    return valueHandle(from: objectRef, in: context)
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: JavaScriptCoreContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<JavaScriptCoreEngine>
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    switch objectRef(for: arrayBuffer.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      guard
+        let typedArrayRef = makeTypedArrayWithArrayBuffer(
+          in: context.ref,
+          type: typedArrayTypeForKind(kind),
+          arrayBuffer: objectRef
+        )
+      else {
+        return nil
+      }
+
+      return valueHandle(from: typedArrayRef, in: context)
+    }
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: JavaScriptCoreContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<JavaScriptCoreEngine>,
+    byteOffset: Int,
+    length: Int
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    switch objectRef(for: arrayBuffer.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      guard
+        let typedArrayRef = makeTypedArrayWithArrayBufferAndOffset(
+          in: context.ref,
+          type: typedArrayTypeForKind(kind),
+          arrayBuffer: objectRef,
+          byteOffset: byteOffset,
+          length: length
+        )
+      else {
+        return nil
+      }
+
+      return valueHandle(from: typedArrayRef, in: context)
+    }
+  }
+
+  public static func typedArrayLengthForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Int? {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      return typedArrayLength(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func typedArrayByteLengthForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Int? {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      return typedArrayByteLength(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func typedArrayByteOffsetForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Int? {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      return typedArrayByteOffset(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func typedArrayBufferForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return nil
+    case .object(let objectRef):
+      guard let bufferRef = typedArrayBuffer(of: objectRef, in: context.ref) else {
+        return nil
+      }
+
+      return valueHandle(from: bufferRef, in: context)
+    }
+  }
+
+  public static func typedArrayBytesPtrForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    switch objectRef(for: value.rawValue, in: context) {
+    case .exception:
+      return (nil, true)
+    case .object(let objectRef):
+      return typedArrayBytesPtr(of: objectRef, in: context.ref)
+    }
+  }
+
+  public static func isArrayBufferHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    guard
+      let valueRef = valueRef(from: value),
+      let type = typedArrayType(of: valueRef, in: context.ref)
+    else {
+      return false
+    }
+
+    return type == typedArrayTypeArrayBuffer
+  }
+
+  public static func typedArrayKindForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSTypedArrayKind? {
+    guard
+      let valueRef = valueRef(from: value),
+      let type = typedArrayType(of: valueRef, in: context.ref)
+    else {
+      return nil
+    }
+
+    return typedArrayKindForType(type)
+  }
+
   package static func makeFunctionClass() -> JSClassRef {
     var definition = makeJavaScriptCoreFunctionClassDefinition()
     return JSClassCreate(&definition)!
@@ -890,6 +1098,58 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static var typedArrayTypeFloat64Array: JavaScriptCoreTypedArrayType {
     kJSTypedArrayTypeFloat64Array
+  }
+
+  package static func typedArrayTypeForKind(
+    _ kind: JSTypedArrayKind
+  ) -> JavaScriptCoreTypedArrayType {
+    switch kind {
+    case .int8Array:
+      return typedArrayTypeInt8Array
+    case .uint8Array:
+      return typedArrayTypeUint8Array
+    case .uint8ClampedArray:
+      return typedArrayTypeUint8ClampedArray
+    case .int16Array:
+      return typedArrayTypeInt16Array
+    case .uint16Array:
+      return typedArrayTypeUint16Array
+    case .int32Array:
+      return typedArrayTypeInt32Array
+    case .uint32Array:
+      return typedArrayTypeUint32Array
+    case .float32Array:
+      return typedArrayTypeFloat32Array
+    case .float64Array:
+      return typedArrayTypeFloat64Array
+    }
+  }
+
+  package static func typedArrayKindForType(
+    _ type: JavaScriptCoreTypedArrayType
+  ) -> JSTypedArrayKind? {
+    switch type {
+    case typedArrayTypeInt8Array:
+      return .int8Array
+    case typedArrayTypeUint8Array:
+      return .uint8Array
+    case typedArrayTypeUint8ClampedArray:
+      return .uint8ClampedArray
+    case typedArrayTypeInt16Array:
+      return .int16Array
+    case typedArrayTypeUint16Array:
+      return .uint16Array
+    case typedArrayTypeInt32Array:
+      return .int32Array
+    case typedArrayTypeUint32Array:
+      return .uint32Array
+    case typedArrayTypeFloat32Array:
+      return .float32Array
+    case typedArrayTypeFloat64Array:
+      return .float64Array
+    default:
+      return nil
+    }
   }
 
   package static func makeArrayBufferWithBytesNoCopy(
