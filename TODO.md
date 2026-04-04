@@ -227,9 +227,10 @@
 - [x] 创建 `JSEngineVirtualMachine<E>` 泛型主类型，并在 facade 保留 `JSVirtualMachine` 兼容别名（`Hashable` 按 `RuntimeHandle: Hashable` 条件提供）
 - [x] 创建 `JSEngineContext<E>` 泛型主类型，并在 facade 保留 `JSContext` 兼容别名
 - [x] 将 `JSResult.from(handleResult:)` 桥接下沉到 `SwiftJavaScript` core（泛型 `JSResultPayload` 扩展），facade 仅保留 JSC 私有结果桥接
+- [x] 将 `JSValueConversion.swift` 除 alias 之外的内容迁移到新文件（协议与实现拆分，原文件仅保留类型别名）
 - [x] 删除 `JSResultHandle`，handle-result 统一改为 `JSResultPayload<ValueHandle>`（含 driver 协议、JSC backend 与 core tests）
 - [x] 迁移 `JSContext` actor：将 JSC 特定上下文创建逻辑下沉到 `JavaScriptCoreContextHandle`，并收缩 actor 存储成员
-- [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名
+- [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
 阶段 B：按垂直切片迁移，逐段收口

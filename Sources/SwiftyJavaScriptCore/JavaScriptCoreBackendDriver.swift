@@ -278,6 +278,45 @@ public enum JavaScriptCoreEngine: JSEngine {
     return valueType(of: rawValueRef, in: rawContext.ref)
   }
 
+  public static func toBooleanForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    guard
+      let rawContext = rawContext(from: context),
+      let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
+    else {
+      return false
+    }
+    return toBoolean(rawValueRef, in: rawContext.ref)
+  }
+
+  public static func toNumberForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Double {
+    guard
+      let rawContext = rawContext(from: context),
+      let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
+    else {
+      return .nan
+    }
+    return toNumber(rawValueRef, in: rawContext.ref)
+  }
+
+  public static func toStringForHandle(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> String? {
+    guard
+      let rawContext = rawContext(from: context),
+      let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
+    else {
+      return nil
+    }
+    return toString(rawValueRef, in: rawContext.ref)
+  }
+
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle

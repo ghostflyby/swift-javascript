@@ -5,6 +5,20 @@ import Testing
 enum ZeroOneBoolConverter: JSValueConverter {
   typealias SwiftType = Bool
 
+  static func decode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> Bool {
+    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+  }
+
+  static func encode<E: JSEngine>(
+    _ value: Bool,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+  }
+
   static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext) -> Bool {
     value.toDouble(in: context) != 0
   }
@@ -15,8 +29,19 @@ enum ZeroOneBoolConverter: JSValueConverter {
 }
 
 struct FailingEncodeValue: JSValueEncodable {
+  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSEngineValue<E> {
+    _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
+  }
+
   func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
     JSValue(undefinedIn: context)
+  }
+
+  func tryEncode<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    _ = context
+    throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 
   func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError) -> JSValue {
@@ -31,6 +56,13 @@ struct ReturnPayload {
 enum ReturnPayloadEncoder: JSValueEncoder {
   typealias SwiftType = ReturnPayload
 
+  static func encode<E: JSEngine>(
+    _ value: ReturnPayload,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+  }
+
   static func encode(_ value: ReturnPayload, in context: borrowing JSInstantContext) -> JSValue {
     JSValue(number: value.value, in: context)
   }
@@ -42,6 +74,13 @@ enum FailurePayload: Error {
 
 enum FailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = FailurePayload
+
+  static func encode<E: JSEngine>(
+    _ value: FailurePayload,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+  }
 
   static func encode(_ value: FailurePayload, in context: borrowing JSInstantContext) -> JSValue {
     switch value {
@@ -78,6 +117,13 @@ struct MacroDelegatedUser: Equatable {
 enum MacroDelegatedUserDecoder: JSValueDecoder {
   typealias SwiftType = MacroDelegatedUser
 
+  static func decode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> MacroDelegatedUser {
+    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+  }
+
   static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> MacroDelegatedUser
   {
@@ -87,6 +133,13 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
 
 enum MacroDelegatedUserEncoder: JSValueEncoder {
   typealias SwiftType = MacroDelegatedUser
+
+  static func encode<E: JSEngine>(
+    _ value: MacroDelegatedUser,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+  }
 
   static func encode(_ value: MacroDelegatedUser, in context: borrowing JSInstantContext)
     -> JSValue

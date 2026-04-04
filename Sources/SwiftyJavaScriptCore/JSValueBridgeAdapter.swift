@@ -24,18 +24,6 @@ extension JSInstantContext {
     .from(handleResult: handleResult)
   }
 
-  func toBoolean(_ value: borrowing JSValue) -> Bool {
-    JavaScriptCoreEngine.toBoolean(value.ref, in: globalContextRef)
-  }
-
-  func toNumber(_ value: borrowing JSValue) -> Double {
-    JavaScriptCoreEngine.toNumber(value.ref, in: globalContextRef)
-  }
-
-  func toString(_ value: borrowing JSValue) -> String {
-    JavaScriptCoreEngine.toString(value.ref, in: globalContextRef) ?? ""
-  }
-
   func looselyEquals(_ lhs: borrowing JSValue, _ rhs: borrowing JSValue) -> Bool {
     JavaScriptCoreEngine.valueEquals(lhs.ref, rhs.ref, in: globalContextRef)
   }

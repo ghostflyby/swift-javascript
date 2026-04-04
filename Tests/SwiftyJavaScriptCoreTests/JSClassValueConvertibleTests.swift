@@ -34,6 +34,13 @@ class ExportedLeafNode: ExportedChildNode {
 enum UppercaseStringDecoder: JSValueDecoder {
   typealias SwiftType = String
 
+  static func decode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> String {
+    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+  }
+
   static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> String
   {

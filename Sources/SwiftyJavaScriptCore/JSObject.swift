@@ -1,4 +1,76 @@
 extension JSValue {
+  public func setProperty(
+    _ value: borrowing JSValue,
+    forKey key: borrowing some JSString,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSInstantContext
+  ) {
+    _ = JavaScriptCoreEngine.setStringPropertyHandle(
+      key.string,
+      on: valueHandle(),
+      to: value.valueHandle(),
+      in: context.driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
+  }
+
+  public func setProperty(
+    _ value: borrowing JSValue,
+    forKey key: borrowing JSValue,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSInstantContext
+  ) {
+    _ = JavaScriptCoreEngine.setValuePropertyHandle(
+      key.valueHandle(),
+      on: valueHandle(),
+      to: value.valueHandle(),
+      in: context.driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
+  }
+
+  public func setProperty(
+    _ value: borrowing JSValue,
+    at index: UInt32,
+    in context: borrowing JSInstantContext
+  ) {
+    _ = JavaScriptCoreEngine.setIndexPropertyHandle(
+      at: index,
+      on: valueHandle(),
+      to: value.valueHandle(),
+      in: context.driverContextHandle
+    )
+  }
+
+  public func setProperty(
+    _ value: borrowing JSValue,
+    forKey key: borrowing some JSString,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) {
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
+    setProperty(value, forKey: key, with: attributes, in: callbackContext)
+  }
+
+  public func setProperty(
+    _ value: borrowing JSValue,
+    forKey key: borrowing JSValue,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext = #isolation
+  ) {
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
+    setProperty(value, forKey: key, with: attributes, in: callbackContext)
+  }
+
+  public func setProperty(
+    _ value: borrowing JSValue,
+    at index: UInt32,
+    in context: isolated JSContext = #isolation
+  ) {
+    let callbackContext = JSInstantContext(handle: context.driverContextHandle)
+    setProperty(value, at: index, in: callbackContext)
+  }
+
   public func setProperty<Val>(
     _ value: borrowing Val, forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,

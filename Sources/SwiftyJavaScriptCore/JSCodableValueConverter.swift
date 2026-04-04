@@ -18,6 +18,41 @@ final class JSCodableNode {
 public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public typealias SwiftType = T
 
+  public static func decode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> T {
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return decode(jscValue, in: jscContext)
+  }
+
+  public static func tryDecode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> T {
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return try tryDecode(jscValue, in: jscContext)
+  }
+
+  public static func encode<E: JSEngine>(
+    _ value: T,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(encode(value, in: jscContext))
+  }
+
+  public static func tryEncode<E: JSEngine>(
+    _ value: T,
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    let encoded = try tryEncode(value, in: jscContext)
+    return _asGenericValue(encoded)
+  }
+
   public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> T
   {
@@ -431,7 +466,13 @@ final class _JSCodableKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     let context = instantContext
     let object = JSValue(ref: objectRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
-    object.setProperty(value, forKey: JSStringManaged(key), in: context)
+    _ = JavaScriptCoreEngine.setStringPropertyHandle(
+      key,
+      on: object.valueHandle(),
+      to: value.valueHandle(),
+      in: context.driverContextHandle,
+      attributes: .none
+    )
   }
 }
 
@@ -538,7 +579,12 @@ final class _JSCodableUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     let context = instantContext
     let array = JSValue(ref: arrayRef, ctx: context)
     let value = JSValue(ref: ref, ctx: context)
-    array.setProperty(value, at: UInt32(index), in: context)
+    _ = JavaScriptCoreEngine.setIndexPropertyHandle(
+      at: UInt32(index),
+      on: array.valueHandle(),
+      to: value.valueHandle(),
+      in: context.driverContextHandle
+    )
   }
 }
 

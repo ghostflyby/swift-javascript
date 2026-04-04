@@ -8,4 +8,12 @@ public struct JSEngineValue<E: JSEngine>: ~Copyable {
   package init(storage: consuming JSEngineValueStorage<E>) {
     self._rawValue = storage
   }
+
+  public init(handleValue: JSValueHandle<E>) {
+    self._rawValue = JSEngineValueStorage(handle: handleValue)
+  }
+
+  public func valueHandle() -> JSValueHandle<E> {
+    _rawValue.valueHandle()
+  }
 }

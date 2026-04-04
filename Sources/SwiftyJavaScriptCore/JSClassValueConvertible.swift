@@ -72,6 +72,41 @@ public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
 public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter {
   public typealias SwiftType = T
 
+  public static func decode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> T {
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return decode(jscValue, in: jscContext)
+  }
+
+  public static func tryDecode<E: JSEngine>(
+    _ value: borrowing JSEngineValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> T {
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return try tryDecode(jscValue, in: jscContext)
+  }
+
+  public static func encode<E: JSEngine>(
+    _ value: T,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(encode(value, in: jscContext))
+  }
+
+  public static func tryEncode<E: JSEngine>(
+    _ value: T,
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    let encoded = try tryEncode(value, in: jscContext)
+    return _asGenericValue(encoded)
+  }
+
   public static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
     -> T
   {
@@ -196,14 +231,19 @@ extension JSClassValueConvertible {
     }
   }
 
-  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
-    Self.encode(self, in: context)
+  public func toJSValue<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(Self.encode(self, in: jscContext))
   }
 
-  public func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError)
-    -> JSValue
-  {
-    try Self.tryEncode(self, in: context)
+  public func tryEncode<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    let encoded = try Self.tryEncode(self, in: jscContext)
+    return _asGenericValue(encoded)
   }
 }
 

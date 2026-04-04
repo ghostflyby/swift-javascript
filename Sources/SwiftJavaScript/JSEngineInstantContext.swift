@@ -67,4 +67,16 @@ extension JSEngineInstantContext {
       "JSEngineInstantContext.makeUndefined could not create handle"
     )
   }
+
+  public func toBoolean(_ value: borrowing JSEngineValue<E>) -> Bool {
+    E.toBooleanForHandle(value._rawValue.valueHandle(), in: driverContextHandle)
+  }
+
+  public func toNumber(_ value: borrowing JSEngineValue<E>) -> Double {
+    E.toNumberForHandle(value._rawValue.valueHandle(), in: driverContextHandle)
+  }
+
+  public func toString(_ value: borrowing JSEngineValue<E>) -> String {
+    E.toStringForHandle(value._rawValue.valueHandle(), in: driverContextHandle) ?? ""
+  }
 }

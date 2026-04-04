@@ -206,14 +206,17 @@ public struct JSArrayBuffer: ~Copyable {
 }
 
 extension JSArrayBuffer: JSValueEncodable {
-  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
-    JSValue(ref: value.ref, ctx: context)
+  public func toJSValue<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(JSValue(ref: value.ref, ctx: jscContext))
   }
 
-  public func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError)
-    -> JSValue
-  {
-    JSValue(ref: value.ref, ctx: context)
+  public func tryEncode<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    toJSValue(in: context)
   }
 }
 
@@ -400,14 +403,17 @@ public struct JSTypedArray: ~Copyable {
 }
 
 extension JSTypedArray: JSValueEncodable {
-  public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
-    JSValue(ref: value.ref, ctx: context)
+  public func toJSValue<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSEngineValue<E> {
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(JSValue(ref: value.ref, ctx: jscContext))
   }
 
-  public func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError)
-    -> JSValue
-  {
-    JSValue(ref: value.ref, ctx: context)
+  public func tryEncode<E: JSEngine>(
+    in context: borrowing JSEngineInstantContext<E>
+  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+    toJSValue(in: context)
   }
 }
 

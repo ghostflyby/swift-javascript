@@ -23,14 +23,6 @@ extension JSValue {
     }
     return ref
   }
-
-  init(handleValue: JSValueHandle<JavaScriptCoreEngine>) {
-    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(handle: handleValue))
-  }
-
-  func valueHandle() -> JSValueHandle<JavaScriptCoreEngine> {
-    return _rawValue.valueHandle()
-  }
 }
 
 extension JSEngineValueStorage where E == JavaScriptCoreEngine {

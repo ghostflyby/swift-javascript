@@ -21,6 +21,21 @@ public protocol _JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> JSType?
 
+  static func toBooleanForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool
+
+  static func toNumberForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Double
+
+  static func toStringForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> String?
+
   static func makeStringValueHandle(
     _ value: String,
     _ context: ContextHandle
@@ -88,6 +103,27 @@ extension _JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> JSType? {
     fatalError("_JSEngineRuntimeDriver.valueTypeForHandle(_:in:) is not implemented")
+  }
+
+  public static func toBooleanForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool {
+    fatalError("_JSEngineRuntimeDriver.toBooleanForHandle(_:in:) is not implemented")
+  }
+
+  public static func toNumberForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Double {
+    fatalError("_JSEngineRuntimeDriver.toNumberForHandle(_:in:) is not implemented")
+  }
+
+  public static func toStringForHandle(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> String? {
+    fatalError("_JSEngineRuntimeDriver.toStringForHandle(_:in:) is not implemented")
   }
 
   public static func makeStringValueHandle(

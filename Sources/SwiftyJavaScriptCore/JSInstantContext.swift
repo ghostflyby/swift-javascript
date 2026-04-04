@@ -63,7 +63,14 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     callback: @escaping JSFunctionCallback
   ) {
     let function = makeFunction(named: name, callback: callback)
-    setGlobalProperty(function, forKey: name, with: attributes)
+    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
+    _ = JavaScriptCoreEngine.setStringPropertyHandle(
+      name,
+      on: globalObject.valueHandle(),
+      to: function.valueHandle(),
+      in: driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
   }
 
   public func setGlobalProperty<Val>(

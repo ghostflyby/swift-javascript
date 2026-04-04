@@ -1207,8 +1207,61 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       )
     }
 
+    let genericInitSource: String
+    if declaration.as(ClassDeclSyntax.self) != nil {
+      genericInitSource = """
+        public convenience init<E: JSEngine>(
+          value: borrowing JSEngineValue<E>,
+          in context: borrowing JSEngineInstantContext<E>
+        ) {
+          self.init(
+            value: _bridgeJavaScriptCoreValue(value),
+            in: _bridgeJavaScriptCoreContext(context)
+          )
+        }
+        """
+    } else {
+      genericInitSource = """
+        public init<E: JSEngine>(
+          value: borrowing JSEngineValue<E>,
+          in context: borrowing JSEngineInstantContext<E>
+        ) {
+          self.init(
+            value: _bridgeJavaScriptCoreValue(value),
+            in: _bridgeJavaScriptCoreContext(context)
+          )
+        }
+        """
+    }
+
     let extSource = """
       extension \(typeName): JSValueCodable {
+        \(genericInitSource)
+
+        public static func tryDecode<E: JSEngine>(
+          _ value: borrowing JSEngineValue<E>,
+          in context: borrowing JSEngineInstantContext<E>
+        ) throws(JSValueConversionError) -> Self {
+          try Self.tryDecode(
+            _bridgeJavaScriptCoreValue(value),
+            in: _bridgeJavaScriptCoreContext(context)
+          )
+        }
+
+        public func toJSValue<E: JSEngine>(
+          in context: borrowing JSEngineInstantContext<E>
+        ) -> JSEngineValue<E> {
+          let __encoded = self.toJSValue(in: _bridgeJavaScriptCoreContext(context))
+          return _asGenericValue(__encoded)
+        }
+
+        public func tryEncode<E: JSEngine>(
+          in context: borrowing JSEngineInstantContext<E>
+        ) throws(JSValueConversionError) -> JSEngineValue<E> {
+          let __encoded = try self.tryEncode(in: _bridgeJavaScriptCoreContext(context))
+          return _asGenericValue(__encoded)
+        }
+
         \(initSource)
 
         public static func tryDecode(
