@@ -233,6 +233,8 @@
 - [x] 将参数容器主类型更名为 `SwiftJavaScript.JSArguments<E>`，移除 facade `JSArguments` 别名，并保留 `where E == JavaScriptCoreEngine` 的指针桥接初始化
 - [x] 将 `JSArrayBuffer` / `JSTypedArray` 下沉到 `SwiftJavaScript` core（新增 `JSArrayBuffer<E>` / `JSTypedArray<E>` 与 typed-array driver 协议；facade 收口为 typealias）
 - [x] 将 `JSObject` 属性访问与编解码重载下沉到 `SwiftJavaScript` core（核心改为 `JSEngineValue<E>` 泛型实现，facade 保留 `JSString` 兼容包装）
+- [x] 将 `JSString` 协议定义下沉到 `SwiftJavaScript` core（facade 侧保留 `ref` 兼容包装）
+- [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `_JSEngineStringDriver` 与 JSC/mock 实现）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 

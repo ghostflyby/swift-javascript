@@ -331,7 +331,10 @@ func classPropertyName(_ propertyName: JavaScriptCoreStringRef?) -> String? {
   guard let propertyName else {
     return nil
   }
-  return String(jsStringRef: propertyName)
+  return String(
+    jsStringHandle: JavaScriptCoreStringHandle(ref: propertyName),
+    engine: JavaScriptCoreEngine.self
+  )
 }
 
 private func classObjectKey(_ object: JavaScriptCoreObjectRef) -> UInt {

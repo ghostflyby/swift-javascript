@@ -26,6 +26,27 @@ public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
 public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
 public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
 
+public struct JavaScriptCoreStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable
+{
+  public let ref: JavaScriptCoreStringRef
+
+  public init(ref: JavaScriptCoreStringRef) {
+    self.ref = ref
+  }
+
+  @discardableResult
+  public func retainReference() -> Bool {
+    JSStringRetain(ref)
+    return true
+  }
+
+  @discardableResult
+  public func releaseReference() -> Bool {
+    JSStringRelease(ref)
+    return true
+  }
+}
+
 package typealias JavaScriptCoreRawRuntime = JavaScriptCoreRuntimeHandle
 package typealias JavaScriptCoreRawContext = JavaScriptCoreContextHandle
 
@@ -52,11 +73,14 @@ package final class JavaScriptCoreRawValue: @unchecked Sendable {
   }
 
   package func toString() -> String? {
-    guard let stringRef = JSValueToStringCopy(contextRef, ref, nil) else {
+    guard let stringHandle = JSValueToStringCopy(contextRef, ref, nil) else {
       return nil
     }
-    defer { JSStringRelease(stringRef) }
-    return String(jsStringRef: stringRef)
+    defer { JSStringRelease(stringHandle) }
+    return String(
+      jsStringHandle: JavaScriptCoreStringHandle(ref: stringHandle),
+      engine: JavaScriptCoreEngine.self
+    )
   }
 }
 
@@ -124,6 +148,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public typealias Engine = JavaScriptCoreEngine
   public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
   public typealias ContextHandle = JavaScriptCoreContextHandle
+  public typealias StringHandle = JavaScriptCoreStringHandle
 
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
@@ -999,33 +1024,25 @@ public enum JavaScriptCoreEngine: JSEngine {
     UInt32(kJSPropertyAttributeDontDelete)
   }
 
-  package static func stringLength(_ stringRef: JavaScriptCoreStringRef) -> Int {
-    JSStringGetLength(stringRef)
+  public static func stringLength(_ stringHandle: JavaScriptCoreStringHandle) -> Int {
+    JSStringGetLength(stringHandle.ref)
   }
 
-  package static func stringCharacters(
-    _ stringRef: JavaScriptCoreStringRef
+  public static func stringCharacters(
+    _ stringHandle: JavaScriptCoreStringHandle
   ) -> UnsafePointer<UInt16>? {
-    JSStringGetCharactersPtr(stringRef)
+    JSStringGetCharactersPtr(stringHandle.ref)
   }
 
-  package static func retain(_ stringRef: JavaScriptCoreStringRef) -> JavaScriptCoreStringRef {
-    JSStringRetain(stringRef)
+  public static func makeJSString(_ value: String) -> JavaScriptCoreStringHandle {
+    JavaScriptCoreStringHandle(ref: JSStringCreateWithCFString(value as CFString))
   }
 
-  package static func release(_ stringRef: JavaScriptCoreStringRef) {
-    JSStringRelease(stringRef)
-  }
-
-  package static func makeJSString(_ value: String) -> JavaScriptCoreStringRef {
-    JSStringCreateWithCFString(value as CFString)
-  }
-
-  package static func stringEquals(
-    _ lhs: JavaScriptCoreStringRef,
-    _ rhs: JavaScriptCoreStringRef
+  public static func stringEquals(
+    _ lhs: JavaScriptCoreStringHandle,
+    _ rhs: JavaScriptCoreStringHandle
   ) -> Bool {
-    JSStringIsEqual(lhs, rhs)
+    JSStringIsEqual(lhs.ref, rhs.ref)
   }
 
   package static func globalObject(
@@ -1353,11 +1370,14 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func toString(_ value: JSValueRef, in context: JSContextRef) -> String? {
-    guard let stringRef = JSValueToStringCopy(context, value, nil) else {
+    guard let stringHandle = JSValueToStringCopy(context, value, nil) else {
       return nil
     }
-    defer { JSStringRelease(stringRef) }
-    return String(jsStringRef: stringRef)
+    defer { JSStringRelease(stringHandle) }
+    return String(
+      jsStringHandle: JavaScriptCoreStringHandle(ref: stringHandle),
+      engine: JavaScriptCoreEngine.self
+    )
   }
 
   package static func hostTypeDescriptor(
@@ -1657,9 +1677,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ value: String,
     in context: JavaScriptCoreRawContext
   ) -> JavaScriptCoreRawValue {
-    withJSString(value) { stringRef in
+    withJSString(value) { stringHandle in
       JavaScriptCoreRawValue(
-        ref: JSValueMakeString(context.ref, stringRef)!, contextRef: context.ref)
+        ref: JSValueMakeString(context.ref, stringHandle)!, contextRef: context.ref)
     }
   }
 
@@ -1667,9 +1687,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ value: String,
     in context: JavaScriptCoreRawContext
   ) -> JavaScriptCoreRawValue {
-    withJSString(value) { stringRef in
+    withJSString(value) { stringHandle in
       JavaScriptCoreRawValue(
-        ref: JSValueMakeSymbol(context.ref, stringRef)!, contextRef: context.ref)
+        ref: JSValueMakeSymbol(context.ref, stringHandle)!, contextRef: context.ref)
     }
   }
 
@@ -1737,10 +1757,14 @@ public enum JavaScriptCoreEngine: JSEngine {
       var result: [String] = []
       result.reserveCapacity(Int(count))
       for index in 0..<count {
-        guard let keyRef = JSPropertyNameArrayGetNameAtIndex(names, index) else {
+        guard let keyHandle = JSPropertyNameArrayGetNameAtIndex(names, index) else {
           continue
         }
-        result.append(String(jsStringRef: keyRef))
+        result.append(
+          String(
+            jsStringHandle: JavaScriptCoreStringHandle(ref: keyHandle),
+            engine: JavaScriptCoreEngine.self
+          ))
       }
       return result
     }
@@ -2090,9 +2114,9 @@ private func javaScriptCorePropertyAttributes(from attributes: JSHostMemberAttri
 }
 
 private func withJSString<R>(_ string: String, _ body: (JSStringRef) -> R) -> R {
-  let ref = JSStringCreateWithCFString(string as CFString)!
-  defer { JSStringRelease(ref) }
-  return body(ref)
+  let stringHandle = JSStringCreateWithCFString(string as CFString)!
+  defer { JSStringRelease(stringHandle) }
+  return body(stringHandle)
 }
 
 private func withOptionalJSString<R>(_ string: String?, _ body: (JSStringRef?) -> R) -> R {

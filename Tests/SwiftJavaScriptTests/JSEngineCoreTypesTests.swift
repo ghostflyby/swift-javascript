@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import SwiftJavaScript
@@ -55,6 +56,47 @@ public struct MockValue: Sendable, Equatable {
   let payload: String
 }
 
+public final class MockStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable {
+  private let count: Int
+  private let storage: UnsafeMutablePointer<UInt16>
+
+  init(_ value: String) {
+    let units = Array(value.utf16)
+    count = units.count
+    storage = .allocate(capacity: max(1, count))
+    if count > 0 {
+      storage.initialize(from: units, count: count)
+    }
+  }
+
+  deinit {
+    if count > 0 {
+      storage.deinitialize(count: count)
+    }
+    storage.deallocate()
+  }
+
+  var length: Int { count }
+
+  var characters: UnsafePointer<UInt16> {
+    UnsafePointer(storage)
+  }
+
+  var string: String {
+    String(decoding: UnsafeBufferPointer(start: characters, count: count), as: UTF16.self)
+  }
+
+  @discardableResult
+  public func retainReference() -> Bool {
+    true
+  }
+
+  @discardableResult
+  public func releaseReference() -> Bool {
+    true
+  }
+}
+
 public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
   typealias Engine = MockEngine
   typealias RawValue = MockValue
@@ -82,6 +124,23 @@ public enum MockEngine: JSEngine {
   public typealias RuntimeHandle = MockRuntimeHandle
   public typealias ContextHandle = MockContextHandle
   public typealias ValueHandle = MockValueHandle
+  public typealias StringHandle = MockStringHandle
+
+  public static func stringLength(_ stringHandle: MockStringHandle) -> Int {
+    stringHandle.length
+  }
+
+  public static func stringCharacters(_ stringHandle: MockStringHandle) -> UnsafePointer<UInt16>? {
+    stringHandle.characters
+  }
+
+  public static func makeJSString(_ value: String) -> MockStringHandle {
+    MockStringHandle(value)
+  }
+
+  public static func stringEquals(_ lhs: MockStringHandle, _ rhs: MockStringHandle) -> Bool {
+    lhs.string == rhs.string
+  }
 }
 
 private enum MockDriver: JSEngine {
@@ -89,6 +148,7 @@ private enum MockDriver: JSEngine {
   typealias Engine = MockEngine
   typealias RuntimeHandle = MockRuntimeHandle
   typealias ContextHandle = MockContextHandle
+  typealias StringHandle = MockStringHandle
 
   static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
 
@@ -248,6 +308,22 @@ private enum MockDriver: JSEngine {
     -> JSDriverResult<Void>
   {
     .value(())
+  }
+
+  static func stringLength(_ stringHandle: MockStringHandle) -> Int {
+    stringHandle.length
+  }
+
+  static func stringCharacters(_ stringHandle: MockStringHandle) -> UnsafePointer<UInt16>? {
+    stringHandle.characters
+  }
+
+  static func makeJSString(_ value: String) -> MockStringHandle {
+    MockStringHandle(value)
+  }
+
+  static func stringEquals(_ lhs: MockStringHandle, _ rhs: MockStringHandle) -> Bool {
+    lhs.string == rhs.string
   }
 }
 

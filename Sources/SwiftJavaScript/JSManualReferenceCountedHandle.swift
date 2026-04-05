@@ -11,3 +11,5 @@ public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedH
 public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
 public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+
+public protocol JSStringManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

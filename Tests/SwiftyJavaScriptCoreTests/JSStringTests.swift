@@ -2,9 +2,12 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-@Test func stringInitFromJSStringRef() {
+@Test func stringInitFromJSStringHandle() {
   let managed = JSStringManaged("hello")
-  let swiftString = String(jsStringRef: managed.ref)
+  let swiftString = String(
+    jsStringHandle: managed.jsStringHandle,
+    engine: JavaScriptCoreEngine.self
+  )
 
   #expect(swiftString == "hello")
 }

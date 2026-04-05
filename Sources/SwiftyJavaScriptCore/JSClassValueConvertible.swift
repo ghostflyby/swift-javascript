@@ -351,7 +351,10 @@ private func withAutoDynamicPropertyCallbackInput<R>(
     return nil
   }
 
-  let key = String(jsStringRef: propertyName)
+  let key = String(
+    jsStringHandle: JavaScriptCoreStringHandle(ref: propertyName),
+    engine: JavaScriptCoreEngine.self
+  )
   return withRememberedClassObjectValue(ctx, object: object) { context, thisValue in
     body(definition, context, thisValue, key)
   }
@@ -460,7 +463,10 @@ private func withAutoStaticValueCallbackInput<R>(
     return nil
   }
 
-  let name = String(jsStringRef: propertyName)
+  let name = String(
+    jsStringHandle: JavaScriptCoreStringHandle(ref: propertyName),
+    engine: JavaScriptCoreEngine.self
+  )
   guard let valueDefinition = inheritedStaticValue(named: name, from: definition) else {
     return nil
   }
