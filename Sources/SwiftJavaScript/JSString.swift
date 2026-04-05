@@ -5,7 +5,7 @@ public protocol JSString: ~Copyable {
 }
 
 extension String {
-  public init<E: JSEngine>(jsStringHandle: E.StringHandle, engine _: E.Type = E.self) {
+  public init<E: JSEngine>(jsStringHandle: borrowing E.StringHandle, engine _: E.Type = E.self) {
     let length = E.stringLength(jsStringHandle)
     let characters = E.stringCharacters(jsStringHandle)!
     self = String(decoding: UnsafeBufferPointer(start: characters, count: length), as: UTF16.self)
@@ -37,9 +37,8 @@ public final class JSStringManaged<E: JSEngine>: @unchecked Sendable, JSString {
   public let string: String
 
   public init(handle: E.StringHandle) {
-    _ = handle.retainReference()
     self.handle = handle
-    string = String(jsStringHandle: handle, engine: E.self)
+    string = String(jsStringHandle: self.handle, engine: E.self)
   }
 
   public convenience init(jsStringHandle: E.StringHandle) {
@@ -66,7 +65,6 @@ public struct JSStringValue<E: JSEngine>: @unchecked Sendable, ~Copyable, JSStri
   }
 
   public init(handle: E.StringHandle) {
-    _ = handle.retainReference()
     self.handle = handle
     cached = nil
   }
