@@ -418,6 +418,63 @@ extension MockDriver {
     )
   }
 
+  fileprivate static func valueTypeForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSType? {
+    _ = context
+    switch value.rawValue.kind {
+    case "undefined":
+      return .undefined
+    case "null":
+      return .null
+    case "boolean":
+      return .boolean
+    case "number":
+      return .number
+    case "string":
+      return .string
+    case "symbol":
+      return .symbol
+    case "object", "array", "call", "construct", "property", "index":
+      return .object
+    default:
+      return nil
+    }
+  }
+
+  fileprivate static func toBooleanForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = context
+    return !value.rawValue.payload.isEmpty
+  }
+
+  fileprivate static func toNumberForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Double {
+    _ = context
+    return Double(value.rawValue.payload) ?? .nan
+  }
+
+  fileprivate static func toStringForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> String? {
+    _ = context
+    return value.rawValue.payload
+  }
+
+  fileprivate static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    let rawContext = context.rawContext
+    return JSValueHandle<MockEngine>(rawValue: makeBoolean(value, in: rawContext))
+  }
+
   fileprivate static func propertyNamesForHandle(
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
@@ -619,6 +676,558 @@ extension MockDriver {
   ) -> Bool? {
     let rawContext = context.rawContext
     return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: rawContext)
+  }
+
+  fileprivate static func makeArrayBufferWithBytesNoCopyHandle(
+    in context: MockContextHandle,
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = bytes
+    _ = byteLength
+    _ = bytesDeallocator
+    _ = deallocatorContext
+    return nil
+  }
+
+  fileprivate static func arrayBufferByteLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  fileprivate static func arrayBufferBytesPtrForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    _ = value
+    _ = context
+    return (nil, false)
+  }
+
+  fileprivate static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = length
+    return nil
+  }
+
+  fileprivate static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = arrayBuffer
+    return nil
+  }
+
+  fileprivate static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<MockEngine>,
+    byteOffset: Int,
+    length: Int
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = arrayBuffer
+    _ = byteOffset
+    _ = length
+    return nil
+  }
+
+  fileprivate static func typedArrayLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  fileprivate static func typedArrayByteLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  fileprivate static func typedArrayByteOffsetForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  fileprivate static func typedArrayBufferForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  fileprivate static func typedArrayBytesPtrForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    _ = value
+    _ = context
+    return (nil, false)
+  }
+
+  fileprivate static func isArrayBufferHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = value
+    _ = context
+    return false
+  }
+
+  fileprivate static func typedArrayKindForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSTypedArrayKind? {
+    _ = value
+    _ = context
+    return nil
+  }
+}
+
+extension MockEngine {
+  public static var capabilities: JSEngineCapabilities {
+    MockDriver.capabilities
+  }
+
+  public static func makeRuntimeHandle() -> MockRuntimeHandle {
+    MockDriver.makeRuntimeHandle()
+  }
+
+  public static func makeBorrowedContextHandleFromRuntime(
+    in runtime: MockRuntimeHandle
+  ) -> MockContextHandle? {
+    MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime)
+  }
+
+  public static func evaluateScriptResultHandle(
+    _ script: String,
+    _ context: MockContextHandle,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.evaluateScriptResultHandle(
+      script,
+      context,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
+  }
+
+  public static func valueTypeForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSType? {
+    _ = context
+    switch value.rawValue.kind {
+    case "undefined":
+      return .undefined
+    case "null":
+      return .null
+    case "boolean":
+      return .boolean
+    case "number":
+      return .number
+    case "string":
+      return .string
+    case "symbol":
+      return .symbol
+    case "object", "array", "call", "construct", "property", "index":
+      return .object
+    default:
+      return nil
+    }
+  }
+
+  public static func toBooleanForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = context
+    return !value.rawValue.payload.isEmpty
+  }
+
+  public static func toNumberForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Double {
+    _ = context
+    return Double(value.rawValue.payload) ?? .nan
+  }
+
+  public static func toStringForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> String? {
+    _ = context
+    return value.rawValue.payload
+  }
+
+  public static func makeStringValueHandle(
+    _ value: String,
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeStringValueHandle(value, context)
+  }
+
+  public static func makeSymbolValueHandle(
+    _ value: String,
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeSymbolValueHandle(value, context)
+  }
+
+  public static func makeNumberValueHandle(
+    _ value: Double,
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeNumberValueHandle(value, context)
+  }
+
+  public static func makeBooleanValueHandle(
+    _ value: Bool,
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    let rawContext = context.rawContext
+    return JSValueHandle<MockEngine>(rawValue: MockDriver.makeBoolean(value, in: rawContext))
+  }
+
+  public static func makeNullValueHandle(
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeNullValueHandle(context)
+  }
+
+  public static func makeUndefinedValueHandle(
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeUndefinedValueHandle(context)
+  }
+
+  public static func makeObjectResultHandle(
+    _ context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.makeObjectResultHandle(context)
+  }
+
+  public static func makeArrayResultHandle(
+    _ context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.makeArrayResultHandle(context)
+  }
+
+  public static func propertyNamesForHandle(
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> [String]? {
+    MockDriver.propertyNamesForHandle(on: object, in: context)
+  }
+
+  public static func getStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.getStringPropertyHandle(key, on: object, in: context)
+  }
+
+  public static func setStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    MockDriver.setStringPropertyHandle(
+      key,
+      on: object,
+      to: value,
+      in: context,
+      attributes: attributes
+    )
+  }
+
+  public static func getValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.getValuePropertyHandle(key, on: object, in: context)
+  }
+
+  public static func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.getIndexPropertyHandle(at: index, on: object, in: context)
+  }
+
+  public static func setValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    MockDriver.setValuePropertyHandle(
+      key,
+      on: object,
+      to: value,
+      in: context,
+      attributes: attributes
+    )
+  }
+
+  public static func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: JSValueHandle<MockEngine>,
+    to value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    MockDriver.setIndexPropertyHandle(at: index, on: object, to: value, in: context)
+  }
+
+  public static func hasStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.hasStringPropertyHandle(key, on: object, in: context)
+  }
+
+  public static func hasValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.hasValuePropertyHandle(key, on: object, in: context)
+  }
+
+  public static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    MockDriver.deleteStringPropertyHandle(key, on: object, in: context)
+  }
+
+  public static func deleteValuePropertyHandle(
+    _ key: JSValueHandle<MockEngine>,
+    on object: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    MockDriver.deleteValuePropertyHandle(key, on: object, in: context)
+  }
+
+  public static func callFunctionHandle(
+    _ function: JSValueHandle<MockEngine>,
+    this thisValue: JSValueHandle<MockEngine>? = nil,
+    arguments: [JSValueHandle<MockEngine>] = [],
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.callFunctionHandle(function, this: thisValue, arguments: arguments, in: context)
+  }
+
+  public static func constructHandle(
+    _ constructor: JSValueHandle<MockEngine>,
+    arguments: [JSValueHandle<MockEngine>] = [],
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.constructHandle(constructor, arguments: arguments, in: context)
+  }
+
+  public static func toObjectHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+    MockDriver.toObjectHandle(value, in: context)
+  }
+
+  public static func isArrayHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.isArrayHandle(value, in: context)
+  }
+
+  public static func isDateHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.isDateHandle(value, in: context)
+  }
+
+  public static func isInstanceOfHandle(
+    _ value: JSValueHandle<MockEngine>,
+    constructor: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.isInstanceOfHandle(value, constructor: constructor, in: context)
+  }
+
+  public static func makeArrayBufferWithBytesNoCopyHandle(
+    in context: MockContextHandle,
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = bytes
+    _ = byteLength
+    _ = bytesDeallocator
+    _ = deallocatorContext
+    return nil
+  }
+
+  public static func arrayBufferByteLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  public static func arrayBufferBytesPtrForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    _ = value
+    _ = context
+    return (nil, false)
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = length
+    return nil
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<MockEngine>
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = arrayBuffer
+    return nil
+  }
+
+  public static func makeTypedArrayHandle(
+    in context: MockContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: JSValueHandle<MockEngine>,
+    byteOffset: Int,
+    length: Int
+  ) -> JSValueHandle<MockEngine>? {
+    _ = context
+    _ = kind
+    _ = arrayBuffer
+    _ = byteOffset
+    _ = length
+    return nil
+  }
+
+  public static func typedArrayLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  public static func typedArrayByteLengthForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  public static func typedArrayByteOffsetForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Int? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  public static func typedArrayBufferForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    _ = value
+    _ = context
+    return nil
+  }
+
+  public static func typedArrayBytesPtrForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    _ = value
+    _ = context
+    return (nil, false)
+  }
+
+  public static func isArrayBufferHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = value
+    _ = context
+    return false
+  }
+
+  public static func typedArrayKindForHandle(
+    _ value: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSTypedArrayKind? {
+    _ = value
+    _ = context
+    return nil
   }
 }
 
