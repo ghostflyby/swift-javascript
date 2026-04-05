@@ -19,7 +19,7 @@ extension JSEngineInstantContext {
     guard let handle else {
       preconditionFailure(String(describing: failureMessage))
     }
-    return JSEngineValue(storage: JSEngineValueStorage(handle: handle))
+    return JSEngineValue(handleValue: handle)
   }
 
   public func makeString(_ value: String) -> JSEngineValue<E> {
@@ -69,14 +69,14 @@ extension JSEngineInstantContext {
   }
 
   public func toBoolean(_ value: borrowing JSEngineValue<E>) -> Bool {
-    E.toBooleanForHandle(value._rawValue.valueHandle(), in: driverContextHandle)
+    E.toBooleanForHandle(value.valueHandle(), in: driverContextHandle)
   }
 
   public func toNumber(_ value: borrowing JSEngineValue<E>) -> Double {
-    E.toNumberForHandle(value._rawValue.valueHandle(), in: driverContextHandle)
+    E.toNumberForHandle(value.valueHandle(), in: driverContextHandle)
   }
 
   public func toString(_ value: borrowing JSEngineValue<E>) -> String {
-    E.toStringForHandle(value._rawValue.valueHandle(), in: driverContextHandle) ?? ""
+    E.toStringForHandle(value.valueHandle(), in: driverContextHandle) ?? ""
   }
 }

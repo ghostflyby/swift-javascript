@@ -3,17 +3,13 @@
 /// Concrete engines provide API surface and bridge behaviors in their facade
 /// modules via constrained extensions.
 public struct JSEngineValue<E: JSEngine>: ~Copyable {
-  package let _rawValue: JSEngineValueStorage<E>
-
-  package init(storage: consuming JSEngineValueStorage<E>) {
-    self._rawValue = storage
-  }
+  package let _rawValue: JSValueHandle<E>
 
   public init(handleValue: JSValueHandle<E>) {
-    self._rawValue = JSEngineValueStorage(handle: handleValue)
+    self._rawValue = handleValue
   }
 
   public func valueHandle() -> JSValueHandle<E> {
-    _rawValue.valueHandle()
+    _rawValue
   }
 }

@@ -25,8 +25,8 @@ public func bridgeHandleResult<E: JSEngine>(
 
   switch handleResult {
   case .value(let value):
-    return .value(JSEngineValue(storage: JSEngineValueStorage(handle: value)))
+    return .value(JSEngineValue(handleValue: value))
   case .exception(let exception):
-    return .exception(JSEngineValue(storage: JSEngineValueStorage(handle: exception)))
+    return .exception(JSEngineValue(handleValue: exception))
   }
 }

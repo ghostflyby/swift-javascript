@@ -1,31 +1,26 @@
 extension JSValue {
-  var ref: JavaScriptCoreValueRef {
-    _rawValue.ref
-  }
-
   /// Wrap a JavaScriptCore value reference into handle-backed value storage.
   /// - Parameters:
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
   init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext) {
     let instant = JSInstantContext(handle: ctx.driverContextHandle)
-    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: instant))
+    self.init(ref: ref, in: instant)
   }
 
   init(ref: JavaScriptCoreValueRef, ctx: borrowing JSInstantContext) {
-    self.init(storage: JSEngineValueStorage<JavaScriptCoreEngine>(ref: ref, in: ctx))
+    self.init(ref: ref, in: ctx)
   }
 
   consuming func takeRef() -> JavaScriptCoreValueRef {
-    let handle = _rawValue.valueHandle()
-    guard let ref = JavaScriptCoreEngine.retainedValueRef(from: handle) else {
+    guard let ref = JavaScriptCoreEngine.retainedValueRef(from: _rawValue) else {
       preconditionFailure("JSValue storage handle has no value ref")
     }
     return ref
   }
 }
 
-extension JSEngineValueStorage where E == JavaScriptCoreEngine {
+extension JSEngineValue where E == JavaScriptCoreEngine {
   init(ref: JavaScriptCoreValueRef, in context: borrowing JSInstantContext) {
     guard
       let handle = JavaScriptCoreEngine.valueHandle(
@@ -35,11 +30,11 @@ extension JSEngineValueStorage where E == JavaScriptCoreEngine {
     else {
       preconditionFailure("JSValue storage could not create value handle")
     }
-    self.init(handle: handle)
+    self.init(handleValue: handle)
   }
 
   var ref: JavaScriptCoreValueRef {
-    guard let ref = JavaScriptCoreEngine.valueRef(from: valueHandle()) else {
+    guard let ref = JavaScriptCoreEngine.valueRef(from: _rawValue) else {
       preconditionFailure("JSValue storage handle has no value ref")
     }
     return ref

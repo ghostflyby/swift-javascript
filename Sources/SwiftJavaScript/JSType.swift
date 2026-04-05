@@ -16,7 +16,7 @@ extension JSEngineValue {
   }
 
   public func type(in context: borrowing JSEngineInstantContext<E>) -> JSType {
-    guard let valueType = E.valueTypeForHandle(_rawValue.valueHandle(), in: context.driverContextHandle)
+    guard let valueType = E.valueTypeForHandle(_rawValue, in: context.driverContextHandle)
     else {
       preconditionFailure("JSEngineValue.type(in:) could not query value type")
     }
