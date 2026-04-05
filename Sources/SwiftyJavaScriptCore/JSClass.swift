@@ -7,49 +7,8 @@ extension JSClassAttributes {
     rawValue: UInt32(JavaScriptCoreEngine.classAttributeNoAutomaticPrototypeRawValue))
 }
 
-public struct JSStaticValue: Sendable {
-  public let name: String
-  public let attributes: JSPropertyAttributes
-  public let getProperty:
-    @Sendable (borrowing JSInstantContext, borrowing JSValue)
-      -> JSResult<JSValue>
-  public let setProperty:
-    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSValue)
-      -> JSResult<JSValue>
-}
-
-public struct JSStaticFunction: Sendable {
-  public let name: String
-  public let attributes: JSPropertyAttributes
-  public let callAsFunction:
-    @Sendable (
-      borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments<JavaScriptCoreEngine>
-    ) -> JSResult<JSValue>
-}
-
-extension JSStaticValue {
-  public func hostPropertyDescriptor(
-    getterBinding: String? = nil,
-    setterBinding: String? = nil
-  ) -> JSHostPropertyDescriptor {
-    JSHostPropertyDescriptor(
-      name: name,
-      attributes: attributes.hostMemberAttributes,
-      getterBinding: getterBinding,
-      setterBinding: setterBinding
-    )
-  }
-}
-
-extension JSStaticFunction {
-  public func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
-    JSHostFunctionDescriptor(
-      name: name,
-      attributes: attributes.hostMemberAttributes,
-      binding: binding
-    )
-  }
-}
+public typealias JSStaticValue = JSEngineStaticValue<JavaScriptCoreEngine>
+public typealias JSStaticFunction = JSEngineStaticFunction<JavaScriptCoreEngine>
 
 public struct JSClassDefinition: Sendable {
 
