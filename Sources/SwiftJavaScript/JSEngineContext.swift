@@ -60,6 +60,90 @@ extension JSEngineContext {
       instantContext.makeUndefined()
     }
   }
+
+  public func makeObject() -> JSEngineValue<E> {
+    withInstantContext { instantContext in
+      instantContext.makeObject()
+    }
+  }
+
+  public func makeArray() -> JSEngineValue<E> {
+    withInstantContext { instantContext in
+      instantContext.makeArray()
+    }
+  }
+
+  public func evaluateScript(_ script: String) -> JSResultPayload<JSEngineValue<E>> {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(script)
+    }
+  }
+
+  public func evaluateScript<Script>(
+    _ script: borrowing Script,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
+    }
+  }
+
+  public func evaluateScript<Script>(
+    _ script: borrowing Script,
+    sourceURL: String,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    }
+  }
+
+  public func evaluateScript<SourceURL>(
+    _ script: String,
+    sourceURL: borrowing SourceURL,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    }
+  }
+
+  public func evaluateScript(
+    _ script: String,
+    sourceURL: String,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSEngineValue<E>> {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    }
+  }
+
+  public func evaluateScript<Script, SourceURL>(
+    _ script: borrowing Script,
+    sourceURL: borrowing SourceURL,
+    startingLineNumber: Int32 = 1
+  ) -> JSResultPayload<JSEngineValue<E>>
+  where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.evaluateScript(
+        script,
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    }
+  }
 }
 
 extension JSEngineContext: Equatable where E.ContextHandle: Equatable {

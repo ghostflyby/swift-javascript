@@ -34,18 +34,6 @@ extension JSEngineContext where E == JavaScriptCoreEngine {
     driverContextHandle.ref
   }
 
-  public func makeObject() -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeObject()
-    }
-  }
-
-  public func makeArray() -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeArray()
-    }
-  }
-
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback
@@ -110,66 +98,6 @@ extension JSEngineContext where E == JavaScriptCoreEngine {
   public func hasGlobalProperty(_ key: String) -> Bool {
     return withInstantContext { instantContext in
       instantContext.hasGlobalProperty(key)
-    }
-  }
-
-  public func evaluateScript(_ script: String) -> JSResult {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script)
-    }
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
-    }
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    sourceURL: String,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
-    }
-  }
-
-  public func evaluateScript<SourceURL>(
-    _ script: String,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult where SourceURL: JSString, SourceURL: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
-    }
-  }
-
-  public func evaluateScript(
-    _ script: String,
-    sourceURL: String,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
-    }
-  }
-
-  public func evaluateScript<Script, SourceURL>(
-    _ script: borrowing Script,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult
-  where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
     }
   }
 }
