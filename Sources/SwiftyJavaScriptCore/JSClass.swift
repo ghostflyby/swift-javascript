@@ -98,55 +98,26 @@ public struct JSClassDefinition: Sendable {
   public func hostTypeDescriptor(
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
   ) -> JSHostTypeDescriptor {
-    let typeName = className ?? "AnonymousHostType"
-
-    return JSHostTypeDescriptor(
-      name: typeName,
-      constructor: callAsConstructor == nil
-        ? nil
-        : JSHostConstructorDescriptor(binding: hostBindingName(suffix: "constructor")),
-      methods: staticFunctions.map {
-        $0.hostFunctionDescriptor(binding: hostBindingName(suffix: "method.\($0.name)"))
-      },
-      staticMethods: [],
-      properties: staticValues.map {
-        $0.hostPropertyDescriptor(
-          getterBinding: hostBindingName(suffix: "property.get.\($0.name)"),
-          setterBinding: hostBindingName(suffix: "property.set.\($0.name)")
-        )
-      },
-      parent: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className },
+    projectClassHostTypeDescriptor(
+      className: className,
+      parentName: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className },
+      staticValues: staticValues,
+      staticFunctions: staticFunctions,
       storagePolicy: storagePolicy,
-      initializerBinding: initialize == nil ? nil : hostBindingName(suffix: "initialize"),
-      finalizerBinding: finalize == nil ? nil : hostBindingName(suffix: "finalize"),
-      dynamicPropertyGetterBinding: getProperty == nil
-        ? nil
-        : hostBindingName(suffix: "dynamicProperty.get"),
-      dynamicPropertySetterBinding: setProperty == nil
-        ? nil
-        : hostBindingName(suffix: "dynamicProperty.set"),
-      dynamicPropertyHasBinding: hasProperty == nil
-        ? nil
-        : hostBindingName(suffix: "dynamicProperty.has"),
-      dynamicPropertyDeleteBinding: deleteProperty == nil
-        ? nil
-        : hostBindingName(suffix: "dynamicProperty.delete"),
-      propertyEnumeratorBinding: getPropertyNames == nil
-        ? nil
-        : hostBindingName(suffix: "dynamicProperty.enumerate"),
-      callAsFunctionBinding: callAsFunction == nil ? nil : hostBindingName(suffix: "call"),
-      hasInstanceBinding: hasInstance == nil ? nil : hostBindingName(suffix: "hasInstance"),
-      convertToTypeBinding: convertToType == nil
-        ? nil
-        : hostBindingName(suffix: "convertToType")
+      flags: JSClassHostDescriptorProjectionFlags(
+        hasInitializer: initialize != nil,
+        hasFinalizer: finalize != nil,
+        hasDynamicPropertyGetter: getProperty != nil,
+        hasDynamicPropertySetter: setProperty != nil,
+        hasDynamicPropertyHas: hasProperty != nil,
+        hasDynamicPropertyDelete: deleteProperty != nil,
+        hasPropertyEnumerator: getPropertyNames != nil,
+        hasCallAsFunction: callAsFunction != nil,
+        hasConstructor: callAsConstructor != nil,
+        hasHasInstance: hasInstance != nil,
+        hasConvertToType: convertToType != nil
+      )
     )
-  }
-
-  private func hostBindingName(suffix: String) -> String {
-    guard let className, !className.isEmpty else {
-      return suffix
-    }
-    return "\(className).\(suffix)"
   }
 }
 
