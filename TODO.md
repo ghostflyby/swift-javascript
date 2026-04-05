@@ -147,6 +147,7 @@
 - [x] 继续迁移 `JSClass` 可通用声明到 `SwiftJavaScript`（已抽离 `JSEngineStaticValue` / `JSEngineStaticFunction`，JSC 侧收敛为特化 typealias）
 - [x] 继续迁移 `JSClass` 的 host descriptor 投影模板到 `SwiftJavaScript`（已抽离 `hostTypeDescriptor` 组装逻辑为 core helper）
 - [x] 继续迁移 `JSClassDefinition` 通用结构到 `SwiftJavaScript`（已新增泛型 `JSEngineClassDefinition`，JSC 侧收敛为特化 typealias，并保留 parent class 名称解析扩展）
+- [x] 继续迁移 `JSValue` 的构造与函数包装扩展到 `SwiftJavaScript`（已新增 `JSValue<E>` 通用初始化扩展，JSC 侧删除重复实现并复用 core 版本）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSTypedArrayKind` 基础声明，并在 `JSArrayBuffer` 侧保留 typed array type 映射 extension）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSType` 基础声明，保留 `JSValue` 类型判断扩展在 JSC facade，并在 backend 侧显式限定 `SwiftJavaScript.JSType` 消除二义性）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSValueConversionError`，保留 `JSValueConversion` 协议与实现在 JSC facade）
@@ -212,7 +213,7 @@
 - [x] 第 3 步：将调用/构造/方法调用核心逻辑下沉到 handle 级 helper（已将参数编码与 call/construct/invokeMethod 编排下沉到 adapter，interop 侧仅保留 facade API 转发）
 - [x] 第 4 步：将基础类型判型与转换实现切到 `SwiftJavaScript` 通用入口，facade 仅保留语义包装（已完成：`looselyEquals`/`strictlyEquals`、`JSType`（instant 与 JSContext 统一入口）以及 `Bool/Double/String` 基础转换均已经 adapter 路径）
 - [x] 第 5 步：将 `JSValue` 主类型迁移为 `SwiftJavaScript` 的引擎无关实现，JSC 侧保留 typealias/兼容层（已完成：新增 `JSEngineValueStorage<E>` 到 `SwiftJavaScript`，`SwiftyJavaScriptCore` 侧 `_JSValueStorage` 收敛为 typealias + JSC 兼容扩展，`JSValue` 主存储已不再依赖本地 raw-storage 结构）
-- [x] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`（已补 `JSEngineValueStorage` 两条 core 语义测试；移除 `_JSValueStorage` 的 `fromHandle` shim 与 alias 文件、`JSValue(rawValue:)` 入口、未使用的 `JSResult.from(driverResult:)` / `valueRef(from rawValue:)` / `rawValue(in:)` 兼容桥，将 `JSPrivateResult` 收敛为 core 的 `JSResult<JavaScriptCoreValueRef>`，将全库 `valueHandle(in:)` 调用统一为无参 `valueHandle()`，移除 `JSValue(ref:ctx:)` 默认 `#isolation` 兼容参数，并将 callback 路径替换为 `takeRef()` + `JSResult.toPrivateResult()` 以保持 `consuming` 所有权转移语义；已将 `JSValue` 类型主体下沉为 `SwiftJavaScript.JSEngineValue<E>`，JSC facade 侧改为 `typealias JSValue = JSEngineValue<JavaScriptCoreEngine>`）
+- [x] 第 6 步：回收兼容层并迁移相关测试到 `SwiftJavaScriptTests`（已补 `JSEngineValueStorage` 两条 core 语义测试；移除 `_JSValueStorage` 的 `fromHandle` shim 与 alias 文件、`JSValue(rawValue:)` 入口、未使用的 `JSResult.from(driverResult:)` / `valueRef(from rawValue:)` / `rawValue(in:)` 兼容桥，将 `JSPrivateResult` 收敛为 core 的 `JSResult<JavaScriptCoreValueRef>`，将全库 `valueHandle(in:)` 调用统一为无参 `valueHandle()`，移除 `JSValue(ref:ctx:)` 默认 `#isolation` 兼容参数，并将 callback 路径替换为 `takeRef()` + `JSResult.toPrivateResult()` 以保持 `consuming` 所有权转移语义；已将 `JSValue` 类型主体下沉并命名为 `SwiftJavaScript.JSValue<E>`，JSC facade 侧删除同名 typealias）
 
 第 6 步收尾约束（context/VM 语义）
 - [ ] 约束A：区分 Home Context 与 Operation Context。Home Context 仅负责值生命周期（protect/unprotect、takeRef retain）；Operation Context 仅负责 API 执行。
@@ -236,12 +237,12 @@
 - [x] 迁移 `JSContext` actor：将 JSC 特定上下文创建逻辑下沉到 `JavaScriptCoreContextHandle`，并收缩 actor 存储成员
 - [x] 将参数容器主类型更名为 `SwiftJavaScript.JSArguments<E>`，移除 facade `JSArguments` 别名，并保留 `where E == JavaScriptCoreEngine` 的指针桥接初始化
 - [x] 将 `JSArrayBuffer` / `JSTypedArray` 下沉到 `SwiftJavaScript` core（新增 `JSArrayBuffer<E>` / `JSTypedArray<E>` 与 typed-array driver 协议；facade 收口为 typealias）
-- [x] 将 `JSObject` 属性访问与编解码重载下沉到 `SwiftJavaScript` core（核心改为 `JSEngineValue<E>` 泛型实现，facade 保留 `JSString` 兼容包装）
+- [x] 将 `JSObject` 属性访问与编解码重载下沉到 `SwiftJavaScript` core（核心改为 `JSValue<E>` 泛型实现，facade 保留 `JSString` 兼容包装）
 - [x] 将 `JSString` 协议定义下沉到 `SwiftJavaScript` core（facade 侧保留 `ref` 兼容包装）
 - [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `_JSEngineStringDriver` 与 JSC/mock 实现）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [x] 继续下沉 Context 全局对象/全局属性通用能力到 core（已补 runtime driver 的 global object handle 抽象，并将 JSInstantContext/JSContext 全局对象与全局属性通用方法下沉到 core）
-- [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSEngineValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
+- [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
 - [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 

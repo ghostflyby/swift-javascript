@@ -1,8 +1,9 @@
-/// Engine-agnostic JavaScript value shell.
+/// Minimal JavaScript value mapping.
 ///
-/// Concrete engines provide API surface and bridge behaviors in their facade
-/// modules via constrained extensions.
-public struct JSEngineValue<E: JSEngine>: ~Copyable {
+/// `JSValue` intentionally does not retain a context reference.
+/// It only carries the minimal value identity/representation and relies on
+/// explicit `in context` parameters at operation sites.
+public struct JSValue<E: JSEngine>: ~Copyable {
   package let _rawValue: JSValueHandle<E>
 
   public init(handleValue: JSValueHandle<E>) {

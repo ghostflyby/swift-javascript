@@ -71,7 +71,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public typealias SwiftType = T
 
   public static func decode<E: JSEngine>(
-    _ value: borrowing JSEngineValue<E>,
+    _ value: borrowing JSValue<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) -> T {
     do {
@@ -82,7 +82,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   }
 
   public static func tryDecode<E: JSEngine>(
-    _ value: borrowing JSEngineValue<E>,
+    _ value: borrowing JSValue<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) throws(JSValueConversionError) -> T {
     let node = try nodeFromJSValue(value, in: context)
@@ -108,7 +108,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public static func encode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSEngineInstantContext<E>
-  ) -> JSEngineValue<E> {
+  ) -> JSValue<E> {
     do {
       return try tryEncode(value, in: context)
     } catch {
@@ -119,7 +119,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public static func tryEncode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSEngineInstantContext<E>
-  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+  ) throws(JSValueConversionError) -> JSValue<E> {
     let data: Data
     do {
       data = try JSONEncoder().encode(value)
@@ -142,7 +142,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   }
 
   fileprivate static func nodeFromJSValue<E: JSEngine>(
-    _ value: borrowing JSEngineValue<E>,
+    _ value: borrowing JSValue<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) throws(JSValueConversionError) -> JSCodableNode {
     if value.isUndefined(in: context) || value.isNull(in: context) {
@@ -205,7 +205,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   fileprivate static func jsValueFromNode<E: JSEngine>(
     _ node: JSCodableNode,
     in context: borrowing JSEngineInstantContext<E>
-  ) throws(JSValueConversionError) -> JSEngineValue<E> {
+  ) throws(JSValueConversionError) -> JSValue<E> {
     switch node {
     case .null:
       return context.makeNull()
@@ -260,8 +260,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     _ key: String,
     on object: JSValueHandle<E>,
     in context: borrowing JSEngineInstantContext<E>
-  ) throws(JSValueConversionError) -> JSEngineValue<E> {
-    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
+  ) throws(JSValueConversionError) -> JSValue<E> {
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
       E.getStringPropertyHandle(
         key,
         on: object,
@@ -281,8 +281,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     _ index: UInt32,
     on object: JSValueHandle<E>,
     in context: borrowing JSEngineInstantContext<E>
-  ) throws(JSValueConversionError) -> JSEngineValue<E> {
-    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
+  ) throws(JSValueConversionError) -> JSValue<E> {
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
       E.getIndexPropertyHandle(
         at: index,
         on: object,

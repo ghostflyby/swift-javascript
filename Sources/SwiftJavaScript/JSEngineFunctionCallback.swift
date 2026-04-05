@@ -1,7 +1,7 @@
 public typealias JSEngineFunctionCallback<E: JSEngine> =
   (
     _ context: borrowing JSEngineInstantContext<E>,
-    _ function: borrowing JSEngineValue<E>,
-    _ this: borrowing JSEngineValue<E>,
+    _ function: borrowing JSValue<E>,
+    _ this: borrowing JSValue<E>,
     _ arguments: borrowing JSArguments<E>
-  ) -> JSResult<JSEngineValue<E>>
+  ) -> JSResult<JSValue<E>>

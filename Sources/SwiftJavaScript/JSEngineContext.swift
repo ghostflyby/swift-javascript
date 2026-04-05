@@ -25,44 +25,44 @@ extension JSEngineContext {
     return try body(instantContext)
   }
 
-  public func makeString(_ value: String) -> JSEngineValue<E> {
+  public func makeString(_ value: String) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeString(value)
     }
   }
 
-  public func makeNumber(_ value: Double) -> JSEngineValue<E> {
+  public func makeNumber(_ value: Double) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeNumber(value)
     }
   }
 
-  public func makeNumber(_ value: some BinaryInteger) -> JSEngineValue<E> {
+  public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeNumber(value)
     }
   }
 
-  public func makeBoolean(_ value: Bool) -> JSEngineValue<E> {
+  public func makeBoolean(_ value: Bool) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeBoolean(value)
     }
   }
 
-  public func makeNull() -> JSEngineValue<E> {
+  public func makeNull() -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeNull()
     }
   }
 
-  public func makeUndefined() -> JSEngineValue<E> {
+  public func makeUndefined() -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeUndefined()
     }
   }
 
   public func withGlobalObject<R: ~Copyable>(
-    _ body: (borrowing JSEngineValue<E>) -> R
+    _ body: (borrowing JSValue<E>) -> R
   ) -> R {
     withInstantContext { instantContext in
       instantContext.withGlobalObject(body)
@@ -90,7 +90,7 @@ extension JSEngineContext {
     }
   }
 
-  public func getGlobalProperty(forKey key: String) -> JSEngineValue<E> {
+  public func getGlobalProperty(forKey key: String) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.getGlobalProperty(forKey: key)
     }
@@ -117,13 +117,13 @@ extension JSEngineContext {
     }
   }
 
-  public func makeObject() -> JSEngineValue<E> {
+  public func makeObject() -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeObject()
     }
   }
 
-  public func makeArray() -> JSEngineValue<E> {
+  public func makeArray() -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeArray()
     }
@@ -132,7 +132,7 @@ extension JSEngineContext {
   public func makeFunction(
     named name: String,
     callback: @escaping JSEngineFunctionCallback<E>
-  ) -> JSEngineValue<E> where E.Engine == E {
+  ) -> JSValue<E> where E.Engine == E {
     withInstantContext { instantContext in
       instantContext.makeFunction(named: name, callback: callback)
     }
@@ -148,7 +148,7 @@ extension JSEngineContext {
     }
   }
 
-  public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
+  public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script)
     }
@@ -157,7 +157,7 @@ extension JSEngineContext {
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
     }
@@ -167,7 +167,7 @@ extension JSEngineContext {
     _ script: borrowing Script,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -181,7 +181,7 @@ extension JSEngineContext {
     _ script: String,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
+  ) -> JSResult<JSValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -195,7 +195,7 @@ extension JSEngineContext {
     _ script: String,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> {
+  ) -> JSResult<JSValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -209,7 +209,7 @@ extension JSEngineContext {
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>>
+  ) -> JSResult<JSValue<E>>
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(

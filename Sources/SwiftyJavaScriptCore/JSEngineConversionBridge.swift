@@ -13,24 +13,26 @@ func _bridgeJavaScriptCoreContext<E: JSEngine>(
 
 @inline(__always)
 func _bridgeJavaScriptCoreValue<E: JSEngine>(
-  _ value: borrowing JSEngineValue<E>
-) -> JSValue {
+  _ value: borrowing JSValue<E>
+) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
   precondition(
     E.self == JavaScriptCoreEngine.self,
     "This conversion path only supports JavaScriptCoreEngine"
   )
 
   let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
-  return JSValue(handleValue: handle)
+  return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(handleValue: handle)
 }
 
 @inline(__always)
-func _asGenericValue<E: JSEngine>(_ value: borrowing JSValue) -> JSEngineValue<E> {
+func _asGenericValue<E: JSEngine>(_ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>)
+  -> JSValue<E>
+{
   precondition(
     E.self == JavaScriptCoreEngine.self,
     "This conversion path only supports JavaScriptCoreEngine"
   )
 
   let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<E>.self)
-  return JSEngineValue<E>(handleValue: handle)
+  return JSValue<E>(handleValue: handle)
 }

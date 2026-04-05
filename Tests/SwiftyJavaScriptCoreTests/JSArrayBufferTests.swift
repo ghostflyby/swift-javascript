@@ -57,7 +57,8 @@ import Testing
       if let wrapped = JSArrayBuffer<JavaScriptCoreEngine>(value: value, in: context) {
         #expect(wrapped.byteLength == 3)
       } else {
-        Issue.record("Expected JSValue to wrap as JSArrayBuffer")
+        Issue.record(
+          "Expected JSValue<JavaScriptCoreEngine> to wrap as JSArrayBuffer")
       }
     case .exception:
       Issue.record("Expected JavaScript ArrayBuffer value")
@@ -135,7 +136,8 @@ import Testing
         #expect(wrapped.length == 5)
         #expect(wrapped.byteOffset == 0)
       } else {
-        Issue.record("Expected JSValue to wrap as JSTypedArray")
+        Issue.record(
+          "Expected JSValue<JavaScriptCoreEngine> to wrap as JSTypedArray")
       }
     case .exception:
       Issue.record("Expected JavaScript TypedArray value")

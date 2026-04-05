@@ -12,14 +12,14 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 
   @inline(__always)
   private func value(at index: Int, in context: borrowing JSEngineInstantContext<E>)
-    -> JSEngineValue<E>
+    -> JSValue<E>
   {
     guard index >= 0 && index < count else {
       fatalError("Index out of bounds")
     }
 
     if let handle = valueHandleAt(index, context.driverContextHandle) {
-      return JSEngineValue(handleValue: handle)
+      return JSValue(handleValue: handle)
     }
 
     return context.makeUndefined()
@@ -28,7 +28,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
   public func unpack<R: ~Copyable>(
     at: Int,
     in context: borrowing JSEngineInstantContext<E>,
-    _ body: (borrowing JSEngineValue<E>) -> R
+    _ body: (borrowing JSValue<E>) -> R
   ) -> R {
     body(value(at: at, in: context))
   }
@@ -36,7 +36,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
   public func unpack<R: ~Copyable>(
     at: Int,
     in context: isolated JSEngineContext<E> = #isolation,
-    _ body: (borrowing JSEngineValue<E>) -> R
+    _ body: (borrowing JSValue<E>) -> R
   ) -> R {
     context.withInstantContext { callbackContext in
       unpack(at: at, in: callbackContext, body)
@@ -47,7 +47,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 extension JSArguments {
   @inline(__always)
   private func nextValue(_ index: inout Int, in context: borrowing JSEngineInstantContext<E>)
-    -> JSEngineValue<E>
+    -> JSValue<E>
   {
     defer { index += 1 }
     return value(at: index, in: context)

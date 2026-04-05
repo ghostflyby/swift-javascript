@@ -1,4 +1,4 @@
-extension JSResult where Value == JSValue {
+extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
   consuming func toPrivateResult() -> JSResult<JavaScriptCoreValueRef> {
     switch consume self {
     case .value(let v):

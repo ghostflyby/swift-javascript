@@ -300,26 +300,40 @@ import Testing
     JSStaticValue(
       name: "version",
       attributes: .readOnly,
-      getProperty: { context, _ in .value(JSValue(number: 1, in: context)) },
-      setProperty: { context, _, _ in .value(JSValue(undefinedIn: context)) }
+      getProperty: { context, _ in
+        .value(JSValue(number: 1, in: context))
+      },
+      setProperty: { context, _, _ in
+        .value(JSValue(undefinedIn: context))
+      }
     )
   ]
   definition.staticFunctions = [
     JSStaticFunction(
       name: "ping",
       attributes: .dontEnum,
-      callAsFunction: { context, _, _ in .value(JSValue(string: "pong", in: context)) }
+      callAsFunction: { context, _, _ in
+        .value(JSValue(string: "pong", in: context))
+      }
     )
   ]
-  definition.getProperty = { context, _, _ in .value(JSValue(undefinedIn: context)) }
+  definition.getProperty = { context, _, _ in
+    .value(JSValue(undefinedIn: context))
+  }
   definition.setProperty = { _, _, _, _ in nil }
   definition.hasProperty = { _, _, _ in true }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { context, _, _, _ in JSValue(undefinedIn: context) }
-  definition.callAsConstructor = { context, _, _, _ in JSValue(objectIn: context) }
+  definition.callAsFunction = { context, _, _, _ in
+    JSValue(undefinedIn: context)
+  }
+  definition.callAsConstructor = { context, _, _, _ in
+    JSValue(objectIn: context)
+  }
   definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { context, _, _, _ in JSValue(undefinedIn: context) }
+  definition.convertToType = { context, _, _, _ in
+    JSValue(undefinedIn: context)
+  }
 
   let descriptor = JavaScriptCoreEngine.hostTypeDescriptor(for: definition)
 

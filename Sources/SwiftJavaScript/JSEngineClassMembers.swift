@@ -2,20 +2,20 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
-    @Sendable (borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>)
-      -> JSResult<JSEngineValue<E>>
+    @Sendable (borrowing JSEngineInstantContext<E>, borrowing JSValue<E>)
+      -> JSResult<JSValue<E>>
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     getProperty:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>
-      ) -> JSResult<JSEngineValue<E>>,
+        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>
+      ) -> JSResult<JSValue<E>>,
     setProperty:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, borrowing JSEngineValue<E>
-      ) -> JSResult<JSEngineValue<E>>
+        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
+      ) -> JSResult<JSValue<E>>
   ) {
     self.name = name
     self.attributes = attributes
@@ -24,9 +24,9 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
   }
   public let setProperty:
     @Sendable (
-      borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, borrowing JSEngineValue<E>
+      borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
     )
-      -> JSResult<JSEngineValue<E>>
+      -> JSResult<JSValue<E>>
 }
 
 public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
@@ -34,16 +34,16 @@ public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
     @Sendable (
-      borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, borrowing JSArguments<E>
-    ) -> JSResult<JSEngineValue<E>>
+      borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
+    ) -> JSResult<JSValue<E>>
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     callAsFunction:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, borrowing JSArguments<E>
-      ) -> JSResult<JSEngineValue<E>>
+        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
+      ) -> JSResult<JSValue<E>>
   ) {
     self.name = name
     self.attributes = attributes

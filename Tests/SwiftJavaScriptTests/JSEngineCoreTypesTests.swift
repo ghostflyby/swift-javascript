@@ -1342,7 +1342,7 @@ extension MockEngine {
 
 @Test func engineValuePreservesHandleAndEngineType() {
   let handle = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "mock-value"))
-  let value = JSEngineValue<MockEngine>(handleValue: handle)
+  let value = JSValue<MockEngine>(handleValue: handle)
 
   let storedHandle = value.valueHandle()
 
@@ -1353,7 +1353,7 @@ extension MockEngine {
 @Test func engineValueKeepsOpaquePayloadIdentity() {
   let payload = MockValue(kind: "number", payload: "runtime:7")
   let handle = JSValueHandle<MockEngine>(rawValue: payload)
-  let value = JSEngineValue<MockEngine>(handleValue: handle)
+  let value = JSValue<MockEngine>(handleValue: handle)
 
   let roundtrip = value.valueHandle().rawValue
 
@@ -1363,7 +1363,7 @@ extension MockEngine {
 @Test func engineValueShellKeepsHandleAndEngineTyping() {
   let handle = JSValueHandle<MockEngine>(
     rawValue: MockValue(kind: "string", payload: "moved-jsvalue"))
-  let value = JSEngineValue<MockEngine>(handleValue: handle)
+  let value = JSValue<MockEngine>(handleValue: handle)
 
   let roundtripHandle = value._rawValue
   #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))

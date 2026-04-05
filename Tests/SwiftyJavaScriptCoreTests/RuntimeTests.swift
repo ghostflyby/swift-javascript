@@ -85,9 +85,11 @@ import Testing
     let oneNumberCopy = JSValue(number: 1, in: context)
 
     let looselyEqual = oneNumber.looselyEquals(oneString, in: context)
-    let looselyNotEqual = !oneNumber.looselyEquals(JSValue(number: 2, in: context), in: context)
+    let looselyNotEqual = !oneNumber.looselyEquals(
+      JSValue(number: 2, in: context), in: context)
     let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy, in: context)
-    let strictlyNotEqual = !oneNumber.strictlyEquals(JSValue(number: 2, in: context), in: context)
+    let strictlyNotEqual = !oneNumber.strictlyEquals(
+      JSValue(number: 2, in: context), in: context)
 
     #expect(looselyEqual)
     #expect(looselyNotEqual)

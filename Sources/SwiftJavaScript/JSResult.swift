@@ -18,15 +18,15 @@ extension JSResult {
 
 public func bridgeHandleResult<E: JSEngine>(
   _ handleResult: JSResult<JSValueHandle<E>>?
-) -> JSResult<JSEngineValue<E>> {
+) -> JSResult<JSValue<E>> {
   guard let handleResult else {
     preconditionFailure("JSResult handle bridge unexpectedly returned nil")
   }
 
   switch handleResult {
   case .value(let value):
-    return .value(JSEngineValue(handleValue: value))
+    return .value(JSValue(handleValue: value))
   case .exception(let exception):
-    return .exception(JSEngineValue(handleValue: exception))
+    return .exception(JSValue(handleValue: exception))
   }
 }

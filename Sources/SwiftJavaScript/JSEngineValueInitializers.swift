@@ -1,116 +1,117 @@
-//
-//  File.swift
-//  SwiftyJavaScriptCore
-//
-//  Created by ghostflyby pan on 2025/9/12.
-//
-/// Minimal JavaScript value mapping.
-///
-/// `JSValue` intentionally does not retain a context reference.
-/// It only carries the minimal value identity/representation and relies on
-/// explicit `in context` parameters at operation sites.
-public typealias JSValue = JSEngineValue<JavaScriptCoreEngine>
-
 extension JSValue {
-  public init(string value: String, in context: isolated JSContext = #isolation) {
+  public init(string value: String, in context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeString(value)
     }
   }
 
-  public init(string value: String, in context: borrowing JSInstantContext) {
+  public init(string value: String, in context: borrowing JSEngineInstantContext<E>) {
     self = context.makeString(value)
   }
 
-  public init(string value: borrowing JSString, in context: isolated JSContext = #isolation) {
+  public init(
+    string value: borrowing some JSString, in context: isolated JSEngineContext<E> = #isolation
+  ) {
     let stringValue = value.string
     self = context.withInstantContext { callbackContext in
       callbackContext.makeString(stringValue)
     }
   }
 
-  public init(number value: Double, in context: isolated JSContext = #isolation) {
+  public init(
+    string value: borrowing some JSString, in context: borrowing JSEngineInstantContext<E>
+  ) {
+    self = context.makeString(value.string)
+  }
+
+  public init(number value: Double, in context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)
     }
   }
 
-  public init(number value: Double, in context: borrowing JSInstantContext) {
+  public init(number value: Double, in context: borrowing JSEngineInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
-  public init(number value: some BinaryInteger, in context: isolated JSContext = #isolation) {
+  public init(
+    number value: some BinaryInteger, in context: isolated JSEngineContext<E> = #isolation
+  ) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)
     }
   }
 
-  public init(number value: some BinaryInteger, in context: borrowing JSInstantContext) {
+  public init(number value: some BinaryInteger, in context: borrowing JSEngineInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
-  public init(boolean value: Bool, in context: isolated JSContext = #isolation) {
+  public init(boolean value: Bool, in context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeBoolean(value)
     }
   }
 
-  public init(boolean value: Bool, in context: borrowing JSInstantContext) {
+  public init(boolean value: Bool, in context: borrowing JSEngineInstantContext<E>) {
     self = context.makeBoolean(value)
   }
 
-  public init(symbol: String, in context: isolated JSContext = #isolation) {
+  public init(symbol: String, in context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeSymbol(symbol)
     }
   }
 
-  public init(nullIn context: isolated JSContext = #isolation) {
+  public init(symbol: String, in context: borrowing JSEngineInstantContext<E>) {
+    self = context.makeSymbol(symbol)
+  }
+
+  public init(nullIn context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNull()
     }
   }
 
-  public init(nullIn context: borrowing JSInstantContext) {
+  public init(nullIn context: borrowing JSEngineInstantContext<E>) {
     self = context.makeNull()
   }
 
-  public init(undefinedIn context: isolated JSContext = #isolation) {
+  public init(undefinedIn context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeUndefined()
     }
   }
 
-  public init(undefinedIn context: borrowing JSInstantContext) {
+  public init(undefinedIn context: borrowing JSEngineInstantContext<E>) {
     self = context.makeUndefined()
   }
 
-  public init(objectIn context: isolated JSContext = #isolation) {
+  public init(objectIn context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeObject()
     }
   }
 
-  public init(objectIn context: borrowing JSInstantContext) {
+  public init(objectIn context: borrowing JSEngineInstantContext<E>) {
     self = context.makeObject()
   }
 
-  public init(arrayIn context: isolated JSContext = #isolation) {
+  public init(arrayIn context: isolated JSEngineContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeArray()
     }
   }
 
-  public init(arrayIn context: borrowing JSInstantContext) {
+  public init(arrayIn context: borrowing JSEngineInstantContext<E>) {
     self = context.makeArray()
   }
 }
 
-extension JSValue {
+extension JSValue where E.Engine == E {
   public init(
     name: String,
-    callback: @escaping JSFunctionCallback,
-    in context: isolated JSContext = #isolation,
+    callback: @escaping JSEngineFunctionCallback<E>,
+    in context: isolated JSEngineContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       JSValue(name: name, callback: callback, in: callbackContext)
@@ -119,8 +120,8 @@ extension JSValue {
 
   public init(
     name: String,
-    callback: @escaping JSFunctionCallback,
-    in context: borrowing JSInstantContext
+    callback: @escaping JSEngineFunctionCallback<E>,
+    in context: borrowing JSEngineInstantContext<E>
   ) {
     self = context.makeFunction(named: name, callback: callback)
   }
@@ -130,14 +131,15 @@ extension JSValue {
     R: JSValueEncodable,
     Err: JSValueEncodable
   >(
-    in context: isolated JSContext = #isolation, name: String,
+    in context: isolated JSEngineContext<E> = #isolation,
+    name: String,
     function: @escaping @Sendable (repeat each A) throws(Err) -> R
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each A).self)
-    let callback: JSFunctionCallback = { context, function, this, arguments in
+    let callback: JSEngineFunctionCallback<E> = { context, function, this, arguments in
       guard arguments.count == count else {
-        return JSResult<JSValue>.value(JSValue(undefinedIn: context))
+        return .value(JSValue(undefinedIn: context))
       }
       do {
         let typedArgs: (repeat each A) = try arguments.tryUnpack(
@@ -164,7 +166,7 @@ extension JSValue {
     RCoder: JSValueEncoder,
     ECoder: JSValueEncoder
   >(
-    in context: isolated JSContext = #isolation,
+    in context: isolated JSEngineContext<E> = #isolation,
     name: String,
     converters: repeat (each C).Type,
     returnCoder: RCoder.Type,
@@ -174,9 +176,10 @@ extension JSValue {
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each C).self)
-    let callback: JSFunctionCallback = { [swiftFunction] context, function, this, arguments in
+    let callback: JSEngineFunctionCallback<E> = {
+      [swiftFunction] context, function, this, arguments in
       guard arguments.count == count else {
-        return JSResult<JSValue>.value(JSValue(undefinedIn: context))
+        return .value(JSValue(undefinedIn: context))
       }
       do {
         let typedArgs: (repeat (each C).SwiftType) = try arguments.tryUnpack(

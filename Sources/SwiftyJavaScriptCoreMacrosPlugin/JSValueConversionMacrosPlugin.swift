@@ -515,7 +515,8 @@ private func makeMethodCallbackBody(_ method: MethodPlan, indentLevel: String) -
     }
   } else {
     bodyLines.append("\(invokedCallExpression)")
-    bodyLines.append("return .value(JSValue(undefinedIn: context))")
+    bodyLines.append(
+      "return .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))")
   }
 
   let executionSource: String
@@ -526,23 +527,23 @@ private func makeMethodCallbackBody(_ method: MethodPlan, indentLevel: String) -
         "  if let encoded = try? \(errorEncoder).tryEncode(error, in: context) {",
         "    return .exception(encoded)",
         "  }",
-        "  return .exception(JSValue(undefinedIn: context))",
+        "  return .exception(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))",
         "} catch {",
-        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "  return .exception(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"\\(error)\", in: context))",
         "}",
       ]).joined(separator: "\n")
   } else if method.isThrowing {
     executionSource =
       (["do {"] + bodyLines + [
         "} catch {",
-        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "  return .exception(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"\\(error)\", in: context))",
         "}",
       ]).joined(separator: "\n")
   } else {
     executionSource =
       (["do {"] + bodyLines + [
         "} catch {",
-        "  return .exception(JSValue(string: \"\\(error)\", in: context))",
+        "  return .exception(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"\\(error)\", in: context))",
         "}",
       ]).joined(separator: "\n")
   }
@@ -561,11 +562,11 @@ private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
     "              callAsFunction: { context, this, arguments in",
     "                guard let instance = try? Self.tryDecode(this, in: context) else {",
     "                  return .exception(",
-    "                    JSValue(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
+    "                    SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
     "                  )",
     "                }",
     "                guard arguments.count == \(argumentCount) else {",
-    "                  return .value(JSValue(undefinedIn: context))",
+    "                  return .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))",
     "                }",
     callbackBody,
     "              }",
@@ -581,11 +582,11 @@ private func makeMethodGetPropertyCase(_ method: MethodPlan) -> String {
     "                context.makeFunction(named: \"\(method.jsName)\") { context, _, this, arguments in",
     "                  guard let instance = try? Self.tryDecode(this, in: context) else {",
     "                    return .exception(",
-    "                      JSValue(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
+    "                      SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",
     "                    )",
     "                  }",
     "                  guard arguments.count == \(method.parameters.count) else {",
-    "                    return .value(JSValue(undefinedIn: context))",
+    "                    return .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))",
     "                  }",
     callbackBody,
     "                }",
@@ -826,12 +827,13 @@ private func makeEnumEncodeCase(
     if taggedObjectMode {
       return """
         case .\(enumCase.name):
-          let __object = JSValue(objectIn: context)
+          let __object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)
           __object.setProperty("\(enumCase.name)", forKey: __tagKey, in: context)
           return __object
         """
     }
-    return "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+    return
+      "case .\(enumCase.name): return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"\(enumCase.name)\", in: context)"
   case .singleUnlabeled:
     let associatedValue = enumCase.associatedValues[0]
     let binding = associatedValue.label ?? "associated0"
@@ -843,7 +845,7 @@ private func makeEnumEncodeCase(
     }
     return """
       case .\(enumCase.name)(let \(binding)):
-        let __object = JSValue(objectIn: context)
+        let __object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)
         __object.setProperty("\(enumCase.name)", forKey: __tagKey, in: context)
         let __payload = \(encodeExpression)
         __object.setProperty(__payload, forKey: __payloadKey, in: context)
@@ -854,9 +856,9 @@ private func makeEnumEncodeCase(
     let pattern = bindings.map { "let \($0)" }.joined(separator: ", ")
     var lines: [String] = [
       "case .\(enumCase.name)(\(pattern)):",
-      "  let __object = JSValue(objectIn: context)",
+      "  let __object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)",
       "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
-      "  let __payload = JSValue(arrayIn: context)",
+      "  let __payload = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(arrayIn: context)",
     ]
     for (index, binding) in bindings.enumerated() {
       if let encoder = enumCase.associatedValues[index].encoderOverride {
@@ -874,12 +876,13 @@ private func makeEnumEncodeCase(
     let pattern = bindings.map { "\($0): let \($0)" }.joined(separator: ", ")
     var lines: [String] = [
       "case .\(enumCase.name)(\(pattern)):",
-      "  let __object = JSValue(objectIn: context)",
+      "  let __object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)",
       "  __object.setProperty(\"\(enumCase.name)\", forKey: __tagKey, in: context)",
     ]
     if flattenedLabeledPayload {
     } else {
-      lines.append("  let __payload = JSValue(objectIn: context)")
+      lines.append(
+        "  let __payload = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)")
     }
     let payloadTarget = flattenedLabeledPayload ? "__object" : "__payload"
     for (index, label) in bindings.enumerated() {
@@ -944,7 +947,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         return try \(encoder).tryEncode(self, in: context)
         """
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -980,7 +983,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       decodeBody = decodeLines.joined(separator: "\n")
 
       var encodeLines: [String] = [
-        "let object = JSValue(objectIn: context)"
+        "let object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)"
       ]
       for property in properties {
         let keyName = "__key_\(property.name)"
@@ -999,7 +1002,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1045,7 +1048,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       let initForwardArgs = properties.map { "\($0.name): __decoded.\($0.name)" }
         .joined(separator: ", ")
       initSource = """
-        public convenience init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+        public convenience init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
           do {
             let __decoded = try Self.tryDecode(value, in: context)
             self.init(\(initForwardArgs))
@@ -1056,7 +1059,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         """
 
       var encodeLines: [String] = [
-        "let object = JSValue(objectIn: context)"
+        "let object = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(objectIn: context)"
       ]
       for property in properties {
         let keyName = "__key_\(property.name)"
@@ -1082,7 +1085,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       )
       let rawValueTypeName = enumRawValueTypeName(from: enumDecl)
       initSource = """
-        public init(value: borrowing JSValue, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1182,7 +1185,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }.joined(separator: "\n")
 
           let encodeCases = cases.map { enumCase in
-            "case .\(enumCase.name): return JSValue(string: \"\(enumCase.name)\", in: context)"
+            "case .\(enumCase.name): return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"\(enumCase.name)\", in: context)"
           }.joined(separator: "\n")
 
           decodeBody = """
@@ -1211,7 +1214,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
     if declaration.as(ClassDeclSyntax.self) != nil {
       genericInitSource = """
         public convenience init<E: JSEngine>(
-          value: borrowing JSEngineValue<E>,
+          value: borrowing JSValue<E>,
           in context: borrowing JSEngineInstantContext<E>
         ) {
           self.init(
@@ -1223,7 +1226,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
     } else {
       genericInitSource = """
         public init<E: JSEngine>(
-          value: borrowing JSEngineValue<E>,
+          value: borrowing JSValue<E>,
           in context: borrowing JSEngineInstantContext<E>
         ) {
           self.init(
@@ -1239,7 +1242,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         \(genericInitSource)
 
         public static func tryDecode<E: JSEngine>(
-          _ value: borrowing JSEngineValue<E>,
+          _ value: borrowing JSValue<E>,
           in context: borrowing JSEngineInstantContext<E>
         ) throws(JSValueConversionError) -> Self {
           try Self.tryDecode(
@@ -1250,14 +1253,14 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
         public func toJSValue<E: JSEngine>(
           in context: borrowing JSEngineInstantContext<E>
-        ) -> JSEngineValue<E> {
+        ) -> JSValue<E> {
           let __encoded = self.toJSValue(in: _bridgeJavaScriptCoreContext(context))
           return _asGenericValue(__encoded)
         }
 
         public func tryEncode<E: JSEngine>(
           in context: borrowing JSEngineInstantContext<E>
-        ) throws(JSValueConversionError) -> JSEngineValue<E> {
+        ) throws(JSValueConversionError) -> JSValue<E> {
           let __encoded = try self.tryEncode(in: _bridgeJavaScriptCoreContext(context))
           return _asGenericValue(__encoded)
         }
@@ -1265,23 +1268,23 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         \(initSource)
 
         public static func tryDecode(
-          _ value: borrowing JSValue,
+          _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
           in context: borrowing JSInstantContext
         ) throws(JSValueConversionError) -> Self {
           \(decodeBody)
         }
 
-        public func toJSValue(in context: borrowing JSInstantContext) -> JSValue {
+        public func toJSValue(in context: borrowing JSInstantContext) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           do {
             return try self.tryEncode(in: context)
           } catch {
-            return JSValue(undefinedIn: context)
+            return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
           }
         }
 
         public func tryEncode(
           in context: borrowing JSInstantContext
-        ) throws(JSValueConversionError) -> JSValue {
+        ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           \(encodeBody)
         }
       }
@@ -1326,7 +1329,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
         """
       parentGetPropertyFallback = """
               return \(inheritedClass).jsClassDefinition.getProperty?(context, this, property)
-                ?? .value(JSValue(undefinedIn: context))
+                ?? .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))
         """
       parentSetPropertyFallback = """
               return \(inheritedClass).jsClassDefinition.setProperty?(context, this, property, value)
@@ -1334,7 +1337,8 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     } else {
       parentClassSetup = ""
       parentHasPropertyFallback = "              return false"
-      parentGetPropertyFallback = "              return .value(JSValue(undefinedIn: context))"
+      parentGetPropertyFallback =
+        "              return .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))"
       parentSetPropertyFallback = "              return nil"
     }
 
@@ -1346,10 +1350,10 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
       let encodeLine: String
       if let encoder = property.encoderOverride {
         encodeLine =
-          "return .value((try? \(encoder).tryEncode(instance.\(property.name), in: context)) ?? JSValue(undefinedIn: context))"
+          "return .value((try? \(encoder).tryEncode(instance.\(property.name), in: context)) ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))"
       } else {
         encodeLine =
-          "return .value((try? instance.\(property.name).tryEncode(in: context)) ?? JSValue(undefinedIn: context))"
+          "return .value((try? instance.\(property.name).tryEncode(in: context)) ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))"
       }
 
       return """
@@ -1382,7 +1386,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
               \(decodeLine)
               return nil
             } catch {
-              return JSValue(string: "\\(error)", in: context)
+              return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: "\\(error)", in: context)
             }
         """
     }.joined(separator: "\n")
@@ -1414,7 +1418,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
         }
         definition.getProperty = { context, this, property in
           guard let instance = try? Self.tryDecode(this, in: context) else {
-            return .value(JSValue(undefinedIn: context))
+            return .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))
           }
           switch property {
           \(getPropertyCases)
@@ -1425,7 +1429,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
         }
         definition.setProperty = { context, this, property, value in
           guard let instance = try? Self.tryDecode(this, in: context) else {
-            return JSValue(string: \"failed to decode \\(Self.self) backing instance\", in: context)
+            return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"failed to decode \\(Self.self) backing instance\", in: context)
           }
           switch property {
           \(setPropertyCases)

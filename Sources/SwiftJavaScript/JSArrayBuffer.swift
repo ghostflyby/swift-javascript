@@ -7,10 +7,10 @@ private let arrayBufferBytesDeallocator:
   }
 
 public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
-  let value: JSEngineValue<E>
+  let value: JSValue<E>
   let contextHandle: E.ContextHandle
 
-  package init(storedValue: consuming JSEngineValue<E>, contextHandle: E.ContextHandle) {
+  package init(storedValue: consuming JSValue<E>, contextHandle: E.ContextHandle) {
     self.value = storedValue
     self.contextHandle = contextHandle
   }
@@ -38,7 +38,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer")
     }
 
-    self.value = JSEngineValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -78,12 +78,12 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer from bytes")
     }
 
-    self.value = JSEngineValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle)
     self.contextHandle = context.driverContextHandle
   }
 
   public init?(
-    value: borrowing JSEngineValue<E>, in context: isolated JSEngineContext<E> = #isolation
+    value: borrowing JSValue<E>, in context: isolated JSEngineContext<E> = #isolation
   ) {
     guard
       let wrapped = context.withInstantContext({ callbackContext in
@@ -95,12 +95,12 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     self = wrapped
   }
 
-  public init?(value: borrowing JSEngineValue<E>, in context: borrowing JSEngineInstantContext<E>) {
+  public init?(value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>) {
     guard value.isArrayBuffer(in: context) else {
       return nil
     }
 
-    self.value = JSEngineValue(handleValue: value.valueHandle())
+    self.value = JSValue(handleValue: value.valueHandle())
     self.contextHandle = context.driverContextHandle
   }
 
@@ -112,7 +112,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     return length
   }
 
-  public borrowing func withJSValue<R: ~Copyable>(_ body: (borrowing JSEngineValue<E>) -> R) -> R {
+  public borrowing func withJSValue<R: ~Copyable>(_ body: (borrowing JSValue<E>) -> R) -> R {
     body(value)
   }
 
@@ -168,7 +168,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
 extension JSArrayBuffer: JSValueEncodable {
   public func toJSValue<TargetEngine: JSEngine>(
     in context: borrowing JSEngineInstantContext<TargetEngine>
-  ) -> JSEngineValue<TargetEngine> {
+  ) -> JSValue<TargetEngine> {
     _ = context
     precondition(
       E.self == TargetEngine.self,
@@ -176,21 +176,21 @@ extension JSArrayBuffer: JSValueEncodable {
     )
 
     let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<TargetEngine>.self)
-    return JSEngineValue(handleValue: handle)
+    return JSValue(handleValue: handle)
   }
 
   public func tryEncode<TargetEngine: JSEngine>(
     in context: borrowing JSEngineInstantContext<TargetEngine>
-  ) throws(JSValueConversionError) -> JSEngineValue<TargetEngine> {
+  ) throws(JSValueConversionError) -> JSValue<TargetEngine> {
     toJSValue(in: context)
   }
 }
 
 public struct JSTypedArray<E: JSEngine>: ~Copyable {
-  let value: JSEngineValue<E>
+  let value: JSValue<E>
   let contextHandle: E.ContextHandle
 
-  package init(storedValue: consuming JSEngineValue<E>, contextHandle: E.ContextHandle) {
+  package init(storedValue: consuming JSValue<E>, contextHandle: E.ContextHandle) {
     self.value = storedValue
     self.contextHandle = contextHandle
   }
@@ -219,7 +219,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create TypedArray")
     }
 
-    self.value = JSEngineValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -285,12 +285,12 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create TypedArray from ArrayBuffer")
     }
 
-    self.value = JSEngineValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle)
     self.contextHandle = context.driverContextHandle
   }
 
   public init?(
-    value: borrowing JSEngineValue<E>, in context: isolated JSEngineContext<E> = #isolation
+    value: borrowing JSValue<E>, in context: isolated JSEngineContext<E> = #isolation
   ) {
     guard
       let wrapped = context.withInstantContext({ callbackContext in
@@ -302,18 +302,18 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     self = wrapped
   }
 
-  public init?(value: borrowing JSEngineValue<E>, in context: borrowing JSEngineInstantContext<E>) {
+  public init?(value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>) {
     guard value.typedArrayKind(in: context) != nil else {
       return nil
     }
 
-    self.value = JSEngineValue(handleValue: value.valueHandle())
+    self.value = JSValue(handleValue: value.valueHandle())
     self.contextHandle = context.driverContextHandle
   }
 
   public var kind: JSTypedArrayKind {
     guard let type = E.typedArrayKindForHandle(value.valueHandle(), in: contextHandle) else {
-      preconditionFailure("Wrapped JSEngineValue is not a TypedArray")
+      preconditionFailure("Wrapped JSValue is not a TypedArray")
     }
     return type
   }
@@ -348,12 +348,12 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to read TypedArray buffer")
     }
     return JSArrayBuffer(
-      storedValue: JSEngineValue(handleValue: bufferHandle),
+      storedValue: JSValue(handleValue: bufferHandle),
       contextHandle: contextHandle
     )
   }
 
-  public borrowing func withJSValue<R: ~Copyable>(_ body: (borrowing JSEngineValue<E>) -> R) -> R {
+  public borrowing func withJSValue<R: ~Copyable>(_ body: (borrowing JSValue<E>) -> R) -> R {
     body(value)
   }
 
@@ -383,7 +383,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
 extension JSTypedArray: JSValueEncodable {
   public func toJSValue<TargetEngine: JSEngine>(
     in context: borrowing JSEngineInstantContext<TargetEngine>
-  ) -> JSEngineValue<TargetEngine> {
+  ) -> JSValue<TargetEngine> {
     _ = context
     precondition(
       E.self == TargetEngine.self,
@@ -391,17 +391,17 @@ extension JSTypedArray: JSValueEncodable {
     )
 
     let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<TargetEngine>.self)
-    return JSEngineValue(handleValue: handle)
+    return JSValue(handleValue: handle)
   }
 
   public func tryEncode<TargetEngine: JSEngine>(
     in context: borrowing JSEngineInstantContext<TargetEngine>
-  ) throws(JSValueConversionError) -> JSEngineValue<TargetEngine> {
+  ) throws(JSValueConversionError) -> JSValue<TargetEngine> {
     toJSValue(in: context)
   }
 }
 
-extension JSEngineValue {
+extension JSValue {
   public func isArrayBuffer(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
     context.withInstantContext { callbackContext in
       isArrayBuffer(in: callbackContext)

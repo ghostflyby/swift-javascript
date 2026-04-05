@@ -9,7 +9,7 @@ public enum JSType: Sendable {
   case bigInt
 }
 
-extension JSEngineValue {
+extension JSValue {
   public func type(in context: borrowing JSEngineContext<E>) -> JSType {
     let instantContext = JSEngineInstantContext<E>(handle: context.driverContextHandle)
     return type(in: instantContext)
@@ -18,7 +18,7 @@ extension JSEngineValue {
   public func type(in context: borrowing JSEngineInstantContext<E>) -> JSType {
     guard let valueType = E.valueTypeForHandle(_rawValue, in: context.driverContextHandle)
     else {
-      preconditionFailure("JSEngineValue.type(in:) could not query value type")
+      preconditionFailure("JSValue.type(in:) could not query value type")
     }
     return valueType
   }

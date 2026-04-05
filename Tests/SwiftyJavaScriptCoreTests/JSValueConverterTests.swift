@@ -127,7 +127,7 @@ import Testing
   let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let fn = JSValue(
+    let fn: JSValue<JavaScriptCoreEngine> = JSValue(
       name: "coded",
       converters: JSDefaultConverter<Double>.self,
       returnCoder: ReturnPayloadEncoder.self,

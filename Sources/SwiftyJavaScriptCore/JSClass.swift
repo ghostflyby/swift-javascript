@@ -154,22 +154,22 @@ func makeRememberedClassCallbackContext(
 func withRememberedClassObjectValue<R>(
   _ ctx: JavaScriptCoreContextRef,
   object: JavaScriptCoreObjectRef,
-  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+  _ body: (borrowing JSInstantContext, borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) -> R
 ) -> R {
   let context = makeRememberedClassCallbackContext(ctx, object)
-  let thisValue = JSValue(ref: object, ctx: context)
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
   return body(context, thisValue)
 }
 
 func withStoredClassObjectValue<R>(
   _ object: JavaScriptCoreObjectRef,
-  _ body: (borrowing JSInstantContext, borrowing JSValue) -> R
+  _ body: (borrowing JSInstantContext, borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) -> R
 ) -> R? {
   guard let objectContext = classObjectContext(object) else {
     return nil
   }
   let context = JSInstantContext(ctx: objectContext)
-  let thisValue = JSValue(ref: object, ctx: context)
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
   return body(context, thisValue)
 }
 
@@ -406,7 +406,7 @@ private func installSetPropertyCallbackIfNeeded(
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
-      let newValue = JSValue(ref: value, ctx: context)
+      let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
       return JavaScriptCoreEngine.callbackSucceeded(
         exceptionValue: definition.setProperty!(
           context,
@@ -467,8 +467,9 @@ private func installCallAsFunctionCallbackIfNeeded(
         ) { args in
           let result =
             definition.callAsFunction?(context, &functionValue, &thisValue, args)
-            ?? JSValue(undefinedIn: context)
-          return JSResult<JSValue>.value(result).toPrivateResult()
+            ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+          return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
+            .toPrivateResult()
         }
       return JavaScriptCoreEngine.callbackReturnValue(
         callbackResult,
@@ -521,12 +522,15 @@ private func installCallAsConstructorCallbackIfNeeded(
         ) { args in
           let result =
             definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
-            ?? JSValue(undefinedIn: context)
+            ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
           guard result.isObject(in: context) else {
-            return JSResult<JSValue>.value(JSValue(undefinedIn: context))
-              .toPrivateResult()
+            return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(
+              SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+            )
+            .toPrivateResult()
           }
-          return JSResult<JSValue>.value(result).toPrivateResult()
+          return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
+            .toPrivateResult()
         }
       return JavaScriptCoreEngine.constructorCallbackReturnValue(
         callbackResult,
@@ -681,19 +685,19 @@ private func installConvertToTypeCallbackIfNeeded(
     ) { definition, context, objectValue, jsType, exceptionValue in
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
-        ?? JSValue(undefinedIn: context)
+        ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
       let exceptionRef: JavaScriptCoreValueRef?
       if exceptionValue.isUndefined(in: context) {
         exceptionRef = nil
       } else {
         exceptionRef = exceptionValue.takeRef()
-        exceptionValue = JSValue(undefinedIn: context)
+        exceptionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
       }
       let conversion: JSResult<JavaScriptCoreValueRef> =
         if let exceptionRef {
           .exception(exceptionRef)
         } else {
-          JSResult<JSValue>.value(result).toPrivateResult()
+          JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result).toPrivateResult()
         }
       return JavaScriptCoreEngine.callbackReturnValue(
         conversion,
@@ -731,7 +735,7 @@ private let staticValueSetPropertyCallback: JavaScriptCoreObjectSetPropertyCallb
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    let newValue = JSValue(ref: value, ctx: context)
+    let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
     switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
     case .value:
       return true

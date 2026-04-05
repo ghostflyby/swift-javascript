@@ -35,13 +35,16 @@ enum UppercaseStringDecoder: JSValueDecoder {
   typealias SwiftType = String
 
   static func decode<E: JSEngine>(
-    _ value: borrowing JSEngineValue<E>,
+    _ value: borrowing JSValue<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) -> String {
     decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
   }
 
-  static func decode(_ value: borrowing JSValue, in context: borrowing JSInstantContext)
+  static func decode(
+    _ value: borrowing JSValue<JavaScriptCoreEngine>,
+    in context: borrowing JSInstantContext
+  )
     -> String
   {
     value.toString(in: context).uppercased()

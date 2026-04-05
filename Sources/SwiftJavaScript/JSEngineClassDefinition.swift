@@ -25,39 +25,39 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
   public var staticFunctions: [JSEngineStaticFunction<E>] = []
 
   public var initialize:
-    (@Sendable (borrowing JSEngineValue<E>, borrowing JSEngineInstantContext<E>) -> Void)? = nil
+    (@Sendable (borrowing JSValue<E>, borrowing JSEngineInstantContext<E>) -> Void)? = nil
 
-  public var finalize: (@Sendable (borrowing JSEngineValue<E>) -> Void)? = nil
+  public var finalize: (@Sendable (borrowing JSValue<E>) -> Void)? = nil
 
   public var hasProperty:
-    (@Sendable (borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, String) -> Bool)? =
+    (@Sendable (borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, String) -> Bool)? =
       nil
 
   public var getProperty:
     (
-      @Sendable (borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, String)
-        -> JSResult<JSEngineValue<E>>
+      @Sendable (borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, String)
+        -> JSResult<JSValue<E>>
     )? =
       nil
 
   public var setProperty:
     (
       @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, String,
-        borrowing JSEngineValue<E>
+        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, String,
+        borrowing JSValue<E>
       )
-        -> JSEngineValue<E>?
+        -> JSValue<E>?
     )? =
       nil
 
   public var deleteProperty:
-    (@Sendable (borrowing JSEngineInstantContext<E>, borrowing JSEngineValue<E>, String) -> Bool)? =
+    (@Sendable (borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, String) -> Bool)? =
       nil
 
   public var getPropertyNames:
     (
       @Sendable (
-        borrowing JSEngineInstantContext<E>, inout JSEngineValue<E>, PropertyNameAccumulator
+        borrowing JSEngineInstantContext<E>, inout JSValue<E>, PropertyNameAccumulator
       ) -> Void
     )? =
       nil
@@ -66,26 +66,26 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
     (
       @Sendable (
         borrowing JSEngineInstantContext<E>,
-        inout JSEngineValue<E>,
-        inout JSEngineValue<E>,
+        inout JSValue<E>,
+        inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSEngineValue<E>
+      ) -> JSValue<E>
     )? = nil
 
   public var callAsConstructor:
     (
       @Sendable (
         borrowing JSEngineInstantContext<E>,
-        inout JSEngineValue<E>,
-        inout JSEngineValue<E>,
+        inout JSValue<E>,
+        inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSEngineValue<E>
+      ) -> JSValue<E>
     )? = nil
 
   public var hasInstance:
     (
       @Sendable (
-        borrowing JSEngineInstantContext<E>, inout JSEngineValue<E>, inout JSEngineValue<E>
+        borrowing JSEngineInstantContext<E>, inout JSValue<E>, inout JSValue<E>
       )
         -> Bool
     )? =
@@ -94,9 +94,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
   public var convertToType:
     (
       @Sendable (
-        borrowing JSEngineInstantContext<E>, inout JSEngineValue<E>, JSType, inout JSEngineValue<E>
+        borrowing JSEngineInstantContext<E>, inout JSValue<E>, JSType, inout JSValue<E>
       )
-        -> JSEngineValue<E>
+        -> JSValue<E>
     )? =
       nil
 

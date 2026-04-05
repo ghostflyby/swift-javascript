@@ -94,8 +94,8 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
-  let functionValue = JSValue(ref: function, ctx: context)
-  let thisValue = JSValue(ref: thisObject, ctx: context)
+  let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
   let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
@@ -1467,7 +1467,10 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     object: JSObjectRef?,
     propertyName: JSStringRef?,
-    _ body: (JSClassDefinition, borrowing JSInstantContext, borrowing JSValue, String) -> R
+    _ body: (
+      JSClassDefinition, borrowing JSInstantContext,
+      borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
+    ) -> R
   ) -> R? {
     guard let ctx, let object,
       let definition = classDefinition(from: object),
@@ -1477,7 +1480,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, object)
-    let thisValue = JSValue(ref: object, ctx: context)
+    let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
     return body(definition, context, thisValue, propertyName)
   }
 
@@ -1485,7 +1488,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     functionRef: JSObjectRef?,
     thisObjectRef: JSObjectRef?,
-    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+    _ body: (
+      JSClassDefinition, borrowing JSInstantContext,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    ) -> R
   ) -> R? {
     guard let ctx, let functionRef, let thisObjectRef,
       let definition = classDefinition(from: thisObjectRef)
@@ -1494,15 +1501,20 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
-    var functionValue = JSValue(ref: functionRef, ctx: context)
-    var thisValue = JSValue(ref: thisObjectRef, ctx: context)
+    var functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+      ref: functionRef, ctx: context)
+    var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObjectRef, ctx: context)
     return body(definition, context, &functionValue, &thisValue)
   }
 
   static func withConstructorCallbackInput<R>(
     ctx: JSContextRef?,
     constructorRef: JSObjectRef?,
-    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+    _ body: (
+      JSClassDefinition, borrowing JSInstantContext,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    ) -> R
   ) -> R? {
     guard let ctx, let constructorRef,
       let definition = classDefinition(from: constructorRef)
@@ -1511,8 +1523,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-    var constructorValue = JSValue(ref: constructorRef, ctx: context)
-    var thisValue = JSValue(undefinedIn: context)
+    var constructorValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+      ref: constructorRef, ctx: context)
+    var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
     return body(definition, context, &constructorValue, &thisValue)
   }
 
@@ -1520,7 +1533,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     constructorRef: JSObjectRef?,
     possibleInstanceRef: JSObjectRef?,
-    _ body: (JSClassDefinition, borrowing JSInstantContext, inout JSValue, inout JSValue) -> R
+    _ body: (
+      JSClassDefinition, borrowing JSInstantContext,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    ) -> R
   ) -> R? {
     guard let ctx, let constructorRef, let possibleInstanceRef,
       let definition = classDefinition(from: constructorRef)
@@ -1529,8 +1546,10 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, constructorRef)
-    var constructorValue = JSValue(ref: constructorRef, ctx: context)
-    var possibleInstanceValue = JSValue(ref: possibleInstanceRef, ctx: context)
+    var constructorValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+      ref: constructorRef, ctx: context)
+    var possibleInstanceValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+      ref: possibleInstanceRef, ctx: context)
     return body(definition, context, &constructorValue, &possibleInstanceValue)
   }
 
@@ -1541,9 +1560,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ body: (
       JSClassDefinition,
       borrowing JSInstantContext,
-      inout JSValue,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       SwiftJavaScript.JSType,
-      inout JSValue
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     ) ->
       R
   ) -> R? {
@@ -1554,8 +1573,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, objectRef)
-    var objectValue = JSValue(ref: objectRef, ctx: context)
-    var exceptionValue = JSValue(undefinedIn: context)
+    var objectValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: objectRef, ctx: context)
+    var exceptionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
     return body(definition, context, &objectValue, jsType, &exceptionValue)
   }
 
@@ -1564,7 +1583,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     object: JSObjectRef?,
     accumulator: JSPropertyNameAccumulatorRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext, inout JSValue, JSPropertyNameAccumulatorRef
+      JSClassDefinition, borrowing JSInstantContext,
+      inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+      JSPropertyNameAccumulatorRef
     ) -> R
   ) -> R? {
     guard let ctx, let object, let accumulator,
@@ -1574,7 +1595,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = makeRememberedClassCallbackContext(ctx, object)
-    var thisValue = JSValue(ref: object, ctx: context)
+    var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
     return body(definition, context, &thisValue, accumulator)
   }
 
@@ -1582,7 +1603,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     object: JSObjectRef?,
     propertyName: JSStringRef?,
-    _ body: (JSStaticValue, borrowing JSInstantContext, borrowing JSValue) -> R
+    _ body: (
+      JSStaticValue, borrowing JSInstantContext,
+      borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    ) ->
+      R
   ) -> R? {
     guard let ctx, let object,
       let definition = classDefinition(from: object),
@@ -1597,7 +1622,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     let context = JSInstantContext(ctx: ctx)
-    let thisValue = JSValue(ref: object, ctx: context)
+    let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
     return body(valueDefinition, context, thisValue)
   }
 
@@ -1605,7 +1630,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     function: JSObjectRef?,
     thisObject: JSObjectRef?,
-    _ body: (JSStaticFunction, borrowing JSInstantContext, borrowing JSValue) -> R
+    _ body: (
+      JSStaticFunction, borrowing JSInstantContext,
+      borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    )
+      -> R
   ) -> R? {
     guard let ctx, let function, let thisObject,
       let definition = classDefinition(from: thisObject)
@@ -1615,7 +1644,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
     rememberClassObjectContext(ctx, thisObject)
     let context = makeRememberedClassCallbackContext(ctx, thisObject)
-    let functionValue = JSValue(ref: function, ctx: context)
+    let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
     let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
       .toString(in: context)
     guard
@@ -1624,7 +1653,7 @@ public enum JavaScriptCoreEngine: JSEngine {
       return nil
     }
 
-    let thisValue = JSValue(ref: thisObject, ctx: context)
+    let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
     return body(functionDefinition, context, thisValue)
   }
 

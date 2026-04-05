@@ -16,9 +16,11 @@ extension JSEngineContext where E == JavaScriptCoreEngine {
   }
 
   public func withIsolatedGlobalObject<R: Sendable>(
-    _ body: @Sendable (isolated JSContext, borrowing JSValue) -> R
+    _ body:
+      @Sendable (isolated JSContext, borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) -> R
   ) -> R {
-    let globalObject = JSValue(ref: driverContextHandle.globalObjectRef, ctx: self)
+    let globalObject = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+      ref: driverContextHandle.globalObjectRef, ctx: self)
     return body(self, globalObject)
   }
 }

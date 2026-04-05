@@ -1,6 +1,6 @@
-extension JSValue {
+extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   public func looselyEquals(
-    _ other: borrowing JSValue,
+    _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: isolated JSContext = #isolation
   ) -> Bool {
     context.withInstantContext { callbackContext in
@@ -8,14 +8,17 @@ extension JSValue {
     }
   }
 
-  public func looselyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
+  public func looselyEquals(
+    _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    in context: borrowing JSInstantContext
+  )
     -> Bool
   {
     context.looselyEquals(self, other)
   }
 
   public func strictlyEquals(
-    _ other: borrowing JSValue,
+    _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: isolated JSContext = #isolation
   ) -> Bool {
     context.withInstantContext { callbackContext in
@@ -23,24 +26,27 @@ extension JSValue {
     }
   }
 
-  public func strictlyEquals(_ other: borrowing JSValue, in context: borrowing JSInstantContext)
+  public func strictlyEquals(
+    _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    in context: borrowing JSInstantContext
+  )
     -> Bool
   {
     context.strictlyEquals(self, other)
   }
 }
 
-extension JSValue {
+extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   public func call(
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       call(in: callbackContext)
     }
   }
 
   public func call(in context: borrowing JSInstantContext)
-    -> JSResult<JSValue>
+    -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>
   {
     context.call(function: self)
   }
@@ -48,7 +54,7 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       call(arguments: repeat each arguments, in: callbackContext)
     }
@@ -57,41 +63,41 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.call(function: self, arguments: repeat each arguments)
   }
 
   public func call(
-    this thisValue: borrowing JSValue,
+    this thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       call(this: thisValue, in: callbackContext)
     }
   }
 
   public func call(
-    this thisValue: borrowing JSValue,
+    this thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.call(function: self, this: thisValue)
   }
 
   public func call<each A: JSValueEncodable>(
-    this thisValue: borrowing JSValue,
+    this thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
     }
   }
 
   public func call<each A: JSValueEncodable>(
-    this thisValue: borrowing JSValue,
+    this thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.call(
       function: self,
       this: thisValue,
@@ -101,7 +107,7 @@ extension JSValue {
 
   public func construct(
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       construct(in: callbackContext)
     }
@@ -109,14 +115,14 @@ extension JSValue {
 
   public func construct(
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.construct(constructor: self)
   }
 
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       construct(arguments: repeat each arguments, in: callbackContext)
     }
@@ -125,7 +131,7 @@ extension JSValue {
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.construct(
       constructor: self,
       arguments: repeat each arguments
@@ -135,7 +141,7 @@ extension JSValue {
   public func invokeMethod<Name: JSString>(
     _ name: borrowing Name,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> where Name: ~Copyable {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> where Name: ~Copyable {
     context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
     }
@@ -144,7 +150,7 @@ extension JSValue {
   public func invokeMethod<Name: JSString>(
     _ name: borrowing Name,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> where Name: ~Copyable {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> where Name: ~Copyable {
     context.invokeMethod(name.string, on: self)
   }
 
@@ -152,7 +158,7 @@ extension JSValue {
     _ name: borrowing Name,
     arguments: repeat each A,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> where Name: ~Copyable {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> where Name: ~Copyable {
     context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
     }
@@ -162,7 +168,7 @@ extension JSValue {
     _ name: borrowing Name,
     arguments: repeat each A,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> where Name: ~Copyable {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> where Name: ~Copyable {
     context.invokeMethod(
       name.string,
       on: self,
@@ -180,7 +186,7 @@ extension JSValue {
 
   public func toObject(
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.withInstantContext { callbackContext in
       toObject(in: callbackContext)
     }
@@ -188,7 +194,7 @@ extension JSValue {
 
   public func toObject(
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue> {
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>> {
     context.toObject(self)
   }
 
@@ -213,7 +219,7 @@ extension JSValue {
   }
 
   public func isInstanceOf(
-    _ constructor: borrowing JSValue,
+    _ constructor: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: isolated JSContext = #isolation
   ) -> Bool {
     context.withInstantContext { callbackContext in
@@ -222,7 +228,7 @@ extension JSValue {
   }
 
   public func isInstanceOf(
-    _ constructor: borrowing JSValue,
+    _ constructor: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext
   ) -> Bool {
     context.isInstanceOf(self, constructor: constructor)
@@ -233,7 +239,7 @@ extension JSValue {
     forKey key: borrowing Key,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext = #isolation
-  ) -> JSResult<JSValue>
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>
   where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     context.withInstantContext { callbackContext in
       defineProperty(value, forKey: key, with: attributes, in: callbackContext)
@@ -245,9 +251,11 @@ extension JSValue {
     forKey key: borrowing Key,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext
-  ) -> JSResult<JSValue>
+  ) -> JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>
   where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? JSValue(undefinedIn: context)
+    let encoded =
+      (try? value.tryEncode(in: context))
+      ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
     let didSet = context.setStringProperty(
       key.string,
       on: self,
@@ -255,7 +263,7 @@ extension JSValue {
       attributes: attributes.hostMemberAttributes
     )
     guard didSet else {
-      return .exception(JSValue(undefinedIn: context))
+      return .exception(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context))
     }
 
     return context.getStringProperty(key.string, on: self)

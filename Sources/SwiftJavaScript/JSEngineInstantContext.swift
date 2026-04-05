@@ -15,18 +15,18 @@ extension JSEngineInstantContext {
   private func valueFromHandle(
     _ handle: JSValueHandle<E>?,
     _ failureMessage: StaticString
-  ) -> JSEngineValue<E> {
+  ) -> JSValue<E> {
     guard let handle else {
       preconditionFailure(String(describing: failureMessage))
     }
-    return JSEngineValue(handleValue: handle)
+    return JSValue(handleValue: handle)
   }
 
   @inline(__always)
   private func valueFromResultHandle(
     _ handleResult: JSResult<JSValueHandle<E>>?
-  ) -> JSEngineValue<E> {
-    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(handleResult)
+  ) -> JSValue<E> {
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(handleResult)
     switch consume result {
     case .value(let value):
       return value
@@ -35,46 +35,46 @@ extension JSEngineInstantContext {
     }
   }
 
-  public func makeString(_ value: String) -> JSEngineValue<E> {
+  public func makeString(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeStringValueHandle(value, driverContextHandle),
       "JSEngineInstantContext.makeString could not create handle"
     )
   }
 
-  package func makeSymbol(_ value: String) -> JSEngineValue<E> {
+  package func makeSymbol(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeSymbolValueHandle(value, driverContextHandle),
       "JSEngineInstantContext.makeSymbol could not create handle"
     )
   }
 
-  public func makeNumber(_ value: Double) -> JSEngineValue<E> {
+  public func makeNumber(_ value: Double) -> JSValue<E> {
     valueFromHandle(
       E.makeNumberValueHandle(value, driverContextHandle),
       "JSEngineInstantContext.makeNumber could not create handle"
     )
   }
 
-  public func makeNumber(_ value: some BinaryInteger) -> JSEngineValue<E> {
+  public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
     makeNumber(Double(value))
   }
 
-  public func makeBoolean(_ value: Bool) -> JSEngineValue<E> {
+  public func makeBoolean(_ value: Bool) -> JSValue<E> {
     valueFromHandle(
       E.makeBooleanValueHandle(value, driverContextHandle),
       "JSEngineInstantContext.makeBoolean could not create handle"
     )
   }
 
-  public func makeNull() -> JSEngineValue<E> {
+  public func makeNull() -> JSValue<E> {
     valueFromHandle(
       E.makeNullValueHandle(driverContextHandle),
       "JSEngineInstantContext.makeNull could not create handle"
     )
   }
 
-  public func makeUndefined() -> JSEngineValue<E> {
+  public func makeUndefined() -> JSValue<E> {
     valueFromHandle(
       E.makeUndefinedValueHandle(driverContextHandle),
       "JSEngineInstantContext.makeUndefined could not create handle"
@@ -82,7 +82,7 @@ extension JSEngineInstantContext {
   }
 
   @inline(__always)
-  private func globalObjectValue() -> JSEngineValue<E> {
+  private func globalObjectValue() -> JSValue<E> {
     valueFromHandle(
       E.globalObjectValueHandle(driverContextHandle),
       "JSEngineInstantContext.globalObjectValue could not create handle"
@@ -90,7 +90,7 @@ extension JSEngineInstantContext {
   }
 
   public func withGlobalObject<R: ~Copyable>(
-    _ body: (borrowing JSEngineValue<E>) -> R
+    _ body: (borrowing JSValue<E>) -> R
   ) -> R {
     let globalObject = globalObjectValue()
     return body(globalObject)
@@ -117,7 +117,7 @@ extension JSEngineInstantContext {
     }
   }
 
-  public func getGlobalProperty(forKey key: String) -> JSEngineValue<E> {
+  public func getGlobalProperty(forKey key: String) -> JSValue<E> {
     withGlobalObject { globalObject in
       globalObject.getProperty(forKey: key, in: self)
     }
@@ -144,18 +144,18 @@ extension JSEngineInstantContext {
     }
   }
 
-  public func makeObject() -> JSEngineValue<E> {
+  public func makeObject() -> JSValue<E> {
     valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle))
   }
 
-  public func makeArray() -> JSEngineValue<E> {
+  public func makeArray() -> JSValue<E> {
     valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
   }
 
   public func makeFunction(
     named name: String,
     callback: @escaping JSEngineFunctionCallback<E>
-  ) -> JSEngineValue<E> where E.Engine == E {
+  ) -> JSValue<E> where E.Engine == E {
     valueFromHandle(
       E.makeFunctionValueHandle(
         named: name,
@@ -177,7 +177,7 @@ extension JSEngineInstantContext {
     }
   }
 
-  public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
+  public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script,
@@ -191,7 +191,7 @@ extension JSEngineInstantContext {
     _ script: String,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> {
+  ) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script,
@@ -204,7 +204,7 @@ extension JSEngineInstantContext {
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script.string,
@@ -218,7 +218,7 @@ extension JSEngineInstantContext {
     _ script: borrowing Script,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
     evaluateScript(script.string, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
   }
 
@@ -226,7 +226,7 @@ extension JSEngineInstantContext {
     _ script: String,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
+  ) -> JSResult<JSValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
     evaluateScript(script, sourceURL: sourceURL.string, startingLineNumber: startingLineNumber)
   }
 
@@ -234,7 +234,7 @@ extension JSEngineInstantContext {
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSEngineValue<E>>
+  ) -> JSResult<JSValue<E>>
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
     evaluateScript(
       script.string,
@@ -243,15 +243,15 @@ extension JSEngineInstantContext {
     )
   }
 
-  public func toBoolean(_ value: borrowing JSEngineValue<E>) -> Bool {
+  public func toBoolean(_ value: borrowing JSValue<E>) -> Bool {
     E.toBooleanForHandle(value.valueHandle(), in: driverContextHandle)
   }
 
-  public func toNumber(_ value: borrowing JSEngineValue<E>) -> Double {
+  public func toNumber(_ value: borrowing JSValue<E>) -> Double {
     E.toNumberForHandle(value.valueHandle(), in: driverContextHandle)
   }
 
-  public func toString(_ value: borrowing JSEngineValue<E>) -> String {
+  public func toString(_ value: borrowing JSValue<E>) -> String {
     E.toStringForHandle(value.valueHandle(), in: driverContextHandle) ?? ""
   }
 }
