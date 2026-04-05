@@ -61,6 +61,62 @@ extension JSEngineContext {
     }
   }
 
+  public func withGlobalObject<R: ~Copyable>(
+    _ body: (borrowing JSEngineValue<E>) -> R
+  ) -> R {
+    withInstantContext { instantContext in
+      instantContext.withGlobalObject(body)
+    }
+  }
+
+  public func setGlobalProperty<Val>(
+    _ value: borrowing Val,
+    forKey key: String,
+    with attributes: JSPropertyAttributes = .none
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    withInstantContext { instantContext in
+      instantContext.setGlobalProperty(value, forKey: key, with: attributes)
+    }
+  }
+
+  public func setGlobalProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: String,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none
+  ) {
+    withInstantContext { instantContext in
+      instantContext.setGlobalProperty(value, forKey: key, using: converter, with: attributes)
+    }
+  }
+
+  public func getGlobalProperty(forKey key: String) -> JSEngineValue<E> {
+    withInstantContext { instantContext in
+      instantContext.getGlobalProperty(forKey: key)
+    }
+  }
+
+  public func getGlobalProperty<C: JSValueDecoder>(
+    forKey key: String,
+    using converter: C.Type
+  ) -> C.SwiftType {
+    withInstantContext { instantContext in
+      instantContext.getGlobalProperty(forKey: key, using: converter)
+    }
+  }
+
+  public func deleteGlobalProperty(forKey key: String) {
+    withInstantContext { instantContext in
+      instantContext.deleteGlobalProperty(forKey: key)
+    }
+  }
+
+  public func hasGlobalProperty(_ key: String) -> Bool {
+    withInstantContext { instantContext in
+      instantContext.hasGlobalProperty(key)
+    }
+  }
+
   public func makeObject() -> JSEngineValue<E> {
     withInstantContext { instantContext in
       instantContext.makeObject()

@@ -81,6 +81,69 @@ extension JSEngineInstantContext {
     )
   }
 
+  @inline(__always)
+  private func globalObjectValue() -> JSEngineValue<E> {
+    valueFromHandle(
+      E.globalObjectValueHandle(driverContextHandle),
+      "JSEngineInstantContext.globalObjectValue could not create handle"
+    )
+  }
+
+  public func withGlobalObject<R: ~Copyable>(
+    _ body: (borrowing JSEngineValue<E>) -> R
+  ) -> R {
+    let globalObject = globalObjectValue()
+    return body(globalObject)
+  }
+
+  public func setGlobalProperty<Val>(
+    _ value: borrowing Val,
+    forKey key: String,
+    with attributes: JSPropertyAttributes = .none
+  ) where Val: JSValueEncodable, Val: ~Copyable {
+    withGlobalObject { globalObject in
+      globalObject.setProperty(value, forKey: key, with: attributes, in: self)
+    }
+  }
+
+  public func setGlobalProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: String,
+    using converter: C.Type,
+    with attributes: JSPropertyAttributes = .none
+  ) {
+    withGlobalObject { globalObject in
+      globalObject.setProperty(value, forKey: key, using: converter, with: attributes, in: self)
+    }
+  }
+
+  public func getGlobalProperty(forKey key: String) -> JSEngineValue<E> {
+    withGlobalObject { globalObject in
+      globalObject.getProperty(forKey: key, in: self)
+    }
+  }
+
+  public func getGlobalProperty<C: JSValueDecoder>(
+    forKey key: String,
+    using converter: C.Type
+  ) -> C.SwiftType {
+    withGlobalObject { globalObject in
+      globalObject.getProperty(forKey: key, using: converter, in: self)
+    }
+  }
+
+  public func deleteGlobalProperty(forKey key: String) {
+    withGlobalObject { globalObject in
+      globalObject.deleteProperty(forKey: key, in: self)
+    }
+  }
+
+  public func hasGlobalProperty(_ key: String) -> Bool {
+    withGlobalObject { globalObject in
+      globalObject.hasProperty(key, in: self)
+    }
+  }
+
   public func makeObject() -> JSEngineValue<E> {
     valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle))
   }

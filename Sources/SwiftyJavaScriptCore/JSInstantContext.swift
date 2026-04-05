@@ -41,15 +41,6 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     return JavaScriptCoreEngine.valueHandle(from: rawValue)
   }
 
-  var globalObjectRef: JavaScriptCoreObjectRef {
-    JavaScriptCoreEngine.globalObject(in: globalContextRef)!
-  }
-
-  public func withGlobalObject<R: ~Copyable>(_ body: (borrowing JSValue) -> R) -> R {
-    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
-    return body(globalObject)
-  }
-
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback
@@ -63,69 +54,14 @@ extension JSEngineInstantContext where E == JavaScriptCoreEngine {
     callback: @escaping JSFunctionCallback
   ) {
     let function = makeFunction(named: name, callback: callback)
-    let globalObject = JSValue(ref: globalObjectRef, ctx: self)
-    _ = JavaScriptCoreEngine.setStringPropertyHandle(
-      name,
-      on: globalObject.valueHandle(),
-      to: function.valueHandle(),
-      in: driverContextHandle,
-      attributes: attributes.hostMemberAttributes
-    )
-  }
-
-  public func setGlobalProperty<Val>(
-    _ value: borrowing Val,
-    forKey key: String,
-    with attributes: JSPropertyAttributes = .none
-  ) where Val: JSValueEncodable, Val: ~Copyable {
-    let ownedKey = JSStringManaged(key)
     withGlobalObject { globalObject in
-      globalObject.setProperty(value, forKey: ownedKey, with: attributes, in: self)
+      _ = JavaScriptCoreEngine.setStringPropertyHandle(
+        name,
+        on: globalObject.valueHandle(),
+        to: function.valueHandle(),
+        in: driverContextHandle,
+        attributes: attributes.hostMemberAttributes
+      )
     }
   }
-
-  public func setGlobalProperty<C: JSValueEncoder>(
-    _ value: C.SwiftType,
-    forKey key: String,
-    using converter: C.Type,
-    with attributes: JSPropertyAttributes = .none
-  ) {
-    let ownedKey = JSStringManaged(key)
-    withGlobalObject { globalObject in
-      globalObject.setProperty(
-        value, forKey: ownedKey, using: converter, with: attributes, in: self)
-    }
-  }
-
-  public func getGlobalProperty(forKey key: String) -> JSValue {
-    let ownedKey = JSStringManaged(key)
-    return withGlobalObject { globalObject in
-      globalObject.getProperty(forKey: ownedKey, in: self)
-    }
-  }
-
-  public func getGlobalProperty<C: JSValueDecoder>(
-    forKey key: String,
-    using converter: C.Type
-  ) -> C.SwiftType {
-    let ownedKey = JSStringManaged(key)
-    return withGlobalObject { globalObject in
-      globalObject.getProperty(forKey: ownedKey, using: converter, in: self)
-    }
-  }
-
-  public func deleteGlobalProperty(forKey key: String) {
-    let ownedKey = JSStringManaged(key)
-    withGlobalObject { globalObject in
-      globalObject.deleteProperty(forKey: ownedKey, in: self)
-    }
-  }
-
-  public func hasGlobalProperty(_ key: String) -> Bool {
-    let ownedKey = JSStringManaged(key)
-    return withGlobalObject { globalObject in
-      globalObject.hasProperty(ownedKey, in: self)
-    }
-  }
-
 }

@@ -196,6 +196,15 @@ public enum JavaScriptCoreEngine: JSEngine {
     makeContext(in: runtime)
   }
 
+  public static func globalObjectValueHandle(
+    _ context: JavaScriptCoreContextHandle
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let objectRef = globalObject(in: context.ref) else {
+      return nil
+    }
+    return valueHandle(from: objectRef, in: context)
+  }
+
   public static func makeStringValueHandle(
     _ value: String,
     _ context: JavaScriptCoreContextHandle

@@ -9,6 +9,8 @@ public protocol _JSEngineRuntimeDriver {
   static func makeRuntimeHandle() -> RuntimeHandle
   static func makeBorrowedContextHandleFromRuntime(in runtime: RuntimeHandle) -> ContextHandle?
 
+  static func globalObjectValueHandle(_ context: ContextHandle) -> ValueHandle?
+
   static func evaluateScriptResultHandle(
     _ script: String,
     _ context: ContextHandle,

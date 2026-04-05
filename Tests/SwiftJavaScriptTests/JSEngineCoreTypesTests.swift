@@ -349,6 +349,14 @@ extension MockDriver {
     return MockContextHandle(rawContext: makeContext(in: runtime.rawRuntime))
   }
 
+  fileprivate static func globalObjectValueHandle(
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    let rawContext = context.rawContext
+    return JSValueHandle<MockEngine>(
+      rawValue: MockValue(kind: "object", payload: "\(rawContext.runtimeID):global"))
+  }
+
   fileprivate static func makeStringValueHandle(
     _ value: String,
     _ context: MockContextHandle
@@ -827,6 +835,12 @@ extension MockEngine {
     in runtime: MockRuntimeHandle
   ) -> MockContextHandle? {
     MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime)
+  }
+
+  public static func globalObjectValueHandle(
+    _ context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.globalObjectValueHandle(context)
   }
 
   public static func evaluateScriptResultHandle(
