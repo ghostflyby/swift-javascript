@@ -9,114 +9,24 @@ extension JSClassAttributes {
 
 public typealias JSStaticValue = JSEngineStaticValue<JavaScriptCoreEngine>
 public typealias JSStaticFunction = JSEngineStaticFunction<JavaScriptCoreEngine>
+public typealias JSClassDefinition = JSEngineClassDefinition<
+  JavaScriptCoreEngine,
+  JSClass,
+  JavaScriptCorePropertyNameAccumulatorRef
+>
 
-public struct JSClassDefinition: Sendable {
-
-  public var version: Int32 = 0
-
-  public var attributes: JSClassAttributes = .none
-
-  public var className: String? {
-    didSet {
-      if let className {
-        _className = className.utf8CString
-      } else {
-        _className = nil
-      }
-    }
-  }
-
-  private var _className: ContiguousArray<CChar>? = nil
-
-  public var parentClass: JSClass? = nil
-
-  public var staticValues: [JSStaticValue] = []
-
-  public var staticFunctions: [JSStaticFunction] = []
-
-  public var initialize: (@Sendable (borrowing JSValue, borrowing JSInstantContext) -> Void)? = nil
-
-  public var finalize: (@Sendable (borrowing JSValue) -> Void)? = nil
-
-  public var hasProperty:
-    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> Bool)? = nil
-
-  public var getProperty:
-    (
-      @Sendable (borrowing JSInstantContext, borrowing JSValue, String)
-        -> JSResult<JSValue>
-    )? =
-      nil
-
-  public var setProperty:
-    (
-      @Sendable (borrowing JSInstantContext, borrowing JSValue, String, borrowing JSValue) ->
-        JSValue?
-    )? =
-      nil
-
-  public var deleteProperty:
-    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> Bool)? =
-      nil
-
-  public var getPropertyNames:
-    (
-      @Sendable (
-        borrowing JSInstantContext, inout JSValue, JavaScriptCorePropertyNameAccumulatorRef
-      ) -> Void
-    )? =
-      nil
-
-  public var callAsFunction:
-    (
-      @Sendable (
-        borrowing JSInstantContext,
-        inout JSValue,
-        inout JSValue,
-        borrowing JSArguments<JavaScriptCoreEngine>
-      ) -> JSValue
-    )? = nil
-
-  public var callAsConstructor:
-    (
-      @Sendable (
-        borrowing JSInstantContext,
-        inout JSValue,
-        inout JSValue,
-        borrowing JSArguments<JavaScriptCoreEngine>
-      ) -> JSValue
-    )? = nil
-
-  public var hasInstance:
-    (@Sendable (borrowing JSInstantContext, inout JSValue, inout JSValue) -> Bool)? =
-      nil
-
-  public var convertToType:
-    (@Sendable (borrowing JSInstantContext, inout JSValue, JSType, inout JSValue) -> JSValue)? =
-      nil
-
+extension JSEngineClassDefinition
+where
+  E == JavaScriptCoreEngine,
+  ParentClass == JSClass,
+  PropertyNameAccumulator == JavaScriptCorePropertyNameAccumulatorRef
+{
   public func hostTypeDescriptor(
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
   ) -> JSHostTypeDescriptor {
-    projectClassHostTypeDescriptor(
-      className: className,
-      parentName: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className },
-      staticValues: staticValues,
-      staticFunctions: staticFunctions,
+    hostTypeDescriptor(
       storagePolicy: storagePolicy,
-      flags: JSClassHostDescriptorProjectionFlags(
-        hasInitializer: initialize != nil,
-        hasFinalizer: finalize != nil,
-        hasDynamicPropertyGetter: getProperty != nil,
-        hasDynamicPropertySetter: setProperty != nil,
-        hasDynamicPropertyHas: hasProperty != nil,
-        hasDynamicPropertyDelete: deleteProperty != nil,
-        hasPropertyEnumerator: getPropertyNames != nil,
-        hasCallAsFunction: callAsFunction != nil,
-        hasConstructor: callAsConstructor != nil,
-        hasHasInstance: hasInstance != nil,
-        hasConvertToType: convertToType != nil
-      )
+      parentName: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className }
     )
   }
 }
