@@ -86,7 +86,7 @@ class ExportedFunctionNode {
 }
 
 @Test func jsClassAutoConvertibleRoundTripsReferenceIdentity() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedLeafNode(base: 1, child: "leaf", enabled: true)
@@ -103,7 +103,7 @@ class ExportedFunctionNode {
 }
 
 @Test func jsClassAutoConvertibleReflectsInheritedStoredProperties() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedLeafNode(base: 2, child: "branch", enabled: true)
@@ -134,7 +134,7 @@ class ExportedFunctionNode {
 }
 
 @Test func jsClassAutoConvertibleBuildsJSClassAndPrototypeInheritanceChain() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   let hasParentClass =
     ExportedChildNode.jsClassDefinition.parentClass?.ref == ExportedBaseNode.jsClass.ref
@@ -164,7 +164,7 @@ class ExportedFunctionNode {
 }
 
 @Test func jsClassAutoConvertibleExportsMarkedMethods() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedFunctionNode(name: "leaf", count: 4)

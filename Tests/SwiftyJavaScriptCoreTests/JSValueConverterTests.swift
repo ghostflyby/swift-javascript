@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func builtinCodableRoundtrip() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let key = JSStringManaged("number")
@@ -24,7 +24,7 @@ import Testing
 }
 
 @Test func converterOverrideForPropertyReadWrite() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let key = JSStringManaged("flag")
@@ -40,7 +40,7 @@ import Testing
 }
 
 @Test func converterOverrideForArgumentsRead() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let source = JSValue(number: 1, in: context)
@@ -55,7 +55,7 @@ import Testing
 }
 
 @Test func converterOverrideForArgumentsReadVariadic() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let boolSource = JSValue(number: 1, in: context)
@@ -76,7 +76,7 @@ import Testing
 }
 
 @Test func strictTryDecodeRejectsMismatchedType() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let stringValue = JSValue(string: "x", in: context)
@@ -90,7 +90,7 @@ import Testing
 }
 
 @Test func strictTryUnpackRejectsMismatchedType() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let source = JSValue(string: "x", in: context)
@@ -110,7 +110,7 @@ import Testing
 }
 
 @Test func strictTryEncodeCanFail() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let value = FailingEncodeValue()
@@ -124,7 +124,7 @@ import Testing
 }
 
 @Test func functionInitSupportsReturnAndErrorCoder() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let fn: JSValue<JavaScriptCoreEngine> = JSValue(

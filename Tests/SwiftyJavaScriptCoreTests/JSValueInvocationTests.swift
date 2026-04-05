@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func jsValueCallSupportsThisAndArguments() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let functionResult = context.evaluateScript("(function(a, b) { return this.base + a + b })")
@@ -27,7 +27,7 @@ import Testing
 }
 
 @Test func jsValueConstructCreatesObject() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let constructorResult = context.evaluateScript(
@@ -57,7 +57,7 @@ import Testing
 }
 
 @Test func jsValueInvokeMethodUsesReceiverAndSurfacesErrors() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let objectResult = context.evaluateScript(

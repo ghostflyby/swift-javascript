@@ -1,6 +1,6 @@
 import Dispatch
 
-public class JSEngineVirtualMachine<E: JSEngine>: @unchecked Sendable {
+public class JSVirtualMachine<E: JSEngine>: @unchecked Sendable {
   package let driverRuntimeHandle: E.RuntimeHandle
   private let executor: SingleThreadExecutor
   public let unownedExecutor: UnownedSerialExecutor
@@ -17,13 +17,13 @@ public class JSEngineVirtualMachine<E: JSEngine>: @unchecked Sendable {
   }
 }
 
-extension JSEngineVirtualMachine: Equatable where E.RuntimeHandle: Equatable {
-  public static func == (lhs: JSEngineVirtualMachine<E>, rhs: JSEngineVirtualMachine<E>) -> Bool {
+extension JSVirtualMachine: Equatable where E.RuntimeHandle: Equatable {
+  public static func == (lhs: JSVirtualMachine<E>, rhs: JSVirtualMachine<E>) -> Bool {
     lhs.driverRuntimeHandle == rhs.driverRuntimeHandle
   }
 }
 
-extension JSEngineVirtualMachine: Hashable where E.RuntimeHandle: Hashable {
+extension JSVirtualMachine: Hashable where E.RuntimeHandle: Hashable {
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(driverRuntimeHandle)

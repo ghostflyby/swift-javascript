@@ -1,10 +1,10 @@
 public actor JSEngineContext<E: JSEngine> {
   nonisolated package let driverContextHandle: E.ContextHandle
-  public let virtualMachine: JSEngineVirtualMachine<E>
+  public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
 
   package init(
-    virtualMachine: JSEngineVirtualMachine<E>,
+    virtualMachine: JSVirtualMachine<E>,
     driverContextHandle: E.ContextHandle
   ) {
     self.virtualMachine = virtualMachine

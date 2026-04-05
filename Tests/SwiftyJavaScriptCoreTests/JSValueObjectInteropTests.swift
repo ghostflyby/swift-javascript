@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func jsValueObjectAndTypeHelpersWork() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let arrayResult = context.evaluateScript("[1, 2, 3]")
@@ -49,7 +49,7 @@ import Testing
 }
 
 @Test func jsValueDefinePropertyAppliesAttributes() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let object = JSValue(objectIn: context)
@@ -70,7 +70,7 @@ import Testing
 }
 
 @Test func jsValueDefinePropertyRespectsDontEnumAndDontDelete() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let hiddenKey = JSStringManaged("hiddenFlag")
@@ -116,7 +116,7 @@ import Testing
 }
 
 @Test func jsValueObjectAndArrayInitializersCreateExpectedKinds() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let object = JSValue(objectIn: context)

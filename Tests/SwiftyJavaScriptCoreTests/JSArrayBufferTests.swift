@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func arrayBufferCreatesZeroedStorageAndSupportsMutation() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let buffer = JSArrayBuffer<JavaScriptCoreEngine>(byteLength: 4, in: context)
@@ -36,7 +36,7 @@ import Testing
 }
 
 @Test func arrayBufferCanCopyBytesAndWrapExistingJSValue() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let copied = JSArrayBuffer<JavaScriptCoreEngine>(copying: [1, 2, 3, 4], in: context)
@@ -67,7 +67,7 @@ import Testing
 }
 
 @Test func typedArrayCreatesStorageAndExposesBytes() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let typedArray = JSTypedArray<JavaScriptCoreEngine>(type: .uint16Array, length: 4, in: context)
@@ -100,7 +100,7 @@ import Testing
 }
 
 @Test func typedArrayCanWrapArrayBufferSliceAndExistingJSValue() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let buffer = JSArrayBuffer<JavaScriptCoreEngine>(

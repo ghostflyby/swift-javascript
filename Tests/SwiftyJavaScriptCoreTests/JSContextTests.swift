@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func evaluateScriptReturnsValueForValidScript() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let result = context.evaluateScript("1 + 2")
@@ -20,7 +20,7 @@ import Testing
 }
 
 @Test func evaluateScriptSupportsSourceURL() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let script = JSStringManaged("40 + 2")
@@ -39,7 +39,7 @@ import Testing
 }
 
 @Test func evaluateScriptReturnsExceptionForThrowingScript() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let result = context.evaluateScript("throw new Error('boom')", sourceURL: "inline://throw.js")
@@ -55,7 +55,7 @@ import Testing
 }
 
 @Test func instantContextSupportsNativeModuleStyleGlobalHelpers() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withInstantContext { context in
     let answerKey = "answer"
@@ -92,7 +92,7 @@ import Testing
 }
 
 @Test func contextThinWrapsInstantContextGlobalHelpers() async {
-  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let countKey = "count"
