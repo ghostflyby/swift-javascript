@@ -205,6 +205,25 @@ public enum JavaScriptCoreEngine: JSEngine {
     return valueHandle(from: objectRef, in: context)
   }
 
+  public static func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    guard let rawContext = rawContext(from: context) else {
+      return nil
+    }
+
+    let rawValue = makeFunction(
+      named: name,
+      callback: callback,
+      in: rawContext,
+      functionClass: context.functionClassRef
+    )
+
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: rawValue)
+  }
+
   public static func makeStringValueHandle(
     _ value: String,
     _ context: JavaScriptCoreContextHandle

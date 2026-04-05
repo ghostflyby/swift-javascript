@@ -137,6 +137,7 @@
 - [x] 继续收口 `JSCodableValueConverter` facade/raw JSC 类型直连（已统一改用 backend 暴露的 *Ref 别名并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `String` facade/raw JSC 字符串直连（已将 JSString 操作改走 backend helper 与公开别名，并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `JSInstantContext` facade/raw JSC 上下文直连（已改用 backend 暴露的 context/object 别名与 globalObject helper，并移除本文件 `import JavaScriptCore`）
+- [x] 继续迁移 `JSInstantContext` 函数创建/安装通用入口到 `SwiftJavaScript`（已下沉 `makeFunction` 与 `installGlobalFunction`，facade 收敛为 JSC 特化上下文辅助）
 - [x] 继续收口 `JSArrayBuffer` facade/raw JSC typed-array 直连（已将 ArrayBuffer/TypedArray C API 调用与常量改走 backend helper，并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `JSValue` facade/raw JSC 值语义直连（已将 unprotect/equality 严格等价判断改走 backend helper，并移除本文件 `import JavaScriptCore`）
 - [x] 继续收口 `JSClassValueConvertible` facade/raw JSC callback 类型直连（已将 class/callback/ref 类型与 undefined fallback 改走 backend 别名/helper，并移除本文件 `import JavaScriptCore`）

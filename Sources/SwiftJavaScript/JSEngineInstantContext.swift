@@ -152,6 +152,31 @@ extension JSEngineInstantContext {
     valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
   }
 
+  public func makeFunction(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<E>
+  ) -> JSEngineValue<E> where E.Engine == E {
+    valueFromHandle(
+      E.makeFunctionValueHandle(
+        named: name,
+        callback: callback,
+        in: driverContextHandle
+      ),
+      "JSEngineInstantContext.makeFunction could not create handle"
+    )
+  }
+
+  public func installGlobalFunction(
+    named name: String,
+    with attributes: JSPropertyAttributes = .none,
+    callback: @escaping JSEngineFunctionCallback<E>
+  ) where E.Engine == E {
+    let function = makeFunction(named: name, callback: callback)
+    withGlobalObject { globalObject in
+      globalObject.setProperty(function, forKey: name, with: attributes, in: self)
+    }
+  }
+
   public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(

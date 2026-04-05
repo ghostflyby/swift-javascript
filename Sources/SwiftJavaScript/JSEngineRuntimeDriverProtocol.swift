@@ -11,6 +11,12 @@ public protocol _JSEngineRuntimeDriver {
 
   static func globalObjectValueHandle(_ context: ContextHandle) -> ValueHandle?
 
+  static func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<Engine>,
+    in context: ContextHandle
+  ) -> ValueHandle?
+
   static func evaluateScriptResultHandle(
     _ script: String,
     _ context: ContextHandle,

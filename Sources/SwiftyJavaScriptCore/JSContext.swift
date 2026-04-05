@@ -27,23 +27,4 @@ extension JSEngineContext where E == JavaScriptCoreEngine {
   nonisolated var globalContextRef: JSGlobalContextRef {
     driverContextHandle.ref
   }
-
-  public func makeFunction(
-    named name: String,
-    callback: @escaping JSFunctionCallback
-  ) -> JSValue {
-    withInstantContext { instantContext in
-      instantContext.makeFunction(named: name, callback: callback)
-    }
-  }
-
-  public func installGlobalFunction(
-    named name: String,
-    with attributes: SwiftJavaScript.JSPropertyAttributes = .none,
-    callback: @escaping JSFunctionCallback
-  ) {
-    withInstantContext { instantContext in
-      instantContext.installGlobalFunction(named: name, with: attributes, callback: callback)
-    }
-  }
 }

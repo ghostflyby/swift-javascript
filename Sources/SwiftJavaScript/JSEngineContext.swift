@@ -129,6 +129,25 @@ extension JSEngineContext {
     }
   }
 
+  public func makeFunction(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<E>
+  ) -> JSEngineValue<E> where E.Engine == E {
+    withInstantContext { instantContext in
+      instantContext.makeFunction(named: name, callback: callback)
+    }
+  }
+
+  public func installGlobalFunction(
+    named name: String,
+    with attributes: JSPropertyAttributes = .none,
+    callback: @escaping JSEngineFunctionCallback<E>
+  ) where E.Engine == E {
+    withInstantContext { instantContext in
+      instantContext.installGlobalFunction(named: name, with: attributes, callback: callback)
+    }
+  }
+
   public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script)

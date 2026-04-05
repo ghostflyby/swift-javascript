@@ -357,6 +357,17 @@ extension MockDriver {
       rawValue: MockValue(kind: "object", payload: "\(rawContext.runtimeID):global"))
   }
 
+  fileprivate static func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    _ = callback
+    let rawContext = context.rawContext
+    return JSValueHandle<MockEngine>(
+      rawValue: MockValue(kind: "function", payload: "\(rawContext.runtimeID):\(name)"))
+  }
+
   fileprivate static func makeStringValueHandle(
     _ value: String,
     _ context: MockContextHandle
@@ -841,6 +852,14 @@ extension MockEngine {
     _ context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     MockDriver.globalObjectValueHandle(context)
+  }
+
+  public static func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSEngineFunctionCallback<MockEngine>,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: context)
   }
 
   public static func evaluateScriptResultHandle(
