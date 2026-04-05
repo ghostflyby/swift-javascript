@@ -197,7 +197,7 @@
 
 #### 非收口边界（显式约束）
 - [ ] 保持 `JSValue`/`JSObject` 的用户语义 API 不下沉（初始化器形态、转换器选择、错误映射等）
-- [ ] 保持 `JSCodableValueConverter` 的业务序列化语义不下沉（树遍历与节点决策留在转换层）
+- [x] 调整 `JSCodableValueConverter` 的迁移边界（业务序列化语义已迁移到 `SwiftJavaScript` 通用转换层，facade 仅保留 typealias 兼容层）
 - [ ] 保持 `JSClassDefinition` 元编程组装不下沉（descriptor 组装与导出语义留在定义层）
 
 ### 8.2 里程碑：将 `JSValue` 迁移到 `SwiftJavaScript`
@@ -237,7 +237,8 @@
 - [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `_JSEngineStringDriver` 与 JSC/mock 实现）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [x] 继续下沉 Context 全局对象/全局属性通用能力到 core（已补 runtime driver 的 global object handle 抽象，并将 JSInstantContext/JSContext 全局对象与全局属性通用方法下沉到 core）
-- [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSEngineValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化改为 `consuming` 所有权转移，保留复制路径显式 retain）
+- [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSEngineValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
+- [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
 阶段 B：按垂直切片迁移，逐段收口
