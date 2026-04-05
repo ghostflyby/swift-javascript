@@ -4,4 +4,4 @@ public typealias JSFunctionCallback =
     _ function: borrowing JSValue,
     _ this: borrowing JSValue,
     _ arguments: borrowing JSArguments<JavaScriptCoreEngine>
-  ) -> JSResult
+  ) -> JSResult<JSValue>

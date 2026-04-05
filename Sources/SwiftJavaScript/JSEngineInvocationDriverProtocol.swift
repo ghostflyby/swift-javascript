@@ -4,18 +4,18 @@ public protocol _JSEngineInvocationDriver: _JSEngineRuntimeDriver {
     this thisValue: ValueHandle?,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func constructHandle(
     _ constructor: ValueHandle,
     arguments: [ValueHandle],
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func toObjectHandle(
     _ value: ValueHandle,
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func isArrayHandle(
     _ value: ValueHandle,

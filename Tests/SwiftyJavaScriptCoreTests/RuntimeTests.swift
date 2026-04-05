@@ -3,8 +3,8 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func virtualMachineHashableAndIdentity() {
-  let vm1 = SwiftyJavaScriptCore.JSVirtualMachine()
-  let vm2 = SwiftyJavaScriptCore.JSVirtualMachine()
+  let vm1 = JSEngineVirtualMachine<JavaScriptCoreEngine>()
+  let vm2 = JSEngineVirtualMachine<JavaScriptCoreEngine>()
 
   #expect(vm1 == vm1)
   #expect(vm1 != vm2)
@@ -12,7 +12,7 @@ import Testing
 }
 
 @Test func contextHashableAndGlobalObject() async {
-  let vm = SwiftyJavaScriptCore.JSVirtualMachine()
+  let vm = JSEngineVirtualMachine<JavaScriptCoreEngine>()
   let context1 = JSContext(virtualMachine: vm)
   let context2 = JSContext(virtualMachine: vm)
 
@@ -28,7 +28,7 @@ import Testing
 }
 
 @Test func valueInitializersAndTypePredicates() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let undefined = JSValue(undefinedIn: context)
@@ -77,7 +77,7 @@ import Testing
 }
 
 @Test func valueEqualityOperators() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
     let oneNumber = JSValue(number: 1, in: context)
@@ -97,7 +97,7 @@ import Testing
 }
 
 @Test func valuesCanBeUsedAcrossContextsInSameVirtualMachine() {
-  let vm = SwiftyJavaScriptCore.JSVirtualMachine()
+  let vm = JSEngineVirtualMachine<JavaScriptCoreEngine>()
   let sourceContext = JSContext(virtualMachine: vm)
   let targetContext = JSContext(virtualMachine: vm)
 

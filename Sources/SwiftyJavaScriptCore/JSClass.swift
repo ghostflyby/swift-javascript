@@ -10,9 +10,12 @@ extension JSClassAttributes {
 public struct JSStaticValue: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
-  public let getProperty: @Sendable (borrowing JSInstantContext, borrowing JSValue) -> JSResult
+  public let getProperty:
+    @Sendable (borrowing JSInstantContext, borrowing JSValue)
+      -> JSResult<JSValue>
   public let setProperty:
-    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSValue) -> JSResult
+    @Sendable (borrowing JSInstantContext, borrowing JSValue, borrowing JSValue)
+      -> JSResult<JSValue>
 }
 
 public struct JSStaticFunction: Sendable {
@@ -21,7 +24,7 @@ public struct JSStaticFunction: Sendable {
   public let callAsFunction:
     @Sendable (
       borrowing JSInstantContext, borrowing JSValue, borrowing JSArguments<JavaScriptCoreEngine>
-    ) -> JSResult
+    ) -> JSResult<JSValue>
 }
 
 extension JSStaticValue {
@@ -80,7 +83,10 @@ public struct JSClassDefinition: Sendable {
     (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> Bool)? = nil
 
   public var getProperty:
-    (@Sendable (borrowing JSInstantContext, borrowing JSValue, String) -> JSResult)? =
+    (
+      @Sendable (borrowing JSInstantContext, borrowing JSValue, String)
+        -> JSResult<JSValue>
+    )? =
       nil
 
   public var setProperty:
@@ -614,15 +620,16 @@ private func installCallAsFunctionCallbackIfNeeded(
       functionRef: functionRef,
       thisObjectRef: thisObjectRef
     ) { definition, context, functionValue, thisValue in
-      let callbackResult: JSPrivateResult = JavaScriptCoreEngine.withArguments(
-        arguments,
-        count: Int(argumentCount)
-      ) { args in
-        let result =
-          definition.callAsFunction?(context, &functionValue, &thisValue, args)
-          ?? JSValue(undefinedIn: context)
-        return JSResult.value(result).toPrivateResult()
-      }
+      let callbackResult: JSResult<JavaScriptCoreValueRef> =
+        JavaScriptCoreEngine.withArguments(
+          arguments,
+          count: Int(argumentCount)
+        ) { args in
+          let result =
+            definition.callAsFunction?(context, &functionValue, &thisValue, args)
+            ?? JSValue(undefinedIn: context)
+          return JSResult<JSValue>.value(result).toPrivateResult()
+        }
       return JavaScriptCoreEngine.callbackReturnValue(
         callbackResult,
         in: ctx,
@@ -667,18 +674,20 @@ private func installCallAsConstructorCallbackIfNeeded(
       ctx: ctx,
       constructorRef: constructorRef
     ) { definition, context, constructorValue, thisValue in
-      let callbackResult: JSPrivateResult = JavaScriptCoreEngine.withArguments(
-        arguments,
-        count: Int(argumentCount)
-      ) { args in
-        let result =
-          definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
-          ?? JSValue(undefinedIn: context)
-        guard result.isObject(in: context) else {
-          return JSResult.value(JSValue(undefinedIn: context)).toPrivateResult()
+      let callbackResult: JSResult<JavaScriptCoreValueRef> =
+        JavaScriptCoreEngine.withArguments(
+          arguments,
+          count: Int(argumentCount)
+        ) { args in
+          let result =
+            definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
+            ?? JSValue(undefinedIn: context)
+          guard result.isObject(in: context) else {
+            return JSResult<JSValue>.value(JSValue(undefinedIn: context))
+              .toPrivateResult()
+          }
+          return JSResult<JSValue>.value(result).toPrivateResult()
         }
-        return JSResult.value(result).toPrivateResult()
-      }
       return JavaScriptCoreEngine.constructorCallbackReturnValue(
         callbackResult,
         in: ctx,
@@ -840,11 +849,11 @@ private func installConvertToTypeCallbackIfNeeded(
         exceptionRef = exceptionValue.takeRef()
         exceptionValue = JSValue(undefinedIn: context)
       }
-      let conversion: JSPrivateResult =
+      let conversion: JSResult<JavaScriptCoreValueRef> =
         if let exceptionRef {
           .exception(exceptionRef)
         } else {
-          JSResult.value(result).toPrivateResult()
+          JSResult<JSValue>.value(result).toPrivateResult()
         }
       return JavaScriptCoreEngine.callbackReturnValue(
         conversion,

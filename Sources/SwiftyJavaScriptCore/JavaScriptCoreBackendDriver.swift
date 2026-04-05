@@ -177,7 +177,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   private static func resultHandle(
     from result: JSDriverResult<JavaScriptCoreRawValue>
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>> {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
     switch result {
     case .value(let value):
       return .value(JSValueHandle<JavaScriptCoreEngine>(rawValue: value))
@@ -265,7 +265,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeObjectResultHandle(
     _ context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -274,7 +274,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeArrayResultHandle(
     _ context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -286,7 +286,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ context: JavaScriptCoreContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -366,7 +366,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -401,7 +401,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -412,7 +412,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -519,7 +519,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -539,7 +539,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ constructor: JSValueHandle<JavaScriptCoreEngine>,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -551,7 +551,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func toObjectHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     guard let rawContext = rawContext(from: context) else {
       return nil
     }
@@ -854,7 +854,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     of jsClass: JSClassRef,
     privateData: UnsafeMutableRawPointer?,
     in context: JavaScriptCoreContextHandle
-  ) -> JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     let rawContext = context
 
     switch makeObject(of: jsClass, privateData: privateData, in: rawContext) {
@@ -1610,7 +1610,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   static func callbackReturnValue(
-    _ result: borrowing JSPrivateResult,
+    _ result: borrowing JSResult<JavaScriptCoreValueRef>,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSValueRef? {
@@ -1635,7 +1635,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   static func constructorCallbackReturnValue(
-    _ result: borrowing JSPrivateResult,
+    _ result: borrowing JSResult<JavaScriptCoreValueRef>,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSObjectRef? {

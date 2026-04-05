@@ -1,11 +1,11 @@
-public enum JSResultPayload<Value: ~Copyable>: ~Copyable {
+public enum JSResult<Value: ~Copyable>: ~Copyable {
   case value(Value)
   case exception(Value)
 }
 
-extension JSResultPayload: Copyable where Value: Copyable {}
+extension JSResult: Copyable where Value: Copyable {}
 
-extension JSResultPayload {
+extension JSResult {
   public var isException: Bool {
     switch self {
     case .value:
@@ -17,8 +17,8 @@ extension JSResultPayload {
 }
 
 public func bridgeHandleResult<E: JSEngine>(
-  _ handleResult: JSResultPayload<JSValueHandle<E>>?
-) -> JSResultPayload<JSEngineValue<E>> {
+  _ handleResult: JSResult<JSValueHandle<E>>?
+) -> JSResult<JSEngineValue<E>> {
   guard let handleResult else {
     preconditionFailure("JSResult handle bridge unexpectedly returned nil")
   }

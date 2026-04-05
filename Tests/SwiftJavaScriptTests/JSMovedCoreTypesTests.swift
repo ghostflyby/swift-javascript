@@ -109,8 +109,8 @@ import Testing
 }
 
 @Test func jsResultPayloadKeepsValueAndExceptionCases() {
-  let ok = JSResultPayload<Int>.value(42)
-  let failure = JSResultPayload<Int>.exception(7)
+  let ok = JSResult<Int>.value(42)
+  let failure = JSResult<Int>.exception(7)
 
   switch ok {
   case .value(let value):

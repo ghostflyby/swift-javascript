@@ -12,7 +12,7 @@ import Testing
 }
 
 @Test func setGetHasDeletePropertyWithStringKey() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let key = JSStringManaged("strKey")
@@ -32,7 +32,7 @@ import Testing
 }
 
 @Test func setGetHasDeletePropertyWithValueKey() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let key = JSValue(string: "valueKey", in: context)
@@ -52,7 +52,7 @@ import Testing
 }
 
 @Test func setGetPropertyAtIndex() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(TestBoolMarshal(true), at: 2, in: context)

@@ -3,10 +3,10 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func arrayBufferCreatesZeroedStorageAndSupportsMutation() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let buffer = JSArrayBuffer(byteLength: 4, in: context)
+    let buffer = JSArrayBuffer<JavaScriptCoreEngine>(byteLength: 4, in: context)
     let length = buffer.byteLength
 
     var initialBytes: [UInt8] = []
@@ -36,10 +36,10 @@ import Testing
 }
 
 @Test func arrayBufferCanCopyBytesAndWrapExistingJSValue() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
-    let copied = JSArrayBuffer(copying: [1, 2, 3, 4], in: context)
+    let copied = JSArrayBuffer<JavaScriptCoreEngine>(copying: [1, 2, 3, 4], in: context)
     var copiedBytes: [UInt8] = []
     copied.withUnsafeBytes { rawBuffer in
       copiedBytes = Array(rawBuffer.bindMemory(to: UInt8.self))
@@ -54,7 +54,7 @@ import Testing
     case .value(let value):
       let isArrayBuffer = value.isArrayBuffer(in: context)
       #expect(isArrayBuffer)
-      if let wrapped = JSArrayBuffer(value: value, in: context) {
+      if let wrapped = JSArrayBuffer<JavaScriptCoreEngine>(value: value, in: context) {
         #expect(wrapped.byteLength == 3)
       } else {
         Issue.record("Expected JSValue to wrap as JSArrayBuffer")
@@ -66,10 +66,10 @@ import Testing
 }
 
 @Test func typedArrayCreatesStorageAndExposesBytes() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let typedArray = JSTypedArray(type: .uint16Array, length: 4, in: context)
+    let typedArray = JSTypedArray<JavaScriptCoreEngine>(type: .uint16Array, length: 4, in: context)
 
     typedArray.withUnsafeMutableBytes { rawBuffer in
       let words = rawBuffer.bindMemory(to: UInt16.self)
@@ -99,11 +99,12 @@ import Testing
 }
 
 @Test func typedArrayCanWrapArrayBufferSliceAndExistingJSValue() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
-    let buffer = JSArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: context)
-    let typedArray = JSTypedArray(
+    let buffer = JSArrayBuffer<JavaScriptCoreEngine>(
+      copying: [10, 20, 30, 40, 50, 60], in: context)
+    let typedArray = JSTypedArray<JavaScriptCoreEngine>(
       type: .uint8Array,
       buffer: buffer,
       byteOffset: 2,
@@ -129,7 +130,7 @@ import Testing
     case .value(let value):
       let isTypedArray = value.isTypedArray(in: context)
       #expect(isTypedArray)
-      if let wrapped = JSTypedArray(value: value, in: context) {
+      if let wrapped = JSTypedArray<JavaScriptCoreEngine>(value: value, in: context) {
         #expect(wrapped.kind == .uint8Array)
         #expect(wrapped.length == 5)
         #expect(wrapped.byteOffset == 0)

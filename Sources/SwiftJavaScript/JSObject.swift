@@ -240,7 +240,7 @@ extension JSEngineValue {
     forKey key: String,
     in context: borrowing JSEngineInstantContext<E>
   ) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
       E.getStringPropertyHandle(
         key,
         on: valueHandle(),
@@ -259,7 +259,7 @@ extension JSEngineValue {
     forKey key: borrowing JSEngineValue<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
       E.getValuePropertyHandle(
         key.valueHandle(),
         on: valueHandle(),
@@ -278,7 +278,7 @@ extension JSEngineValue {
     at index: UInt32,
     in context: borrowing JSEngineInstantContext<E>
   ) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
       E.getIndexPropertyHandle(
         at: index,
         on: valueHandle(),

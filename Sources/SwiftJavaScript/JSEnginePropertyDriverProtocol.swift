@@ -8,7 +8,7 @@ public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
     _ key: String,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func setStringPropertyHandle(
     _ key: String,
@@ -22,13 +22,13 @@ public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
     _ key: ValueHandle,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func getIndexPropertyHandle(
     at index: UInt32,
     on object: ValueHandle,
     in context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func setValuePropertyHandle(
     _ key: ValueHandle,

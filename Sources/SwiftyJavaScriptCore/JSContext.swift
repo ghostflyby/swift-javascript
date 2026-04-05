@@ -3,7 +3,7 @@
 public typealias JSContext = JSEngineContext<JavaScriptCoreEngine>
 
 extension JSEngineContext where E == JavaScriptCoreEngine {
-  public init(virtualMachine: JSVirtualMachine) {
+  public init(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>) {
     guard
       let driverContextHandle = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(
         in: virtualMachine.driverRuntimeHandle)

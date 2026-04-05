@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func codableConverterRoundtripDirectObjectGraph() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let user = CodableUser(

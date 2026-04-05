@@ -261,7 +261,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     on object: JSValueHandle<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) throws(JSValueConversionError) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
       E.getStringPropertyHandle(
         key,
         on: object,
@@ -282,7 +282,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     on object: JSValueHandle<E>,
     in context: borrowing JSEngineInstantContext<E>
   ) throws(JSValueConversionError) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(
       E.getIndexPropertyHandle(
         at: index,
         on: object,

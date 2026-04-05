@@ -16,7 +16,7 @@ public protocol _JSEngineRuntimeDriver {
     _ context: ContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func valueTypeForHandle(
     _ value: ValueHandle,
@@ -68,9 +68,9 @@ public protocol _JSEngineRuntimeDriver {
 
   static func makeObjectResultHandle(
     _ context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 
   static func makeArrayResultHandle(
     _ context: ContextHandle
-  ) -> JSResultPayload<ValueHandle>?
+  ) -> JSResult<ValueHandle>?
 }

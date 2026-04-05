@@ -329,7 +329,7 @@ private enum MockDriver: JSEngine {
 
 extension MockDriver {
   fileprivate static func resultHandle(from result: JSDriverResult<MockValue>)
-    -> JSResultPayload<JSValueHandle<MockEngine>>
+    -> JSResult<JSValueHandle<MockEngine>>
   {
     switch result {
     case .value(let value):
@@ -397,14 +397,14 @@ extension MockDriver {
 
   fileprivate static func makeObjectResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: makeObject(in: rawContext))
   }
 
   fileprivate static func makeArrayResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: makeArray(in: rawContext))
   }
@@ -414,7 +414,7 @@ extension MockDriver {
     _ context: MockContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(
       from: evaluateScript(
@@ -495,7 +495,7 @@ extension MockDriver {
     _ key: String,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
   }
@@ -526,7 +526,7 @@ extension MockDriver {
     _ key: JSValueHandle<MockEngine>,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
   }
@@ -535,7 +535,7 @@ extension MockDriver {
     at index: UInt32,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
   }
@@ -628,7 +628,7 @@ extension MockDriver {
     this thisValue: JSValueHandle<MockEngine>? = nil,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     let rawThisValue: MockValue? = thisValue?.rawValue
     let rawArguments = arguments.map(\.rawValue)
@@ -646,7 +646,7 @@ extension MockDriver {
     _ constructor: JSValueHandle<MockEngine>,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     let rawArguments = arguments.map(\.rawValue)
     return resultHandle(
@@ -656,7 +656,7 @@ extension MockDriver {
   fileprivate static func toObjectHandle(
     _ value: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     let rawContext = context.rawContext
     return resultHandle(from: toObject(value.rawValue, in: rawContext))
   }
@@ -848,7 +848,7 @@ extension MockEngine {
     _ context: MockContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.evaluateScriptResultHandle(
       script,
       context,
@@ -949,13 +949,13 @@ extension MockEngine {
 
   public static func makeObjectResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.makeObjectResultHandle(context)
   }
 
   public static func makeArrayResultHandle(
     _ context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.makeArrayResultHandle(context)
   }
 
@@ -970,7 +970,7 @@ extension MockEngine {
     _ key: String,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.getStringPropertyHandle(key, on: object, in: context)
   }
 
@@ -994,7 +994,7 @@ extension MockEngine {
     _ key: JSValueHandle<MockEngine>,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.getValuePropertyHandle(key, on: object, in: context)
   }
 
@@ -1002,7 +1002,7 @@ extension MockEngine {
     at index: UInt32,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.getIndexPropertyHandle(at: index, on: object, in: context)
   }
 
@@ -1068,7 +1068,7 @@ extension MockEngine {
     this thisValue: JSValueHandle<MockEngine>? = nil,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.callFunctionHandle(function, this: thisValue, arguments: arguments, in: context)
   }
 
@@ -1076,14 +1076,14 @@ extension MockEngine {
     _ constructor: JSValueHandle<MockEngine>,
     arguments: [JSValueHandle<MockEngine>] = [],
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.constructHandle(constructor, arguments: arguments, in: context)
   }
 
   public static func toObjectHandle(
     _ value: JSValueHandle<MockEngine>,
     in context: MockContextHandle
-  ) -> JSResultPayload<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<JSValueHandle<MockEngine>>? {
     MockDriver.toObjectHandle(value, in: context)
   }
 
@@ -1359,8 +1359,8 @@ extension MockEngine {
     rawValue: MockValue(kind: "exception", payload: "mock-error")
   )
 
-  let valueResult = JSResultPayload<JSValueHandle<MockEngine>>.value(valueHandle)
-  let exceptionResult = JSResultPayload<JSValueHandle<MockEngine>>.exception(exceptionHandle)
+  let valueResult = JSResult<JSValueHandle<MockEngine>>.value(valueHandle)
+  let exceptionResult = JSResult<JSValueHandle<MockEngine>>.exception(exceptionHandle)
 
   let valueIsException = valueResult.isException
   let exceptionIsException = exceptionResult.isException

@@ -24,9 +24,9 @@ extension JSEngineInstantContext {
 
   @inline(__always)
   private func valueFromResultHandle(
-    _ handleResult: JSResultPayload<JSValueHandle<E>>?
+    _ handleResult: JSResult<JSValueHandle<E>>?
   ) -> JSEngineValue<E> {
-    let result: JSResultPayload<JSEngineValue<E>> = bridgeHandleResult(handleResult)
+    let result: JSResult<JSEngineValue<E>> = bridgeHandleResult(handleResult)
     switch consume result {
     case .value(let value):
       return value
@@ -152,7 +152,7 @@ extension JSEngineInstantContext {
     valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
   }
 
-  public func evaluateScript(_ script: String) -> JSResultPayload<JSEngineValue<E>> {
+  public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script,
@@ -166,7 +166,7 @@ extension JSEngineInstantContext {
     _ script: String,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> {
+  ) -> JSResult<JSEngineValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script,
@@ -179,7 +179,7 @@ extension JSEngineInstantContext {
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
         script.string,
@@ -193,7 +193,7 @@ extension JSEngineInstantContext {
     _ script: borrowing Script,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
     evaluateScript(script.string, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
   }
 
@@ -201,7 +201,7 @@ extension JSEngineInstantContext {
     _ script: String,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
     evaluateScript(script, sourceURL: sourceURL.string, startingLineNumber: startingLineNumber)
   }
 
@@ -209,7 +209,7 @@ extension JSEngineInstantContext {
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>>
+  ) -> JSResult<JSEngineValue<E>>
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
     evaluateScript(
       script.string,

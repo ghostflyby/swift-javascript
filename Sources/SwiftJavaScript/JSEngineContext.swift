@@ -129,7 +129,7 @@ extension JSEngineContext {
     }
   }
 
-  public func evaluateScript(_ script: String) -> JSResultPayload<JSEngineValue<E>> {
+  public func evaluateScript(_ script: String) -> JSResult<JSEngineValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script)
     }
@@ -138,7 +138,7 @@ extension JSEngineContext {
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
     }
@@ -148,7 +148,7 @@ extension JSEngineContext {
     _ script: borrowing Script,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where Script: JSString, Script: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -162,7 +162,7 @@ extension JSEngineContext {
     _ script: String,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
+  ) -> JSResult<JSEngineValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -176,7 +176,7 @@ extension JSEngineContext {
     _ script: String,
     sourceURL: String,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>> {
+  ) -> JSResult<JSEngineValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,
@@ -190,7 +190,7 @@ extension JSEngineContext {
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
-  ) -> JSResultPayload<JSEngineValue<E>>
+  ) -> JSResult<JSEngineValue<E>>
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
     withInstantContext { instantContext in
       instantContext.evaluateScript(

@@ -19,8 +19,8 @@ extension JSInstantContext {
   }
 
   func bridgeResult(
-    _ handleResult: JSResultPayload<JSValueHandle<JavaScriptCoreEngine>>?
-  ) -> JSResult {
+    _ handleResult: JSResult<JSValueHandle<JavaScriptCoreEngine>>?
+  ) -> JSResult<JSValue> {
     .from(handleResult: handleResult)
   }
 
@@ -51,7 +51,7 @@ extension JSInstantContext {
     function: borrowing JSValue,
     this thisValueHandle: JSValueHandle<JavaScriptCoreEngine>?,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     bridgeResult(
       JavaScriptCoreEngine.callFunctionHandle(
         valueHandle(for: function),
@@ -61,14 +61,14 @@ extension JSInstantContext {
       ))
   }
 
-  func call(function: borrowing JSValue) -> JSResult {
+  func call(function: borrowing JSValue) -> JSResult<JSValue> {
     call(function: function, this: nil, arguments: [])
   }
 
   func call(
     function: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     call(function: function, this: nil, arguments: arguments)
   }
 
@@ -76,7 +76,7 @@ extension JSInstantContext {
     function: borrowing JSValue,
     this thisValue: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = []
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     call(
       function: function,
       this: valueHandle(for: thisValue),
@@ -87,7 +87,7 @@ extension JSInstantContext {
   func call<each A: JSValueEncodable>(
     function: borrowing JSValue,
     arguments: repeat each A
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     call(function: function, arguments: encodeArguments(repeat each arguments))
   }
 
@@ -95,7 +95,7 @@ extension JSInstantContext {
     function: borrowing JSValue,
     this thisValue: borrowing JSValue,
     arguments: repeat each A
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     call(
       function: function,
       this: thisValue,
@@ -106,7 +106,7 @@ extension JSInstantContext {
   func construct(
     constructor: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     bridgeResult(
       JavaScriptCoreEngine.constructHandle(
         valueHandle(for: constructor),
@@ -115,18 +115,20 @@ extension JSInstantContext {
       ))
   }
 
-  func construct(constructor: borrowing JSValue) -> JSResult {
+  func construct(constructor: borrowing JSValue) -> JSResult<JSValue> {
     construct(constructor: constructor, arguments: [])
   }
 
   func construct<each A: JSValueEncodable>(
     constructor: borrowing JSValue,
     arguments: repeat each A
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     construct(constructor: constructor, arguments: encodeArguments(repeat each arguments))
   }
 
-  func getStringProperty(_ key: String, on object: borrowing JSValue) -> JSResult {
+  func getStringProperty(_ key: String, on object: borrowing JSValue)
+    -> JSResult<JSValue>
+  {
     bridgeResult(
       JavaScriptCoreEngine.getStringPropertyHandle(
         key,
@@ -154,7 +156,7 @@ extension JSInstantContext {
     _ name: String,
     on object: borrowing JSValue,
     arguments: [JSValueHandle<JavaScriptCoreEngine>]
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     switch getStringProperty(name, on: object) {
     case .exception(let exception):
       return .exception(exception)
@@ -167,7 +169,9 @@ extension JSInstantContext {
     }
   }
 
-  func invokeMethod(_ name: String, on object: borrowing JSValue) -> JSResult {
+  func invokeMethod(_ name: String, on object: borrowing JSValue)
+    -> JSResult<JSValue>
+  {
     invokeMethod(name, on: object, arguments: [])
   }
 
@@ -175,11 +179,11 @@ extension JSInstantContext {
     _ name: String,
     on object: borrowing JSValue,
     arguments: repeat each A
-  ) -> JSResult {
+  ) -> JSResult<JSValue> {
     invokeMethod(name, on: object, arguments: encodeArguments(repeat each arguments))
   }
 
-  func toObject(_ value: borrowing JSValue) -> JSResult {
+  func toObject(_ value: borrowing JSValue) -> JSResult<JSValue> {
     bridgeResult(
       JavaScriptCoreEngine.toObjectHandle(
         valueHandle(for: value),

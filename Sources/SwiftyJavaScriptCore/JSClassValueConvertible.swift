@@ -421,7 +421,7 @@ private func autoDynamicSetPropertyCallbackResult(
     return true
   }
   if let error = setProperty(context, thisValue, key, newValue) {
-    let privateResult = JSResult.exception(error).toPrivateResult()
+    let privateResult = JSResult<JSValue>.exception(error).toPrivateResult()
     guard case .exception(let errorRef) = privateResult else {
       return true
     }

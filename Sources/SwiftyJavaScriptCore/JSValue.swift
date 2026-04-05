@@ -137,7 +137,7 @@ extension JSValue {
     let count = countTypePack(repeat (each A).self)
     let callback: JSFunctionCallback = { context, function, this, arguments in
       guard arguments.count == count else {
-        return JSResult.value(JSValue(undefinedIn: context))
+        return JSResult<JSValue>.value(JSValue(undefinedIn: context))
       }
       do {
         let typedArgs: (repeat each A) = try arguments.tryUnpack(
@@ -176,7 +176,7 @@ extension JSValue {
     let count = countTypePack(repeat (each C).self)
     let callback: JSFunctionCallback = { [swiftFunction] context, function, this, arguments in
       guard arguments.count == count else {
-        return JSResult.value(JSValue(undefinedIn: context))
+        return JSResult<JSValue>.value(JSValue(undefinedIn: context))
       }
       do {
         let typedArgs: (repeat (each C).SwiftType) = try arguments.tryUnpack(

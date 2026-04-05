@@ -3,7 +3,7 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func macroDefaultSynthesisRoundtrip() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroDefaultUser(name: "alice", age: 42)
@@ -20,7 +20,7 @@ import Testing
 }
 
 @Test func macroTypeLevelDecoderEncoderOverride() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroDelegatedUser(score: 9)
@@ -39,7 +39,7 @@ import Testing
 }
 
 @Test func macroFieldLevelOverrideUsesCustomConverter() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroFieldOverrideUser(name: "bob", active: true)
@@ -64,7 +64,7 @@ import Testing
 }
 
 @Test func macroFinalClassSerializationUsesValueSemantics() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroSerializedClass(name: "iris", active: true)
@@ -97,7 +97,7 @@ import Testing
 }
 
 @Test func macroEnumSynthesisUsesCaseNameStrings() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroStringEnum.running
@@ -117,7 +117,7 @@ import Testing
 }
 
 @Test func macroRawEnumSynthesisUsesRawValue() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroRawEnum.alpha
@@ -137,7 +137,7 @@ import Testing
 }
 
 @Test func macroAssociatedEnumSynthesisUsesTaggedObjects() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(MacroAssociatedEnum.idle, forKey: JSStringManaged("enumIdle"), in: context)
@@ -172,7 +172,7 @@ import Testing
 }
 
 @Test func macroAssociatedEnumCanDecodeTaggedObjects() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     _ = context.evaluateScript(
@@ -212,7 +212,7 @@ import Testing
 }
 
 @Test func macroAssociatedEnumCanCustomizeTagAndPayloadKeys() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
@@ -279,7 +279,7 @@ import Testing
 }
 
 @Test func macroAssociatedEnumCanFlattenLabeledPayloadIntoTopLevelObject() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
@@ -350,7 +350,7 @@ import Testing
 }
 
 @Test func macroAssociatedEnumFieldOverridesApplyPerPayloadField() async {
-  let context = JSContext(virtualMachine: SwiftyJavaScriptCore.JSVirtualMachine())
+  let context = JSContext(virtualMachine: JSEngineVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(

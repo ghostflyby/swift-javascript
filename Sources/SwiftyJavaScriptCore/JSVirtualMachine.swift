@@ -1,4 +1,0 @@
-import JavaScriptCore.JSVirtualMachine
-import SwiftJavaScript
-
-public typealias JSVirtualMachine = JSEngineVirtualMachine<JavaScriptCoreEngine>
