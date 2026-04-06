@@ -260,6 +260,7 @@
 - [x] 迁移 `JSClassValueConvertible` 的 auto storage/container 到 core（已新增 `SwiftJavaScript` 的通用 auto storage 与 class cache registry，facade 收敛为 JSC 特化 typealias 与调用）
 - [x] 迁移 `JSClass` object-definition/finalize-counter registry 到 core（新增通用 depth/finalize registry，facade 仅保留 object key 适配）
 - [x] 迁移 `JSClass` object-context/class-definition registry 到 core（新增通用 map registry，facade 仅保留 key 计算与桥接调用）
+
 - [x] 迁移 `JSClass` manual native backing 到 core（新增通用 manual backing 存储类型，facade 改为 JSC 特化 typealias）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
@@ -272,6 +273,35 @@
 阶段 C：收尾
 - [ ] 删除过渡兼容层与旧路径
 - [ ] 在 `SwiftJavaScriptTests` 增加“跨引擎误用应在编译期失败”的测试样例
+
+### 8.4 剩余 JSC -> Core 迁移清单（按步骤）
+
+边界约束：
+- [ ] 不迁移 `JSContextRef/JSGlobalContextRef/JSObjectRef/JSClassRef/JSStringRef/JSPropertyNameAccumulatorRef`、`JavaScriptCore.JSStaticValue`、`JavaScriptCore.JSStaticFunction` 本体；这些仍属于 JSC facade/backend 的原始桥接边界
+- [ ] 仅迁移这些原始类型之上的引擎无关组装逻辑、结果桥接模板与可复用的定义投影逻辑
+
+Step 1：继续删 facade 薄包装
+- [ ] 评估并删除 `Sources/SwiftyJavaScriptCore/JSValueResultBridge.swift` 中仅作 core `bridgeHandleResult` 薄封装的入口，调用点直接落到 core helper
+- [ ] 评估并删除 `Sources/SwiftyJavaScriptCore/JSInstantContext.swift` / `Sources/SwiftyJavaScriptCore/JSContext.swift` 中仅暴露 `globalContextRef` 的兼容扩展；若仍需要 raw context，改集中到 backend-only 桥接面
+- [ ] 评估 `Sources/SwiftyJavaScriptCore/JSArguments.swift` 的 `pointer + count` 初始化是否仍值得保留在 facade；若只服务 callback glue，则收口到 callback 所在文件附近
+
+Step 2：为剩余值语义 API 决定是否扩 core driver
+- [ ] 评估 `Sources/SwiftyJavaScriptCore/JSValueBridgeAdapter.swift` / `Sources/SwiftyJavaScriptCore/JSValueInvocationInterop.swift` 的 `looselyEquals/strictlyEquals` 是否提升为 core driver 协议能力；若决定不通用，则明确标注为 JSC-only API
+- [ ] 若相等性上收到 core，则新增对应 engine driver hook，并删除 facade 中对 `JSValueIsEqual` / `JSValueIsStrictEqual` 的直接调用
+
+Step 3：继续下沉 `JSClass` 的定义组装逻辑
+- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClass.swift` 中继续识别并迁移与引擎无关的 definition 组装步骤：静态成员安装规划、生命周期/动态属性/callable 分组装配顺序、继承链上的 definition 查找模板
+- [ ] 将 `Sources/SwiftyJavaScriptCore/JSClass.swift` 中剩余的 class-definition/cache/finalize 协调逻辑继续压缩到 core helper，facade 仅保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release` 和各类 JSC callback 接线
+- [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
+
+Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
+- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略
+- [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线
+- [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，评估是否可先由 core typealias/别名包装，再由 facade 做最终特化
+
+Step 5：宏与公开文档去 JSC 硬编码
+- [ ] 审查 `Sources/SwiftyJavaScriptCore/JSValueConversionMacros.swift` 中仍直接写死 `JavaScriptCoreEngine` / `JSClass` / `JSPropertyNameAccumulatorRef` 的说明与生成模板，优先改为引用 core converter/protocol 语义
+- [ ] 补一轮面向 `SwiftJavaScriptTests` 的迁移测试，把新下沉的 `JSClass` / auto-convertible 组装逻辑优先放到 core 测试覆盖，避免继续只能在 JSC facade tests 中验证
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
