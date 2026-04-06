@@ -15,6 +15,10 @@ typealias JavaScriptCoreClassDefinitionModel = SwiftJavaScript.JSClassDefinition
   JSClass,
   JSPropertyNameAccumulatorRef
 >
+typealias JSManualNativeClassBacking = SwiftJavaScript.JSClassManualNativeClassBacking<
+  JavaScriptCore.JSStaticValue,
+  JavaScriptCore.JSStaticFunction
+>
 
 extension SwiftJavaScript.JSClassDefinition
 where
@@ -30,14 +34,6 @@ where
       parentName: parentClass.flatMap { classDefinitionRegistry.get(classKey($0.ref))?.className }
     )
   }
-}
-
-final class JSManualNativeClassBacking {
-  var className: ContiguousArray<CChar>? = nil
-  var staticValueNames: [ContiguousArray<CChar>] = []
-  var staticValues: [JavaScriptCore.JSStaticValue] = []
-  var staticFunctionNames: [ContiguousArray<CChar>] = []
-  var staticFunctions: [JavaScriptCore.JSStaticFunction] = []
 }
 
 private typealias JSClassObjectContextRegistry = SwiftJavaScript.JSClassMapRegistry<
