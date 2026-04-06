@@ -1623,7 +1623,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     guard
       let valueDefinition = definition.inheritedStaticValue(
         named: propertyName,
-        resolvingParentDefinition: resolveParentDefinition
+        resolvingParentDefinition: { classDefinition(for: $0.ref) }
       )
     else {
       return nil
@@ -1661,7 +1661,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     guard
       let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,
-        resolvingParentDefinition: resolveParentDefinition
+        resolvingParentDefinition: { classDefinition(for: $0.ref) }
       )
     else {
       return nil

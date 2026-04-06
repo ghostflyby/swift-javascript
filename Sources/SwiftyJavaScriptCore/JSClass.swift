@@ -126,17 +126,13 @@ func classDefinition(for jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionMo
   classDefinitionRegistry.get(UInt(bitPattern: jsClass))
 }
 
-func resolveParentDefinition(_ parentClass: JSClass) -> JavaScriptCoreClassDefinitionModel? {
-  classDefinition(for: parentClass.ref)
-}
-
 func rememberClassObjectDefinition(
   _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectDefinitionRegistry.set(
     UInt(bitPattern: object),
     definition: definition,
-    depth: definition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
+    depth: definition.inheritanceDepth(resolvingParentDefinition: { classDefinition(for: $0.ref) })
   )
 }
 
@@ -145,7 +141,8 @@ func rememberClassObjectFinalizeCount(
 ) {
   classObjectFinalizeCounterRegistry.setMax(
     UInt(bitPattern: object),
-    count: definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
+    count: definition.exportedDefinitionCount(
+      resolvingParentDefinition: { classDefinition(for: $0.ref) })
   )
 }
 

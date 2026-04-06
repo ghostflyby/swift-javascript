@@ -187,7 +187,7 @@ extension JSClassValueConvertible {
       definition: definition,
       instance: value,
       finalizeDepth: definition.exportedDefinitionCount(
-        resolvingParentDefinition: resolveParentDefinition
+        resolvingParentDefinition: { classDefinition(for: $0.ref) }
       )
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
@@ -285,16 +285,6 @@ private func autoClassStorageRecord(from object: JSObjectRef)
   return (storage, privateData)
 }
 
-private func autoClassStorage(from object: JSObjectRef) -> JSClassAutoObjectStorage? {
-  autoClassStorageRecord(from: object)?.storage
-}
-
-private func autoClassDefinition(from object: JSObjectRef) -> SwiftJavaScript
-  .JSClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef>?
-{
-  autoClassStorage(from: object)?.definition
-}
-
 private func withAutoDynamicPropertyCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -307,7 +297,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   ) -> R
 ) -> R? {
   guard let ctx, let object, let propertyName,
-    let definition = autoClassDefinition(from: object)
+    let definition = autoClassStorageRecord(from: object)?.storage.definition
   else {
     return nil
   }
@@ -319,47 +309,6 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   return withRememberedClassObjectValue(ctx, object: object) { context, thisValue in
     body(definition, context, thisValue, key)
   }
-}
-
-private func withAutoDynamicPropertyValueCallback(
-  ctx: JSContextRef?,
-  object: JSObjectRef?,
-  propertyName: JSStringRef?,
-  _ body: (
-    SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >, borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
-  ) ->
-    JSValueRef?
-) -> JSValueRef? {
-  let value = withAutoDynamicPropertyCallbackInput(
-    ctx: ctx,
-    object: object,
-    propertyName: propertyName,
-    body
-  )
-  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func withAutoDynamicPropertyBoolCallback(
-  ctx: JSContextRef?,
-  object: JSObjectRef?,
-  propertyName: JSStringRef?,
-  _ body: (
-    SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >, borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
-  ) -> Bool
-) -> Bool {
-  let value = withAutoDynamicPropertyCallbackInput(
-    ctx: ctx,
-    object: object,
-    propertyName: propertyName,
-    body
-  )
-  return value ?? false
 }
 
 private func autoDynamicGetPropertyCallbackValue(
@@ -419,7 +368,7 @@ private func withAutoStaticValueCallbackInput<R>(
   ) -> R
 ) -> R? {
   guard let ctx, let object, let propertyName,
-    let definition = autoClassDefinition(from: object)
+    let definition = autoClassStorageRecord(from: object)?.storage.definition
   else {
     return nil
   }
@@ -431,7 +380,7 @@ private func withAutoStaticValueCallbackInput<R>(
   guard
     let valueDefinition = definition.inheritedStaticValue(
       named: name,
-      resolvingParentDefinition: resolveParentDefinition
+      resolvingParentDefinition: { classDefinition(for: $0.ref) }
     )
   else {
     return nil
@@ -440,46 +389,6 @@ private func withAutoStaticValueCallbackInput<R>(
   return withRememberedClassObjectValue(ctx, object: object) { context, thisValue in
     body(valueDefinition, context, thisValue)
   }
-}
-
-private func withAutoStaticValuePropertyCallback(
-  ctx: JSContextRef?,
-  object: JSObjectRef?,
-  propertyName: JSStringRef?,
-  _ body: (
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
-    borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
-  ) ->
-    JSValueRef?
-) -> JSValueRef? {
-  let value = withAutoStaticValueCallbackInput(
-    ctx: ctx,
-    object: object,
-    propertyName: propertyName,
-    body
-  )
-  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func withAutoStaticValueBooleanCallback(
-  ctx: JSContextRef?,
-  object: JSObjectRef?,
-  propertyName: JSStringRef?,
-  _ body: (
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
-    borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
-  ) ->
-    Bool
-) -> Bool {
-  let value = withAutoStaticValueCallbackInput(
-    ctx: ctx,
-    object: object,
-    propertyName: propertyName,
-    body
-  )
-  return value ?? false
 }
 
 private func withAutoStaticFunctionCallbackInput<R>(
@@ -494,7 +403,7 @@ private func withAutoStaticFunctionCallbackInput<R>(
     R
 ) -> R? {
   guard let ctx, let function, let thisObject,
-    let definition = autoClassDefinition(from: thisObject)
+    let definition = autoClassStorageRecord(from: thisObject)?.storage.definition
   else {
     return nil
   }
@@ -508,33 +417,13 @@ private func withAutoStaticFunctionCallbackInput<R>(
     guard
       let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,
-        resolvingParentDefinition: resolveParentDefinition
+        resolvingParentDefinition: { classDefinition(for: $0.ref) }
       )
     else {
       return nil
     }
     return body(functionDefinition, context, thisValue)
   }
-}
-
-private func withAutoStaticFunctionValueCallback(
-  ctx: JSContextRef?,
-  function: JSObjectRef?,
-  thisObject: JSObjectRef?,
-  _ body: (
-    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>,
-    borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
-  ) ->
-    JSValueRef?
-) -> JSValueRef? {
-  let value = withAutoStaticFunctionCallbackInput(
-    ctx: ctx,
-    function: function,
-    thisObject: thisObject,
-    body
-  )
-  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func autoStaticGetPropertyCallbackValue(
@@ -590,7 +479,7 @@ private func autoStaticFunctionCallCallbackValue(
 
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
-  withAutoStaticValuePropertyCallback(
+  let value = withAutoStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -603,6 +492,7 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -610,7 +500,7 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   guard let value else {
     return false
   }
-  return withAutoStaticValueBooleanCallback(
+  let didSet = withAutoStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -624,11 +514,12 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       exception: exception
     )
   }
+  return didSet ?? false
 }
 
 private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
-  withAutoStaticFunctionValueCallback(
+  let value = withAutoStaticFunctionCallbackInput(
     ctx: ctx,
     function: function,
     thisObject: thisObject
@@ -643,6 +534,7 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
       exception: exception
     )
   }
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func installAutoDynamicCallbacks(
@@ -653,7 +545,7 @@ private func installAutoDynamicCallbacks(
 ) {
   if definition.getProperty != nil {
     cls.getProperty = { ctx, object, propertyName, exception in
-      withAutoDynamicPropertyValueCallback(
+      let value = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
         object: object,
         propertyName: propertyName
@@ -667,6 +559,7 @@ private func installAutoDynamicCallbacks(
           exception: exception
         )
       }
+      return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
     }
   }
 
@@ -675,7 +568,7 @@ private func installAutoDynamicCallbacks(
       guard let value else {
         return false
       }
-      return withAutoDynamicPropertyBoolCallback(
+      let didSet = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
         object: object,
         propertyName: propertyName
@@ -690,30 +583,33 @@ private func installAutoDynamicCallbacks(
           exception: exception
         )
       }
+      return didSet ?? false
     }
   }
 
   if definition.hasProperty != nil {
     cls.hasProperty = { ctx, object, propertyName in
-      withAutoDynamicPropertyBoolCallback(
+      let hasProperty = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
         definition.hasProperty?(context, thisValue, key) ?? false
       }
+      return hasProperty ?? false
     }
   }
 
   if definition.deleteProperty != nil {
     cls.deleteProperty = { ctx, object, propertyName, exception in
-      withAutoDynamicPropertyBoolCallback(
+      let didDelete = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
         definition.deleteProperty?(context, thisValue, key) ?? false
       }
+      return didDelete ?? false
     }
   }
 }
