@@ -1,5 +1,31 @@
 import Foundation
 
+package final class JSClassMapRegistry<Key: Hashable, Value>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var map: [Key: Value] = [:]
+
+  package init() {}
+
+  package func set(_ key: Key, value: Value) {
+    lock.lock()
+    map[key] = value
+    lock.unlock()
+  }
+
+  package func get(_ key: Key) -> Value? {
+    lock.lock()
+    let value = map[key]
+    lock.unlock()
+    return value
+  }
+
+  package func remove(_ key: Key) {
+    lock.lock()
+    map.removeValue(forKey: key)
+    lock.unlock()
+  }
+}
+
 package final class JSClassDefinitionDepthRegistry<Key: Hashable, Definition>: @unchecked Sendable {
   private let lock = NSLock()
   private var map: [Key: (definition: Definition, depth: Int)] = [:]

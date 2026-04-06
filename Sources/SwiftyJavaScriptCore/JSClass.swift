@@ -27,7 +27,7 @@ where
   ) -> JSHostTypeDescriptor {
     hostTypeDescriptor(
       storagePolicy: storagePolicy,
-      parentName: parentClass.flatMap { classDefinitionRegistry.get($0.ref)?.className }
+      parentName: parentClass.flatMap { classDefinitionRegistry.get(classKey($0.ref))?.className }
     )
   }
 }
@@ -40,49 +40,15 @@ final class JSManualNativeClassBacking {
   var staticFunctions: [JavaScriptCore.JSStaticFunction] = []
 }
 
-private final class JSClassObjectContextRegistry: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [UInt: JSContextRef] = [:]
-
-  func set(_ object: JSObjectRef, context: JSContextRef) {
-    lock.lock()
-    map[classObjectKey(object)] = context
-    lock.unlock()
-  }
-
-  func get(_ object: JSObjectRef) -> JSContextRef? {
-    lock.lock()
-    let value = map[classObjectKey(object)]
-    lock.unlock()
-    return value
-  }
-
-  func remove(_ object: JSObjectRef) {
-    lock.lock()
-    map.removeValue(forKey: classObjectKey(object))
-    lock.unlock()
-  }
-}
+private typealias JSClassObjectContextRegistry = SwiftJavaScript.JSClassMapRegistry<
+  UInt, JSContextRef
+>
+private typealias JavaScriptCoreClassDefinitionModelRegistry = SwiftJavaScript.JSClassMapRegistry<
+  UInt,
+  JavaScriptCoreClassDefinitionModel
+>
 
 private let classObjectContextRegistry = JSClassObjectContextRegistry()
-
-private final class JavaScriptCoreClassDefinitionModelRegistry: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [UInt: JavaScriptCoreClassDefinitionModel] = [:]
-
-  func set(_ jsClass: JSClassRef, definition: JavaScriptCoreClassDefinitionModel) {
-    lock.lock()
-    map[classKey(jsClass)] = definition
-    lock.unlock()
-  }
-
-  func get(_ jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionModel? {
-    lock.lock()
-    let value = map[classKey(jsClass)]
-    lock.unlock()
-    return value
-  }
-}
 
 private typealias JSClassObjectDefinitionRegistry = SwiftJavaScript.JSClassDefinitionDepthRegistry<
   UInt,
@@ -151,15 +117,15 @@ private func classKey(_ jsClass: JSClassRef) -> UInt {
 }
 
 func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
-  classObjectContextRegistry.set(object, context: ctx)
+  classObjectContextRegistry.set(classObjectKey(object), value: ctx)
 }
 
 func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
-  classObjectContextRegistry.get(object)
+  classObjectContextRegistry.get(classObjectKey(object))
 }
 
 func removeClassObjectContext(_ object: JSObjectRef) {
-  classObjectContextRegistry.remove(object)
+  classObjectContextRegistry.remove(classObjectKey(object))
 }
 
 func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionModel? {
@@ -167,7 +133,7 @@ func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionM
 }
 
 func classDefinition(for jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionModel? {
-  classDefinitionRegistry.get(jsClass)
+  classDefinitionRegistry.get(classKey(jsClass))
 }
 
 func resolveParentDefinition(_ parentClass: JSClass) -> JavaScriptCoreClassDefinitionModel? {
@@ -200,7 +166,7 @@ private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
 private func rememberClassDefinition(
   _ definition: JavaScriptCoreClassDefinitionModel, for jsClass: JSClassRef
 ) {
-  classDefinitionRegistry.set(jsClass, definition: definition)
+  classDefinitionRegistry.set(classKey(jsClass), value: definition)
 }
 
 private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
