@@ -8,7 +8,15 @@ public protocol JSManualReferenceCountedHandle: Sendable {
 
 public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {
+  func bindContextOwner(_ owner: AnyObject)
+}
+
+extension JSContextManualReferenceCountedHandle {
+  public func bindContextOwner(_ owner: AnyObject) {
+    _ = owner
+  }
+}
 
 public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 

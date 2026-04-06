@@ -3,6 +3,22 @@ public actor JSEngineContext<E: JSEngine> {
   public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
 
+  public init() {
+    self.init(virtualMachine: JSVirtualMachine<E>())
+  }
+
+  public init(virtualMachine: JSVirtualMachine<E>) {
+    guard
+      let driverContextHandle = E.makeBorrowedContextHandleFromRuntime(
+        in: virtualMachine.driverRuntimeHandle)
+    else {
+      preconditionFailure("JSEngineContext could not create context handle from runtime")
+    }
+
+    self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
+    self.driverContextHandle.bindContextOwner(self)
+  }
+
   package init(
     virtualMachine: JSVirtualMachine<E>,
     driverContextHandle: E.ContextHandle

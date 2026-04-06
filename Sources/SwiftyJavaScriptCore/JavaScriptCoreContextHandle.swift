@@ -43,7 +43,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     return JSContext.borrow(ctx: ref).driverContextHandle.functionClassRef
   }
 
-  package func bind(owner: JSContext) {
+  public func bindContextOwner(_ owner: AnyObject) {
     JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(owner).toOpaque())
   }
 
