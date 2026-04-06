@@ -164,7 +164,7 @@ extension JSInstantContext {
 
   public func makeFunction(
     named name: String,
-    callback: @escaping JSEngineFunctionCallback<E>
+    callback: @escaping JSFunctionCallback<E>
   ) -> JSValue<E> where E.Engine == E {
     valueFromHandle(
       E.makeFunctionValueHandle(
@@ -179,7 +179,7 @@ extension JSInstantContext {
   public func installGlobalFunction(
     named name: String,
     with attributes: JSPropertyAttributes = .none,
-    callback: @escaping JSEngineFunctionCallback<E>
+    callback: @escaping JSFunctionCallback<E>
   ) where E.Engine == E {
     let function = makeFunction(named: name, callback: callback)
     withGlobalObject { globalObject in

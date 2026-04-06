@@ -15,7 +15,7 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let key = JSStringManaged("strKey")
+    let key = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("strKey")
     global.setProperty(TestNumberMarshal(3.5), forKey: key, in: context)
 
     let hasBeforeDelete = global.hasProperty(key, in: context)

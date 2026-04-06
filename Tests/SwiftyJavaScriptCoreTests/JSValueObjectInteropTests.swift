@@ -53,7 +53,7 @@ import Testing
 
   await context.withIsolatedGlobalObject { context, _ in
     let object = JSValue(objectIn: context)
-    let key = JSStringManaged("locked")
+    let key = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("locked")
 
     let defineResult = object.defineProperty(7, forKey: key, with: [.readOnly], in: context)
     switch consume defineResult {
@@ -73,8 +73,8 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let hiddenKey = JSStringManaged("hiddenFlag")
-    let pinnedKey = JSStringManaged("pinnedFlag")
+    let hiddenKey = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("hiddenFlag")
+    let pinnedKey = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("pinnedFlag")
 
     _ = global.defineProperty(true, forKey: hiddenKey, with: [.dontEnum], in: context)
     _ = global.defineProperty(1, forKey: pinnedKey, with: [.dontDelete], in: context)

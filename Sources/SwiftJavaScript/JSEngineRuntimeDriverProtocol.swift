@@ -13,7 +13,7 @@ public protocol _JSEngineRuntimeDriver {
 
   static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSEngineFunctionCallback<Engine>,
+    callback: @escaping JSFunctionCallback<Engine>,
     in context: ContextHandle
   ) -> ValueHandle?
 

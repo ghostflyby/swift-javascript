@@ -91,7 +91,7 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   }
 
   let context = JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
-  let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(
+  let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
   let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
@@ -118,7 +118,7 @@ private func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSCla
     guard let function, let privateData = JSObjectGetPrivate(function) else {
       return
     }
-    let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(privateData)
+    let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(privateData)
       .takeRetainedValue()
     _ = callback.value
   }
@@ -207,7 +207,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSEngineFunctionCallback<JavaScriptCoreEngine>,
+    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard let rawContext = rawContext(from: context) else {
@@ -836,14 +836,16 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func makeFunction(
     named name: String,
-    callback: @escaping JSFunctionCallback,
+    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
     in context: JavaScriptCoreRawContext,
     functionClass: JSClassRef
   ) -> JavaScriptCoreRawValue {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
     guard let functionRef = JSObjectMake(context.ref, functionClass, callbackRef) else {
-      let callback = Unmanaged<Box<JSFunctionCallback>>.fromOpaque(callbackRef)
-        .takeRetainedValue()
+      let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
+        callbackRef
+      )
+      .takeRetainedValue()
       _ = callback.value
       return makeUndefined(in: context)
     }
@@ -1422,7 +1424,9 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func hostTypeDescriptor(
-    for definition: JSClassDefinition,
+    for definition: SwiftJavaScript.JSClassDefinition<
+      JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    >,
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
   ) -> JSHostTypeDescriptor {
     definition.hostTypeDescriptor(storagePolicy: storagePolicy)
@@ -1481,7 +1485,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     object: JSObjectRef?,
     propertyName: JSStringRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
     ) -> R
   ) -> R? {
@@ -1502,7 +1508,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     functionRef: JSObjectRef?,
     thisObjectRef: JSObjectRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     ) -> R
@@ -1524,7 +1532,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     ctx: JSContextRef?,
     constructorRef: JSObjectRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     ) -> R
@@ -1547,7 +1557,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     constructorRef: JSObjectRef?,
     possibleInstanceRef: JSObjectRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     ) -> R
@@ -1571,7 +1583,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     objectRef: JSObjectRef?,
     jsType: SwiftJavaScript.JSType,
     _ body: (
-      JSClassDefinition,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >,
       borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       SwiftJavaScript.JSType,
@@ -1596,7 +1610,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     object: JSObjectRef?,
     accumulator: JSPropertyNameAccumulatorRef?,
     _ body: (
-      JSClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSClassDefinition<
+        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       JSPropertyNameAccumulatorRef
     ) -> R
@@ -1617,7 +1633,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     object: JSObjectRef?,
     propertyName: JSStringRef?,
     _ body: (
-      JSStaticValue, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
+      borrowing JSInstantContext<JavaScriptCoreEngine>,
       borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     ) ->
       R
@@ -1649,7 +1666,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     function: JSObjectRef?,
     thisObject: JSObjectRef?,
     _ body: (
-      JSStaticFunction, borrowing JSInstantContext<JavaScriptCoreEngine>,
+      SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>,
+      borrowing JSInstantContext<JavaScriptCoreEngine>,
       borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
     )
       -> R
@@ -1663,8 +1681,10 @@ public enum JavaScriptCoreEngine: JSEngine {
     rememberClassObjectContext(ctx, thisObject)
     let context = makeRememberedClassCallbackContext(ctx, thisObject)
     let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
-    let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
-      .toString(in: context)
+    let functionName = functionValue.getProperty(
+      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("name"), in: context
+    )
+    .toString(in: context)
     guard
       let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,

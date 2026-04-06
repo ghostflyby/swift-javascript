@@ -7,15 +7,15 @@ extension JSClassAttributes {
     rawValue: UInt32(JavaScriptCoreEngine.classAttributeNoAutomaticPrototypeRawValue))
 }
 
-public typealias JSStaticValue = JSEngineStaticValue<JavaScriptCoreEngine>
-public typealias JSStaticFunction = JSEngineStaticFunction<JavaScriptCoreEngine>
-public typealias JSClassDefinition = JSEngineClassDefinition<
+typealias JavaScriptCoreStaticValueModel = JSStaticValue<JavaScriptCoreEngine>
+typealias JavaScriptCoreStaticFunctionModel = JSStaticFunction<JavaScriptCoreEngine>
+typealias JavaScriptCoreClassDefinitionModel = JSClassDefinition<
   JavaScriptCoreEngine,
   JSClass,
   JavaScriptCorePropertyNameAccumulatorRef
 >
 
-extension JSEngineClassDefinition
+extension SwiftJavaScript.JSClassDefinition
 where
   E == JavaScriptCoreEngine,
   ParentClass == JSClass,
@@ -65,17 +65,17 @@ private final class JSClassObjectContextRegistry: @unchecked Sendable {
 
 private let classObjectContextRegistry = JSClassObjectContextRegistry()
 
-private final class JSClassDefinitionRegistry: @unchecked Sendable {
+private final class JavaScriptCoreClassDefinitionModelRegistry: @unchecked Sendable {
   private let lock = NSLock()
-  private var map: [UInt: JSClassDefinition] = [:]
+  private var map: [UInt: JavaScriptCoreClassDefinitionModel] = [:]
 
-  func set(_ jsClass: JavaScriptCoreClassRef, definition: JSClassDefinition) {
+  func set(_ jsClass: JavaScriptCoreClassRef, definition: JavaScriptCoreClassDefinitionModel) {
     lock.lock()
     map[classKey(jsClass)] = definition
     lock.unlock()
   }
 
-  func get(_ jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? {
+  func get(_ jsClass: JavaScriptCoreClassRef) -> JavaScriptCoreClassDefinitionModel? {
     lock.lock()
     let value = map[classKey(jsClass)]
     lock.unlock()
@@ -85,9 +85,11 @@ private final class JSClassDefinitionRegistry: @unchecked Sendable {
 
 private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
   private let lock = NSLock()
-  private var map: [UInt: (definition: JSClassDefinition, depth: Int)] = [:]
+  private var map: [UInt: (definition: JavaScriptCoreClassDefinitionModel, depth: Int)] = [:]
 
-  func set(_ object: JavaScriptCoreObjectRef, definition: JSClassDefinition, depth: Int) {
+  func set(
+    _ object: JavaScriptCoreObjectRef, definition: JavaScriptCoreClassDefinitionModel, depth: Int
+  ) {
     lock.lock()
     let key = classObjectKey(object)
     if let current = map[key], current.depth > depth {
@@ -98,7 +100,7 @@ private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
     lock.unlock()
   }
 
-  func get(_ object: JavaScriptCoreObjectRef) -> JSClassDefinition? {
+  func get(_ object: JavaScriptCoreObjectRef) -> JavaScriptCoreClassDefinitionModel? {
     lock.lock()
     let value = map[classObjectKey(object)]?.definition
     lock.unlock()
@@ -138,7 +140,7 @@ private final class JSClassObjectFinalizeCounterRegistry: @unchecked Sendable {
   }
 }
 
-private let classDefinitionRegistry = JSClassDefinitionRegistry()
+private let classDefinitionRegistry = JavaScriptCoreClassDefinitionModelRegistry()
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
@@ -210,20 +212,21 @@ func removeClassObjectContext(_ object: JavaScriptCoreObjectRef) {
   classObjectContextRegistry.remove(object)
 }
 
-func classDefinition(from object: JavaScriptCoreObjectRef) -> JSClassDefinition? {
+func classDefinition(from object: JavaScriptCoreObjectRef) -> JavaScriptCoreClassDefinitionModel? {
   classObjectDefinitionRegistry.get(object)
 }
 
-func classDefinition(for jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? {
+func classDefinition(for jsClass: JavaScriptCoreClassRef) -> JavaScriptCoreClassDefinitionModel? {
   classDefinitionRegistry.get(jsClass)
 }
 
-func resolveParentDefinition(_ parentClass: JSClass) -> JSClassDefinition? {
+func resolveParentDefinition(_ parentClass: JSClass) -> JavaScriptCoreClassDefinitionModel? {
   classDefinition(for: parentClass.ref)
 }
 
-func rememberClassObjectDefinition(_ object: JavaScriptCoreObjectRef, definition: JSClassDefinition)
-{
+func rememberClassObjectDefinition(
+  _ object: JavaScriptCoreObjectRef, definition: JavaScriptCoreClassDefinitionModel
+) {
   classObjectDefinitionRegistry.set(
     object,
     definition: definition,
@@ -232,7 +235,7 @@ func rememberClassObjectDefinition(_ object: JavaScriptCoreObjectRef, definition
 }
 
 func rememberClassObjectFinalizeCount(
-  _ object: JavaScriptCoreObjectRef, definition: JSClassDefinition
+  _ object: JavaScriptCoreObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectFinalizeCounterRegistry.setMax(
     object,
@@ -245,7 +248,7 @@ private func finalizeCountAfterDecrement(_ object: JavaScriptCoreObjectRef) -> I
 }
 
 private func rememberClassDefinition(
-  _ definition: JSClassDefinition, for jsClass: JavaScriptCoreClassRef
+  _ definition: JavaScriptCoreClassDefinitionModel, for jsClass: JavaScriptCoreClassRef
 ) {
   classDefinitionRegistry.set(jsClass, definition: definition)
 }
@@ -622,7 +625,7 @@ private func installClassName(
 }
 
 private func installClassMetadata(
-  from definition: JSClassDefinition,
+  from definition: JavaScriptCoreClassDefinitionModel,
   into cls: inout JavaScriptCoreClassDefinition
 ) {
   cls.version = definition.version
@@ -739,7 +742,7 @@ private let staticFunctionCallAsFunctionCallback: JavaScriptCoreObjectCallAsFunc
   return callbackValueOrUndefined(value, in: ctx)
 }
 
-extension JSClassDefinition {
+extension JavaScriptCoreClassDefinitionModel {
 
   fileprivate func manualNativeDefinition(backing: JSManualNativeClassBacking)
     -> JavaScriptCoreClassDefinition
@@ -779,7 +782,13 @@ public class JSClass: @unchecked Sendable {
     self.nativeBacking = nil
   }
 
-  public init(defination: JSClassDefinition) {
+  public init(
+    defination: SwiftJavaScript.JSClassDefinition<
+      JavaScriptCoreEngine,
+      JSClass,
+      JavaScriptCorePropertyNameAccumulatorRef
+    >
+  ) {
     let backing = JSManualNativeClassBacking()
     var copy = defination.manualNativeDefinition(backing: backing)
     self.ref = JavaScriptCoreEngine.createClass(&copy)
@@ -790,7 +799,7 @@ public class JSClass: @unchecked Sendable {
   init(
     nativeDefinition: JavaScriptCoreClassDefinition,
     retainedBacking: AnyObject?,
-    rememberedDefinition: JSClassDefinition? = nil
+    rememberedDefinition: JavaScriptCoreClassDefinitionModel? = nil
   ) {
     var copy = nativeDefinition
     self.ref = JavaScriptCoreEngine.createClass(&copy)

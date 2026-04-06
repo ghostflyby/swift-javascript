@@ -294,10 +294,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverConsumesJSClassHostDescriptorBindings() {
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   definition.className = "BackendProjected"
   definition.staticValues = [
-    JSStaticValue(
+    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
       name: "version",
       attributes: .readOnly,
       getProperty: { context, _ in
@@ -309,7 +311,7 @@ import Testing
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction(
+    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in

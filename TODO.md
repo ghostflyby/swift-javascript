@@ -144,9 +144,9 @@
 - [x] 继续收口 `JSClass` facade/raw JSC callback/class-definition 直连（已将 class/ref/callback 类型、class attribute 常量、undefined/class create/retain/release 调用改走 backend 别名/helper，并移除本文件 `import JavaScriptCore`）
 - [x] 开始迁移通用类型到 `SwiftJavaScript`（已迁 `JSPropertyAttributes` 基础声明，并在 `JSObject` 侧保留 JSC 常量 extension）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSClassAttributes` 基础声明，并在 `JSClass` 侧保留 JSC 常量 extension）
-- [x] 继续迁移 `JSClass` 可通用声明到 `SwiftJavaScript`（已抽离 `JSEngineStaticValue` / `JSEngineStaticFunction`，JSC 侧收敛为特化 typealias）
+- [x] 继续迁移 `JSClass` 可通用声明到 `SwiftJavaScript`（已抽离 `JSStaticValue` / `JSStaticFunction`，JSC 侧收敛为特化 typealias）
 - [x] 继续迁移 `JSClass` 的 host descriptor 投影模板到 `SwiftJavaScript`（已抽离 `hostTypeDescriptor` 组装逻辑为 core helper）
-- [x] 继续迁移 `JSClassDefinition` 通用结构到 `SwiftJavaScript`（已新增泛型 `JSEngineClassDefinition`，JSC 侧收敛为特化 typealias，并保留 parent class 名称解析扩展）
+- [x] 继续迁移 `JSClassDefinition` 通用结构到 `SwiftJavaScript`（已新增泛型 `JSClassDefinition`，JSC 侧收敛为特化 typealias，并保留 parent class 名称解析扩展）
 - [x] 继续迁移 `JSValue` 的构造与函数包装扩展到 `SwiftJavaScript`（已新增 `JSValue<E>` 通用初始化扩展，JSC 侧删除重复实现并复用 core 版本）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSTypedArrayKind` 基础声明，并在 `JSArrayBuffer` 侧保留 typed array type 映射 extension）
 - [x] 继续迁移通用类型到 `SwiftJavaScript`（已迁 `JSType` 基础声明，保留 `JSValue` 类型判断扩展在 JSC facade，并在 backend 侧显式限定 `SwiftJavaScript.JSType` 消除二义性）
@@ -184,7 +184,7 @@
 - [x] 中期解耦推进：`JSValueInvocationInterop` 的比较/调用/toObject/类型辅助与 defineProperty 流程不再直接调用 backend，改由 `JSInstantContext` 提供统一收口方法
 - [x] 继续迁移 `JSValueInvocationInterop` 到 `SwiftJavaScript` core（已将 call/construct/invokeMethod/toObject/isArray/isDate/isInstanceOf/defineProperty 与参数桥接下沉到通用层，JSC facade 仅保留 equal 语义扩展）
 - [x] 继续迁移 `JSClassDefinition` 继承查询 helper 到 `SwiftJavaScript` core（已下沉 inheritanceDepth/exportedDefinitionCount/inheritedStaticValue/inheritedStaticFunction，facade 仅保留 parent definition resolver）
-- [x] 继续收口 `JSClass` 继承查询调用点（已移除 facade 全局 wrapper，`JSClassValueConvertible` 与 backend 直接调用 core `JSEngineClassDefinition` helper）
+- [x] 继续收口 `JSClass` 继承查询调用点（已移除 facade 全局 wrapper，`JSClassValueConvertible` 与 backend 直接调用 core `JSClassDefinition` helper）
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
 
 ### 8.1 InstantContext 收口待办（按“仅底层 bridge 细节收口”原则）

@@ -110,7 +110,7 @@ extension JSValue {
 extension JSValue where E.Engine == E {
   public init(
     name: String,
-    callback: @escaping JSEngineFunctionCallback<E>,
+    callback: @escaping JSFunctionCallback<E>,
     in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
@@ -120,7 +120,7 @@ extension JSValue where E.Engine == E {
 
   public init(
     name: String,
-    callback: @escaping JSEngineFunctionCallback<E>,
+    callback: @escaping JSFunctionCallback<E>,
     in context: borrowing JSInstantContext<E>
   ) {
     self = context.makeFunction(named: name, callback: callback)
@@ -137,7 +137,7 @@ extension JSValue where E.Engine == E {
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each A).self)
-    let callback: JSEngineFunctionCallback<E> = { context, function, this, arguments in
+    let callback: JSFunctionCallback<E> = { context, function, this, arguments in
       guard arguments.count == count else {
         return .value(JSValue(undefinedIn: context))
       }
@@ -176,7 +176,7 @@ extension JSValue where E.Engine == E {
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each C).self)
-    let callback: JSEngineFunctionCallback<E> = {
+    let callback: JSFunctionCallback<E> = {
       [swiftFunction] context, function, this, arguments in
       guard arguments.count == count else {
         return .value(JSValue(undefinedIn: context))

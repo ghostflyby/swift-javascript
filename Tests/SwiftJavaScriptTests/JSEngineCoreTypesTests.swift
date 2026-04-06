@@ -359,7 +359,7 @@ extension MockDriver {
 
   fileprivate static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSEngineFunctionCallback<MockEngine>,
+    callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     _ = callback
@@ -856,7 +856,7 @@ extension MockEngine {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSEngineFunctionCallback<MockEngine>,
+    callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: context)

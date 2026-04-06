@@ -23,8 +23,8 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, _ in
-    let script = JSStringManaged("40 + 2")
-    let sourceURL = JSStringManaged("inline://unit-test.js")
+    let script = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("40 + 2")
+    let sourceURL = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("inline://unit-test.js")
     let result = context.evaluateScript(script, sourceURL: sourceURL, startingLineNumber: 12)
 
     switch consume result {
@@ -67,8 +67,11 @@ import Testing
     #expect(answer.toDouble(in: context) == 41)
 
     let object = context.makeObject()
-    object.setProperty(context.makeBoolean(true), forKey: JSStringManaged("flag"), in: context)
-    let flagValue = object.getProperty(forKey: JSStringManaged("flag"), in: context)
+    object.setProperty(
+      context.makeBoolean(true),
+      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flag"), in: context)
+    let flagValue = object.getProperty(
+      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flag"), in: context)
     let flag = flagValue.toBool(in: context)
     #expect(flag)
 

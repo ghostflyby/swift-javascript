@@ -1,4 +1,4 @@
-public typealias JSEngineFunctionCallback<E: JSEngine> =
+public typealias JSFunctionCallback<E: JSEngine> =
   (
     _ context: borrowing JSInstantContext<E>,
     _ function: borrowing JSValue<E>,

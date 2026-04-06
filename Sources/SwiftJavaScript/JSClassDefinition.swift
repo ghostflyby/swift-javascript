@@ -1,4 +1,4 @@
-public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
+public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
   Sendable
 {
 
@@ -20,9 +20,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
 
   public var parentClass: ParentClass? = nil
 
-  public var staticValues: [JSEngineStaticValue<E>] = []
+  public var staticValues: [JSStaticValue<E>] = []
 
-  public var staticFunctions: [JSEngineStaticFunction<E>] = []
+  public var staticFunctions: [JSStaticFunction<E>] = []
 
   public var initialize:
     (@Sendable (borrowing JSValue<E>, borrowing JSInstantContext<E>) -> Void)? = nil
@@ -140,7 +140,7 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
 
   public func inheritanceDepth(
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
     guard let parentClass,
       let parentDefinition = resolveParentDefinition(parentClass)
@@ -152,7 +152,7 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
 
   public func exportedDefinitionCount(
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
     inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
   }
@@ -160,8 +160,8 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
   public func inheritedStaticValue(
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
-  ) -> JSEngineStaticValue<E>? {
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> JSStaticValue<E>? {
     if let value = staticValues.first(where: { $0.name == name }) {
       return value
     }
@@ -179,8 +179,8 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
   public func inheritedStaticFunction(
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
-  ) -> JSEngineStaticFunction<E>? {
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> JSStaticFunction<E>? {
     if let function = staticFunctions.first(where: { $0.name == name }) {
       return function
     }

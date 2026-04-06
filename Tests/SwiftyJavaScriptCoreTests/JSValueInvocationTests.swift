@@ -11,7 +11,8 @@ import Testing
     switch consume functionResult {
     case .value(let function):
       let thisObject = JSValue(objectIn: context)
-      thisObject.setProperty(10, forKey: JSStringManaged("base"), in: context)
+      thisObject.setProperty(
+        10, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("base"), in: context)
 
       let callResult = function.call(this: thisObject, arguments: 1, 2, in: context)
       switch consume callResult {
@@ -40,9 +41,13 @@ import Testing
       switch consume constructResult {
       case .value(let instance):
         let isObject = instance.isObject(in: context)
-        let name = instance.getProperty(forKey: JSStringManaged("name"), in: context).toString(
+        let name = instance.getProperty(
+          forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("name"), in: context
+        ).toString(
           in: context)
-        let kind = instance.getProperty(forKey: JSStringManaged("kind"), in: context).toString(
+        let kind = instance.getProperty(
+          forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("kind"), in: context
+        ).toString(
           in: context)
         #expect(isObject)
         #expect(name == "alice")
@@ -65,7 +70,8 @@ import Testing
 
     switch consume objectResult {
     case .value(let object):
-      let invokeResult = object.invokeMethod(JSStringManaged("mul"), arguments: 5, in: context)
+      let invokeResult = object.invokeMethod(
+        SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("mul"), arguments: 5, in: context)
       switch consume invokeResult {
       case .value(let value):
         #expect(value.toDouble(in: context) == 20)
@@ -73,7 +79,8 @@ import Testing
         Issue.record("Expected method invocation to succeed")
       }
 
-      let missingResult = object.invokeMethod(JSStringManaged("missing"), in: context)
+      let missingResult = object.invokeMethod(
+        SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("missing"), in: context)
       switch consume missingResult {
       case .value:
         Issue.record("Expected missing method invocation to raise exception")

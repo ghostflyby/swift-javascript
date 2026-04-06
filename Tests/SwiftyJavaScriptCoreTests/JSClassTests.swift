@@ -10,7 +10,7 @@ import Testing
 }
 
 @Test func staticValueAndFunctionStorage() {
-  let staticValue = JSStaticValue(
+  let staticValue = SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
     name: "value",
     attributes: .readOnly,
     getProperty: { context, _ in
@@ -21,7 +21,7 @@ import Testing
     }
   )
 
-  let staticFunction = JSStaticFunction(
+  let staticFunction = SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
     name: "fn",
     attributes: .dontEnum,
     callAsFunction: { context, _, _ in
@@ -36,7 +36,9 @@ import Testing
 }
 
 @Test func classDefinitionDefaultsAndClassCreation() {
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
 
   #expect(definition.version == 0)
   #expect(definition.attributes == .none)
@@ -56,7 +58,9 @@ import Testing
 }
 
 @Test func classDefinitionCallbacksAreSettable() {
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
 
   definition.initialize = { _, _ in }
   definition.finalize = { _ in }
@@ -92,17 +96,21 @@ import Testing
 }
 
 @Test func classDefinitionFullWiringSmoke() {
-  var base = JSClassDefinition()
+  var base = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   base.className = "Base"
   let baseClass = JSClass(defination: base)
 
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   definition.version = 0
   definition.attributes = .noAutomaticPrototype
   definition.className = "FullWired"
   definition.parentClass = baseClass
   definition.staticValues = [
-    JSStaticValue(
+    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
       name: "version",
       attributes: .readOnly,
       getProperty: { context, _ in
@@ -114,7 +122,7 @@ import Testing
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction(
+    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
@@ -152,7 +160,9 @@ import Testing
 }
 
 @Test func classNameMutationStillBuildsClass() {
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   definition.className = "A"
   definition.className = "B"
   definition.className = "C"
@@ -166,15 +176,19 @@ import Testing
 }
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
-  var parentDefinition = JSClassDefinition()
+  var parentDefinition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   parentDefinition.className = "BaseType"
   let parentClass = JSClass(defination: parentDefinition)
 
-  var definition = JSClassDefinition()
+  var definition = SwiftJavaScript.JSClassDefinition<
+    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+  >()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
-    JSStaticValue(
+    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
       name: "version",
       attributes: [.readOnly, .dontDelete],
       getProperty: { context, _ in
@@ -186,7 +200,7 @@ import Testing
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction(
+    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in

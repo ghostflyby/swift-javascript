@@ -1,4 +1,4 @@
-public struct JSEngineStaticValue<E: JSEngine>: Sendable {
+public struct JSStaticValue<E: JSEngine>: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
@@ -29,7 +29,7 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
       -> JSResult<JSValue<E>>
 }
 
-public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
+public struct JSStaticFunction<E: JSEngine>: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
@@ -51,7 +51,7 @@ public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
   }
 }
 
-extension JSEngineStaticValue {
+extension JSStaticValue {
   public func hostPropertyDescriptor(
     getterBinding: String? = nil,
     setterBinding: String? = nil
@@ -65,7 +65,7 @@ extension JSEngineStaticValue {
   }
 }
 
-extension JSEngineStaticFunction {
+extension JSStaticFunction {
   public func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
     JSHostFunctionDescriptor(
       name: name,
@@ -118,8 +118,8 @@ package struct JSClassHostDescriptorProjectionFlags: Sendable {
 package func projectClassHostTypeDescriptor<E: JSEngine>(
   className: String?,
   parentName: String?,
-  staticValues: [JSEngineStaticValue<E>],
-  staticFunctions: [JSEngineStaticFunction<E>],
+  staticValues: [JSStaticValue<E>],
+  staticFunctions: [JSStaticFunction<E>],
   storagePolicy: JSHostObjectStoragePolicy,
   flags: JSClassHostDescriptorProjectionFlags
 ) -> JSHostTypeDescriptor {

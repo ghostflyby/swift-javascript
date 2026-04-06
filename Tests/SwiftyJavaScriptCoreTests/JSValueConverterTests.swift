@@ -6,7 +6,7 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let key = JSStringManaged("number")
+    let key = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("number")
     global.setProperty(42.5, forKey: key, in: context)
 
     let decoded = global.getProperty(
@@ -27,7 +27,7 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let key = JSStringManaged("flag")
+    let key = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flag")
 
     global.setProperty(true, forKey: key, using: ZeroOneBoolConverter.self, in: context)
 
@@ -140,7 +140,8 @@ import Testing
       }
     )
 
-    global.setProperty(fn, forKey: JSStringManaged("coded"), in: context)
+    global.setProperty(
+      fn, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("coded"), in: context)
 
     let success = context.evaluateScript("coded(40)")
     switch consume success {

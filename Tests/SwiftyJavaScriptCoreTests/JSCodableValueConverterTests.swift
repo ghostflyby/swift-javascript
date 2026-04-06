@@ -16,13 +16,13 @@ import Testing
 
     global.setProperty(
       user,
-      forKey: JSStringManaged("user"),
+      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("user"),
       using: JSCodableValueConverter<CodableUser>.self,
       in: context
     )
 
     let decoded: CodableUser = global.getProperty(
-      forKey: JSStringManaged("user"),
+      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("user"),
       using: JSCodableValueConverter<CodableUser>.self,
       in: context
     )

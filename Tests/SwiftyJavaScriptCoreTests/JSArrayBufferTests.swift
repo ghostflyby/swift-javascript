@@ -20,7 +20,8 @@ import Testing
       bytes[3] = 9
     }
 
-    global.setProperty(buffer, forKey: JSStringManaged("buffer"), in: context)
+    global.setProperty(
+      buffer, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("buffer"), in: context)
     let result = context.evaluateScript("new Uint8Array(buffer)[0] + new Uint8Array(buffer)[3]")
 
     #expect(length == 4)
@@ -79,7 +80,9 @@ import Testing
       words[3] = 12
     }
 
-    global.setProperty(typedArray, forKey: JSStringManaged("typedArray"), in: context)
+    global.setProperty(
+      typedArray, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("typedArray"),
+      in: context)
     let result = context.evaluateScript(
       "typedArray.length + typedArray.byteOffset + typedArray.BYTES_PER_ELEMENT + typedArray[0] + typedArray[1] + typedArray[3]"
     )

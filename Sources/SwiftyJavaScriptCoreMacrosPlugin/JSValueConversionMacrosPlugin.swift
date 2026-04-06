@@ -556,7 +556,7 @@ private func makeMethodFunctionCase(_ method: MethodPlan) -> String {
   let argumentCount = method.parameters.count
 
   return [
-    "            JSStaticFunction(",
+    "            SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(",
     "              name: \"\(method.jsName)\",",
     "              attributes: .none,",
     "              callAsFunction: { context, this, arguments in",
@@ -800,7 +800,8 @@ private func makeEnumDecodeCase(
       let label = associatedValue.label!
       let keyName = "__payloadKey_\(enumCase.name)_\(label)"
       let valueName = "__payloadValue_\(enumCase.name)_\(label)"
-      lines.append("  let \(keyName) = JSStringManaged(\"\(label)\")")
+      lines.append(
+        "  let \(keyName) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(label)\")")
       lines.append(
         "  let \(valueName) = \(payloadSource).getProperty(forKey: \(keyName), in: context)")
       if let decoder = associatedValue.decoderOverride {
@@ -886,7 +887,9 @@ private func makeEnumEncodeCase(
     }
     let payloadTarget = flattenedLabeledPayload ? "__object" : "__payload"
     for (index, label) in bindings.enumerated() {
-      lines.append("  let __payloadKey_\(label) = JSStringManaged(\"\(label)\")")
+      lines.append(
+        "  let __payloadKey_\(label) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(label)\")"
+      )
       if let encoder = enumCase.associatedValues[index].encoderOverride {
         lines.append("  let __encoded_\(label) = try \(encoder).tryEncode(\(label), in: context)")
       } else {
@@ -968,7 +971,9 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       for property in properties {
         let keyName = "__key_\(property.name)"
         let localName = "__\(property.name)Value"
-        decodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        decodeLines.append(
+          "let \(keyName) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(property.name)\")"
+        )
         decodeLines.append(
           "let \(localName) = value.getProperty(forKey: \(keyName), in: context)")
 
@@ -988,7 +993,9 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       for property in properties {
         let keyName = "__key_\(property.name)"
         let encodedName = "__encoded_\(property.name)"
-        encodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        encodeLines.append(
+          "let \(keyName) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(property.name)\")"
+        )
         if let encoder = property.encoderOverride ?? sharedEncoder {
           encodeLines.append(
             "let \(encodedName) = try \(encoder).tryEncode(self.\(property.name), in: context)")
@@ -1030,7 +1037,9 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       for property in properties {
         let keyName = "__key_\(property.name)"
         let localName = "__\(property.name)Value"
-        decodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        decodeLines.append(
+          "let \(keyName) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(property.name)\")"
+        )
         decodeLines.append(
           "let \(localName) = value.getProperty(forKey: \(keyName), in: context)")
 
@@ -1064,7 +1073,9 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       for property in properties {
         let keyName = "__key_\(property.name)"
         let encodedName = "__encoded_\(property.name)"
-        encodeLines.append("let \(keyName) = JSStringManaged(\"\(property.name)\")")
+        encodeLines.append(
+          "let \(keyName) = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(property.name)\")"
+        )
         if let encoder = property.encoderOverride ?? sharedEncoder {
           encodeLines.append(
             "let \(encodedName) = try \(encoder).tryEncode(self.\(property.name), in: context)")
@@ -1143,14 +1154,14 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           if flattenedLabeledPayload {
             ""
           } else {
-            "let __payloadKey = JSStringManaged(\"\(options.payloadKey)\")"
+            "let __payloadKey = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>(\"\(options.payloadKey)\")"
           }
 
         decodeBody = """
           guard value.isObject(in: context) else {
             throw .typeMismatch(expected: "object", actual: value.type(in: context))
           }
-          let __tagKey = JSStringManaged("\(options.tagKey)")
+          let __tagKey = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("\(options.tagKey)")
           \(payloadKeyDeclaration)
           let __tagValue = value.getProperty(forKey: __tagKey, in: context)
           let __caseName = try String.tryDecode(__tagValue, in: context)
@@ -1161,7 +1172,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }
           """
         encodeBody = """
-          let __tagKey = JSStringManaged("\(options.tagKey)")
+          let __tagKey = SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("\(options.tagKey)")
           \(payloadKeyDeclaration)
           switch self {
           \(encodeCases)
@@ -1404,8 +1415,8 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let propertySource = """
-      \(declarationModifier) var jsClassDefinition: JSClassDefinition {
-        var definition = JSClassDefinition()
+      \(declarationModifier) var jsClassDefinition: SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef> {
+        var definition = SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef>()
         definition.className = \"\(trimmed(classDecl.name.text))\"
         \(parentClassSetup)
         \(staticFunctionsSource)
