@@ -184,34 +184,6 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 }
 
-private func callbackValueOrUndefined(
-  _ value: JSValueRef?, in ctx: JSContextRef?
-) -> JSValueRef? {
-  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func callbackValueOrUndefined(
-  _ value: JSValueRef??, in ctx: JSContextRef?
-) -> JSValueRef? {
-  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func callbackBoolOrFalse(_ value: Bool?) -> Bool {
-  value ?? false
-}
-
-private func callbackObjectOrNil(_ value: JSObjectRef?) -> JSObjectRef? {
-  value
-}
-
-private func callbackObjectOrNil(_ value: JSObjectRef??) -> JSObjectRef? {
-  value ?? nil
-}
-
-private func callbackDidRun(_ value: Void?) -> Bool {
-  value != nil
-}
-
 private func installPropertyNamesCallbackIfNeeded(
   _ descriptor: JSHostTypeDescriptor,
   into cls: inout JavaScriptCore.JSClassDefinition
@@ -228,7 +200,7 @@ private func installPropertyNamesCallbackIfNeeded(
     ) { definition, context, thisValue, accumulator in
       definition.getPropertyNames?(context, &thisValue, accumulator)
     }
-    guard callbackDidRun(enumerated) else {
+    guard JavaScriptCoreEngine.callbackDidRun(enumerated) else {
       return
     }
   }
@@ -250,7 +222,7 @@ private func installHasPropertyCallbackIfNeeded(
     ) { definition, context, thisValue, propertyName in
       definition.hasProperty!(context, thisValue, propertyName)
     }
-    return callbackBoolOrFalse(hasProperty)
+    return JavaScriptCoreEngine.callbackBoolOrFalse(hasProperty)
   }
 }
 
@@ -270,7 +242,7 @@ private func installDeletePropertyCallbackIfNeeded(
     ) { definition, context, thisValue, propertyName in
       definition.deleteProperty!(context, thisValue, propertyName)
     }
-    return callbackBoolOrFalse(didDelete)
+    return JavaScriptCoreEngine.callbackBoolOrFalse(didDelete)
   }
 }
 
@@ -302,7 +274,7 @@ private func installSetPropertyCallbackIfNeeded(
         exception: exception
       )
     }
-    return callbackBoolOrFalse(didSet)
+    return JavaScriptCoreEngine.callbackBoolOrFalse(didSet)
   }
 }
 
@@ -326,7 +298,7 @@ private func installGetPropertyCallbackIfNeeded(
         exception: exception
       )
     }
-    return callbackValueOrUndefined(value, in: ctx)
+    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
   }
 }
 
@@ -362,7 +334,7 @@ private func installCallAsFunctionCallbackIfNeeded(
         exception: exception
       )
     }
-    return callbackValueOrUndefined(value, in: ctx)
+    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
   }
 }
 
@@ -382,7 +354,7 @@ private func installHasInstanceCallbackIfNeeded(
     ) { definition, context, constructorValue, possibleInstanceValue in
       definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
     }
-    return callbackBoolOrFalse(hasInstance)
+    return JavaScriptCoreEngine.callbackBoolOrFalse(hasInstance)
   }
 }
 
@@ -423,7 +395,7 @@ private func installCallAsConstructorCallbackIfNeeded(
         exception: exception
       )
     }
-    return callbackObjectOrNil(object)
+    return JavaScriptCoreEngine.callbackObjectOrNil(object)
   }
 }
 
@@ -590,7 +562,7 @@ private func installConvertToTypeCallbackIfNeeded(
         exception: exception
       )
     }
-    return callbackValueOrUndefined(value, in: ctx)
+    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
   }
 }
 
@@ -607,7 +579,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  return callbackValueOrUndefined(value, in: ctx)
+  return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
 }
 
 private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -631,7 +603,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  return callbackBoolOrFalse(didSet)
+  return JavaScriptCoreEngine.callbackBoolOrFalse(didSet)
 }
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
@@ -651,7 +623,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
       exception: exception
     )
   }
-  return callbackValueOrUndefined(value, in: ctx)
+  return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
 }
 
 extension JavaScriptCoreClassDefinitionModel {

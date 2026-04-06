@@ -72,6 +72,7 @@
 - [x] 将 `_JSEngineRuntimeDriver/_JSEnginePropertyDriver/_JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与 `JSDriverResult` 公开可见性）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static value/function callback 的结果/异常包装改复用 backend helper）
 - [x] 继续收口 `JSClass` callback glue（已将 static function callback 的名称解析改走 `JSValue` helper，减少 backend 内部 raw context 构造）
+- [x] 继续收口 `JSClass` callback glue（已将 callback 输出归一化 helper 统一收口到 backend driver，facade 删除重复包装）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static function 名称解析改走 `JSValue` helper，减少 callback 内部 raw context 构造）
 - [x] 收口 `JSClassValueConvertible` 的 facade/raw JSC 直连（已迁 privateData 读取与 class-backed object 创建到 backend handle helper）
 - [x] 收口 `JSValue` symbol 构造的 facade 直连（已补 `_JSEngineDriver`/JSC backend 的 symbol bridge，并切 `JSValue(symbol:in:)` 到 context/handle helper）
