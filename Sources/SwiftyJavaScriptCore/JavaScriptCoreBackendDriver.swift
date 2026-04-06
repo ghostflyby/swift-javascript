@@ -1617,7 +1617,12 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
 
     rememberClassObjectContext(ctx, object)
-    guard let valueDefinition = inheritedStaticValue(named: propertyName, from: definition) else {
+    guard
+      let valueDefinition = definition.inheritedStaticValue(
+        named: propertyName,
+        resolvingParentDefinition: resolveParentDefinition
+      )
+    else {
       return nil
     }
 
@@ -1648,7 +1653,10 @@ public enum JavaScriptCoreEngine: JSEngine {
     let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
       .toString(in: context)
     guard
-      let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
+      let functionDefinition = definition.inheritedStaticFunction(
+        named: functionName,
+        resolvingParentDefinition: resolveParentDefinition
+      )
     else {
       return nil
     }

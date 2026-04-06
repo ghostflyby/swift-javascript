@@ -226,7 +226,9 @@ extension JSClassValueConvertible {
     let storage = JSClassAutoObjectStorage(
       definition: definition,
       instance: value,
-      finalizeDepth: exportedDefinitionCount(definition)
+      finalizeDepth: definition.exportedDefinitionCount(
+        resolvingParentDefinition: resolveParentDefinition
+      )
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
@@ -495,7 +497,12 @@ private func withAutoStaticValueCallbackInput<R>(
     jsStringHandle: JavaScriptCoreStringHandle(ref: propertyName),
     engine: JavaScriptCoreEngine.self
   )
-  guard let valueDefinition = inheritedStaticValue(named: name, from: definition) else {
+  guard
+    let valueDefinition = definition.inheritedStaticValue(
+      named: name,
+      resolvingParentDefinition: resolveParentDefinition
+    )
+  else {
     return nil
   }
 
@@ -562,7 +569,11 @@ private func withAutoStaticFunctionCallbackInput<R>(
     let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
     let functionName = functionValue.getProperty(forKey: JSStringManaged("name"), in: context)
       .toString(in: context)
-    guard let functionDefinition = inheritedStaticFunction(named: functionName, from: definition)
+    guard
+      let functionDefinition = definition.inheritedStaticFunction(
+        named: functionName,
+        resolvingParentDefinition: resolveParentDefinition
+      )
     else {
       return nil
     }

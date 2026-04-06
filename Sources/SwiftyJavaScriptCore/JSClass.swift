@@ -212,7 +212,7 @@ func classDefinition(for jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? 
   classDefinitionRegistry.get(jsClass)
 }
 
-private func resolveParentDefinition(_ parentClass: JSClass) -> JSClassDefinition? {
+func resolveParentDefinition(_ parentClass: JSClass) -> JSClassDefinition? {
   classDefinition(for: parentClass.ref)
 }
 
@@ -225,14 +225,13 @@ func rememberClassObjectDefinition(_ object: JavaScriptCoreObjectRef, definition
   )
 }
 
-func exportedDefinitionCount(_ definition: JSClassDefinition) -> Int {
-  definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
-}
-
 func rememberClassObjectFinalizeCount(
   _ object: JavaScriptCoreObjectRef, definition: JSClassDefinition
 ) {
-  classObjectFinalizeCounterRegistry.setMax(object, count: exportedDefinitionCount(definition))
+  classObjectFinalizeCounterRegistry.setMax(
+    object,
+    count: definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
+  )
 }
 
 private func finalizeCountAfterDecrement(_ object: JavaScriptCoreObjectRef) -> Int {
@@ -243,21 +242,6 @@ private func rememberClassDefinition(
   _ definition: JSClassDefinition, for jsClass: JavaScriptCoreClassRef
 ) {
   classDefinitionRegistry.set(jsClass, definition: definition)
-}
-
-func inheritedStaticValue(named name: String, from definition: JSClassDefinition)
-  -> JSStaticValue?
-{
-  definition.inheritedStaticValue(named: name, resolvingParentDefinition: resolveParentDefinition)
-}
-
-func inheritedStaticFunction(named name: String, from definition: JSClassDefinition)
-  -> JSStaticFunction?
-{
-  definition.inheritedStaticFunction(
-    named: name,
-    resolvingParentDefinition: resolveParentDefinition
-  )
 }
 
 private let classInitializeCallback: JavaScriptCoreObjectInitializeCallback = { ctx, object in
