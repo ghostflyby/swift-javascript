@@ -1,3 +1,4 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
@@ -35,14 +36,14 @@ enum UppercaseStringDecoder: JSValueDecoder {
   typealias SwiftType = String
 
   static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>,
+    _ value: borrowing SwiftJavaScript.JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> String {
     decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
   }
 
   static func decode(
-    _ value: borrowing JSValue<JavaScriptCoreEngine>,
+    _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
     -> String

@@ -1,11 +1,13 @@
+import JavaScriptCore
+
 extension JSInstantContext where E == JavaScriptCoreEngine {
-  init(ctx: JavaScriptCoreContextRef) {
+  init(ctx: JSContextRef) {
     self.init(
       handle: JavaScriptCoreContextHandle(borrowing: ctx)
     )
   }
 
-  public var globalContextRef: JavaScriptCoreGlobalContextRef {
+  public var globalContextRef: JSGlobalContextRef {
     driverContextHandle.ref
   }
 }

@@ -1,3 +1,4 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
@@ -295,7 +296,7 @@ import Testing
 
 @Test func javaScriptCoreBackendDriverConsumesJSClassHostDescriptorBindings() {
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "BackendProjected"
   definition.staticValues = [

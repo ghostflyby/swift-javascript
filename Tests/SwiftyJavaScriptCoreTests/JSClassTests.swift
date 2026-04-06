@@ -1,12 +1,13 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
 
 @Test func classAttributesOptionSet() {
-  let value: JSClassAttributes = [.noAutomaticPrototype]
+  let value: SwiftJavaScript.JSClassAttributes = [.noAutomaticPrototype]
 
   #expect(value.contains(.noAutomaticPrototype))
-  #expect(JSClassAttributes.none.rawValue == 0)
+  #expect(SwiftJavaScript.JSClassAttributes.none.rawValue == 0)
 }
 
 @Test func staticValueAndFunctionStorage() {
@@ -37,7 +38,7 @@ import Testing
 
 @Test func classDefinitionDefaultsAndClassCreation() {
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
 
   #expect(definition.version == 0)
@@ -59,7 +60,7 @@ import Testing
 
 @Test func classDefinitionCallbacksAreSettable() {
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
 
   definition.initialize = { _, _ in }
@@ -97,13 +98,13 @@ import Testing
 
 @Test func classDefinitionFullWiringSmoke() {
   var base = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   base.className = "Base"
   let baseClass = JSClass(defination: base)
 
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.version = 0
   definition.attributes = .noAutomaticPrototype
@@ -161,7 +162,7 @@ import Testing
 
 @Test func classNameMutationStillBuildsClass() {
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "A"
   definition.className = "B"
@@ -177,13 +178,13 @@ import Testing
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
   var parentDefinition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   parentDefinition.className = "BaseType"
   let parentClass = JSClass(defination: parentDefinition)
 
   var definition = SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass

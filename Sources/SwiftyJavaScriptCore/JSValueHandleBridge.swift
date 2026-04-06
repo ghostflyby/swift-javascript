@@ -1,10 +1,12 @@
+import JavaScriptCore
+
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   /// Wrap a JavaScriptCore value reference into handle-backed value storage.
   /// - Parameters:
-  ///   - ref: The JavaScriptCoreValueRef to wrap
+  ///   - ref: The JSValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
   init(
-    ref: JavaScriptCoreValueRef,
+    ref: JSValueRef,
     ctx: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine>
   ) {
     let instant = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
@@ -14,13 +16,13 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   }
 
   init(
-    ref: JavaScriptCoreValueRef,
+    ref: JSValueRef,
     ctx: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.init(ref: ref, in: ctx)
   }
 
-  consuming func takeRef() -> JavaScriptCoreValueRef {
+  consuming func takeRef() -> JSValueRef {
     guard let ref = JavaScriptCoreEngine.retainedValueRef(from: _rawValue) else {
       preconditionFailure(
         "SwiftJavaScript.JSValue<JavaScriptCoreEngine> storage handle has no value ref")
@@ -31,7 +33,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   init(
-    ref: JavaScriptCoreValueRef,
+    ref: JSValueRef,
     in context: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
   ) {
     guard
@@ -46,7 +48,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     self.init(handleValue: handle)
   }
 
-  var ref: JavaScriptCoreValueRef {
+  var ref: JSValueRef {
     guard let ref = JavaScriptCoreEngine.valueRef(from: _rawValue) else {
       preconditionFailure(
         "SwiftJavaScript.JSValue<JavaScriptCoreEngine> storage handle has no value ref")

@@ -2,35 +2,11 @@ import Foundation
 import JavaScriptCore
 import SwiftJavaScript
 
-public typealias JavaScriptCoreValueRef = JSValueRef
-public typealias JavaScriptCoreObjectRef = JSObjectRef
-public typealias JavaScriptCoreContextRef = JSContextRef
-public typealias JavaScriptCoreGlobalContextRef = JSGlobalContextRef
-public typealias JavaScriptCoreStringRef = JSStringRef
-public typealias JavaScriptCoreClassRef = JSClassRef
-public typealias JavaScriptCorePropertyNameAccumulatorRef = JSPropertyNameAccumulatorRef
-public typealias JavaScriptCoreObjectInitializeCallback = JSObjectInitializeCallback
-public typealias JavaScriptCoreObjectFinalizeCallback = JSObjectFinalizeCallback
-public typealias JavaScriptCoreObjectGetPropertyCallback = JSObjectGetPropertyCallback
-public typealias JavaScriptCoreObjectSetPropertyCallback = JSObjectSetPropertyCallback
-public typealias JavaScriptCoreObjectHasPropertyCallback = JSObjectHasPropertyCallback
-public typealias JavaScriptCoreObjectDeletePropertyCallback = JSObjectDeletePropertyCallback
-public typealias JavaScriptCoreObjectGetPropertyNamesCallback = JSObjectGetPropertyNamesCallback
-public typealias JavaScriptCoreObjectCallAsFunctionCallback = JSObjectCallAsFunctionCallback
-public typealias JavaScriptCoreObjectCallAsConstructorCallback = JSObjectCallAsConstructorCallback
-public typealias JavaScriptCoreObjectHasInstanceCallback = JSObjectHasInstanceCallback
-public typealias JavaScriptCoreObjectConvertToTypeCallback = JSObjectConvertToTypeCallback
-public typealias JavaScriptCoreClassDefinition = JavaScriptCore.JSClassDefinition
-public typealias JavaScriptCoreStaticValue = JavaScriptCore.JSStaticValue
-public typealias JavaScriptCoreStaticFunction = JavaScriptCore.JSStaticFunction
-public typealias JavaScriptCoreTypedArrayType = JSTypedArrayType
-public typealias JavaScriptCoreTypedArrayBytesDeallocator = JSTypedArrayBytesDeallocator
-
 public struct JavaScriptCoreStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable
 {
-  public let ref: JavaScriptCoreStringRef
+  public let ref: JSStringRef
 
-  public init(ref: JavaScriptCoreStringRef) {
+  public init(ref: JSStringRef) {
     self.ref = ref
   }
 
@@ -47,14 +23,11 @@ public struct JavaScriptCoreStringHandle: JSStringManualReferenceCountedHandle, 
   }
 }
 
-package typealias JavaScriptCoreRawRuntime = JavaScriptCoreRuntimeHandle
-package typealias JavaScriptCoreRawContext = JavaScriptCoreContextHandle
-
 package final class JavaScriptCoreRawValue: @unchecked Sendable {
   package let ref: JSValueRef
-  package let contextRef: JavaScriptCoreGlobalContextRef
+  package let contextRef: JSGlobalContextRef
 
-  package init(ref: JSValueRef, contextRef: JavaScriptCoreGlobalContextRef) {
+  package init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
     self.ref = ref
     self.contextRef = contextRef
     JSValueProtect(contextRef, ref)
@@ -159,19 +132,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     supportsPromiseJobQueueControl: false
   )
 
-  package static func makeRuntime() -> JavaScriptCoreRawRuntime {
+  package static func makeRuntime() -> JavaScriptCoreRuntimeHandle {
     JavaScriptCoreRuntimeHandle()
   }
 
-  package static func makeContext(in runtime: JavaScriptCoreRawRuntime)
-    -> JavaScriptCoreRawContext
+  package static func makeContext(in runtime: JavaScriptCoreRuntimeHandle)
+    -> JavaScriptCoreContextHandle
   {
     JavaScriptCoreContextHandle(runtime: runtime)
   }
 
   private static func rawContext(
     from context: JavaScriptCoreContextHandle
-  ) -> JavaScriptCoreRawContext? {
+  ) -> JavaScriptCoreContextHandle? {
     context
   }
 
@@ -837,7 +810,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreRawContext,
+    in context: JavaScriptCoreContextHandle,
     functionClass: JSClassRef
   ) -> JavaScriptCoreRawValue {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
@@ -864,7 +837,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func makeObject(
     of jsClass: JSClassRef,
     privateData: UnsafeMutableRawPointer?,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
       return .exception(makeUndefined(in: context))
@@ -874,7 +847,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func privateData(
     from value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<UnsafeMutableRawPointer?> {
     switch objectRef(for: value, in: context) {
     case .exception:
@@ -909,13 +882,13 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func valueRef(from handle: JSValueHandle<JavaScriptCoreEngine>)
-    -> JavaScriptCoreValueRef?
+    -> JSValueRef?
   {
     handle.rawValue.ref
   }
 
   package static func retainedValueRef(from handle: JSValueHandle<JavaScriptCoreEngine>)
-    -> JavaScriptCoreValueRef?
+    -> JSValueRef?
   {
     let rawValue = handle.rawValue
     JSValueProtect(rawValue.contextRef, rawValue.ref)
@@ -942,7 +915,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func valueHandle(
-    from valueRef: JavaScriptCoreValueRef,
+    from valueRef: JSValueRef,
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     let rawValue = JavaScriptCoreRawValue(ref: valueRef, contextRef: context.ref)
@@ -950,8 +923,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func rawValue(
-    from valueRef: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreRawContext
+    from valueRef: JSValueRef,
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawValue {
     JavaScriptCoreRawValue(ref: valueRef, contextRef: context.ref)
   }
@@ -972,7 +945,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func stringProperty(
     _ key: String,
     on object: JSObjectRef,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> String? {
     switch getProperty(
       key,
@@ -1089,12 +1062,12 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func globalObject(
-    in context: JavaScriptCoreGlobalContextRef
-  ) -> JavaScriptCoreObjectRef? {
+    in context: JSGlobalContextRef
+  ) -> JSObjectRef? {
     JSContextGetGlobalObject(context)
   }
 
-  package static var emptyClassDefinition: JavaScriptCoreClassDefinition {
+  package static var emptyClassDefinition: JavaScriptCore.JSClassDefinition {
     JavaScriptCore.kJSClassDefinitionEmpty
   }
 
@@ -1106,63 +1079,63 @@ public enum JavaScriptCoreEngine: JSEngine {
     UInt32(kJSClassAttributeNoAutomaticPrototype)
   }
 
-  package static func retainClass(_ jsClass: JavaScriptCoreClassRef) -> JavaScriptCoreClassRef {
+  package static func retainClass(_ jsClass: JSClassRef) -> JSClassRef {
     JSClassRetain(jsClass)
   }
 
   package static func createClass(
-    _ definition: inout JavaScriptCoreClassDefinition
-  ) -> JavaScriptCoreClassRef {
+    _ definition: inout JavaScriptCore.JSClassDefinition
+  ) -> JSClassRef {
     JSClassCreate(&definition)
   }
 
-  package static func releaseClass(_ jsClass: JavaScriptCoreClassRef) {
+  package static func releaseClass(_ jsClass: JSClassRef) {
     JSClassRelease(jsClass)
   }
 
-  package static var typedArrayTypeArrayBuffer: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeArrayBuffer: JSTypedArrayType {
     kJSTypedArrayTypeArrayBuffer
   }
 
-  package static var typedArrayTypeInt8Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeInt8Array: JSTypedArrayType {
     kJSTypedArrayTypeInt8Array
   }
 
-  package static var typedArrayTypeUint8Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeUint8Array: JSTypedArrayType {
     kJSTypedArrayTypeUint8Array
   }
 
-  package static var typedArrayTypeUint8ClampedArray: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeUint8ClampedArray: JSTypedArrayType {
     kJSTypedArrayTypeUint8ClampedArray
   }
 
-  package static var typedArrayTypeInt16Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeInt16Array: JSTypedArrayType {
     kJSTypedArrayTypeInt16Array
   }
 
-  package static var typedArrayTypeUint16Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeUint16Array: JSTypedArrayType {
     kJSTypedArrayTypeUint16Array
   }
 
-  package static var typedArrayTypeInt32Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeInt32Array: JSTypedArrayType {
     kJSTypedArrayTypeInt32Array
   }
 
-  package static var typedArrayTypeUint32Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeUint32Array: JSTypedArrayType {
     kJSTypedArrayTypeUint32Array
   }
 
-  package static var typedArrayTypeFloat32Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeFloat32Array: JSTypedArrayType {
     kJSTypedArrayTypeFloat32Array
   }
 
-  package static var typedArrayTypeFloat64Array: JavaScriptCoreTypedArrayType {
+  package static var typedArrayTypeFloat64Array: JSTypedArrayType {
     kJSTypedArrayTypeFloat64Array
   }
 
   package static func typedArrayTypeForKind(
     _ kind: JSTypedArrayKind
-  ) -> JavaScriptCoreTypedArrayType {
+  ) -> JSTypedArrayType {
     switch kind {
     case .int8Array:
       return typedArrayTypeInt8Array
@@ -1186,7 +1159,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayKindForType(
-    _ type: JavaScriptCoreTypedArrayType
+    _ type: JSTypedArrayType
   ) -> JSTypedArrayKind? {
     switch type {
     case typedArrayTypeInt8Array:
@@ -1213,12 +1186,12 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func makeArrayBufferWithBytesNoCopy(
-    in context: JavaScriptCoreGlobalContextRef,
+    in context: JSGlobalContextRef,
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
-    bytesDeallocator: JavaScriptCoreTypedArrayBytesDeallocator?,
+    bytesDeallocator: JSTypedArrayBytesDeallocator?,
     deallocatorContext: UnsafeMutableRawPointer?
-  ) -> JavaScriptCoreObjectRef? {
+  ) -> JSObjectRef? {
     var exception: JSValueRef?
     let ref = JSObjectMakeArrayBufferWithBytesNoCopy(
       context,
@@ -1235,8 +1208,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func arrayBufferByteLength(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> Int? {
     var exception: JSValueRef?
     let length = JSObjectGetArrayBufferByteLength(context, object, &exception)
@@ -1247,8 +1220,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func arrayBufferBytesPtr(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     var exception: JSValueRef?
     let bytes = JSObjectGetArrayBufferBytesPtr(context, object, &exception)
@@ -1256,10 +1229,10 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func makeTypedArray(
-    in context: JavaScriptCoreGlobalContextRef,
-    type: JavaScriptCoreTypedArrayType,
+    in context: JSGlobalContextRef,
+    type: JSTypedArrayType,
     length: Int
-  ) -> JavaScriptCoreObjectRef? {
+  ) -> JSObjectRef? {
     var exception: JSValueRef?
     let ref = JSObjectMakeTypedArray(context, type, length, &exception)
     guard exception == nil else {
@@ -1269,10 +1242,10 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func makeTypedArrayWithArrayBuffer(
-    in context: JavaScriptCoreGlobalContextRef,
-    type: JavaScriptCoreTypedArrayType,
-    arrayBuffer: JavaScriptCoreObjectRef
-  ) -> JavaScriptCoreObjectRef? {
+    in context: JSGlobalContextRef,
+    type: JSTypedArrayType,
+    arrayBuffer: JSObjectRef
+  ) -> JSObjectRef? {
     var exception: JSValueRef?
     let ref = JSObjectMakeTypedArrayWithArrayBuffer(context, type, arrayBuffer, &exception)
     guard exception == nil else {
@@ -1282,12 +1255,12 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func makeTypedArrayWithArrayBufferAndOffset(
-    in context: JavaScriptCoreGlobalContextRef,
-    type: JavaScriptCoreTypedArrayType,
-    arrayBuffer: JavaScriptCoreObjectRef,
+    in context: JSGlobalContextRef,
+    type: JSTypedArrayType,
+    arrayBuffer: JSObjectRef,
     byteOffset: Int,
     length: Int
-  ) -> JavaScriptCoreObjectRef? {
+  ) -> JSObjectRef? {
     var exception: JSValueRef?
     let ref = JSObjectMakeTypedArrayWithArrayBufferAndOffset(
       context,
@@ -1304,8 +1277,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayLength(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> Int? {
     var exception: JSValueRef?
     let length = JSObjectGetTypedArrayLength(context, object, &exception)
@@ -1316,8 +1289,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayByteLength(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> Int? {
     var exception: JSValueRef?
     let length = JSObjectGetTypedArrayByteLength(context, object, &exception)
@@ -1328,8 +1301,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayByteOffset(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> Int? {
     var exception: JSValueRef?
     let offset = JSObjectGetTypedArrayByteOffset(context, object, &exception)
@@ -1340,9 +1313,9 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayBuffer(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
-  ) -> JavaScriptCoreObjectRef? {
+    of object: JSObjectRef,
+    in context: JSContextRef
+  ) -> JSObjectRef? {
     var exception: JSValueRef?
     let buffer = JSObjectGetTypedArrayBuffer(context, object, &exception)
     guard exception == nil else {
@@ -1352,8 +1325,8 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayBytesPtr(
-    of object: JavaScriptCoreObjectRef,
-    in context: JavaScriptCoreContextRef
+    of object: JSObjectRef,
+    in context: JSContextRef
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     var exception: JSValueRef?
     let bytes = JSObjectGetTypedArrayBytesPtr(context, object, &exception)
@@ -1361,9 +1334,9 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func typedArrayType(
-    of value: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreContextRef
-  ) -> JavaScriptCoreTypedArrayType? {
+    of value: JSValueRef,
+    in context: JSContextRef
+  ) -> JSTypedArrayType? {
     var exception: JSValueRef?
     let type = JSValueGetTypedArrayType(context, value, &exception)
     guard exception == nil else {
@@ -1373,38 +1346,38 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   package static func unprotect(
-    _ value: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreContextRef
+    _ value: JSValueRef,
+    in context: JSContextRef
   ) {
     JSValueUnprotect(context, value)
   }
 
   package static func protect(
-    _ value: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreContextRef
+    _ value: JSValueRef,
+    in context: JSContextRef
   ) {
     JSValueProtect(context, value)
   }
 
   package static func valueEquals(
-    _ lhs: JavaScriptCoreValueRef,
-    _ rhs: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreContextRef
+    _ lhs: JSValueRef,
+    _ rhs: JSValueRef,
+    in context: JSContextRef
   ) -> Bool {
     JSValueIsEqual(context, lhs, rhs, nil)
   }
 
   package static func valueStrictEquals(
-    _ lhs: JavaScriptCoreValueRef,
-    _ rhs: JavaScriptCoreValueRef,
-    in context: JavaScriptCoreContextRef
+    _ lhs: JSValueRef,
+    _ rhs: JSValueRef,
+    in context: JSContextRef
   ) -> Bool {
     JSValueIsStrictEqual(context, lhs, rhs)
   }
 
   package static func undefinedValue(
-    in context: JavaScriptCoreContextRef?
-  ) -> JavaScriptCoreValueRef? {
+    in context: JSContextRef?
+  ) -> JSValueRef? {
     JSValueMakeUndefined(context)
   }
 
@@ -1425,7 +1398,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func hostTypeDescriptor(
     for definition: SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
     >,
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer
   ) -> JSHostTypeDescriptor {
@@ -1486,7 +1459,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     propertyName: JSStringRef?,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
     ) -> R
@@ -1509,7 +1482,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     thisObjectRef: JSObjectRef?,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
@@ -1533,7 +1506,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     constructorRef: JSObjectRef?,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
@@ -1558,7 +1531,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     possibleInstanceRef: JSObjectRef?,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
@@ -1584,7 +1557,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     jsType: SwiftJavaScript.JSType,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >,
       borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
@@ -1611,7 +1584,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     accumulator: JSPropertyNameAccumulatorRef?,
     _ body: (
       SwiftJavaScript.JSClassDefinition<
-        JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
+        JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
       >, borrowing JSInstantContext<JavaScriptCoreEngine>,
       inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
       JSPropertyNameAccumulatorRef
@@ -1699,7 +1672,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   static func callbackReturnValue(
-    _ result: borrowing JSResult<JavaScriptCoreValueRef>,
+    _ result: borrowing JSResult<JSValueRef>,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSValueRef? {
@@ -1724,7 +1697,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   static func constructorCallbackReturnValue(
-    _ result: borrowing JSResult<JavaScriptCoreValueRef>,
+    _ result: borrowing JSResult<JSValueRef>,
     in ctx: JSContextRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?
   ) -> JSObjectRef? {
@@ -1742,7 +1715,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func evaluateScript(
     _ script: String,
-    in context: JavaScriptCoreRawContext,
+    in context: JavaScriptCoreContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
@@ -1773,7 +1746,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func makeString(
     _ value: String,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawValue {
     withJSString(value) { stringHandle in
       JavaScriptCoreRawValue(
@@ -1783,7 +1756,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func makeSymbol(
     _ value: String,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawValue {
     withJSString(value) { stringHandle in
       JavaScriptCoreRawValue(
@@ -1793,31 +1766,31 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func makeNumber(
     _ value: Double,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawValue {
     JavaScriptCoreRawValue(ref: JSValueMakeNumber(context.ref, value)!, contextRef: context.ref)
   }
 
   package static func makeBoolean(
     _ value: Bool,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreRawValue {
     JavaScriptCoreRawValue(ref: JSValueMakeBoolean(context.ref, value)!, contextRef: context.ref)
   }
 
-  package static func makeNull(in context: JavaScriptCoreRawContext)
+  package static func makeNull(in context: JavaScriptCoreContextHandle)
     -> JavaScriptCoreRawValue
   {
     JavaScriptCoreRawValue(ref: JSValueMakeNull(context.ref)!, contextRef: context.ref)
   }
 
-  package static func makeUndefined(in context: JavaScriptCoreRawContext)
+  package static func makeUndefined(in context: JavaScriptCoreContextHandle)
     -> JavaScriptCoreRawValue
   {
     JavaScriptCoreRawValue(ref: JSValueMakeUndefined(context.ref)!, contextRef: context.ref)
   }
 
-  package static func makeObject(in context: JavaScriptCoreRawContext)
+  package static func makeObject(in context: JavaScriptCoreContextHandle)
     -> JSDriverResult<JavaScriptCoreRawValue>
   {
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
@@ -1826,7 +1799,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     return .value(JavaScriptCoreRawValue(ref: objectRef, contextRef: context.ref))
   }
 
-  package static func makeArray(in context: JavaScriptCoreRawContext)
+  package static func makeArray(in context: JavaScriptCoreContextHandle)
     -> JSDriverResult<JavaScriptCoreRawValue>
   {
     var exception: JSValueRef?
@@ -1842,7 +1815,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func propertyNames(
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> [String] {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -1871,7 +1844,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func getProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
@@ -1894,7 +1867,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func getProperty(
     _ key: JavaScriptCoreRawValue,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
@@ -1909,7 +1882,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func getProperty(
     at index: UInt32,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
@@ -1924,7 +1897,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func hasProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -1939,7 +1912,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func hasProperty(
     _ key: JavaScriptCoreRawValue,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -1954,7 +1927,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func deleteProperty(
     _ key: String,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -1974,7 +1947,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func deleteProperty(
     _ key: JavaScriptCoreRawValue,
     on object: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -1993,7 +1966,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ function: JavaScriptCoreRawValue,
     this thisValue: JavaScriptCoreRawValue?,
     arguments: [JavaScriptCoreRawValue],
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: function, in: context) {
     case .exception(let exception):
@@ -2030,7 +2003,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func construct(
     _ constructor: JavaScriptCoreRawValue,
     arguments: [JavaScriptCoreRawValue],
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: constructor, in: context) {
     case .exception(let exception):
@@ -2053,7 +2026,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func toObject(
     _ value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     switch objectRef(for: value, in: context) {
     case .exception(let exception):
@@ -2065,14 +2038,14 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   package static func isArray(
     _ value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     JSValueIsArray(context.ref, value.ref)
   }
 
   package static func isDate(
     _ value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     JSValueIsDate(context.ref, value.ref)
   }
@@ -2080,7 +2053,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   package static func isInstanceOf(
     _ value: JavaScriptCoreRawValue,
     constructor: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> Bool {
     switch objectRef(for: constructor, in: context) {
     case .exception:
@@ -2097,7 +2070,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: String,
     on object: JavaScriptCoreRawValue,
     to value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext,
+    in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes
   ) -> JSDriverResult<Void> {
     switch objectRef(for: object, in: context) {
@@ -2126,7 +2099,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: JavaScriptCoreRawValue,
     on object: JavaScriptCoreRawValue,
     to value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext,
+    in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes
   ) -> JSDriverResult<Void> {
     switch objectRef(for: object, in: context) {
@@ -2153,7 +2126,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     at index: UInt32,
     on object: JavaScriptCoreRawValue,
     to value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
@@ -2170,7 +2143,7 @@ public enum JavaScriptCoreEngine: JSEngine {
 
   private static func objectRef(
     for value: JavaScriptCoreRawValue,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JavaScriptCoreObjectLookup {
     var exception: JSValueRef?
     guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
@@ -2185,7 +2158,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   private static func result(
     value resultRef: JSValueRef?,
     exception exceptionRef: JSValueRef?,
-    in context: JavaScriptCoreRawContext
+    in context: JavaScriptCoreContextHandle
   ) -> JSDriverResult<JavaScriptCoreRawValue> {
     if let exceptionRef {
       return .exception(JavaScriptCoreRawValue(ref: exceptionRef, contextRef: context.ref))

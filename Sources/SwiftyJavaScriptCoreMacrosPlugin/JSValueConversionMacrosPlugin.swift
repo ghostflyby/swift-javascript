@@ -1415,8 +1415,8 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let propertySource = """
-      \(declarationModifier) var jsClassDefinition: SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef> {
-        var definition = SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef>()
+      \(declarationModifier) var jsClassDefinition: SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef> {
+        var definition = SwiftJavaScript.JSClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef>()
         definition.className = \"\(trimmed(classDecl.name.text))\"
         \(parentClassSetup)
         \(staticFunctionsSource)

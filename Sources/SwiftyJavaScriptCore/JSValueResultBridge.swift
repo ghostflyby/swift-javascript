@@ -1,5 +1,7 @@
+import JavaScriptCore
+
 extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-  consuming func toPrivateResult() -> JSResult<JavaScriptCoreValueRef> {
+  consuming func toPrivateResult() -> JSResult<JSValueRef> {
     switch consume self {
     case .value(let v):
       return .value(v.takeRef())
