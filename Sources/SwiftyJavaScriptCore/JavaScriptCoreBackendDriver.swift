@@ -825,13 +825,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     return JSValueHandle<JavaScriptCoreEngine>(rawValue: rawValue)
   }
 
-  package static func rawValue(
-    from valueRef: JSValueRef,
-    in context: JavaScriptCoreContextHandle
-  ) -> JavaScriptCoreValueHandle {
-    JavaScriptCoreValueHandle(ref: valueRef, contextRef: context.ref)
-  }
-
   package static func privateData(from object: JSObjectRef?) -> UnsafeMutableRawPointer? {
     guard let object else {
       return nil
