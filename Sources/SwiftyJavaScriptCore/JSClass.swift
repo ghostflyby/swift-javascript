@@ -212,28 +212,21 @@ func classDefinition(for jsClass: JavaScriptCoreClassRef) -> JSClassDefinition? 
   classDefinitionRegistry.get(jsClass)
 }
 
-private func definitionDepth(_ definition: JSClassDefinition) -> Int {
-  guard let parentClass = definition.parentClass,
-    let parentDefinition = classDefinition(for: parentClass.ref)
-  else {
-    return 1
-  }
-  return 1 + definitionDepth(parentDefinition)
+private func resolveParentDefinition(_ parentClass: JSClass) -> JSClassDefinition? {
+  classDefinition(for: parentClass.ref)
 }
 
 func rememberClassObjectDefinition(_ object: JavaScriptCoreObjectRef, definition: JSClassDefinition)
 {
   classObjectDefinitionRegistry.set(
-    object, definition: definition, depth: definitionDepth(definition))
+    object,
+    definition: definition,
+    depth: definition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
+  )
 }
 
 func exportedDefinitionCount(_ definition: JSClassDefinition) -> Int {
-  guard let parentClass = definition.parentClass,
-    let parentDefinition = classDefinition(for: parentClass.ref)
-  else {
-    return 1
-  }
-  return 1 + exportedDefinitionCount(parentDefinition)
+  definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
 }
 
 func rememberClassObjectFinalizeCount(
@@ -255,29 +248,16 @@ private func rememberClassDefinition(
 func inheritedStaticValue(named name: String, from definition: JSClassDefinition)
   -> JSStaticValue?
 {
-  if let value = definition.staticValues.first(where: { $0.name == name }) {
-    return value
-  }
-  guard let parentClass = definition.parentClass,
-    let parentDefinition = classDefinition(for: parentClass.ref)
-  else {
-    return nil
-  }
-  return inheritedStaticValue(named: name, from: parentDefinition)
+  definition.inheritedStaticValue(named: name, resolvingParentDefinition: resolveParentDefinition)
 }
 
 func inheritedStaticFunction(named name: String, from definition: JSClassDefinition)
   -> JSStaticFunction?
 {
-  if let function = definition.staticFunctions.first(where: { $0.name == name }) {
-    return function
-  }
-  guard let parentClass = definition.parentClass,
-    let parentDefinition = classDefinition(for: parentClass.ref)
-  else {
-    return nil
-  }
-  return inheritedStaticFunction(named: name, from: parentDefinition)
+  definition.inheritedStaticFunction(
+    named: name,
+    resolvingParentDefinition: resolveParentDefinition
+  )
 }
 
 private let classInitializeCallback: JavaScriptCoreObjectInitializeCallback = { ctx, object in

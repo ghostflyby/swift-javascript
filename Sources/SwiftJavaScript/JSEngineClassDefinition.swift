@@ -137,4 +137,61 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
       parentName: parentClass.flatMap { resolveParentName($0) }
     )
   }
+
+  public func inheritanceDepth(
+    resolvingParentDefinition resolveParentDefinition:
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> Int {
+    guard let parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return 1
+    }
+    return 1 + parentDefinition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
+  }
+
+  public func exportedDefinitionCount(
+    resolvingParentDefinition resolveParentDefinition:
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> Int {
+    inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
+  }
+
+  public func inheritedStaticValue(
+    named name: String,
+    resolvingParentDefinition resolveParentDefinition:
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> JSEngineStaticValue<E>? {
+    if let value = staticValues.first(where: { $0.name == name }) {
+      return value
+    }
+    guard let parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return parentDefinition.inheritedStaticValue(
+      named: name,
+      resolvingParentDefinition: resolveParentDefinition
+    )
+  }
+
+  public func inheritedStaticFunction(
+    named name: String,
+    resolvingParentDefinition resolveParentDefinition:
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) -> JSEngineStaticFunction<E>? {
+    if let function = staticFunctions.first(where: { $0.name == name }) {
+      return function
+    }
+    guard let parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return parentDefinition.inheritedStaticFunction(
+      named: name,
+      resolvingParentDefinition: resolveParentDefinition
+    )
+  }
 }

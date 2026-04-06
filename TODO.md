@@ -183,6 +183,7 @@
 - [x] 中期解耦推进：`JSValue(name:callback:in:)` 不再直接依赖 `JavaScriptCoreBackendDriver.makeFunction` 与 `functionClass` 细节，改由 `JSInstantContext.makeFunction` 统一收口
 - [x] 中期解耦推进：`JSValueInvocationInterop` 的比较/调用/toObject/类型辅助与 defineProperty 流程不再直接调用 backend，改由 `JSInstantContext` 提供统一收口方法
 - [x] 继续迁移 `JSValueInvocationInterop` 到 `SwiftJavaScript` core（已将 call/construct/invokeMethod/toObject/isArray/isDate/isInstanceOf/defineProperty 与参数桥接下沉到通用层，JSC facade 仅保留 equal 语义扩展）
+- [x] 继续迁移 `JSClassDefinition` 继承查询 helper 到 `SwiftJavaScript` core（已下沉 inheritanceDepth/exportedDefinitionCount/inheritedStaticValue/inheritedStaticFunction，facade 仅保留 parent definition resolver）
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
 
 ### 8.1 InstantContext 收口待办（按“仅底层 bridge 细节收口”原则）
