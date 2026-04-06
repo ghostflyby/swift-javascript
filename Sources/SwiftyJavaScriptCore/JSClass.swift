@@ -31,7 +31,9 @@ where
   ) -> JSHostTypeDescriptor {
     hostTypeDescriptor(
       storagePolicy: storagePolicy,
-      parentName: parentClass.flatMap { classDefinitionRegistry.get(classKey($0.ref))?.className }
+      parentName: parentClass.flatMap {
+        classDefinitionRegistry.get(UInt(bitPattern: $0.ref))?.className
+      }
     )
   }
 }
@@ -104,32 +106,24 @@ func classPropertyName(_ propertyName: JSStringRef?) -> String? {
   )
 }
 
-private func classObjectKey(_ object: JSObjectRef) -> UInt {
-  UInt(bitPattern: object)
-}
-
-private func classKey(_ jsClass: JSClassRef) -> UInt {
-  UInt(bitPattern: jsClass)
-}
-
 func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
-  classObjectContextRegistry.set(classObjectKey(object), value: ctx)
+  classObjectContextRegistry.set(UInt(bitPattern: object), value: ctx)
 }
 
 func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
-  classObjectContextRegistry.get(classObjectKey(object))
+  classObjectContextRegistry.get(UInt(bitPattern: object))
 }
 
 func removeClassObjectContext(_ object: JSObjectRef) {
-  classObjectContextRegistry.remove(classObjectKey(object))
+  classObjectContextRegistry.remove(UInt(bitPattern: object))
 }
 
 func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionModel? {
-  classObjectDefinitionRegistry.get(classObjectKey(object))
+  classObjectDefinitionRegistry.get(UInt(bitPattern: object))
 }
 
 func classDefinition(for jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionModel? {
-  classDefinitionRegistry.get(classKey(jsClass))
+  classDefinitionRegistry.get(UInt(bitPattern: jsClass))
 }
 
 func resolveParentDefinition(_ parentClass: JSClass) -> JavaScriptCoreClassDefinitionModel? {
@@ -140,7 +134,7 @@ func rememberClassObjectDefinition(
   _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectDefinitionRegistry.set(
-    classObjectKey(object),
+    UInt(bitPattern: object),
     definition: definition,
     depth: definition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
   )
@@ -150,19 +144,19 @@ func rememberClassObjectFinalizeCount(
   _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectFinalizeCounterRegistry.setMax(
-    classObjectKey(object),
+    UInt(bitPattern: object),
     count: definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
   )
 }
 
 private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
-  classObjectFinalizeCounterRegistry.decrement(classObjectKey(object))
+  classObjectFinalizeCounterRegistry.decrement(UInt(bitPattern: object))
 }
 
 private func rememberClassDefinition(
   _ definition: JavaScriptCoreClassDefinitionModel, for jsClass: JSClassRef
 ) {
-  classDefinitionRegistry.set(classKey(jsClass), value: definition)
+  classDefinitionRegistry.set(UInt(bitPattern: jsClass), value: definition)
 }
 
 private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
@@ -179,7 +173,7 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 
   if finalizeCountAfterDecrement(object) <= 0 {
-    classObjectDefinitionRegistry.remove(classObjectKey(object))
+    classObjectDefinitionRegistry.remove(UInt(bitPattern: object))
     removeClassObjectContext(object)
   }
 }
@@ -200,7 +194,7 @@ private func installPropertyNamesCallbackIfNeeded(
     ) { definition, context, thisValue, accumulator in
       definition.getPropertyNames?(context, &thisValue, accumulator)
     }
-    guard JavaScriptCoreEngine.callbackDidRun(enumerated) else {
+    guard enumerated != nil else {
       return
     }
   }
@@ -222,7 +216,7 @@ private func installHasPropertyCallbackIfNeeded(
     ) { definition, context, thisValue, propertyName in
       definition.hasProperty!(context, thisValue, propertyName)
     }
-    return JavaScriptCoreEngine.callbackBoolOrFalse(hasProperty)
+    return hasProperty ?? false
   }
 }
 
@@ -242,7 +236,7 @@ private func installDeletePropertyCallbackIfNeeded(
     ) { definition, context, thisValue, propertyName in
       definition.deleteProperty!(context, thisValue, propertyName)
     }
-    return JavaScriptCoreEngine.callbackBoolOrFalse(didDelete)
+    return didDelete ?? false
   }
 }
 
@@ -274,7 +268,7 @@ private func installSetPropertyCallbackIfNeeded(
         exception: exception
       )
     }
-    return JavaScriptCoreEngine.callbackBoolOrFalse(didSet)
+    return didSet ?? false
   }
 }
 
@@ -298,7 +292,7 @@ private func installGetPropertyCallbackIfNeeded(
         exception: exception
       )
     }
-    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
+    return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
   }
 }
 
@@ -334,7 +328,7 @@ private func installCallAsFunctionCallbackIfNeeded(
         exception: exception
       )
     }
-    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
+    return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
   }
 }
 
@@ -354,7 +348,7 @@ private func installHasInstanceCallbackIfNeeded(
     ) { definition, context, constructorValue, possibleInstanceValue in
       definition.hasInstance?(context, &constructorValue, &possibleInstanceValue) ?? false
     }
-    return JavaScriptCoreEngine.callbackBoolOrFalse(hasInstance)
+    return hasInstance ?? false
   }
 }
 
@@ -395,7 +389,7 @@ private func installCallAsConstructorCallbackIfNeeded(
         exception: exception
       )
     }
-    return JavaScriptCoreEngine.callbackObjectOrNil(object)
+    return object ?? nil
   }
 }
 
@@ -562,7 +556,7 @@ private func installConvertToTypeCallbackIfNeeded(
         exception: exception
       )
     }
-    return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
+    return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
   }
 }
 
@@ -579,7 +573,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -603,7 +597,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
       )
     }
   }
-  return JavaScriptCoreEngine.callbackBoolOrFalse(didSet)
+  return didSet ?? false
 }
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
@@ -623,7 +617,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
       exception: exception
     )
   }
-  return JavaScriptCoreEngine.callbackValueOrUndefined(value, in: ctx)
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 extension JavaScriptCoreClassDefinitionModel {

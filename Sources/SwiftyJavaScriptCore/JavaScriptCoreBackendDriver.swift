@@ -1685,36 +1685,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
   }
 
-  package static func callbackValueOrUndefined(
-    _ value: JSValueRef?,
-    in context: JSContextRef?
-  ) -> JSValueRef? {
-    value ?? undefinedValue(in: context)
-  }
-
-  package static func callbackValueOrUndefined(
-    _ value: JSValueRef??,
-    in context: JSContextRef?
-  ) -> JSValueRef? {
-    value ?? undefinedValue(in: context)
-  }
-
-  package static func callbackBoolOrFalse(_ value: Bool?) -> Bool {
-    value ?? false
-  }
-
-  package static func callbackObjectOrNil(_ value: JSObjectRef?) -> JSObjectRef? {
-    value
-  }
-
-  package static func callbackObjectOrNil(_ value: JSObjectRef??) -> JSObjectRef? {
-    value ?? nil
-  }
-
-  package static func callbackDidRun(_ value: Void?) -> Bool {
-    value != nil
-  }
-
   static func callbackSucceeded(
     exceptionValue: JSValueRef?,
     exception: UnsafeMutablePointer<JSValueRef?>?

@@ -281,7 +281,7 @@
 - [x] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`91` tests passed）
 
 ## 10. 无用 Helper 清理（进行中）
-- [ ] 清理 `JavaScriptCoreBackendDriver` 中短小一次性 fallback helper（`callbackBoolOrFalse` / `callbackObjectOrNil` / `callbackDidRun`），调用点就地内联
-- [ ] 清理 `JSClassValueConvertible` 内部同类短 helper（`autoCallbackValueOrUndefined` / `autoCallbackSucceededOrFalse`），调用点就地内联
-- [ ] 清理后执行 `swift build --build-tests` + `swift test` 并按单独 cleanup commit 收口
+- [x] 清理 `JavaScriptCoreBackendDriver` 中短小一次性 fallback helper（已删除 `callbackBoolOrFalse` / `callbackObjectOrNil` / `callbackDidRun` 并在 `JSClass` 调用点就地内联）
+- [x] 清理 `JSClassValueConvertible` 内部同类短 helper（已删除 `autoCallbackValueOrUndefined` / `autoCallbackSucceededOrFalse` 及单处包装型 bool helper，调用点就地内联）
+- [x] 清理后执行 `swift build --build-tests` + `swift test` 并按单独 cleanup commit 收口（已验证 96 tests passed）
 

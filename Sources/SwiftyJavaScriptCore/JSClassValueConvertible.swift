@@ -295,26 +295,6 @@ private func autoClassDefinition(from object: JSObjectRef) -> SwiftJavaScript
   autoClassStorage(from: object)?.definition
 }
 
-private func autoCallbackValueOrUndefined(
-  _ value: JSValueRef?, in ctx: JSContextRef?
-)
-  -> JSValueRef?
-{
-  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func autoCallbackValueOrUndefined(
-  _ value: JSValueRef??, in ctx: JSContextRef?
-)
-  -> JSValueRef?
-{
-  value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
-}
-
-private func autoCallbackSucceededOrFalse(_ value: Bool?) -> Bool {
-  value ?? false
-}
-
 private func withAutoDynamicPropertyCallbackInput<R>(
   ctx: JSContextRef?,
   object: JSObjectRef?,
@@ -359,7 +339,7 @@ private func withAutoDynamicPropertyValueCallback(
     propertyName: propertyName,
     body
   )
-  return autoCallbackValueOrUndefined(value, in: ctx)
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func withAutoDynamicPropertyBoolCallback(
@@ -379,7 +359,7 @@ private func withAutoDynamicPropertyBoolCallback(
     propertyName: propertyName,
     body
   )
-  return autoCallbackSucceededOrFalse(value)
+  return value ?? false
 }
 
 private func autoDynamicGetPropertyCallbackValue(
@@ -392,11 +372,10 @@ private func autoDynamicGetPropertyCallbackValue(
   ctx: JSContextRef?,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> JSValueRef? {
-  guard let getProperty = definition.getProperty else {
-    return JavaScriptCoreEngine.undefinedValue(in: ctx)
-  }
   return JavaScriptCoreEngine.callbackReturnValue(
-    getProperty(context, thisValue, key).toPrivateResult(),
+    (definition.getProperty?(context, thisValue, key)
+      ?? .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)))
+      .toPrivateResult(),
     in: ctx,
     exception: exception
   )
@@ -427,28 +406,6 @@ private func autoDynamicSetPropertyCallbackResult(
     )
   }
   return true
-}
-
-private func autoDynamicHasPropertyCallbackResult(
-  definition: SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-  key: String
-) -> Bool {
-  definition.hasProperty?(context, thisValue, key) ?? false
-}
-
-private func autoDynamicDeletePropertyCallbackResult(
-  definition: SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-  key: String
-) -> Bool {
-  definition.deleteProperty?(context, thisValue, key) ?? false
 }
 
 private func withAutoStaticValueCallbackInput<R>(
@@ -502,7 +459,7 @@ private func withAutoStaticValuePropertyCallback(
     propertyName: propertyName,
     body
   )
-  return autoCallbackValueOrUndefined(value, in: ctx)
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func withAutoStaticValueBooleanCallback(
@@ -522,7 +479,7 @@ private func withAutoStaticValueBooleanCallback(
     propertyName: propertyName,
     body
   )
-  return autoCallbackSucceededOrFalse(value)
+  return value ?? false
 }
 
 private func withAutoStaticFunctionCallbackInput<R>(
@@ -577,7 +534,7 @@ private func withAutoStaticFunctionValueCallback(
     thisObject: thisObject,
     body
   )
-  return autoCallbackValueOrUndefined(value, in: ctx)
+  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
 }
 
 private func autoStaticGetPropertyCallbackValue(
@@ -743,12 +700,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        autoDynamicHasPropertyCallbackResult(
-          definition: definition,
-          context: context,
-          thisValue: thisValue,
-          key: key
-        )
+        definition.hasProperty?(context, thisValue, key) ?? false
       }
     }
   }
@@ -760,12 +712,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        autoDynamicDeletePropertyCallbackResult(
-          definition: definition,
-          context: context,
-          thisValue: thisValue,
-          key: key
-        )
+        definition.deleteProperty?(context, thisValue, key) ?? false
       }
     }
   }
