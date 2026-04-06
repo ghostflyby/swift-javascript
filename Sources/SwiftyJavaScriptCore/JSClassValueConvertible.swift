@@ -1,74 +1,21 @@
 import Foundation
 import JavaScriptCore
 
-private final class JSClassCacheRegistry: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [ObjectIdentifier: JSClass] = [:]
+private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNativeClassBacking<
+  JavaScriptCoreEngine,
+  JSClass,
+  JSPropertyNameAccumulatorRef,
+  JavaScriptCore.JSStaticValue,
+  JavaScriptCore.JSStaticFunction
+>
 
-  func jsClass<T: JSClassValueConvertible>(for type: T.Type) -> JSClass {
-    let key = ObjectIdentifier(type)
+private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectStorage<
+  JavaScriptCoreEngine,
+  JSClass,
+  JSPropertyNameAccumulatorRef
+>
 
-    lock.lock()
-    if let existing = map[key] {
-      lock.unlock()
-      return existing
-    }
-    lock.unlock()
-
-    let created = T.makeAutoJSClass()
-
-    lock.lock()
-    if let existing = map[key] {
-      lock.unlock()
-      return existing
-    }
-    map[key] = created
-    lock.unlock()
-    return created
-  }
-}
-
-private final class JSClassAutoNativeClassBacking {
-  let definition:
-    SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >
-  let usesManagedParent: Bool
-  var staticValueNames: [ContiguousArray<CChar>] = []
-  var staticValues: [JavaScriptCore.JSStaticValue] = []
-  var staticFunctionNames: [ContiguousArray<CChar>] = []
-  var staticFunctions: [JavaScriptCore.JSStaticFunction] = []
-
-  init(
-    definition: SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >, usesManagedParent: Bool
-  ) {
-    self.definition = definition
-    self.usesManagedParent = usesManagedParent
-  }
-}
-
-final class JSClassAutoObjectStorage {
-  let definition:
-    SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >
-  let instance: AnyObject
-  let finalizeDepth: Int
-
-  init(
-    definition: SwiftJavaScript.JSClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >, instance: AnyObject, finalizeDepth: Int
-  ) {
-    self.definition = definition
-    self.instance = instance
-    self.finalizeDepth = finalizeDepth
-  }
-}
-
-private let jsClassCacheRegistry = JSClassCacheRegistry()
+private let jsClassCacheRegistry = SwiftJavaScript.JSClassCacheRegistry<ObjectIdentifier, JSClass>()
 
 public protocol JSClassValueConvertible: AnyObject, JSValueEncodable,
   JSClassValueConverterCompatible
@@ -98,7 +45,10 @@ public protocol JSClassValueConvertible: AnyObject, JSValueEncodable,
 
 extension JSClassValueConvertible {
   public static var jsClass: JSClass {
-    jsClassCacheRegistry.jsClass(for: Self.self)
+    let key = ObjectIdentifier(Self.self)
+    return jsClassCacheRegistry.value(for: key) {
+      Self.makeAutoJSClass()
+    }
   }
 
   fileprivate static func makeAutoJSClass() -> JSClass {
