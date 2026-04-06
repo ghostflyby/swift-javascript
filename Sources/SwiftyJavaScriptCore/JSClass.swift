@@ -156,6 +156,285 @@ private func rememberClassDefinition(
   classDefinitionRegistry.set(UInt(bitPattern: jsClass), value: definition)
 }
 
+private func withJavaScriptCoreDynamicPropertyCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    String
+  ) -> R
+) -> R? {
+  guard let ctx, let object,
+    let definition = classDefinition(from: object),
+    let propertyName = classPropertyName(propertyName)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, object)
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
+  return body(definition, context, thisValue, propertyName)
+}
+
+private func withJavaScriptCoreFunctionCallbackInput<R>(
+  ctx: JSContextRef?,
+  functionRef: JSObjectRef?,
+  thisObjectRef: JSObjectRef?,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let functionRef, let thisObjectRef,
+    let definition = classDefinition(from: thisObjectRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, thisObjectRef)
+  var functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: functionRef, ctx: context)
+  var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObjectRef, ctx: context)
+  return body(definition, context, &functionValue, &thisValue)
+}
+
+private func withJavaScriptCoreConstructorCallbackInput<R>(
+  ctx: JSContextRef?,
+  constructorRef: JSObjectRef?,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let constructorRef,
+    let definition = classDefinition(from: constructorRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+  var constructorValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+    ref: constructorRef, ctx: context)
+  var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+  return body(definition, context, &constructorValue, &thisValue)
+}
+
+private func withJavaScriptCoreHasInstanceCallbackInput<R>(
+  ctx: JSContextRef?,
+  constructorRef: JSObjectRef?,
+  possibleInstanceRef: JSObjectRef?,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let constructorRef, let possibleInstanceRef,
+    let definition = classDefinition(from: constructorRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, constructorRef)
+  var constructorValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+    ref: constructorRef, ctx: context)
+  var possibleInstanceValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+    ref: possibleInstanceRef, ctx: context)
+  return body(definition, context, &constructorValue, &possibleInstanceValue)
+}
+
+private func withJavaScriptCoreConvertToTypeCallbackInput<R>(
+  ctx: JSContextRef?,
+  objectRef: JSObjectRef?,
+  jsType: SwiftJavaScript.JSType,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    SwiftJavaScript.JSType,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let objectRef,
+    let definition = classDefinition(from: objectRef)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, objectRef)
+  var objectValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: objectRef, ctx: context)
+  var exceptionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+  return body(definition, context, &objectValue, jsType, &exceptionValue)
+}
+
+private func withJavaScriptCorePropertyNamesCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  accumulator: JSPropertyNameAccumulatorRef?,
+  _ body: (
+    JavaScriptCoreClassDefinitionModel,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    inout SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+    JSPropertyNameAccumulatorRef
+  ) -> R
+) -> R? {
+  guard let ctx, let object, let accumulator,
+    let definition = classDefinition(from: object)
+  else {
+    return nil
+  }
+
+  let context = makeRememberedClassCallbackContext(ctx, object)
+  var thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
+  return body(definition, context, &thisValue, accumulator)
+}
+
+private func withJavaScriptCoreStaticValueCallbackInput<R>(
+  ctx: JSContextRef?,
+  object: JSObjectRef?,
+  propertyName: JSStringRef?,
+  _ body: (
+    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let object,
+    let definition = classDefinition(from: object),
+    let propertyName = classPropertyName(propertyName)
+  else {
+    return nil
+  }
+
+  rememberClassObjectContext(ctx, object)
+  guard
+    let valueDefinition = definition.inheritedStaticValue(
+      named: propertyName,
+      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+    )
+  else {
+    return nil
+  }
+
+  let context = JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
+  return body(valueDefinition, context, thisValue)
+}
+
+private func withJavaScriptCoreStaticFunctionCallbackInput<R>(
+  ctx: JSContextRef?,
+  function: JSObjectRef?,
+  thisObject: JSObjectRef?,
+  _ body: (
+    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>,
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
+) -> R? {
+  guard let ctx, let function, let thisObject,
+    let definition = classDefinition(from: thisObject)
+  else {
+    return nil
+  }
+
+  rememberClassObjectContext(ctx, thisObject)
+  let context = makeRememberedClassCallbackContext(ctx, thisObject)
+  let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
+  let functionName = functionValue.getProperty(
+    forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("name"), in: context
+  )
+  .toString(in: context)
+  guard
+    let functionDefinition = definition.inheritedStaticFunction(
+      named: functionName,
+      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+    )
+  else {
+    return nil
+  }
+
+  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
+  return body(functionDefinition, context, thisValue)
+}
+
+func javaScriptCoreCallbackReturnValue(
+  _ result: borrowing JSResult<JSValueRef>,
+  in ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSValueRef? {
+  switch result {
+  case .value(let value):
+    return value
+  case .exception(let error):
+    exception?.pointee = error
+    return JSValueMakeUndefined(ctx)
+  }
+}
+
+func javaScriptCoreCallbackSucceeded(
+  exceptionValue: JSValueRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> Bool {
+  guard let exceptionValue else {
+    return true
+  }
+  exception?.pointee = exceptionValue
+  return false
+}
+
+private func javaScriptCoreConstructorCallbackReturnValue(
+  _ result: borrowing JSResult<JSValueRef>,
+  in ctx: JSContextRef?,
+  exception: UnsafeMutablePointer<JSValueRef?>?
+) -> JSObjectRef? {
+  switch result {
+  case .value(let value):
+    if JSValueIsObject(ctx, value) {
+      return unsafeBitCast(value, to: JSObjectRef?.self)
+    }
+    return nil
+  case .exception(let error):
+    exception?.pointee = error
+    return nil
+  }
+}
+
+private func javaScriptCoreType(from rawType: JavaScriptCore.JSType) -> SwiftJavaScript.JSType {
+  switch rawType {
+  case kJSTypeUndefined:
+    return .undefined
+  case kJSTypeNull:
+    return .null
+  case kJSTypeBoolean:
+    return .boolean
+  case kJSTypeNumber:
+    return .number
+  case kJSTypeString:
+    return .string
+  case kJSTypeSymbol:
+    return .symbol
+  case kJSTypeObject:
+    return .object
+  case kJSTypeBigInt:
+    return .bigInt
+  default:
+    fatalError("Unknown JSType raw value: \(rawType)")
+  }
+}
+
+private func javaScriptCorePrivateData(fromGlobalObjectIn context: JSContextRef)
+  -> UnsafeMutableRawPointer?
+{
+  JSObjectGetPrivate(JSContextGetGlobalObject(context))
+}
+
 private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
   guard let ctx, let object else {
     return
@@ -184,7 +463,7 @@ private func installPropertyNamesCallbackIfNeeded(
   }
 
   cls.getPropertyNames = { ctx, object, accumulator in
-    let enumerated: Void? = JavaScriptCoreEngine.withPropertyNamesCallbackInput(
+    let enumerated: Void? = withJavaScriptCorePropertyNamesCallbackInput(
       ctx: ctx,
       object: object,
       accumulator: accumulator
@@ -206,7 +485,7 @@ private func installHasPropertyCallbackIfNeeded(
   }
 
   cls.hasProperty = { ctx, object, propertyName in
-    let hasProperty = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
+    let hasProperty = withJavaScriptCoreDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
@@ -226,7 +505,7 @@ private func installDeletePropertyCallbackIfNeeded(
   }
 
   cls.deleteProperty = { ctx, object, propertyName, exception in
-    let didDelete = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
+    let didDelete = withJavaScriptCoreDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
@@ -249,13 +528,13 @@ private func installSetPropertyCallbackIfNeeded(
     guard let value else {
       return false
     }
-    let didSet = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
+    let didSet = withJavaScriptCoreDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
       let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
-      return JavaScriptCoreEngine.callbackSucceeded(
+      return javaScriptCoreCallbackSucceeded(
         exceptionValue: definition.setProperty!(
           context,
           thisValue,
@@ -278,12 +557,12 @@ private func installGetPropertyCallbackIfNeeded(
   }
 
   cls.getProperty = { ctx, object, propertyName, exception in
-    let value = JavaScriptCoreEngine.withDynamicPropertyCallbackInput(
+    let value = withJavaScriptCoreDynamicPropertyCallbackInput(
       ctx: ctx,
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
-      JavaScriptCoreEngine.callbackReturnValue(
+      javaScriptCoreCallbackReturnValue(
         definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
         in: ctx,
         exception: exception
@@ -303,7 +582,7 @@ private func installCallAsFunctionCallbackIfNeeded(
 
   cls.callAsFunction = {
     ctx, functionRef, thisObjectRef, argumentCount, arguments, exception in
-    let value = JavaScriptCoreEngine.withFunctionCallbackInput(
+    let value = withJavaScriptCoreFunctionCallbackInput(
       ctx: ctx,
       functionRef: functionRef,
       thisObjectRef: thisObjectRef
@@ -319,7 +598,7 @@ private func installCallAsFunctionCallbackIfNeeded(
           return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
             .toPrivateResult()
         }
-      return JavaScriptCoreEngine.callbackReturnValue(
+      return javaScriptCoreCallbackReturnValue(
         callbackResult,
         in: ctx,
         exception: exception
@@ -338,7 +617,7 @@ private func installHasInstanceCallbackIfNeeded(
   }
 
   cls.hasInstance = { ctx, constructorRef, possibleInstanceRef, exception in
-    let hasInstance = JavaScriptCoreEngine.withHasInstanceCallbackInput(
+    let hasInstance = withJavaScriptCoreHasInstanceCallbackInput(
       ctx: ctx,
       constructorRef: constructorRef,
       possibleInstanceRef: possibleInstanceRef
@@ -359,7 +638,7 @@ private func installCallAsConstructorCallbackIfNeeded(
 
   cls.callAsConstructor = {
     ctx, constructorRef, argumentCount, arguments, exception in
-    let object = JavaScriptCoreEngine.withConstructorCallbackInput(
+    let object = withJavaScriptCoreConstructorCallbackInput(
       ctx: ctx,
       constructorRef: constructorRef
     ) { definition, context, constructorValue, thisValue in
@@ -380,7 +659,7 @@ private func installCallAsConstructorCallbackIfNeeded(
           return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
             .toPrivateResult()
         }
-      return JavaScriptCoreEngine.constructorCallbackReturnValue(
+      return javaScriptCoreConstructorCallbackReturnValue(
         callbackResult,
         in: ctx,
         exception: exception
@@ -522,10 +801,10 @@ private func installConvertToTypeCallbackIfNeeded(
   }
 
   cls.convertToType = { ctx, objectRef, type, exception in
-    let value = JavaScriptCoreEngine.withConvertToTypeCallbackInput(
+    let value = withJavaScriptCoreConvertToTypeCallbackInput(
       ctx: ctx,
       objectRef: objectRef,
-      jsType: JavaScriptCoreEngine.jsType(from: type)
+      jsType: javaScriptCoreType(from: type)
     ) { definition, context, objectValue, jsType, exceptionValue in
       let result =
         definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
@@ -543,7 +822,7 @@ private func installConvertToTypeCallbackIfNeeded(
         } else {
           JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result).toPrivateResult()
         }
-      return JavaScriptCoreEngine.callbackReturnValue(
+      return javaScriptCoreCallbackReturnValue(
         conversion,
         in: ctx,
         exception: exception
@@ -555,12 +834,12 @@ private func installConvertToTypeCallbackIfNeeded(
 
 private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
-  let value = JavaScriptCoreEngine.withStaticValueCallbackInput(
+  let value = withJavaScriptCoreStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    JavaScriptCoreEngine.callbackReturnValue(
+    javaScriptCoreCallbackReturnValue(
       valueDefinition.getProperty(context, thisValue).toPrivateResult(),
       in: ctx,
       exception: exception
@@ -574,7 +853,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
   guard let value else {
     return false
   }
-  let didSet = JavaScriptCoreEngine.withStaticValueCallbackInput(
+  let didSet = withJavaScriptCoreStaticValueCallbackInput(
     ctx: ctx,
     object: object,
     propertyName: propertyName
@@ -584,7 +863,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     case .value:
       return true
     case .exception(let error):
-      return JavaScriptCoreEngine.callbackSucceeded(
+      return javaScriptCoreCallbackSucceeded(
         exceptionValue: error,
         exception: exception
       )
@@ -595,7 +874,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
 
 private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
-  let value = JavaScriptCoreEngine.withStaticFunctionCallbackInput(
+  let value = withJavaScriptCoreStaticFunctionCallbackInput(
     ctx: ctx,
     function: function,
     thisObject: thisObject
@@ -604,7 +883,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
       args in
       functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
     }
-    return JavaScriptCoreEngine.callbackReturnValue(
+    return javaScriptCoreCallbackReturnValue(
       result,
       in: ctx,
       exception: exception
@@ -638,7 +917,7 @@ extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
     -> SwiftJavaScript.JSContext<JavaScriptCoreEngine>
   {
     let context = Unmanaged<SwiftJavaScript.JSContext<JavaScriptCoreEngine>>.fromOpaque(
-      JavaScriptCoreEngine.privateData(fromGlobalObjectIn: ctx)!
+      javaScriptCorePrivateData(fromGlobalObjectIn: ctx)!
     ).takeUnretainedValue()
     return context
   }

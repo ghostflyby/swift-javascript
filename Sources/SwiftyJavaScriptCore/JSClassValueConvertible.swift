@@ -17,6 +17,32 @@ private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectSt
 
 private let jsClassCacheRegistry = SwiftJavaScript.JSClassCacheRegistry<ObjectIdentifier, JSClass>()
 
+private func javaScriptCorePrivateData(
+  from value: JSValueHandle<JavaScriptCoreEngine>,
+  in context: JavaScriptCoreContextHandle
+) -> JSDriverResult<UnsafeMutableRawPointer?> {
+  var exception: JSValueRef?
+  guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
+    return .exception(nil)
+  }
+  return .value(JSObjectGetPrivate(objectRef))
+}
+
+private func makeJavaScriptCoreObjectResultHandle(
+  of jsClass: JSClassRef,
+  privateData: UnsafeMutableRawPointer?,
+  in context: JavaScriptCoreContextHandle
+) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
+  guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
+    let exception = JavaScriptCoreValueHandle(
+      ref: JSValueMakeUndefined(context.ref)!,
+      contextRef: context.ref
+    )
+    return .exception(exception)
+  }
+  return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
+}
+
 extension JSClassValueConverterCompatible
 where
   Engine == JavaScriptCoreEngine,
@@ -98,12 +124,10 @@ where
       throw .typeMismatch(expected: "object", actual: value.type(in: context))
     }
     let privateData: UnsafeMutableRawPointer?
-    switch JavaScriptCoreEngine.privateData(
+    switch javaScriptCorePrivateData(
       from: value.valueHandle(),
       in: context.driverContextHandle
     ) {
-    case .none:
-      throw .codable("\(Self.self) driver handle bridge failed")
     case .exception:
       throw .codable("\(Self.self) could not be converted to JSObjectRef")
     case .value(let data):
@@ -150,18 +174,15 @@ where
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
-    switch JavaScriptCoreEngine.makeObjectResultHandle(
+    switch makeJavaScriptCoreObjectResultHandle(
       of: Self.jsClass.ref,
       privateData: data,
       in: context.driverContextHandle
     ) {
-    case .none:
-      _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
-      throw .codable("Driver handle bridge failed to create JS object for \(Self.self)")
-    case .some(.exception):
+    case .exception:
       _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
       throw .codable("Failed to create JS object for \(Self.self)")
-    case .some(.value(let object)):
+    case .value(let object):
       return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(handleValue: object)
     }
   }
@@ -244,7 +265,7 @@ private let autoClassFinalizeCallback: JSObjectFinalizeCallback = { object in
 private func autoClassStorageRecord(from object: JSObjectRef)
   -> (storage: JSClassAutoObjectStorage, privateData: UnsafeMutableRawPointer)?
 {
-  guard let privateData = JavaScriptCoreEngine.privateData(from: object) else {
+  guard let privateData = JSObjectGetPrivate(object) else {
     return nil
   }
   let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
@@ -287,7 +308,7 @@ private func autoDynamicGetPropertyCallbackValue(
   ctx: JSContextRef?,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> JSValueRef? {
-  return JavaScriptCoreEngine.callbackReturnValue(
+  return javaScriptCoreCallbackReturnValue(
     (definition.getProperty?(context, thisValue, key)
       ?? .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)))
       .toPrivateResult(),
@@ -315,7 +336,7 @@ private func autoDynamicSetPropertyCallbackResult(
     guard case .exception(let errorRef) = privateResult else {
       return true
     }
-    return JavaScriptCoreEngine.callbackSucceeded(
+    return javaScriptCoreCallbackSucceeded(
       exceptionValue: errorRef,
       exception: exception
     )
@@ -399,7 +420,7 @@ private func autoStaticGetPropertyCallbackValue(
   ctx: JSContextRef?,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> JSValueRef? {
-  JavaScriptCoreEngine.callbackReturnValue(
+  javaScriptCoreCallbackReturnValue(
     valueDefinition.getProperty(context, thisValue).toPrivateResult(),
     in: ctx,
     exception: exception
@@ -417,7 +438,7 @@ private func autoStaticSetPropertyCallbackResult(
   case .value:
     return true
   case .exception(let error):
-    return JavaScriptCoreEngine.callbackSucceeded(
+    return javaScriptCoreCallbackSucceeded(
       exceptionValue: error,
       exception: exception
     )
@@ -436,7 +457,7 @@ private func autoStaticFunctionCallCallbackValue(
   let result = withJavaScriptCoreArguments(arguments, count: argumentCount) { args in
     functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
   }
-  return JavaScriptCoreEngine.callbackReturnValue(
+  return javaScriptCoreCallbackReturnValue(
     result,
     in: ctx,
     exception: exception

@@ -68,6 +68,8 @@
 - [x] 暂停迁移主线，优先清理无用 helper（按 AGENTS 约束：`JSEngine/JavaScriptCoreBackendDriver` 仅保留引擎必须或低层桥接复用 helper）
 - [x] JavaScriptCore backend：内联同类型内仅单次调用的短 helper（test 调用不计），并将测试改为直接覆盖调用方（已内联 `makeRuntime`/`makeContext`/`globalObject`/`privateDataResult`/`makeNumber`/`makeBoolean`/`makeNull`/`makeSymbol`/`isArray`/`isDate`，并将 backend tests 改为经 `makeRuntimeHandle` 与 `makeBorrowedContextHandleFromRuntime` 建立上下文及使用 *ForHandle 调用方）
 - [x] JavaScriptCore backend：按注释标记清理 noop/inline helper（已移除 `JavaScriptCoreValueHandle` 的 `rawValue/init(rawValue:)` 与 `valueHandle` 包装，删除 class/typed array/descriptor/equality/undefined 的 backend 透传 helper，typed array 映射改为 `JSTypedArrayKind` 扩展，并内联删除 `JSEngineConversionBridge` 的 JSC 专用转换 noop；调用方、宏模板与 tests 已同步迁移）
+- [x] JavaScriptCore backend：继续清理 `JavaScriptCoreBackendDriver.swift` 文件级 helper（已将 callback/class/privateData/valueType/functionClass 等一次性或 facade 专用 helper 回迁到各调用文件顶级，测试改走 *ForHandle/上下文公开入口，Engine 内删除残余 `valueRef(from:)` 依赖并收紧 helper 可见性为 `private`/默认级别）
+- [x] JavaScriptCore backend：删除 `JavaScriptCoreValueHandle` 上仅供测试使用的 `type/toDouble/toString` 便捷入口，并统一改回 engine 的 `*ForHandle` 主入口
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）

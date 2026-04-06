@@ -15,7 +15,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ref = JSGlobalContextCreateInGroup(runtime.ref, globalObjectClass)
     self.ownsContext = true
     self.globalObjectClass = globalObjectClass
-    self.functionClass = JavaScriptCoreEngine.makeFunctionClass()
+    self.functionClass = makeJavaScriptCoreFunctionClass()
   }
 
   package init(borrowing ref: JSGlobalContextRef) {
@@ -81,6 +81,11 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     JSGlobalContextRelease(ref)
     return true
   }
+}
+
+private func makeJavaScriptCoreFunctionClass() -> JSClassRef {
+  var definition = makeJavaScriptCoreFunctionClassDefinition()
+  return JSClassCreate(&definition)!
 }
 
 extension JavaScriptCoreContextHandle: Hashable {

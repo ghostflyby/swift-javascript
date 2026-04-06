@@ -22,12 +22,9 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     self.init(ref: ref, in: ctx)
   }
 
+  /// tansfer ownership of the underlying JSValueRef out of this value, consuming self in the process.
   consuming func takeRef() -> JSValueRef {
-    guard let ref = JavaScriptCoreEngine.retainedValueRef(from: _rawValue) else {
-      preconditionFailure(
-        "SwiftJavaScript.JSValue<JavaScriptCoreEngine> storage handle has no value ref")
-    }
-    return ref
+    return _rawValue.ref
   }
 }
 
@@ -44,10 +41,6 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   }
 
   var ref: JSValueRef {
-    guard let ref = JavaScriptCoreEngine.valueRef(from: _rawValue) else {
-      preconditionFailure(
-        "SwiftJavaScript.JSValue<JavaScriptCoreEngine> storage handle has no value ref")
-    }
-    return ref
+    _rawValue.ref
   }
 }

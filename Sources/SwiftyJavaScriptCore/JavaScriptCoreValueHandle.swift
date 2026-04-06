@@ -10,25 +10,6 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
     self.contextRef = contextRef
   }
 
-  var type: SwiftJavaScript.JSType {
-    JavaScriptCoreEngine.valueType(of: ref, in: contextRef)
-  }
-
-  func toDouble() -> Double {
-    JSValueToNumber(contextRef, ref, nil)
-  }
-
-  func toString() -> String? {
-    guard let stringHandle = JSValueToStringCopy(contextRef, ref, nil) else {
-      return nil
-    }
-    defer { JSStringRelease(stringHandle) }
-    return String(
-      jsStringHandle: JavaScriptCoreStringHandle(ref: stringHandle),
-      engine: JavaScriptCoreEngine.self
-    )
-  }
-
   @discardableResult
   public func retainReference() -> Bool {
     JSValueProtect(contextRef, ref)
