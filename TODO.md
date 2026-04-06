@@ -245,6 +245,7 @@
 - [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `_JSEngineStringDriver` 与 JSC/mock 实现）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [x] 继续下沉 Context 全局对象/全局属性通用能力到 core（已补 runtime driver 的 global object handle 抽象，并将 JSInstantContext/JSContext 全局对象与全局属性通用方法下沉到 core）
+- [x] 继续下沉 `JSValueBridgeAdapter` 的通用调用桥接到 core（call/construct/invokeMethod/toObject/type helpers 已移除 facade 重复实现，跨 VM 校验改为 runtime driver 兼容性 hook）
 - [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
 - [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定

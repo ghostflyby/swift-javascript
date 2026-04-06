@@ -416,6 +416,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
   }
 
+  public static func isValueHandleCompatibleWithContext(
+    _ value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    guard
+      let valueGroup = contextGroupRef(from: value),
+      let contextGroup = contextGroupRef(from: context)
+    else {
+      return false
+    }
+    return valueGroup == contextGroup
+  }
+
   public static func getValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,

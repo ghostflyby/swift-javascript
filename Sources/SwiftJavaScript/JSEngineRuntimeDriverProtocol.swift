@@ -79,4 +79,20 @@ public protocol _JSEngineRuntimeDriver {
   static func makeArrayResultHandle(
     _ context: ContextHandle
   ) -> JSResult<ValueHandle>?
+
+  static func isValueHandleCompatibleWithContext(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool
+}
+
+extension _JSEngineRuntimeDriver {
+  public static func isValueHandleCompatibleWithContext(
+    _ value: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool {
+    _ = value
+    _ = context
+    return true
+  }
 }

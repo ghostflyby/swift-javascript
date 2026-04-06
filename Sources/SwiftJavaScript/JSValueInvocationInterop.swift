@@ -1,7 +1,12 @@
 extension JSInstantContext {
   @inline(__always)
   package func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
-    value.valueHandle()
+    let handle = value.valueHandle()
+    precondition(
+      E.isValueHandleCompatibleWithContext(handle, in: driverContextHandle),
+      "Cross-VM JSValue operation is not allowed; pass a context from the same JSVirtualMachine"
+    )
+    return handle
   }
 
   @inline(__always)
