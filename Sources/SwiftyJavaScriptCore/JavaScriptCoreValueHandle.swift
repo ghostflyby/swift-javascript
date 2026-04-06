@@ -2,23 +2,50 @@ import JavaScriptCore
 import SwiftJavaScript
 
 public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
-  package typealias RawValue = JavaScriptCoreRawValue
+  let ref: JSValueRef
+  let contextRef: JSGlobalContextRef
 
-  package let rawValue: RawValue
+  init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
+    self.ref = ref
+    self.contextRef = contextRef
+  }
 
-  package init(rawValue: RawValue) {
-    self.rawValue = rawValue
+  init(rawValue: JavaScriptCoreValueHandle) {
+    self = rawValue
+  }
+
+  var rawValue: JavaScriptCoreValueHandle {
+    self
+  }
+
+  var type: SwiftJavaScript.JSType {
+    JavaScriptCoreEngine.valueType(of: ref, in: contextRef)
+  }
+
+  func toDouble() -> Double {
+    JSValueToNumber(contextRef, ref, nil)
+  }
+
+  func toString() -> String? {
+    guard let stringHandle = JSValueToStringCopy(contextRef, ref, nil) else {
+      return nil
+    }
+    defer { JSStringRelease(stringHandle) }
+    return String(
+      jsStringHandle: JavaScriptCoreStringHandle(ref: stringHandle),
+      engine: JavaScriptCoreEngine.self
+    )
   }
 
   @discardableResult
   public func retainReference() -> Bool {
-    JSValueProtect(rawValue.contextRef, rawValue.ref)
+    JSValueProtect(contextRef, ref)
     return true
   }
 
   @discardableResult
   public func releaseReference() -> Bool {
-    JSValueUnprotect(rawValue.contextRef, rawValue.ref)
+    JSValueUnprotect(contextRef, ref)
     return true
   }
 }
