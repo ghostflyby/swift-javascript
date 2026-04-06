@@ -1,0 +1,418 @@
+extension JSEngineInstantContext {
+  @inline(__always)
+  package func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
+    value.valueHandle()
+  }
+
+  @inline(__always)
+  package func bridgeInvocationResult(
+    _ handleResult: JSResult<JSValueHandle<E>>?
+  ) -> JSResult<JSValue<E>> {
+    bridgeHandleResult(handleResult)
+  }
+
+  package func encodeArguments<each A: JSValueEncodable>(
+    _ arguments: repeat each A
+  ) -> [JSValueHandle<E>] {
+    var values: [JSValueHandle<E>] = []
+    values.reserveCapacity(countTypePack(repeat (each A).self))
+
+    func appendArgument<T: JSValueEncodable>(_ argument: T) {
+      let encoded = (try? argument.tryEncode(in: self)) ?? makeUndefined()
+      values.append(valueHandle(for: encoded))
+    }
+
+    repeat appendArgument(each arguments)
+    return values
+  }
+
+  package func call(
+    function: borrowing JSValue<E>,
+    this thisValueHandle: JSValueHandle<E>?,
+    arguments: [JSValueHandle<E>]
+  ) -> JSResult<JSValue<E>> {
+    bridgeInvocationResult(
+      E.callFunctionHandle(
+        valueHandle(for: function),
+        this: thisValueHandle,
+        arguments: arguments,
+        in: driverContextHandle
+      ))
+  }
+
+  package func call(function: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+    call(function: function, this: nil, arguments: [])
+  }
+
+  package func call(
+    function: borrowing JSValue<E>,
+    arguments: [JSValueHandle<E>]
+  ) -> JSResult<JSValue<E>> {
+    call(function: function, this: nil, arguments: arguments)
+  }
+
+  package func call(
+    function: borrowing JSValue<E>,
+    this thisValue: borrowing JSValue<E>,
+    arguments: [JSValueHandle<E>] = []
+  ) -> JSResult<JSValue<E>> {
+    call(
+      function: function,
+      this: valueHandle(for: thisValue),
+      arguments: arguments
+    )
+  }
+
+  package func call<each A: JSValueEncodable>(
+    function: borrowing JSValue<E>,
+    arguments: repeat each A
+  ) -> JSResult<JSValue<E>> {
+    call(function: function, arguments: encodeArguments(repeat each arguments))
+  }
+
+  package func call<each A: JSValueEncodable>(
+    function: borrowing JSValue<E>,
+    this thisValue: borrowing JSValue<E>,
+    arguments: repeat each A
+  ) -> JSResult<JSValue<E>> {
+    call(
+      function: function,
+      this: thisValue,
+      arguments: encodeArguments(repeat each arguments)
+    )
+  }
+
+  package func construct(
+    constructor: borrowing JSValue<E>,
+    arguments: [JSValueHandle<E>]
+  ) -> JSResult<JSValue<E>> {
+    bridgeInvocationResult(
+      E.constructHandle(
+        valueHandle(for: constructor),
+        arguments: arguments,
+        in: driverContextHandle
+      ))
+  }
+
+  package func construct(constructor: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+    construct(constructor: constructor, arguments: [])
+  }
+
+  package func construct<each A: JSValueEncodable>(
+    constructor: borrowing JSValue<E>,
+    arguments: repeat each A
+  ) -> JSResult<JSValue<E>> {
+    construct(constructor: constructor, arguments: encodeArguments(repeat each arguments))
+  }
+
+  package func getStringProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<
+    JSValue<E>
+  > {
+    bridgeInvocationResult(
+      E.getStringPropertyHandle(
+        key,
+        on: valueHandle(for: object),
+        in: driverContextHandle
+      ))
+  }
+
+  package func setStringProperty(
+    _ key: String,
+    on object: borrowing JSValue<E>,
+    to value: borrowing JSValue<E>,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    E.setStringPropertyHandle(
+      key,
+      on: valueHandle(for: object),
+      to: valueHandle(for: value),
+      in: driverContextHandle,
+      attributes: attributes
+    )
+  }
+
+  package func invokeMethod(
+    _ name: String,
+    on object: borrowing JSValue<E>,
+    arguments: [JSValueHandle<E>]
+  ) -> JSResult<JSValue<E>> {
+    switch getStringProperty(name, on: object) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return call(
+        function: method,
+        this: valueHandle(for: object),
+        arguments: arguments
+      )
+    }
+  }
+
+  package func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>>
+  {
+    invokeMethod(name, on: object, arguments: [])
+  }
+
+  package func invokeMethod<each A: JSValueEncodable>(
+    _ name: String,
+    on object: borrowing JSValue<E>,
+    arguments: repeat each A
+  ) -> JSResult<JSValue<E>> {
+    invokeMethod(name, on: object, arguments: encodeArguments(repeat each arguments))
+  }
+
+  package func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+    bridgeInvocationResult(
+      E.toObjectHandle(
+        valueHandle(for: value),
+        in: driverContextHandle
+      ))
+  }
+
+  package func isArray(_ value: borrowing JSValue<E>) -> Bool {
+    E.isArrayHandle(valueHandle(for: value), in: driverContextHandle) ?? false
+  }
+
+  package func isDate(_ value: borrowing JSValue<E>) -> Bool {
+    E.isDateHandle(valueHandle(for: value), in: driverContextHandle) ?? false
+  }
+
+  package func isInstanceOf(
+    _ value: borrowing JSValue<E>,
+    constructor: borrowing JSValue<E>
+  ) -> Bool {
+    E.isInstanceOfHandle(
+      valueHandle(for: value),
+      constructor: valueHandle(for: constructor),
+      in: driverContextHandle
+    ) ?? false
+  }
+}
+
+extension JSValue {
+  public func call(in context: isolated JSEngineContext<E> = #isolation) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      call(in: callbackContext)
+    }
+  }
+
+  public func call(in context: borrowing JSEngineInstantContext<E>) -> JSResult<JSValue<E>> {
+    context.call(function: self)
+  }
+
+  public func call<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      call(arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func call<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.call(function: self, arguments: repeat each arguments)
+  }
+
+  public func call(
+    this thisValue: borrowing JSValue<E>,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      call(this: thisValue, in: callbackContext)
+    }
+  }
+
+  public func call(
+    this thisValue: borrowing JSValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.call(function: self, this: thisValue)
+  }
+
+  public func call<each A: JSValueEncodable>(
+    this thisValue: borrowing JSValue<E>,
+    arguments: repeat each A,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func call<each A: JSValueEncodable>(
+    this thisValue: borrowing JSValue<E>,
+    arguments: repeat each A,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.call(
+      function: self,
+      this: thisValue,
+      arguments: repeat each arguments
+    )
+  }
+
+  public func construct(
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      construct(in: callbackContext)
+    }
+  }
+
+  public func construct(
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.construct(constructor: self)
+  }
+
+  public func construct<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      construct(arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func construct<each A: JSValueEncodable>(
+    arguments: repeat each A,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.construct(
+      constructor: self,
+      arguments: repeat each arguments
+    )
+  }
+
+  public func invokeMethod<Name: JSString>(
+    _ name: borrowing Name,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+    context.withInstantContext { callbackContext in
+      invokeMethod(name, in: callbackContext)
+    }
+  }
+
+  public func invokeMethod<Name: JSString>(
+    _ name: borrowing Name,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+    context.invokeMethod(name.string, on: self)
+  }
+
+  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
+    _ name: borrowing Name,
+    arguments: repeat each A,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+    context.withInstantContext { callbackContext in
+      invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
+    _ name: borrowing Name,
+    arguments: repeat each A,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+    context.invokeMethod(
+      name.string,
+      on: self,
+      arguments: repeat each arguments
+    )
+  }
+
+  public func toNumber(in context: isolated JSEngineContext<E> = #isolation) -> Double {
+    toDouble(in: context)
+  }
+
+  public func toNumber(in context: borrowing JSEngineInstantContext<E>) -> Double {
+    toDouble(in: context)
+  }
+
+  public func toObject(
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      toObject(in: callbackContext)
+    }
+  }
+
+  public func toObject(
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.toObject(self)
+  }
+
+  public func isArray(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+    context.withInstantContext { callbackContext in
+      isArray(in: callbackContext)
+    }
+  }
+
+  public func isArray(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+    context.isArray(self)
+  }
+
+  public func isDate(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+    context.withInstantContext { callbackContext in
+      isDate(in: callbackContext)
+    }
+  }
+
+  public func isDate(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+    context.isDate(self)
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing JSValue<E>,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> Bool {
+    context.withInstantContext { callbackContext in
+      isInstanceOf(constructor, in: callbackContext)
+    }
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing JSValue<E>,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> Bool {
+    context.isInstanceOf(self, constructor: constructor)
+  }
+
+  public func defineProperty<Val, Key>(
+    _ value: borrowing Val,
+    forKey key: borrowing Key,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSEngineContext<E> = #isolation
+  ) -> JSResult<JSValue<E>>
+  where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+    context.withInstantContext { callbackContext in
+      defineProperty(value, forKey: key, with: attributes, in: callbackContext)
+    }
+  }
+
+  public func defineProperty<Val, Key>(
+    _ value: borrowing Val,
+    forKey key: borrowing Key,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSEngineInstantContext<E>
+  ) -> JSResult<JSValue<E>>
+  where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let didSet = context.setStringProperty(
+      key.string,
+      on: self,
+      to: encoded,
+      attributes: attributes.hostMemberAttributes
+    )
+    guard didSet else {
+      return .exception(context.makeUndefined())
+    }
+
+    return context.getStringProperty(key.string, on: self)
+  }
+}

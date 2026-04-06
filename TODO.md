@@ -182,6 +182,7 @@
 - [x] 中期解耦推进：`JSValue` 在 `isolated JSContext` 分支下不再直接构造 `JSInstantContext(ctx:)`，统一改走 `withInstantContext` 转发（并修复 `borrowing JSString` 闭包捕获）
 - [x] 中期解耦推进：`JSValue(name:callback:in:)` 不再直接依赖 `JavaScriptCoreBackendDriver.makeFunction` 与 `functionClass` 细节，改由 `JSInstantContext.makeFunction` 统一收口
 - [x] 中期解耦推进：`JSValueInvocationInterop` 的比较/调用/toObject/类型辅助与 defineProperty 流程不再直接调用 backend，改由 `JSInstantContext` 提供统一收口方法
+- [x] 继续迁移 `JSValueInvocationInterop` 到 `SwiftJavaScript` core（已将 call/construct/invokeMethod/toObject/isArray/isDate/isInstanceOf/defineProperty 与参数桥接下沉到通用层，JSC facade 仅保留 equal 语义扩展）
 - [x] 迁移边界确认：`JSPropertyAttributes -> JSHostMemberAttributes` 映射保留在 facade（依赖引擎语义位定义，提前下沉会造成标志错位）
 
 ### 8.1 InstantContext 收口待办（按“仅底层 bridge 细节收口”原则）
@@ -247,7 +248,7 @@
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
 阶段 B：按垂直切片迁移，逐段收口
-- [ ] Slice 1：`JSValue` 调用链（call/construct/invokeMethod）全链路引擎泛型化
+- [x] Slice 1：`JSValue` 调用链（call/construct/invokeMethod）全链路引擎泛型化（已在 core 下沉调用链与参数桥接，JSC 侧仅保留 equal 专有语义）
 - [ ] Slice 2：基础判型与基础转换链路泛型化
 - [ ] Slice 3：`JSObject` 属性访问链路泛型化
 - [ ] Slice 4：`JSClass` callback 输入输出链路泛型化
