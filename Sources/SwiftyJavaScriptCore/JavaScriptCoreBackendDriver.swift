@@ -904,38 +904,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     jsType(from: JSValueGetType(context, value))
   }
 
-  package static func isUndefined(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .undefined
-  }
-
-  package static func isNull(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .null
-  }
-
-  package static func isBoolean(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .boolean
-  }
-
-  package static func isNumber(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .number
-  }
-
-  package static func isString(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .string
-  }
-
-  package static func isSymbol(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .symbol
-  }
-
-  package static func isObject(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .object
-  }
-
-  package static func isBigInt(_ value: JSValueRef, in context: JSContextRef) -> Bool {
-    valueType(of: value, in: context) == .bigInt
-  }
-
   package static var propertyAttributeNoneRawValue: UInt32 {
     UInt32(kJSPropertyAttributeNone)
   }
