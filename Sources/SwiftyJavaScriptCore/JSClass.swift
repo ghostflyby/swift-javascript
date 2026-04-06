@@ -84,62 +84,12 @@ private final class JavaScriptCoreClassDefinitionModelRegistry: @unchecked Senda
   }
 }
 
-private final class JSClassObjectDefinitionRegistry: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [UInt: (definition: JavaScriptCoreClassDefinitionModel, depth: Int)] = [:]
-
-  func set(
-    _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel, depth: Int
-  ) {
-    lock.lock()
-    let key = classObjectKey(object)
-    if let current = map[key], current.depth > depth {
-      lock.unlock()
-      return
-    }
-    map[key] = (definition, depth)
-    lock.unlock()
-  }
-
-  func get(_ object: JSObjectRef) -> JavaScriptCoreClassDefinitionModel? {
-    lock.lock()
-    let value = map[classObjectKey(object)]?.definition
-    lock.unlock()
-    return value
-  }
-
-  func remove(_ object: JSObjectRef) {
-    lock.lock()
-    map.removeValue(forKey: classObjectKey(object))
-    lock.unlock()
-  }
-}
-
-private final class JSClassObjectFinalizeCounterRegistry: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [UInt: Int] = [:]
-
-  func setMax(_ object: JSObjectRef, count: Int) {
-    lock.lock()
-    let key = classObjectKey(object)
-    map[key] = max(count, map[key] ?? 0)
-    lock.unlock()
-  }
-
-  func decrement(_ object: JSObjectRef) -> Int {
-    lock.lock()
-    let key = classObjectKey(object)
-    let current = map[key] ?? 1
-    let next = current - 1
-    if next <= 0 {
-      map.removeValue(forKey: key)
-    } else {
-      map[key] = next
-    }
-    lock.unlock()
-    return next
-  }
-}
+private typealias JSClassObjectDefinitionRegistry = SwiftJavaScript.JSClassDefinitionDepthRegistry<
+  UInt,
+  JavaScriptCoreClassDefinitionModel
+>
+private typealias JSClassObjectFinalizeCounterRegistry =
+  SwiftJavaScript.JSClassFinalizeCounterRegistry<UInt>
 
 private let classDefinitionRegistry = JavaScriptCoreClassDefinitionModelRegistry()
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
@@ -213,7 +163,7 @@ func removeClassObjectContext(_ object: JSObjectRef) {
 }
 
 func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionModel? {
-  classObjectDefinitionRegistry.get(object)
+  classObjectDefinitionRegistry.get(classObjectKey(object))
 }
 
 func classDefinition(for jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionModel? {
@@ -228,7 +178,7 @@ func rememberClassObjectDefinition(
   _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectDefinitionRegistry.set(
-    object,
+    classObjectKey(object),
     definition: definition,
     depth: definition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
   )
@@ -238,13 +188,13 @@ func rememberClassObjectFinalizeCount(
   _ object: JSObjectRef, definition: JavaScriptCoreClassDefinitionModel
 ) {
   classObjectFinalizeCounterRegistry.setMax(
-    object,
+    classObjectKey(object),
     count: definition.exportedDefinitionCount(resolvingParentDefinition: resolveParentDefinition)
   )
 }
 
 private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
-  classObjectFinalizeCounterRegistry.decrement(object)
+  classObjectFinalizeCounterRegistry.decrement(classObjectKey(object))
 }
 
 private func rememberClassDefinition(
@@ -267,7 +217,7 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
   }
 
   if finalizeCountAfterDecrement(object) <= 0 {
-    classObjectDefinitionRegistry.remove(object)
+    classObjectDefinitionRegistry.remove(classObjectKey(object))
     removeClassObjectContext(object)
   }
 }

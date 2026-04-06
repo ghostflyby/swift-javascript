@@ -250,6 +250,7 @@
 - [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
 - [x] 迁移 `JSClassValueConverter` 到 core（新增 `JSClassValueConverterCompatible`，facade `JSClassValueConvertible` 适配并移除重复 converter 定义）
 - [x] 迁移 `JSClassValueConvertible` 的 auto storage/container 到 core（已新增 `SwiftJavaScript` 的通用 auto storage 与 class cache registry，facade 收敛为 JSC 特化 typealias 与调用）
+- [x] 迁移 `JSClass` object-definition/finalize-counter registry 到 core（新增通用 depth/finalize registry，facade 仅保留 object key 适配）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
 阶段 B：按垂直切片迁移，逐段收口
