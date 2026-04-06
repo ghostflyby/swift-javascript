@@ -1,15 +1,17 @@
+import JavaScriptCore
+
 extension SwiftJavaScript.JSInstantContext where E == JavaScriptCoreEngine {
   func looselyEquals(
     _ lhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     _ rhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
   ) -> Bool {
-    JavaScriptCoreEngine.valueEquals(lhs.ref, rhs.ref, in: globalContextRef)
+    JSValueIsEqual(globalContextRef, lhs.ref, rhs.ref, nil)
   }
 
   func strictlyEquals(
     _ lhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     _ rhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
   ) -> Bool {
-    JavaScriptCoreEngine.valueStrictEquals(lhs.ref, rhs.ref, in: globalContextRef)
+    JSValueIsStrictEqual(globalContextRef, lhs.ref, rhs.ref)
   }
 }

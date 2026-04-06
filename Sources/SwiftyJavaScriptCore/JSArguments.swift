@@ -6,7 +6,7 @@ extension JSArguments where E == JavaScriptCoreEngine {
       guard index >= 0 && index < count, let valueRef = pointer[index] else {
         return nil
       }
-      return JavaScriptCoreEngine.valueHandle(from: valueRef, in: contextHandle)
+      return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
     }
   }
 }

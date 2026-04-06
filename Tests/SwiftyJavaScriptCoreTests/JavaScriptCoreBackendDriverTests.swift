@@ -14,7 +14,7 @@ import Testing
   #expect(JavaScriptCoreEngine.capabilities.supportsHostObjects)
   #expect(JavaScriptCoreEngine.capabilities.supportsSymbol)
 
-  let number = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!.rawValue
+  let number = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!
   let string = JavaScriptCoreEngine.makeString("hello", in: context)
 
   #expect(number.type == .number)
@@ -31,7 +31,7 @@ import Testing
   case .exception:
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
-    let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!.rawValue
+    let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!
 
     switch JavaScriptCoreEngine.setProperty(
       "answer",
@@ -133,7 +133,7 @@ import Testing
     case .exception:
       Issue.record("expected receiver object creation to succeed")
     case .value(let thisObject):
-      let base = JavaScriptCoreEngine.makeNumberValueHandle(10, context)!.rawValue
+      let base = JavaScriptCoreEngine.makeNumberValueHandle(10, context)!
       _ = JavaScriptCoreEngine.setProperty(
         "base",
         on: thisObject,
@@ -141,8 +141,8 @@ import Testing
         in: context,
         attributes: .none
       )
-      let one = JavaScriptCoreEngine.makeNumberValueHandle(1, context)!.rawValue
-      let two = JavaScriptCoreEngine.makeNumberValueHandle(2, context)!.rawValue
+      let one = JavaScriptCoreEngine.makeNumberValueHandle(1, context)!
+      let two = JavaScriptCoreEngine.makeNumberValueHandle(2, context)!
 
       switch JavaScriptCoreEngine.callFunction(
         function,
@@ -223,8 +223,8 @@ import Testing
       case .exception:
         Issue.record("expected Array constructor evaluation to succeed")
       case .value(let arrayConstructor):
-        let arrayHandle = JSValueHandle<JavaScriptCoreEngine>(rawValue: array)
-        let dateHandle = JSValueHandle<JavaScriptCoreEngine>(rawValue: date)
+        let arrayHandle = array
+        let dateHandle = date
         #expect(JavaScriptCoreEngine.isArrayHandle(arrayHandle, in: context) == true)
         #expect(JavaScriptCoreEngine.isDateHandle(arrayHandle, in: context) == false)
         #expect(JavaScriptCoreEngine.isDateHandle(dateHandle, in: context) == true)
@@ -232,7 +232,7 @@ import Testing
           JavaScriptCoreEngine.isInstanceOf(
             array, constructor: arrayConstructor, in: context))
 
-        let primitive = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!.rawValue
+        let primitive = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!
         switch JavaScriptCoreEngine.toObject(primitive, in: context) {
         case .exception:
           Issue.record("expected toObject to box primitive numbers")
@@ -278,7 +278,7 @@ import Testing
       }
     }
 
-    let indexedValue = JavaScriptCoreEngine.makeBooleanValueHandle(true, context)!.rawValue
+    let indexedValue = JavaScriptCoreEngine.makeBooleanValueHandle(true, context)!
     switch JavaScriptCoreEngine.setProperty(at: 2, on: object, to: indexedValue, in: context)
     {
     case .exception:
@@ -368,18 +368,18 @@ import Testing
     JSValue(undefinedIn: context)
   }
 
-  let descriptor = JavaScriptCoreEngine.hostTypeDescriptor(for: definition)
+  let descriptor = definition.hostTypeDescriptor()
 
   #expect(descriptor.name == "BackendProjected")
   #expect(!descriptor.properties.isEmpty)
   #expect(!descriptor.methods.isEmpty)
-  #expect(JavaScriptCoreEngine.hasDynamicPropertyGetter(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasDynamicPropertySetter(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasDynamicPropertyHas(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasDynamicPropertyDelete(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasPropertyEnumerator(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasCallAsFunction(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasConstructor(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasHasInstance(for: descriptor))
-  #expect(JavaScriptCoreEngine.hasConvertToType(for: descriptor))
+  #expect(descriptor.dynamicPropertyGetterBinding != nil)
+  #expect(descriptor.dynamicPropertySetterBinding != nil)
+  #expect(descriptor.dynamicPropertyHasBinding != nil)
+  #expect(descriptor.dynamicPropertyDeleteBinding != nil)
+  #expect(descriptor.propertyEnumeratorBinding != nil)
+  #expect(descriptor.callAsFunctionBinding != nil)
+  #expect(descriptor.constructor?.binding != nil)
+  #expect(descriptor.hasInstanceBinding != nil)
+  #expect(descriptor.convertToTypeBinding != nil)
 }

@@ -467,7 +467,7 @@ private func autoStaticFunctionCallCallbackValue(
   ctx: JSContextRef?,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> JSValueRef? {
-  let result = JavaScriptCoreEngine.withArguments(arguments, count: argumentCount) { args in
+  let result = withJavaScriptCoreArguments(arguments, count: argumentCount) { args in
     functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
   }
   return JavaScriptCoreEngine.callbackReturnValue(
@@ -492,7 +492,7 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
       exception: exception
     )
   }
-  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
+  return value ?? JSValueMakeUndefined(ctx)
 }
 
 private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
@@ -534,7 +534,7 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
       exception: exception
     )
   }
-  return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
+  return value ?? JSValueMakeUndefined(ctx)
 }
 
 private func installAutoDynamicCallbacks(
@@ -559,7 +559,7 @@ private func installAutoDynamicCallbacks(
           exception: exception
         )
       }
-      return value ?? JavaScriptCoreEngine.undefinedValue(in: ctx)
+      return value ?? JSValueMakeUndefined(ctx)
     }
   }
 
@@ -676,7 +676,7 @@ private func installAutoStaticFunctionMembers(
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   -> JavaScriptCore.JSClassDefinition
 {
-  var cls = JavaScriptCoreEngine.emptyClassDefinition
+  var cls = JavaScriptCore.kJSClassDefinitionEmpty
   cls.version = backing.definition.version
   cls.attributes = backing.definition.attributes.rawValue
   cls.parentClass = backing.definition.parentClass?.ref

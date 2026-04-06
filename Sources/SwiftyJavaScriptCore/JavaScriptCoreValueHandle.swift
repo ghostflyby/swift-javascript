@@ -10,14 +10,6 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
     self.contextRef = contextRef
   }
 
-  init(rawValue: JavaScriptCoreValueHandle) {
-    self = rawValue
-  }
-
-  var rawValue: JavaScriptCoreValueHandle {
-    self
-  }
-
   var type: SwiftJavaScript.JSType {
     JavaScriptCoreEngine.valueType(of: ref, in: contextRef)
   }
