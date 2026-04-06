@@ -279,6 +279,9 @@
 边界约束：
 - [ ] 不迁移 `JSContextRef/JSGlobalContextRef/JSObjectRef/JSClassRef/JSStringRef/JSPropertyNameAccumulatorRef`、`JavaScriptCore.JSStaticValue`、`JavaScriptCore.JSStaticFunction` 本体；这些仍属于 JSC facade/backend 的原始桥接边界
 - [ ] 仅迁移这些原始类型之上的引擎无关组装逻辑、结果桥接模板与可复用的定义投影逻辑
+- [ ] 不以“搬空 facade”为目标；后续迁移以“core 暴露接口/模板，JSC 保留具体实现”为准
+- [ ] 保留在 JSC 的内容包括：raw ref 生命周期、`JavaScriptCore.JSClassDefinition` / `JSStaticValue` / `JSStaticFunction` 字段写入、`JSObject*Callback` 接线、`JSObjectGetPrivate` / `JSObjectSetPrivate` / exception pointer 读写
+- [ ] 迁移到 core 的内容包括：definition 组装规则、安装计划/阶段划分、static member 查找模板、auto storage 状态计算、与具体引擎无关的 callback 前后置模板
 
 Step 1：继续删 facade 薄包装
 - [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSValueResultBridge.swift` 中仅作 core `bridgeHandleResult` 薄封装的入口，调用点直接落到 core helper（已删除未使用的 `JSResult.from(handleResult:)` facade 包装）
@@ -291,18 +294,23 @@ Step 2：为剩余值语义 API 决定是否扩 core driver
 - [x] 若相等性上收到 core，则新增对应 engine driver hook，并删除 facade 中对 `JSValueIsEqual` / `JSValueIsStrictEqual` 的直接调用
 
 Step 3：继续下沉 `JSClass` 的定义组装逻辑
-- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClass.swift` 中继续识别并迁移与引擎无关的 definition 组装步骤：静态成员安装规划、生命周期/动态属性/callable 分组装配顺序、继承链上的 definition 查找模板
-- [ ] 将 `Sources/SwiftyJavaScriptCore/JSClass.swift` 中剩余的 class-definition/cache/finalize 协调逻辑继续压缩到 core helper，facade 仅保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release` 和各类 JSC callback 接线
-- [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
+- [ ] 先在 core 提炼 `JSClassDefinition` 的“安装计划”接口：明确 metadata / static members / lifecycle / dynamic-property / callable 五组阶段，不直接携带任何 JSC callback 类型
+- [ ] 在 core 为 static members 增加可复用的安装规划数据，而不是直接迁移 `JavaScriptCore.JSStaticValue` / `JavaScriptCore.JSStaticFunction` 写入代码
+- [ ] 在 core 抽出 definition 继承链查找模板，供 `JSClass` 与 `JSClassValueConvertible` 共同消费，避免 facade 重复写 `classDefinition(for: $0.ref)` 闭包
+- [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只改为消费 core 安装计划
+- [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition plan” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
 
 Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
 - [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板已下沉到 core）
+- [ ] 在 core 提炼“从 definition 解析 static value/function”的名称查找模板，JSC facade 仅负责从 `JSStringRef` / function object 上取出名字再调用模板
+- [ ] 在 core 提炼 auto-convertible 的 definition 选择与 parent-definition 解析接口，JSC facade 只提供 `JSClassRef -> definition` 的适配闭包
 - [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线
-- [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，评估是否可先由 core typealias/别名包装，再由 facade 做最终特化
+- [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，优先改成 core 泛型接口 + facade 特化，而不是继续扩大 facade API 面
 
 Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 审查 `Sources/SwiftyJavaScriptCore/JSValueConversionMacros.swift` 中仍直接写死 `JavaScriptCoreEngine` / `JSClass` / `JSPropertyNameAccumulatorRef` 的说明与生成模板，优先改为引用 core converter/protocol 语义
 - [ ] 补一轮面向 `SwiftJavaScriptTests` 的迁移测试，把新下沉的 `JSClass` / auto-convertible 组装逻辑优先放到 core 测试覆盖，避免继续只能在 JSC facade tests 中验证
+- [ ] 为每一轮“core 接口 + JSC 实现”拆分补对应测试：core 侧测安装计划/解析模板，JSC 侧只测 raw callback wiring 与实际 JavaScriptCore 行为
 
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
