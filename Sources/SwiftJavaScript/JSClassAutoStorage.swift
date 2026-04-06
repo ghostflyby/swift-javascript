@@ -19,6 +19,18 @@ package final class JSClassAutoNativeClassBacking<
     self.definition = definition
     self.usesManagedParent = usesManagedParent
   }
+
+  package convenience init(
+    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    resolvingManagedParentDefinition:
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) {
+    self.init(
+      definition: definition,
+      usesManagedParent: definition.parentClass.flatMap { resolvingManagedParentDefinition($0) }
+        != nil
+    )
+  }
 }
 
 package final class JSClassAutoObjectStorage<
@@ -38,5 +50,24 @@ package final class JSClassAutoObjectStorage<
     self.definition = definition
     self.instance = instance
     self.finalizeDepth = finalizeDepth
+  }
+
+  package convenience init(
+    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    instance: AnyObject,
+    resolvingParentDefinition:
+      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+  ) {
+    self.init(
+      definition: definition,
+      instance: instance,
+      finalizeDepth: definition.exportedDefinitionCount(
+        resolvingParentDefinition: resolvingParentDefinition
+      )
+    )
+  }
+
+  package func typedInstance<T: AnyObject>(as type: T.Type) -> T? {
+    instance as? T
   }
 }

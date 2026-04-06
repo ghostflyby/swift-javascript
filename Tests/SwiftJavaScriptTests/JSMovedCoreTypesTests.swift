@@ -134,3 +134,46 @@ import Testing
   #expect(boxed.value == 123)
   #expect(sendableBox.value == "payload")
 }
+
+private final class DummyJSClassInstance: Sendable {}
+
+@Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {
+  var parent = JSClassDefinition<MockEngine, String, Never>()
+  parent.className = "Parent"
+
+  var child = JSClassDefinition<MockEngine, String, Never>()
+  child.className = "Child"
+  child.parentClass = "Parent"
+
+  let backing = JSClassAutoNativeClassBacking<
+    MockEngine,
+    String,
+    Never,
+    Int,
+    Int
+  >(definition: child) { parentName in
+    parentName == "Parent" ? parent : nil
+  }
+
+  let storage = JSClassAutoObjectStorage(
+    definition: child,
+    instance: DummyJSClassInstance()
+  ) { parentName in
+    parentName == "Parent" ? parent : nil
+  }
+
+  #expect(backing.usesManagedParent)
+  #expect(storage.finalizeDepth == 2)
+}
+
+@Test func jsClassAutoStorageTypedInstanceAccessIsSafe() {
+  let instance = DummyJSClassInstance()
+  let storage = JSClassAutoObjectStorage<MockEngine, String, Never>(
+    definition: JSClassDefinition(),
+    instance: instance,
+    finalizeDepth: 1
+  )
+
+  #expect(storage.typedInstance(as: DummyJSClassInstance.self) === instance)
+  #expect(storage.typedInstance(as: MockStringHandle.self) == nil)
+}

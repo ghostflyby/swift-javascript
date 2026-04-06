@@ -296,7 +296,7 @@ Step 3：继续下沉 `JSClass` 的定义组装逻辑
 - [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
 
 Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
-- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略
+- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板已下沉到 core）
 - [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线
 - [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，评估是否可先由 core typealias/别名包装，再由 facade 做最终特化
 

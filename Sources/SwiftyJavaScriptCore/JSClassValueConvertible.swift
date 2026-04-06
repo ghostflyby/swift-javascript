@@ -58,11 +58,9 @@ where
 
   fileprivate static func makeAutoJSClass() -> JSClass {
     let definition = jsClassDefinition
-    let usesManagedParent =
-      definition.parentClass.map { classDefinition(for: $0.ref) != nil } ?? false
     let backing = JSClassAutoNativeClassBacking(
       definition: definition,
-      usesManagedParent: usesManagedParent
+      resolvingManagedParentDefinition: { classDefinition(for: $0.ref) }
     )
     let nativeDefinition = autoNativeDefinition(backing: backing)
     return JSClass(
@@ -139,7 +137,7 @@ where
     }
 
     let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
-    guard let instance = storage.instance as? Self else {
+    guard let instance = storage.typedInstance(as: Self.self) else {
       throw .codable("JS object backing is not of type \(Self.self)")
     }
 
@@ -168,9 +166,7 @@ where
     let storage = JSClassAutoObjectStorage(
       definition: definition,
       instance: value,
-      finalizeDepth: definition.exportedDefinitionCount(
-        resolvingParentDefinition: { classDefinition(for: $0.ref) }
-      )
+      resolvingParentDefinition: { classDefinition(for: $0.ref) }
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
