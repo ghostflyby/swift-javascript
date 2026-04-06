@@ -1,6 +1,19 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
+
+private func makeJavaScriptCoreArguments(
+  _ pointer: UnsafePointer<JSValueRef?>,
+  count: Int
+) -> JSArguments<JavaScriptCoreEngine> {
+  JSArguments<JavaScriptCoreEngine>(count: count) { index, contextHandle in
+    guard index >= 0, index < count, let valueRef = pointer[index] else {
+      return nil
+    }
+    return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+  }
+}
 
 @Test func builtinCodableRoundtrip() async {
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
@@ -47,7 +60,7 @@ import Testing
     let rawArguments = [Optional(source.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 1)
+      let args = makeJavaScriptCoreArguments(buffer.baseAddress!, count: 1)
       let decoded = args.unpack(at: 0, using: ZeroOneBoolConverter.self, in: context)
       #expect(decoded)
     }
@@ -63,7 +76,7 @@ import Testing
     let rawArguments = [Optional(boolSource.ref), Optional(numberSource.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 2)
+      let args = makeJavaScriptCoreArguments(buffer.baseAddress!, count: 2)
       let (decodedBool, decodedNumber): (Bool, Double) = args.unpack(
         using: ZeroOneBoolConverter.self,
         JSDefaultConverter<Double>.self,
@@ -97,7 +110,7 @@ import Testing
     let rawArguments = [Optional(source.ref)]
 
     rawArguments.withUnsafeBufferPointer { buffer in
-      let args = JSArguments<JavaScriptCoreEngine>(pointer: buffer.baseAddress!, count: 1)
+      let args = makeJavaScriptCoreArguments(buffer.baseAddress!, count: 1)
       do {
         let _: Double = try args.tryUnpack(
           at: 0, using: JSDefaultConverter<Double>.self, in: context)
@@ -127,7 +140,7 @@ import Testing
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withIsolatedGlobalObject { context, global in
-    let fn: JSValue<JavaScriptCoreEngine> = JSValue(
+    let fn: SwiftJavaScript.JSValue<JavaScriptCoreEngine> = JSValue(
       name: "coded",
       converters: JSDefaultConverter<Double>.self,
       returnCoder: ReturnPayloadEncoder.self,

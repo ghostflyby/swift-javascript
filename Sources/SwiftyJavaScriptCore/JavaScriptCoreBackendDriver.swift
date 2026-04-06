@@ -2,131 +2,6 @@ import Foundation
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCoreStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable
-{
-  public let ref: JSStringRef
-
-  public init(ref: JSStringRef) {
-    self.ref = ref
-  }
-
-  @discardableResult
-  public func retainReference() -> Bool {
-    JSStringRetain(ref)
-    return true
-  }
-
-  @discardableResult
-  public func releaseReference() -> Bool {
-    JSStringRelease(ref)
-    return true
-  }
-}
-
-private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
-  ctx, function, thisObject, argumentCount, arguments, exception in
-  guard let ctx, let function, let thisObject else {
-    return JSValueMakeUndefined(ctx)
-  }
-
-  let context = JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
-  let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
-    JSObjectGetPrivate(function)!
-  ).takeUnretainedValue().value
-  let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
-  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
-  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
-    callback(context, functionValue, thisValue, args).toPrivateResult()
-  }
-
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
-    return JSValueMakeUndefined(ctx)
-  }
-}
-
-func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
-  var definition = JavaScriptCore.kJSClassDefinitionEmpty
-  definition.callAsFunction = javaScriptCoreFunctionCallback
-  definition.finalize = { function in
-    guard let function, let privateData = JSObjectGetPrivate(function) else {
-      return
-    }
-    let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(privateData)
-      .takeRetainedValue()
-    _ = callback.value
-  }
-  return definition
-}
-
-func withJavaScriptCoreArguments<R: ~Copyable>(
-  _ pointer: UnsafePointer<JSValueRef?>?,
-  count: Int,
-  _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
-) -> R {
-  var empty: JSValueRef? = nil
-  return withUnsafePointer(to: &empty) { emptyPointer in
-    let arguments = JSArguments<JavaScriptCoreEngine>(
-      pointer: pointer ?? emptyPointer, count: count)
-    return body(arguments)
-  }
-}
-
-extension JSTypedArrayKind {
-  fileprivate var javaScriptCoreType: JSTypedArrayType {
-    switch self {
-    case .int8Array:
-      return kJSTypedArrayTypeInt8Array
-    case .uint8Array:
-      return kJSTypedArrayTypeUint8Array
-    case .uint8ClampedArray:
-      return kJSTypedArrayTypeUint8ClampedArray
-    case .int16Array:
-      return kJSTypedArrayTypeInt16Array
-    case .uint16Array:
-      return kJSTypedArrayTypeUint16Array
-    case .int32Array:
-      return kJSTypedArrayTypeInt32Array
-    case .uint32Array:
-      return kJSTypedArrayTypeUint32Array
-    case .float32Array:
-      return kJSTypedArrayTypeFloat32Array
-    case .float64Array:
-      return kJSTypedArrayTypeFloat64Array
-    }
-  }
-
-  fileprivate init?(javaScriptCoreType: JSTypedArrayType) {
-    switch javaScriptCoreType {
-    case kJSTypedArrayTypeInt8Array:
-      self = .int8Array
-    case kJSTypedArrayTypeUint8Array:
-      self = .uint8Array
-    case kJSTypedArrayTypeUint8ClampedArray:
-      self = .uint8ClampedArray
-    case kJSTypedArrayTypeInt16Array:
-      self = .int16Array
-    case kJSTypedArrayTypeUint16Array:
-      self = .uint16Array
-    case kJSTypedArrayTypeInt32Array:
-      self = .int32Array
-    case kJSTypedArrayTypeUint32Array:
-      self = .uint32Array
-    case kJSTypedArrayTypeFloat32Array:
-      self = .float32Array
-    case kJSTypedArrayTypeFloat64Array:
-      self = .float64Array
-    default:
-      return nil
-    }
-  }
-}
-
 private enum JavaScriptCoreObjectLookup {
   case object(JSObjectRef)
   case exception(JavaScriptCoreValueHandle)
@@ -525,7 +400,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard
-      let objectRef = makeArrayBufferWithBytesNoCopy(
+      let objectRef = makeJavaScriptCoreArrayBufferWithBytesNoCopy(
         in: context.ref,
         bytes: bytes,
         byteLength: byteLength,
@@ -547,7 +422,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return nil
     case .object(let objectRef):
-      return arrayBufferByteLength(of: objectRef, in: context.ref)
+      return javaScriptCoreArrayBufferByteLength(of: objectRef, in: context.ref)
     }
   }
 
@@ -559,7 +434,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return (nil, true)
     case .object(let objectRef):
-      return arrayBufferBytesPtr(of: objectRef, in: context.ref)
+      return javaScriptCoreArrayBufferBytesPtr(of: objectRef, in: context.ref)
     }
   }
 
@@ -569,9 +444,9 @@ public enum JavaScriptCoreEngine: JSEngine {
     length: Int
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     guard
-      let objectRef = makeTypedArray(
+      let objectRef = makeJavaScriptCoreTypedArray(
         in: context.ref,
-        type: kind.javaScriptCoreType,
+        type: kind.javaScriptCoreTypedArrayType,
         length: length
       )
     else {
@@ -591,9 +466,9 @@ public enum JavaScriptCoreEngine: JSEngine {
       return nil
     case .object(let objectRef):
       guard
-        let typedArrayRef = makeTypedArrayWithArrayBuffer(
+        let typedArrayRef = makeJavaScriptCoreTypedArrayWithArrayBuffer(
           in: context.ref,
-          type: kind.javaScriptCoreType,
+          type: kind.javaScriptCoreTypedArrayType,
           arrayBuffer: objectRef
         )
       else {
@@ -616,9 +491,9 @@ public enum JavaScriptCoreEngine: JSEngine {
       return nil
     case .object(let objectRef):
       guard
-        let typedArrayRef = makeTypedArrayWithArrayBufferAndOffset(
+        let typedArrayRef = makeJavaScriptCoreTypedArrayWithArrayBufferAndOffset(
           in: context.ref,
-          type: kind.javaScriptCoreType,
+          type: kind.javaScriptCoreTypedArrayType,
           arrayBuffer: objectRef,
           byteOffset: byteOffset,
           length: length
@@ -639,7 +514,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return nil
     case .object(let objectRef):
-      return typedArrayLength(of: objectRef, in: context.ref)
+      return javaScriptCoreTypedArrayLength(of: objectRef, in: context.ref)
     }
   }
 
@@ -651,7 +526,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return nil
     case .object(let objectRef):
-      return typedArrayByteLength(of: objectRef, in: context.ref)
+      return javaScriptCoreTypedArrayByteLength(of: objectRef, in: context.ref)
     }
   }
 
@@ -663,7 +538,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return nil
     case .object(let objectRef):
-      return typedArrayByteOffset(of: objectRef, in: context.ref)
+      return javaScriptCoreTypedArrayByteOffset(of: objectRef, in: context.ref)
     }
   }
 
@@ -675,7 +550,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return nil
     case .object(let objectRef):
-      guard let bufferRef = typedArrayBuffer(of: objectRef, in: context.ref) else {
+      guard let bufferRef = javaScriptCoreTypedArrayBuffer(of: objectRef, in: context.ref) else {
         return nil
       }
 
@@ -691,7 +566,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     case .exception:
       return (nil, true)
     case .object(let objectRef):
-      return typedArrayBytesPtr(of: objectRef, in: context.ref)
+      return javaScriptCoreTypedArrayBytesPtr(of: objectRef, in: context.ref)
     }
   }
 
@@ -700,7 +575,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
     guard
-      let type = typedArrayType(of: value.ref, in: context.ref)
+      let type = javaScriptCoreTypedArrayType(of: value.ref, in: context.ref)
     else {
       return false
     }
@@ -713,12 +588,12 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> JSTypedArrayKind? {
     guard
-      let type = typedArrayType(of: value.ref, in: context.ref)
+      let type = javaScriptCoreTypedArrayType(of: value.ref, in: context.ref)
     else {
       return nil
     }
 
-    return JSTypedArrayKind(javaScriptCoreType: type)
+    return JSTypedArrayKind(javaScriptCoreTypedArrayType: type)
   }
 
   private static func makeFunction(
@@ -767,166 +642,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ rhs: JavaScriptCoreStringHandle
   ) -> Bool {
     JSStringIsEqual(lhs.ref, rhs.ref)
-  }
-
-  private static func makeArrayBufferWithBytesNoCopy(
-    in context: JSGlobalContextRef,
-    bytes: UnsafeMutableRawPointer?,
-    byteLength: Int,
-    bytesDeallocator: JSTypedArrayBytesDeallocator?,
-    deallocatorContext: UnsafeMutableRawPointer?
-  ) -> JSObjectRef? {
-    var exception: JSValueRef?
-    let ref = JSObjectMakeArrayBufferWithBytesNoCopy(
-      context,
-      bytes,
-      byteLength,
-      bytesDeallocator,
-      deallocatorContext,
-      &exception
-    )
-    guard exception == nil else {
-      return nil
-    }
-    return ref
-  }
-
-  private static func arrayBufferByteLength(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> Int? {
-    var exception: JSValueRef?
-    let length = JSObjectGetArrayBufferByteLength(context, object, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return length
-  }
-
-  private static func arrayBufferBytesPtr(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    var exception: JSValueRef?
-    let bytes = JSObjectGetArrayBufferBytesPtr(context, object, &exception)
-    return (bytes, exception != nil)
-  }
-
-  private static func makeTypedArray(
-    in context: JSGlobalContextRef,
-    type: JSTypedArrayType,
-    length: Int
-  ) -> JSObjectRef? {
-    var exception: JSValueRef?
-    let ref = JSObjectMakeTypedArray(context, type, length, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return ref
-  }
-
-  private static func makeTypedArrayWithArrayBuffer(
-    in context: JSGlobalContextRef,
-    type: JSTypedArrayType,
-    arrayBuffer: JSObjectRef
-  ) -> JSObjectRef? {
-    var exception: JSValueRef?
-    let ref = JSObjectMakeTypedArrayWithArrayBuffer(context, type, arrayBuffer, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return ref
-  }
-
-  private static func makeTypedArrayWithArrayBufferAndOffset(
-    in context: JSGlobalContextRef,
-    type: JSTypedArrayType,
-    arrayBuffer: JSObjectRef,
-    byteOffset: Int,
-    length: Int
-  ) -> JSObjectRef? {
-    var exception: JSValueRef?
-    let ref = JSObjectMakeTypedArrayWithArrayBufferAndOffset(
-      context,
-      type,
-      arrayBuffer,
-      byteOffset,
-      length,
-      &exception
-    )
-    guard exception == nil else {
-      return nil
-    }
-    return ref
-  }
-
-  private static func typedArrayLength(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> Int? {
-    var exception: JSValueRef?
-    let length = JSObjectGetTypedArrayLength(context, object, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return length
-  }
-
-  private static func typedArrayByteLength(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> Int? {
-    var exception: JSValueRef?
-    let length = JSObjectGetTypedArrayByteLength(context, object, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return length
-  }
-
-  private static func typedArrayByteOffset(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> Int? {
-    var exception: JSValueRef?
-    let offset = JSObjectGetTypedArrayByteOffset(context, object, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return offset
-  }
-
-  private static func typedArrayBuffer(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> JSObjectRef? {
-    var exception: JSValueRef?
-    let buffer = JSObjectGetTypedArrayBuffer(context, object, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return buffer
-  }
-
-  private static func typedArrayBytesPtr(
-    of object: JSObjectRef,
-    in context: JSContextRef
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    var exception: JSValueRef?
-    let bytes = JSObjectGetTypedArrayBytesPtr(context, object, &exception)
-    return (bytes, exception != nil)
-  }
-
-  private static func typedArrayType(
-    of value: JSValueRef,
-    in context: JSContextRef
-  ) -> JSTypedArrayType? {
-    var exception: JSValueRef?
-    let type = JSValueGetTypedArrayType(context, value, &exception)
-    guard exception == nil else {
-      return nil
-    }
-    return type
   }
 
   private static func toString(_ value: JSValueRef, in context: JSContextRef) -> String? {
@@ -1351,20 +1066,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     }
     return .value(makeUndefined(in: context))
   }
-}
-
-func javaScriptCorePropertyAttributes(from attributes: JSHostMemberAttributes) -> UInt32 {
-  var rawValue = UInt32(kJSPropertyAttributeNone)
-  if attributes.contains(.readOnly) {
-    rawValue |= UInt32(kJSPropertyAttributeReadOnly)
-  }
-  if attributes.contains(.dontEnum) {
-    rawValue |= UInt32(kJSPropertyAttributeDontEnum)
-  }
-  if attributes.contains(.dontDelete) {
-    rawValue |= UInt32(kJSPropertyAttributeDontDelete)
-  }
-  return rawValue
 }
 
 private func withJSString<R>(_ string: String, _ body: (JSStringRef) -> R) -> R {

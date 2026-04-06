@@ -9,10 +9,4 @@ extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> 
       return .exception(e.takeRef())
     }
   }
-
-  static func from(
-    handleResult: JSResult<JSValueHandle<JavaScriptCoreEngine>>?
-  ) -> Self {
-    bridgeHandleResult(handleResult)
-  }
 }

@@ -6,8 +6,4 @@ extension JSInstantContext where E == JavaScriptCoreEngine {
       handle: JavaScriptCoreContextHandle(borrowing: ctx)
     )
   }
-
-  public var globalContextRef: JSGlobalContextRef {
-    driverContextHandle.ref
-  }
 }

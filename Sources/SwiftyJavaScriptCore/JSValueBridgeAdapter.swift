@@ -5,13 +5,13 @@ extension SwiftJavaScript.JSInstantContext where E == JavaScriptCoreEngine {
     _ lhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     _ rhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
   ) -> Bool {
-    JSValueIsEqual(globalContextRef, lhs.ref, rhs.ref, nil)
+    JSValueIsEqual(driverContextHandle.ref, lhs.ref, rhs.ref, nil)
   }
 
   func strictlyEquals(
     _ lhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
     _ rhs: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
   ) -> Bool {
-    JSValueIsStrictEqual(globalContextRef, lhs.ref, rhs.ref)
+    JSValueIsStrictEqual(driverContextHandle.ref, lhs.ref, rhs.ref)
   }
 }
