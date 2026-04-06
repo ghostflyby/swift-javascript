@@ -69,7 +69,9 @@ final class JSClassAutoObjectStorage {
 
 private let jsClassCacheRegistry = JSClassCacheRegistry()
 
-public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
+public protocol JSClassValueConvertible: AnyObject, JSValueEncodable,
+  JSClassValueConverterCompatible
+{
   static var jsClassDefinition:
     SwiftJavaScript.JSClassDefinition<
       JavaScriptCoreEngine, JSClass, JavaScriptCorePropertyNameAccumulatorRef
@@ -93,76 +95,6 @@ public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
   ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine>
 }
 
-public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter {
-  public typealias SwiftType = T
-
-  public static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) -> T {
-    let jscValue = _bridgeJavaScriptCoreValue(value)
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    return decode(jscValue, in: jscContext)
-  }
-
-  public static func tryDecode<E: JSEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> T {
-    let jscValue = _bridgeJavaScriptCoreValue(value)
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    return try tryDecode(jscValue, in: jscContext)
-  }
-
-  public static func encode<E: JSEngine>(
-    _ value: T,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    return _asGenericValue(encode(value, in: jscContext))
-  }
-
-  public static func tryEncode<E: JSEngine>(
-    _ value: T,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    let encoded = try tryEncode(value, in: jscContext)
-    return _asGenericValue(encoded)
-  }
-
-  public static func decode(
-    _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> T
-  {
-    T.decode(value, in: context)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) throws(JSValueConversionError) -> T {
-    try T.tryDecode(value, in: context)
-  }
-
-  public static func encode(
-    _ value: T, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> JSValue<
-    JavaScriptCoreEngine
-  > {
-    T.encode(value, in: context)
-  }
-
-  public static func tryEncode(
-    _ value: T,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-    try T.tryEncode(value, in: context)
-  }
-}
-
 extension JSClassValueConvertible {
   public static var jsClass: JSClass {
     jsClassCacheRegistry.jsClass(for: Self.self)
@@ -182,6 +114,58 @@ extension JSClassValueConvertible {
       retainedBacking: backing,
       rememberedDefinition: definition
     )
+  }
+
+  public static func decode<E: JSEngine>(
+    _ value: borrowing JSValue<E>,
+    in context: borrowing JSInstantContext<E>
+  ) -> Self {
+    let decodeJSC:
+      (
+        borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+        borrowing JSInstantContext<JavaScriptCoreEngine>
+      ) -> Self = Self.decode
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return decodeJSC(jscValue, jscContext)
+  }
+
+  public static func tryDecode<E: JSEngine>(
+    _ value: borrowing JSValue<E>,
+    in context: borrowing JSInstantContext<E>
+  ) throws(JSValueConversionError) -> Self {
+    let tryDecodeJSC:
+      (
+        borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+        borrowing JSInstantContext<JavaScriptCoreEngine>
+      ) throws(JSValueConversionError) -> Self = Self.tryDecode
+    let jscValue = _bridgeJavaScriptCoreValue(value)
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return try tryDecodeJSC(jscValue, jscContext)
+  }
+
+  public static func encode<E: JSEngine>(
+    _ value: Self,
+    in context: borrowing JSInstantContext<E>
+  ) -> JSValue<E> {
+    let encodeJSC:
+      (Self, borrowing JSInstantContext<JavaScriptCoreEngine>)
+        -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> = Self.encode
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    return _asGenericValue(encodeJSC(value, jscContext))
+  }
+
+  public static func tryEncode<E: JSEngine>(
+    _ value: Self,
+    in context: borrowing JSInstantContext<E>
+  ) throws(JSValueConversionError) -> JSValue<E> {
+    let tryEncodeJSC:
+      (Self, borrowing JSInstantContext<JavaScriptCoreEngine>)
+        throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> =
+        Self.tryEncode
+    let jscContext = _bridgeJavaScriptCoreContext(context)
+    let encoded = try tryEncodeJSC(value, jscContext)
+    return _asGenericValue(encoded)
   }
 
   public static func decode(
@@ -274,16 +258,13 @@ extension JSClassValueConvertible {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    return _asGenericValue(Self.encode(self, in: jscContext))
+    Self.encode(self, in: context)
   }
 
   public func tryEncode<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
-    let jscContext = _bridgeJavaScriptCoreContext(context)
-    let encoded = try Self.tryEncode(self, in: jscContext)
-    return _asGenericValue(encoded)
+    try Self.tryEncode(self, in: context)
   }
 }
 

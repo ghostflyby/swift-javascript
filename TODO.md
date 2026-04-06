@@ -248,6 +248,7 @@
 - [x] 继续下沉 `JSValueBridgeAdapter` 的通用调用桥接到 core（call/construct/invokeMethod/toObject/type helpers 已移除 facade 重复实现，跨 VM 校验改为 runtime driver 兼容性 hook）
 - [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
 - [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
+- [x] 迁移 `JSClassValueConverter` 到 core（新增 `JSClassValueConverterCompatible`，facade `JSClassValueConvertible` 适配并移除重复 converter 定义）
 - [ ] 保留过渡兼容层（typealias/adapter）以确保当前 `SwiftyJavaScriptCore` API 与测试面稳定
 
 阶段 B：按垂直切片迁移，逐段收口
