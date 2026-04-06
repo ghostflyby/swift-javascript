@@ -521,12 +521,10 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
 }
 
 private func installAutoDynamicCallbacks(
-  _ definition: SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  if definition.getProperty != nil {
+  if callbacks.hasDynamicPropertyGetter {
     cls.getProperty = { ctx, object, propertyName, exception in
       let value = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
@@ -546,7 +544,7 @@ private func installAutoDynamicCallbacks(
     }
   }
 
-  if definition.setProperty != nil {
+  if callbacks.hasDynamicPropertySetter {
     cls.setProperty = { ctx, object, propertyName, value, exception in
       guard let value else {
         return false
@@ -570,7 +568,7 @@ private func installAutoDynamicCallbacks(
     }
   }
 
-  if definition.hasProperty != nil {
+  if callbacks.hasDynamicPropertyHas {
     cls.hasProperty = { ctx, object, propertyName in
       let hasProperty = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
@@ -583,7 +581,7 @@ private func installAutoDynamicCallbacks(
     }
   }
 
-  if definition.deleteProperty != nil {
+  if callbacks.hasDynamicPropertyDelete {
     cls.deleteProperty = { ctx, object, propertyName, exception in
       let didDelete = withAutoDynamicPropertyCallbackInput(
         ctx: ctx,
@@ -598,20 +596,18 @@ private func installAutoDynamicCallbacks(
 }
 
 private func installAutoStaticValueMembers(
-  _ definition: SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
+  _ staticValues: [SwiftJavaScript.JSClassStaticValueInstallationPlan],
   backing: JSClassAutoNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard !definition.staticValues.isEmpty else {
+  guard !staticValues.isEmpty else {
     return
   }
 
-  backing.staticValueNames = definition.staticValues.map { $0.name.utf8CString }
+  backing.staticValueNames = staticValues.map { $0.name.utf8CString }
   backing.staticValues = []
-  backing.staticValues.reserveCapacity(definition.staticValues.count + 1)
-  for (index, value) in definition.staticValues.enumerated() {
+  backing.staticValues.reserveCapacity(staticValues.count + 1)
+  for (index, value) in staticValues.enumerated() {
     var staticValue = JavaScriptCore.JSStaticValue()
     backing.staticValueNames[index].withUnsafeBufferPointer {
       staticValue.name = $0.baseAddress
@@ -628,20 +624,18 @@ private func installAutoStaticValueMembers(
 }
 
 private func installAutoStaticFunctionMembers(
-  _ definition: SwiftJavaScript.JSClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
+  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionInstallationPlan],
   backing: JSClassAutoNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard !definition.staticFunctions.isEmpty else {
+  guard !staticFunctions.isEmpty else {
     return
   }
 
-  backing.staticFunctionNames = definition.staticFunctions.map { $0.name.utf8CString }
+  backing.staticFunctionNames = staticFunctions.map { $0.name.utf8CString }
   backing.staticFunctions = []
-  backing.staticFunctions.reserveCapacity(definition.staticFunctions.count + 1)
-  for (index, function) in definition.staticFunctions.enumerated() {
+  backing.staticFunctions.reserveCapacity(staticFunctions.count + 1)
+  for (index, function) in staticFunctions.enumerated() {
     var staticFunction = JavaScriptCore.JSStaticFunction()
     backing.staticFunctionNames[index].withUnsafeBufferPointer {
       staticFunction.name = $0.baseAddress
@@ -659,17 +653,18 @@ private func installAutoStaticFunctionMembers(
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   -> JavaScriptCore.JSClassDefinition
 {
+  let plan = backing.definition.installationPlan()
   var cls = JavaScriptCore.kJSClassDefinitionEmpty
-  cls.version = backing.definition.version
-  cls.attributes = backing.definition.attributes.rawValue
-  cls.parentClass = backing.definition.parentClass?.ref
+  cls.version = plan.version
+  cls.attributes = plan.attributes.rawValue
+  cls.parentClass = plan.parentClass?.ref
   cls.initialize = autoClassInitializeCallback
   cls.finalize = autoClassFinalizeCallback
 
-  installAutoStaticValueMembers(backing.definition, backing: backing, into: &cls)
-  installAutoStaticFunctionMembers(backing.definition, backing: backing, into: &cls)
+  installAutoStaticValueMembers(plan.staticValues, backing: backing, into: &cls)
+  installAutoStaticFunctionMembers(plan.staticFunctions, backing: backing, into: &cls)
 
-  installAutoDynamicCallbacks(backing.definition, into: &cls)
+  installAutoDynamicCallbacks(plan.callbacks, into: &cls)
 
   return cls
 }

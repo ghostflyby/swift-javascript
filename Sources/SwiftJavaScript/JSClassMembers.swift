@@ -75,51 +75,37 @@ extension JSStaticFunction {
   }
 }
 
-package struct JSClassHostDescriptorProjectionFlags: Sendable {
-  package let hasInitializer: Bool
-  package let hasFinalizer: Bool
-  package let hasDynamicPropertyGetter: Bool
-  package let hasDynamicPropertySetter: Bool
-  package let hasDynamicPropertyHas: Bool
-  package let hasDynamicPropertyDelete: Bool
-  package let hasPropertyEnumerator: Bool
-  package let hasCallAsFunction: Bool
-  package let hasConstructor: Bool
-  package let hasHasInstance: Bool
-  package let hasConvertToType: Bool
-
-  package init(
-    hasInitializer: Bool,
-    hasFinalizer: Bool,
-    hasDynamicPropertyGetter: Bool,
-    hasDynamicPropertySetter: Bool,
-    hasDynamicPropertyHas: Bool,
-    hasDynamicPropertyDelete: Bool,
-    hasPropertyEnumerator: Bool,
-    hasCallAsFunction: Bool,
-    hasConstructor: Bool,
-    hasHasInstance: Bool,
-    hasConvertToType: Bool
-  ) {
-    self.hasInitializer = hasInitializer
-    self.hasFinalizer = hasFinalizer
-    self.hasDynamicPropertyGetter = hasDynamicPropertyGetter
-    self.hasDynamicPropertySetter = hasDynamicPropertySetter
-    self.hasDynamicPropertyHas = hasDynamicPropertyHas
-    self.hasDynamicPropertyDelete = hasDynamicPropertyDelete
-    self.hasPropertyEnumerator = hasPropertyEnumerator
-    self.hasCallAsFunction = hasCallAsFunction
-    self.hasConstructor = hasConstructor
-    self.hasHasInstance = hasHasInstance
-    self.hasConvertToType = hasConvertToType
+extension JSClassStaticValueInstallationPlan {
+  package func hostPropertyDescriptor(
+    getterBinding: String? = nil,
+    setterBinding: String? = nil
+  ) -> JSHostPropertyDescriptor {
+    JSHostPropertyDescriptor(
+      name: name,
+      attributes: attributes.hostMemberAttributes,
+      getterBinding: getterBinding,
+      setterBinding: setterBinding
+    )
   }
 }
 
-package func projectClassHostTypeDescriptor<E: JSEngine>(
+extension JSClassStaticFunctionInstallationPlan {
+  package func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
+    JSHostFunctionDescriptor(
+      name: name,
+      attributes: attributes.hostMemberAttributes,
+      binding: binding
+    )
+  }
+}
+
+package typealias JSClassHostDescriptorProjectionFlags = JSClassCallbackInstallationPlan
+
+package func projectClassHostTypeDescriptor(
   className: String?,
   parentName: String?,
-  staticValues: [JSStaticValue<E>],
-  staticFunctions: [JSStaticFunction<E>],
+  staticValues: [JSClassStaticValueInstallationPlan],
+  staticFunctions: [JSClassStaticFunctionInstallationPlan],
   storagePolicy: JSHostObjectStoragePolicy,
   flags: JSClassHostDescriptorProjectionFlags
 ) -> JSHostTypeDescriptor {
@@ -173,6 +159,28 @@ package func projectClassHostTypeDescriptor<E: JSEngine>(
     convertToTypeBinding: flags.hasConvertToType
       ? classHostBindingName(className, suffix: "convertToType")
       : nil
+  )
+}
+
+package func projectClassHostTypeDescriptor<E: JSEngine>(
+  className: String?,
+  parentName: String?,
+  staticValues: [JSStaticValue<E>],
+  staticFunctions: [JSStaticFunction<E>],
+  storagePolicy: JSHostObjectStoragePolicy,
+  flags: JSClassHostDescriptorProjectionFlags
+) -> JSHostTypeDescriptor {
+  projectClassHostTypeDescriptor(
+    className: className,
+    parentName: parentName,
+    staticValues: staticValues.map {
+      JSClassStaticValueInstallationPlan(name: $0.name, attributes: $0.attributes)
+    },
+    staticFunctions: staticFunctions.map {
+      JSClassStaticFunctionInstallationPlan(name: $0.name, attributes: $0.attributes)
+    },
+    storagePolicy: storagePolicy,
+    flags: flags
   )
 }
 

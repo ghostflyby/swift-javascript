@@ -1,3 +1,37 @@
+package struct JSClassStaticValueInstallationPlan: Sendable {
+  package let name: String
+  package let attributes: JSPropertyAttributes
+}
+
+package struct JSClassStaticFunctionInstallationPlan: Sendable {
+  package let name: String
+  package let attributes: JSPropertyAttributes
+}
+
+package struct JSClassCallbackInstallationPlan: Sendable {
+  package let hasInitializer: Bool
+  package let hasFinalizer: Bool
+  package let hasDynamicPropertyGetter: Bool
+  package let hasDynamicPropertySetter: Bool
+  package let hasDynamicPropertyHas: Bool
+  package let hasDynamicPropertyDelete: Bool
+  package let hasPropertyEnumerator: Bool
+  package let hasCallAsFunction: Bool
+  package let hasConstructor: Bool
+  package let hasHasInstance: Bool
+  package let hasConvertToType: Bool
+}
+
+package struct JSClassDefinitionInstallationPlan<ParentClass: Sendable>: Sendable {
+  package let version: Int32
+  package let attributes: JSClassAttributes
+  package let className: String?
+  package let parentClass: ParentClass?
+  package let staticValues: [JSClassStaticValueInstallationPlan]
+  package let staticFunctions: [JSClassStaticFunctionInstallationPlan]
+  package let callbacks: JSClassCallbackInstallationPlan
+}
+
 public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
   Sendable
 {
@@ -106,25 +140,14 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer,
     parentName: String?
   ) -> JSHostTypeDescriptor {
-    projectClassHostTypeDescriptor(
-      className: className,
+    let plan = installationPlan()
+    return projectClassHostTypeDescriptor(
+      className: plan.className,
       parentName: parentName,
-      staticValues: staticValues,
-      staticFunctions: staticFunctions,
+      staticValues: plan.staticValues,
+      staticFunctions: plan.staticFunctions,
       storagePolicy: storagePolicy,
-      flags: JSClassHostDescriptorProjectionFlags(
-        hasInitializer: initialize != nil,
-        hasFinalizer: finalize != nil,
-        hasDynamicPropertyGetter: getProperty != nil,
-        hasDynamicPropertySetter: setProperty != nil,
-        hasDynamicPropertyHas: hasProperty != nil,
-        hasDynamicPropertyDelete: deleteProperty != nil,
-        hasPropertyEnumerator: getPropertyNames != nil,
-        hasCallAsFunction: callAsFunction != nil,
-        hasConstructor: callAsConstructor != nil,
-        hasHasInstance: hasInstance != nil,
-        hasConvertToType: convertToType != nil
-      )
+      flags: plan.callbacks
     )
   }
 
@@ -192,6 +215,34 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     return parentDefinition.inheritedStaticFunction(
       named: name,
       resolvingParentDefinition: resolveParentDefinition
+    )
+  }
+
+  package func installationPlan() -> JSClassDefinitionInstallationPlan<ParentClass> {
+    JSClassDefinitionInstallationPlan(
+      version: version,
+      attributes: attributes,
+      className: className,
+      parentClass: parentClass,
+      staticValues: staticValues.map {
+        JSClassStaticValueInstallationPlan(name: $0.name, attributes: $0.attributes)
+      },
+      staticFunctions: staticFunctions.map {
+        JSClassStaticFunctionInstallationPlan(name: $0.name, attributes: $0.attributes)
+      },
+      callbacks: JSClassCallbackInstallationPlan(
+        hasInitializer: initialize != nil,
+        hasFinalizer: finalize != nil,
+        hasDynamicPropertyGetter: getProperty != nil,
+        hasDynamicPropertySetter: setProperty != nil,
+        hasDynamicPropertyHas: hasProperty != nil,
+        hasDynamicPropertyDelete: deleteProperty != nil,
+        hasPropertyEnumerator: getPropertyNames != nil,
+        hasCallAsFunction: callAsFunction != nil,
+        hasConstructor: callAsConstructor != nil,
+        hasHasInstance: hasInstance != nil,
+        hasConvertToType: convertToType != nil
+      )
     )
   }
 }

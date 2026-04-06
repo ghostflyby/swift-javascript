@@ -294,7 +294,7 @@ Step 2：为剩余值语义 API 决定是否扩 core driver
 - [x] 若相等性上收到 core，则新增对应 engine driver hook，并删除 facade 中对 `JSValueIsEqual` / `JSValueIsStrictEqual` 的直接调用
 
 Step 3：继续下沉 `JSClass` 的定义组装逻辑
-- [ ] 先在 core 提炼 `JSClassDefinition` 的“安装计划”接口：明确 metadata / static members / lifecycle / dynamic-property / callable 五组阶段，不直接携带任何 JSC callback 类型
+- [x] 先在 core 提炼 `JSClassDefinition` 的“安装计划”接口：明确 metadata / static members / lifecycle / dynamic-property / callable 五组阶段，不直接携带任何 JSC callback 类型（已抽出 metadata / static-members / callback-flags 计划，`JSClass` / auto native definition 改为消费计划）
 - [ ] 在 core 为 static members 增加可复用的安装规划数据，而不是直接迁移 `JavaScriptCore.JSStaticValue` / `JavaScriptCore.JSStaticFunction` 写入代码
 - [ ] 在 core 抽出 definition 继承链查找模板，供 `JSClass` 与 `JSClassValueConvertible` 共同消费，避免 facade 重复写 `classDefinition(for: $0.ref)` 闭包
 - [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只改为消费 core 安装计划

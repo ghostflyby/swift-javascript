@@ -8,8 +8,6 @@ extension SwiftJavaScript.JSClassAttributes {
     rawValue: UInt32(kJSClassAttributeNoAutomaticPrototype))
 }
 
-typealias JavaScriptCoreStaticValueModel = SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>
-typealias JavaScriptCoreStaticFunctionModel = SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>
 typealias JavaScriptCoreClassDefinitionModel = SwiftJavaScript.JSClassDefinition<
   JavaScriptCoreEngine,
   JSClass,
@@ -455,10 +453,10 @@ private let classFinalizeCallback: JSObjectFinalizeCallback = { object in
 }
 
 private func installPropertyNamesCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.propertyEnumeratorBinding != nil else {
+  guard callbacks.hasPropertyEnumerator else {
     return
   }
 
@@ -477,10 +475,10 @@ private func installPropertyNamesCallbackIfNeeded(
 }
 
 private func installHasPropertyCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.dynamicPropertyHasBinding != nil else {
+  guard callbacks.hasDynamicPropertyHas else {
     return
   }
 
@@ -497,10 +495,10 @@ private func installHasPropertyCallbackIfNeeded(
 }
 
 private func installDeletePropertyCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.dynamicPropertyDeleteBinding != nil else {
+  guard callbacks.hasDynamicPropertyDelete else {
     return
   }
 
@@ -517,10 +515,10 @@ private func installDeletePropertyCallbackIfNeeded(
 }
 
 private func installSetPropertyCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.dynamicPropertySetterBinding != nil else {
+  guard callbacks.hasDynamicPropertySetter else {
     return
   }
 
@@ -549,10 +547,10 @@ private func installSetPropertyCallbackIfNeeded(
 }
 
 private func installGetPropertyCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.dynamicPropertyGetterBinding != nil else {
+  guard callbacks.hasDynamicPropertyGetter else {
     return
   }
 
@@ -573,10 +571,10 @@ private func installGetPropertyCallbackIfNeeded(
 }
 
 private func installCallAsFunctionCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.callAsFunctionBinding != nil else {
+  guard callbacks.hasCallAsFunction else {
     return
   }
 
@@ -609,10 +607,10 @@ private func installCallAsFunctionCallbackIfNeeded(
 }
 
 private func installHasInstanceCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.hasInstanceBinding != nil else {
+  guard callbacks.hasHasInstance else {
     return
   }
 
@@ -629,10 +627,10 @@ private func installHasInstanceCallbackIfNeeded(
 }
 
 private func installCallAsConstructorCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.constructor?.binding != nil else {
+  guard callbacks.hasConstructor else {
     return
   }
 
@@ -670,25 +668,25 @@ private func installCallAsConstructorCallbackIfNeeded(
 }
 
 private func installStaticValueMembers(
-  _ descriptor: JSHostTypeDescriptor,
+  _ staticValues: [SwiftJavaScript.JSClassStaticValueInstallationPlan],
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard !descriptor.properties.isEmpty else {
+  guard !staticValues.isEmpty else {
     return
   }
 
-  backing.staticValueNames = descriptor.properties.map { $0.name.utf8CString }
+  backing.staticValueNames = staticValues.map { $0.name.utf8CString }
   backing.staticValues = []
-  backing.staticValues.reserveCapacity(descriptor.properties.count + 1)
-  for (index, property) in descriptor.properties.enumerated() {
+  backing.staticValues.reserveCapacity(staticValues.count + 1)
+  for (index, property) in staticValues.enumerated() {
     var staticValue = JavaScriptCore.JSStaticValue()
     backing.staticValueNames[index].withUnsafeBufferPointer {
       staticValue.name = $0.baseAddress
     }
     staticValue.getProperty = staticValueGetPropertyCallback
     staticValue.setProperty = staticValueSetPropertyCallback
-    staticValue.attributes = javaScriptCorePropertyAttributes(from: property.attributes)
+    staticValue.attributes = property.attributes.rawValue
     backing.staticValues.append(staticValue)
   }
   backing.staticValues.append(JavaScriptCore.JSStaticValue())
@@ -698,24 +696,24 @@ private func installStaticValueMembers(
 }
 
 private func installStaticFunctionMembers(
-  _ descriptor: JSHostTypeDescriptor,
+  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionInstallationPlan],
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard !descriptor.methods.isEmpty else {
+  guard !staticFunctions.isEmpty else {
     return
   }
 
-  backing.staticFunctionNames = descriptor.methods.map { $0.name.utf8CString }
+  backing.staticFunctionNames = staticFunctions.map { $0.name.utf8CString }
   backing.staticFunctions = []
-  backing.staticFunctions.reserveCapacity(descriptor.methods.count + 1)
-  for (index, method) in descriptor.methods.enumerated() {
+  backing.staticFunctions.reserveCapacity(staticFunctions.count + 1)
+  for (index, method) in staticFunctions.enumerated() {
     var staticFunction = JavaScriptCore.JSStaticFunction()
     backing.staticFunctionNames[index].withUnsafeBufferPointer {
       staticFunction.name = $0.baseAddress
     }
     staticFunction.callAsFunction = staticFunctionCallAsFunctionCallback
-    staticFunction.attributes = javaScriptCorePropertyAttributes(from: method.attributes)
+    staticFunction.attributes = method.attributes.rawValue
     backing.staticFunctions.append(staticFunction)
   }
   backing.staticFunctions.append(JavaScriptCore.JSStaticFunction())
@@ -725,12 +723,12 @@ private func installStaticFunctionMembers(
 }
 
 private func installStaticMembers(
-  _ descriptor: JSHostTypeDescriptor,
+  _ plan: SwiftJavaScript.JSClassDefinitionInstallationPlan<JSClass>,
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  installStaticValueMembers(descriptor, backing: backing, into: &cls)
-  installStaticFunctionMembers(descriptor, backing: backing, into: &cls)
+  installStaticValueMembers(plan.staticValues, backing: backing, into: &cls)
+  installStaticFunctionMembers(plan.staticFunctions, backing: backing, into: &cls)
 }
 
 private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDefinition) {
@@ -739,24 +737,24 @@ private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDef
 }
 
 private func installDynamicPropertyCallbacks(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  installGetPropertyCallbackIfNeeded(descriptor, into: &cls)
-  installSetPropertyCallbackIfNeeded(descriptor, into: &cls)
-  installHasPropertyCallbackIfNeeded(descriptor, into: &cls)
-  installDeletePropertyCallbackIfNeeded(descriptor, into: &cls)
-  installPropertyNamesCallbackIfNeeded(descriptor, into: &cls)
+  installGetPropertyCallbackIfNeeded(callbacks, into: &cls)
+  installSetPropertyCallbackIfNeeded(callbacks, into: &cls)
+  installHasPropertyCallbackIfNeeded(callbacks, into: &cls)
+  installDeletePropertyCallbackIfNeeded(callbacks, into: &cls)
+  installPropertyNamesCallbackIfNeeded(callbacks, into: &cls)
 }
 
 private func installCallableCallbacks(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  installCallAsFunctionCallbackIfNeeded(descriptor, into: &cls)
-  installCallAsConstructorCallbackIfNeeded(descriptor, into: &cls)
-  installHasInstanceCallbackIfNeeded(descriptor, into: &cls)
-  installConvertToTypeCallbackIfNeeded(descriptor, into: &cls)
+  installCallAsFunctionCallbackIfNeeded(callbacks, into: &cls)
+  installCallAsConstructorCallbackIfNeeded(callbacks, into: &cls)
+  installHasInstanceCallbackIfNeeded(callbacks, into: &cls)
+  installConvertToTypeCallbackIfNeeded(callbacks, into: &cls)
 }
 
 private func installClassName(
@@ -775,28 +773,28 @@ private func installClassName(
 }
 
 private func installClassMetadata(
-  from definition: JavaScriptCoreClassDefinitionModel,
+  from plan: SwiftJavaScript.JSClassDefinitionInstallationPlan<JSClass>,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  cls.version = definition.version
-  cls.attributes = definition.attributes.rawValue
-  cls.parentClass = definition.parentClass?.ref
+  cls.version = plan.version
+  cls.attributes = plan.attributes.rawValue
+  cls.parentClass = plan.parentClass?.ref
 }
 
 private func installClassCallbacks(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
   installLifecycleCallbacks(into: &cls)
-  installDynamicPropertyCallbacks(descriptor, into: &cls)
-  installCallableCallbacks(descriptor, into: &cls)
+  installDynamicPropertyCallbacks(callbacks, into: &cls)
+  installCallableCallbacks(callbacks, into: &cls)
 }
 
 private func installConvertToTypeCallbackIfNeeded(
-  _ descriptor: JSHostTypeDescriptor,
+  _ callbacks: SwiftJavaScript.JSClassCallbackInstallationPlan,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  guard descriptor.convertToTypeBinding != nil else {
+  guard callbacks.hasConvertToType else {
     return
   }
 
@@ -898,15 +896,15 @@ extension JavaScriptCoreClassDefinitionModel {
     -> JavaScriptCore.JSClassDefinition
   {
     var cls = JavaScriptCore.kJSClassDefinitionEmpty
-    let descriptor = hostTypeDescriptor()
+    let plan = installationPlan()
 
-    installClassMetadata(from: self, into: &cls)
+    installClassMetadata(from: plan, into: &cls)
 
-    installClassName(className, backing: backing, into: &cls)
+    installClassName(plan.className, backing: backing, into: &cls)
 
-    installStaticMembers(descriptor, backing: backing, into: &cls)
+    installStaticMembers(plan, backing: backing, into: &cls)
 
-    installClassCallbacks(descriptor, into: &cls)
+    installClassCallbacks(plan.callbacks, into: &cls)
 
     return cls
   }

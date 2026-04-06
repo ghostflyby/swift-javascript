@@ -137,6 +137,12 @@ import Testing
 
 private final class DummyJSClassInstance: Sendable {}
 
+private func mockUndefinedValue() -> JSValue<MockEngine> {
+  JSValue<MockEngine>(
+    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test"))
+  )
+}
+
 @Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {
   var parent = JSClassDefinition<MockEngine, String, Never>()
   parent.className = "Parent"
@@ -176,4 +182,62 @@ private final class DummyJSClassInstance: Sendable {}
 
   #expect(storage.typedInstance(as: DummyJSClassInstance.self) === instance)
   #expect(storage.typedInstance(as: MockStringHandle.self) == nil)
+}
+
+@Test func jsClassDefinitionInstallationPlanKeepsMemberAndCallbackShape() {
+  var definition = JSClassDefinition<MockEngine, String, Never>()
+  definition.version = 3
+  definition.attributes = JSClassAttributes(rawValue: 0b101)
+  definition.className = "Widget"
+  definition.parentClass = "Parent"
+  definition.staticValues = [
+    JSStaticValue(
+      name: "title",
+      attributes: [.readOnly],
+      getProperty: { _, _ in .value(mockUndefinedValue()) },
+      setProperty: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+  definition.staticFunctions = [
+    JSStaticFunction(
+      name: "render",
+      attributes: [.dontDelete],
+      callAsFunction: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+  definition.initialize = { _, _ in }
+  definition.finalize = { _ in }
+  definition.hasProperty = { _, _, _ in true }
+  definition.getProperty = { _, _, _ in .value(mockUndefinedValue()) }
+  definition.setProperty = { _, _, _, _ in nil }
+  definition.deleteProperty = { _, _, _ in true }
+  definition.getPropertyNames = { _, _, _ in }
+  definition.callAsFunction = { _, _, _, _ in mockUndefinedValue() }
+  definition.callAsConstructor = { _, _, _, _ in mockUndefinedValue() }
+  definition.hasInstance = { _, _, _ in true }
+  definition.convertToType = { _, _, _, _ in mockUndefinedValue() }
+
+  let plan = definition.installationPlan()
+
+  #expect(plan.version == 3)
+  #expect(plan.attributes == JSClassAttributes(rawValue: 0b101))
+  #expect(plan.className == "Widget")
+  #expect(plan.parentClass == "Parent")
+  #expect(plan.staticValues.map(\.name) == ["title"])
+  #expect(plan.staticValues.count == 1)
+  #expect(plan.staticValues[0].attributes == [.readOnly])
+  #expect(plan.staticFunctions.map(\.name) == ["render"])
+  #expect(plan.staticFunctions.count == 1)
+  #expect(plan.staticFunctions[0].attributes == [.dontDelete])
+  #expect(plan.callbacks.hasInitializer)
+  #expect(plan.callbacks.hasFinalizer)
+  #expect(plan.callbacks.hasDynamicPropertyGetter)
+  #expect(plan.callbacks.hasDynamicPropertySetter)
+  #expect(plan.callbacks.hasDynamicPropertyHas)
+  #expect(plan.callbacks.hasDynamicPropertyDelete)
+  #expect(plan.callbacks.hasPropertyEnumerator)
+  #expect(plan.callbacks.hasCallAsFunction)
+  #expect(plan.callbacks.hasConstructor)
+  #expect(plan.callbacks.hasHasInstance)
+  #expect(plan.callbacks.hasConvertToType)
 }
