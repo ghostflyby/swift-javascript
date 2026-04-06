@@ -390,6 +390,22 @@ public enum JavaScriptCoreEngine: JSEngine {
     return isInstanceOf(value, constructor: constructor, in: context)
   }
 
+  public static func looselyEqualsHandle(
+    _ lhs: JSValueHandle<JavaScriptCoreEngine>,
+    _ rhs: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool? {
+    JSValueIsEqual(context.ref, lhs.ref, rhs.ref, nil)
+  }
+
+  public static func strictlyEqualsHandle(
+    _ lhs: JSValueHandle<JavaScriptCoreEngine>,
+    _ rhs: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool? {
+    JSValueIsStrictEqual(context.ref, lhs.ref, rhs.ref)
+  }
+
   public static func makeArrayBufferWithBytesNoCopyHandle(
     in context: JavaScriptCoreContextHandle,
     bytes: UnsafeMutableRawPointer?,

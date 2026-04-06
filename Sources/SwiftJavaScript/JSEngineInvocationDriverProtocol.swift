@@ -32,4 +32,16 @@ public protocol _JSEngineInvocationDriver: _JSEngineRuntimeDriver {
     constructor: ValueHandle,
     in context: ContextHandle
   ) -> Bool?
+
+  static func looselyEqualsHandle(
+    _ lhs: ValueHandle,
+    _ rhs: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
+
+  static func strictlyEqualsHandle(
+    _ lhs: ValueHandle,
+    _ rhs: ValueHandle,
+    in context: ContextHandle
+  ) -> Bool?
 }

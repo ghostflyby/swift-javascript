@@ -287,8 +287,8 @@ Step 1：继续删 facade 薄包装
 - [x] 收口 `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift` 中仅服务 callback/typed-array bridge 的 helper；driver 仅保留 core driver 协议要求的方法与直接实现（已将 callback glue、typed-array bridge、property-attributes 和 `JavaScriptCoreStringHandle` 拆到独立 bridge 文件）
 
 Step 2：为剩余值语义 API 决定是否扩 core driver
-- [ ] 评估 `Sources/SwiftyJavaScriptCore/JSValueBridgeAdapter.swift` / `Sources/SwiftyJavaScriptCore/JSValueInvocationInterop.swift` 的 `looselyEquals/strictlyEquals` 是否提升为 core driver 协议能力；若决定不通用，则明确标注为 JSC-only API
-- [ ] 若相等性上收到 core，则新增对应 engine driver hook，并删除 facade 中对 `JSValueIsEqual` / `JSValueIsStrictEqual` 的直接调用
+- [x] 评估 `Sources/SwiftyJavaScriptCore/JSValueBridgeAdapter.swift` / `Sources/SwiftyJavaScriptCore/JSValueInvocationInterop.swift` 的 `looselyEquals/strictlyEquals` 是否提升为 core driver 协议能力；若决定不通用，则明确标注为 JSC-only API（已决定上收到 core driver）
+- [x] 若相等性上收到 core，则新增对应 engine driver hook，并删除 facade 中对 `JSValueIsEqual` / `JSValueIsStrictEqual` 的直接调用
 
 Step 3：继续下沉 `JSClass` 的定义组装逻辑
 - [ ] 从 `Sources/SwiftyJavaScriptCore/JSClass.swift` 中继续识别并迁移与引擎无关的 definition 组装步骤：静态成员安装规划、生命周期/动态属性/callable 分组装配顺序、继承链上的 definition 查找模板

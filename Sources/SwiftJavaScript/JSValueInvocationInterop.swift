@@ -1,6 +1,6 @@
 extension JSInstantContext {
   @inline(__always)
-  package func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
+  func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
     let handle = value.valueHandle()
     precondition(
       E.isValueHandleCompatibleWithContext(handle, in: driverContextHandle),
@@ -10,13 +10,13 @@ extension JSInstantContext {
   }
 
   @inline(__always)
-  package func bridgeInvocationResult(
+  func bridgeInvocationResult(
     _ handleResult: JSResult<JSValueHandle<E>>?
   ) -> JSResult<JSValue<E>> {
     bridgeHandleResult(handleResult)
   }
 
-  package func encodeArguments<each A: JSValueEncodable>(
+  func encodeArguments<each A: JSValueEncodable>(
     _ arguments: repeat each A
   ) -> [JSValueHandle<E>] {
     var values: [JSValueHandle<E>] = []
@@ -31,7 +31,7 @@ extension JSInstantContext {
     return values
   }
 
-  package func call(
+  func call(
     function: borrowing JSValue<E>,
     this thisValueHandle: JSValueHandle<E>?,
     arguments: [JSValueHandle<E>]
@@ -45,18 +45,18 @@ extension JSInstantContext {
       ))
   }
 
-  package func call(function: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func call(function: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     call(function: function, this: nil, arguments: [])
   }
 
-  package func call(
+  func call(
     function: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
     call(function: function, this: nil, arguments: arguments)
   }
 
-  package func call(
+  func call(
     function: borrowing JSValue<E>,
     this thisValue: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>] = []
@@ -68,14 +68,14 @@ extension JSInstantContext {
     )
   }
 
-  package func call<each A: JSValueEncodable>(
+  func call<each A: JSValueEncodable>(
     function: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
     call(function: function, arguments: encodeArguments(repeat each arguments))
   }
 
-  package func call<each A: JSValueEncodable>(
+  func call<each A: JSValueEncodable>(
     function: borrowing JSValue<E>,
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A
@@ -87,7 +87,7 @@ extension JSInstantContext {
     )
   }
 
-  package func construct(
+  func construct(
     constructor: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
@@ -99,18 +99,18 @@ extension JSInstantContext {
       ))
   }
 
-  package func construct(constructor: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func construct(constructor: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     construct(constructor: constructor, arguments: [])
   }
 
-  package func construct<each A: JSValueEncodable>(
+  func construct<each A: JSValueEncodable>(
     constructor: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
     construct(constructor: constructor, arguments: encodeArguments(repeat each arguments))
   }
 
-  package func getStringProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<
+  func getStringProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<
     JSValue<E>
   > {
     bridgeInvocationResult(
@@ -121,7 +121,7 @@ extension JSInstantContext {
       ))
   }
 
-  package func setStringProperty(
+  func setStringProperty(
     _ key: String,
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
@@ -136,7 +136,7 @@ extension JSInstantContext {
     )
   }
 
-  package func invokeMethod(
+  func invokeMethod(
     _ name: String,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
@@ -153,12 +153,11 @@ extension JSInstantContext {
     }
   }
 
-  package func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>>
-  {
+  func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     invokeMethod(name, on: object, arguments: [])
   }
 
-  package func invokeMethod<each A: JSValueEncodable>(
+  func invokeMethod<each A: JSValueEncodable>(
     _ name: String,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
@@ -166,7 +165,7 @@ extension JSInstantContext {
     invokeMethod(name, on: object, arguments: encodeArguments(repeat each arguments))
   }
 
-  package func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     bridgeInvocationResult(
       E.toObjectHandle(
         valueHandle(for: value),
@@ -174,21 +173,43 @@ extension JSInstantContext {
       ))
   }
 
-  package func isArray(_ value: borrowing JSValue<E>) -> Bool {
+  func isArray(_ value: borrowing JSValue<E>) -> Bool {
     E.isArrayHandle(valueHandle(for: value), in: driverContextHandle) ?? false
   }
 
-  package func isDate(_ value: borrowing JSValue<E>) -> Bool {
+  func isDate(_ value: borrowing JSValue<E>) -> Bool {
     E.isDateHandle(valueHandle(for: value), in: driverContextHandle) ?? false
   }
 
-  package func isInstanceOf(
+  func isInstanceOf(
     _ value: borrowing JSValue<E>,
     constructor: borrowing JSValue<E>
   ) -> Bool {
     E.isInstanceOfHandle(
       valueHandle(for: value),
       constructor: valueHandle(for: constructor),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func looselyEquals(
+    _ lhs: borrowing JSValue<E>,
+    _ rhs: borrowing JSValue<E>
+  ) -> Bool {
+    E.looselyEqualsHandle(
+      valueHandle(for: lhs),
+      valueHandle(for: rhs),
+      in: driverContextHandle
+    ) ?? false
+  }
+
+  func strictlyEquals(
+    _ lhs: borrowing JSValue<E>,
+    _ rhs: borrowing JSValue<E>
+  ) -> Bool {
+    E.strictlyEqualsHandle(
+      valueHandle(for: lhs),
+      valueHandle(for: rhs),
       in: driverContextHandle
     ) ?? false
   }
@@ -386,6 +407,38 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
     context.isInstanceOf(self, constructor: constructor)
+  }
+
+  public func looselyEquals(
+    _ other: borrowing JSValue<E>,
+    in context: isolated JSContext<E> = #isolation
+  ) -> Bool {
+    context.withInstantContext { callbackContext in
+      looselyEquals(other, in: callbackContext)
+    }
+  }
+
+  public func looselyEquals(
+    _ other: borrowing JSValue<E>,
+    in context: borrowing JSInstantContext<E>
+  ) -> Bool {
+    context.looselyEquals(self, other)
+  }
+
+  public func strictlyEquals(
+    _ other: borrowing JSValue<E>,
+    in context: isolated JSContext<E> = #isolation
+  ) -> Bool {
+    context.withInstantContext { callbackContext in
+      strictlyEquals(other, in: callbackContext)
+    }
+  }
+
+  public func strictlyEquals(
+    _ other: borrowing JSValue<E>,
+    in context: borrowing JSInstantContext<E>
+  ) -> Bool {
+    context.strictlyEquals(self, other)
   }
 
   public func defineProperty<Val, Key>(

@@ -52,7 +52,7 @@ extension JSInstantContext {
     )
   }
 
-  package func makeSymbol(_ value: String) -> JSValue<E> {
+  func makeSymbol(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeSymbolValueHandle(value, driverContextHandle),
       "JSInstantContext.makeSymbol could not create handle"

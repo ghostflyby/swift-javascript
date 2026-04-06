@@ -282,6 +282,29 @@ private enum MockDriver: JSEngine {
     value.payload == constructor.payload
   }
 
+  static func looselyEquals(_ lhs: MockValue, _ rhs: MockValue, in context: MockContext) -> Bool {
+    _ = context
+    if lhs.kind == rhs.kind {
+      return lhs.payload == rhs.payload
+    }
+    if lhs.kind == "number" && rhs.kind == "string" {
+      return lhs.payload == rhs.payload
+    }
+    if lhs.kind == "string" && rhs.kind == "number" {
+      return lhs.payload == rhs.payload
+    }
+    return false
+  }
+
+  static func strictlyEquals(
+    _ lhs: MockValue,
+    _ rhs: MockValue,
+    in context: MockContext
+  ) -> Bool {
+    _ = context
+    return lhs == rhs
+  }
+
   static func setProperty(
     _ key: String,
     on object: MockValue,
@@ -694,6 +717,22 @@ extension MockDriver {
   ) -> Bool? {
 
     return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: context.rawContext)
+  }
+
+  fileprivate static func looselyEqualsHandle(
+    _ lhs: JSValueHandle<MockEngine>,
+    _ rhs: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    looselyEquals(lhs.rawValue, rhs.rawValue, in: context.rawContext)
+  }
+
+  fileprivate static func strictlyEqualsHandle(
+    _ lhs: JSValueHandle<MockEngine>,
+    _ rhs: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    strictlyEquals(lhs.rawValue, rhs.rawValue, in: context.rawContext)
   }
 
   fileprivate static func makeArrayBufferWithBytesNoCopyHandle(
@@ -1129,6 +1168,22 @@ extension MockEngine {
     MockDriver.isInstanceOfHandle(value, constructor: constructor, in: context)
   }
 
+  public static func looselyEqualsHandle(
+    _ lhs: JSValueHandle<MockEngine>,
+    _ rhs: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.looselyEqualsHandle(lhs, rhs, in: context)
+  }
+
+  public static func strictlyEqualsHandle(
+    _ lhs: JSValueHandle<MockEngine>,
+    _ rhs: JSValueHandle<MockEngine>,
+    in context: MockContextHandle
+  ) -> Bool? {
+    MockDriver.strictlyEqualsHandle(lhs, rhs, in: context)
+  }
+
   public static func makeArrayBufferWithBytesNoCopyHandle(
     in context: MockContextHandle,
     bytes: UnsafeMutableRawPointer?,
@@ -1552,4 +1607,25 @@ extension MockEngine {
   #expect(
     undefinedValue.rawValue
       == MockValue(kind: "undefined", payload: "runtime"))
+}
+
+@Test func genericValueEqualityUsesDriverHooks() async {
+  let context = JSContext<MockEngine>()
+
+  await context.withInstantContext { context in
+    let oneNumber = JSValue<MockEngine>(number: 1, in: context)
+    let oneString = JSValue<MockEngine>(string: "1.0", in: context)
+    let oneNumberCopy = JSValue<MockEngine>(number: 1, in: context)
+    let twoNumber = JSValue<MockEngine>(number: 2, in: context)
+
+    let looselyEqual = oneNumber.looselyEquals(oneString, in: context)
+    let looselyNotEqual = !oneNumber.looselyEquals(twoNumber, in: context)
+    let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy, in: context)
+    let strictlyNotEqual = !oneNumber.strictlyEquals(oneString, in: context)
+
+    #expect(looselyEqual)
+    #expect(looselyNotEqual)
+    #expect(strictlyEqual)
+    #expect(strictlyNotEqual)
+  }
 }
