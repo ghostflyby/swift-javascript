@@ -139,14 +139,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
 
     let rawValue = makeFunction(
       named: name,
       callback: callback,
-      in: rawContext,
+      in: context,
       functionClass: context.functionClassRef
     )
 
@@ -157,23 +154,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ value: String,
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeString(value, in: rawContext))
+
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeString(value, in: context))
   }
 
   public static func makeNumberValueHandle(
     _ value: Double,
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     return JSValueHandle<JavaScriptCoreEngine>(
       rawValue: JavaScriptCoreValueHandle(
-        ref: JSValueMakeNumber(rawContext.ref, value)!,
-        contextRef: rawContext.ref
+        ref: JSValueMakeNumber(context.ref, value)!,
+        contextRef: context.ref
       )
     )
   }
@@ -182,14 +175,12 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ value: String,
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     return withJSString(value) { stringHandle in
       JSValueHandle<JavaScriptCoreEngine>(
         rawValue: JavaScriptCoreValueHandle(
-          ref: JSValueMakeSymbol(rawContext.ref, stringHandle)!,
-          contextRef: rawContext.ref
+          ref: JSValueMakeSymbol(context.ref, stringHandle)!,
+          contextRef: context.ref
         )
       )
     }
@@ -199,13 +190,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ value: Bool,
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     return JSValueHandle<JavaScriptCoreEngine>(
       rawValue: JavaScriptCoreValueHandle(
-        ref: JSValueMakeBoolean(rawContext.ref, value)!,
-        contextRef: rawContext.ref
+        ref: JSValueMakeBoolean(context.ref, value)!,
+        contextRef: context.ref
       )
     )
   }
@@ -213,13 +202,11 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func makeNullValueHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     return JSValueHandle<JavaScriptCoreEngine>(
       rawValue: JavaScriptCoreValueHandle(
-        ref: JSValueMakeNull(rawContext.ref)!,
-        contextRef: rawContext.ref
+        ref: JSValueMakeNull(context.ref)!,
+        contextRef: context.ref
       )
     )
   }
@@ -227,28 +214,22 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func makeUndefinedValueHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeUndefined(in: rawContext))
+
+    return JSValueHandle<JavaScriptCoreEngine>(rawValue: makeUndefined(in: context))
   }
 
   public static func makeObjectResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: makeObject(in: rawContext))
+
+    return resultHandle(from: makeObject(in: context))
   }
 
   public static func makeArrayResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: makeArray(in: rawContext))
+
+    return resultHandle(from: makeArray(in: context))
   }
 
   public static func evaluateScriptResultHandle(
@@ -257,13 +238,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     return resultHandle(
       from: evaluateScript(
         script,
-        in: rawContext,
+        in: context,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       )
@@ -275,12 +254,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> SwiftJavaScript.JSType? {
     guard
-      let rawContext = rawContext(from: context),
       let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
     else {
       return nil
     }
-    return valueType(of: rawValueRef, in: rawContext.ref)
+    return valueType(of: rawValueRef, in: context.ref)
   }
 
   public static func toBooleanForHandle(
@@ -288,12 +266,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
     guard
-      let rawContext = rawContext(from: context),
       let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
     else {
       return false
     }
-    return JSValueToBoolean(rawContext.ref, rawValueRef)
+    return JSValueToBoolean(context.ref, rawValueRef)
   }
 
   public static func toNumberForHandle(
@@ -301,12 +278,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> Double {
     guard
-      let rawContext = rawContext(from: context),
       let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
     else {
       return .nan
     }
-    return JSValueToNumber(rawContext.ref, rawValueRef, nil)
+    return JSValueToNumber(context.ref, rawValueRef, nil)
   }
 
   public static func toStringForHandle(
@@ -314,22 +290,19 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> String? {
     guard
-      let rawContext = rawContext(from: context),
       let rawValueRef = JavaScriptCoreEngine.valueRef(from: value)
     else {
       return nil
     }
-    return toString(rawValueRef, in: rawContext.ref)
+    return toString(rawValueRef, in: context.ref)
   }
 
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> [String]? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return propertyNames(on: object.rawValue, in: rawContext)
+
+    return propertyNames(on: object.rawValue, in: context)
   }
 
   public static func getStringPropertyHandle(
@@ -337,10 +310,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: getProperty(key, on: object.rawValue, in: rawContext))
+
+    return resultHandle(from: getProperty(key, on: object.rawValue, in: context))
   }
 
   public static func setStringPropertyHandle(
@@ -350,14 +321,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    guard let rawContext = rawContext(from: context) else {
-      return false
-    }
     switch setProperty(
       key,
       on: object.rawValue,
       to: value.rawValue,
-      in: rawContext,
+      in: context,
       attributes: attributes
     ) {
     case .value:
@@ -385,10 +353,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: rawContext))
+
+    return resultHandle(from: getProperty(key.rawValue, on: object.rawValue, in: context))
   }
 
   public static func getIndexPropertyHandle(
@@ -396,10 +362,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: getProperty(at: index, on: object.rawValue, in: rawContext))
+
+    return resultHandle(from: getProperty(at: index, on: object.rawValue, in: context))
   }
 
   public static func setValuePropertyHandle(
@@ -409,14 +373,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    guard let rawContext = rawContext(from: context) else {
-      return false
-    }
     switch setProperty(
       key.rawValue,
       on: object.rawValue,
       to: value.rawValue,
-      in: rawContext,
+      in: context,
       attributes: attributes
     ) {
     case .value:
@@ -432,10 +393,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     to value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
-    guard let rawContext = rawContext(from: context) else {
-      return false
-    }
-    switch setProperty(at: index, on: object.rawValue, to: value.rawValue, in: rawContext) {
+    switch setProperty(at: index, on: object.rawValue, to: value.rawValue, in: context) {
     case .value:
       return true
     case .exception:
@@ -448,10 +406,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return hasProperty(key, on: object.rawValue, in: rawContext)
+
+    return hasProperty(key, on: object.rawValue, in: context)
   }
 
   public static func hasValuePropertyHandle(
@@ -459,10 +415,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return hasProperty(key.rawValue, on: object.rawValue, in: rawContext)
+
+    return hasProperty(key.rawValue, on: object.rawValue, in: context)
   }
 
   public static func deleteStringPropertyHandle(
@@ -470,10 +424,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
-    guard let rawContext = rawContext(from: context) else {
-      return false
-    }
-    switch deleteProperty(key, on: object.rawValue, in: rawContext) {
+    switch deleteProperty(key, on: object.rawValue, in: context) {
     case .value:
       return true
     case .exception:
@@ -486,10 +437,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
-    guard let rawContext = rawContext(from: context) else {
-      return false
-    }
-    switch deleteProperty(key.rawValue, on: object.rawValue, in: rawContext) {
+    switch deleteProperty(key.rawValue, on: object.rawValue, in: context) {
     case .value:
       return true
     case .exception:
@@ -503,9 +451,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     let rawThisValue: JavaScriptCoreValueHandle? = thisValue?.rawValue
     let rawArguments = arguments.map(\.rawValue)
     return resultHandle(
@@ -513,7 +459,7 @@ public enum JavaScriptCoreEngine: JSEngine {
         function.rawValue,
         this: rawThisValue,
         arguments: rawArguments,
-        in: rawContext
+        in: context
       )
     )
   }
@@ -523,42 +469,34 @@ public enum JavaScriptCoreEngine: JSEngine {
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
+
     let rawArguments = arguments.map(\.rawValue)
     return resultHandle(
-      from: construct(constructor.rawValue, arguments: rawArguments, in: rawContext))
+      from: construct(constructor.rawValue, arguments: rawArguments, in: context))
   }
 
   public static func toObjectHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return resultHandle(from: toObject(value.rawValue, in: rawContext))
+
+    return resultHandle(from: toObject(value.rawValue, in: context))
   }
 
   public static func isArrayHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return JSValueIsArray(rawContext.ref, value.rawValue.ref)
+
+    return JSValueIsArray(context.ref, value.rawValue.ref)
   }
 
   public static func isDateHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return JSValueIsDate(rawContext.ref, value.rawValue.ref)
+
+    return JSValueIsDate(context.ref, value.rawValue.ref)
   }
 
   public static func isInstanceOfHandle(
@@ -566,10 +504,8 @@ public enum JavaScriptCoreEngine: JSEngine {
     constructor: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    guard let rawContext = rawContext(from: context) else {
-      return nil
-    }
-    return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: rawContext)
+
+    return isInstanceOf(value.rawValue, constructor: constructor.rawValue, in: context)
   }
 
   public static func makeArrayBufferWithBytesNoCopyHandle(
@@ -828,9 +764,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     privateData: UnsafeMutableRawPointer?,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    let rawContext = context
-
-    switch makeObject(of: jsClass, privateData: privateData, in: rawContext) {
+    switch makeObject(of: jsClass, privateData: privateData, in: context) {
     case .value(let value):
       return .value(JSValueHandle<JavaScriptCoreEngine>(rawValue: value))
     case .exception(let exception):
