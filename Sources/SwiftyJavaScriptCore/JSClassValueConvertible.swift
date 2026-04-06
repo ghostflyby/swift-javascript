@@ -20,7 +20,7 @@ private let jsClassCacheRegistry = SwiftJavaScript.JSClassCacheRegistry<ObjectId
 private func javaScriptCorePrivateData(
   from value: JSValueHandle<JavaScriptCoreEngine>,
   in context: JavaScriptCoreContextHandle
-) -> JSDriverResult<UnsafeMutableRawPointer?> {
+) -> JSResult<UnsafeMutableRawPointer?> {
   var exception: JSValueRef?
   guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
     return .exception(nil)

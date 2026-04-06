@@ -165,7 +165,7 @@ private enum MockDriver: JSEngine {
     in context: MockContext,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<MockValue> {
+  ) -> JSResult<MockValue> {
     if script == "throw" {
       return .exception(MockValue(kind: "exception", payload: "\(context.runtimeID):throw"))
     }
@@ -196,11 +196,11 @@ private enum MockDriver: JSEngine {
     MockValue(kind: "undefined", payload: context.runtimeID)
   }
 
-  static func makeObject(in context: MockContext) -> JSDriverResult<MockValue> {
+  static func makeObject(in context: MockContext) -> JSResult<MockValue> {
     .value(MockValue(kind: "object", payload: context.runtimeID))
   }
 
-  static func makeArray(in context: MockContext) -> JSDriverResult<MockValue> {
+  static func makeArray(in context: MockContext) -> JSResult<MockValue> {
     .value(MockValue(kind: "array", payload: context.runtimeID))
   }
 
@@ -209,20 +209,20 @@ private enum MockDriver: JSEngine {
   }
 
   static func getProperty(_ key: String, on object: MockValue, in context: MockContext)
-    -> JSDriverResult<MockValue>
+    -> JSResult<MockValue>
   {
     .value(MockValue(kind: "property", payload: "\(context.runtimeID):\(object.payload):\(key)"))
   }
 
   static func getProperty(_ key: MockValue, on object: MockValue, in context: MockContext)
-    -> JSDriverResult<MockValue>
+    -> JSResult<MockValue>
   {
     .value(
       MockValue(kind: "property", payload: "\(context.runtimeID):\(object.payload):\(key.payload)"))
   }
 
   static func getProperty(at index: UInt32, on object: MockValue, in context: MockContext)
-    -> JSDriverResult<MockValue>
+    -> JSResult<MockValue>
   {
     .value(MockValue(kind: "index", payload: "\(context.runtimeID):\(object.payload):\(index)"))
   }
@@ -236,13 +236,13 @@ private enum MockDriver: JSEngine {
   }
 
   static func deleteProperty(_ key: String, on object: MockValue, in context: MockContext)
-    -> JSDriverResult<Void>
+    -> JSResult<Void>
   {
     .value(())
   }
 
   static func deleteProperty(_ key: MockValue, on object: MockValue, in context: MockContext)
-    -> JSDriverResult<Void>
+    -> JSResult<Void>
   {
     .value(())
   }
@@ -252,19 +252,19 @@ private enum MockDriver: JSEngine {
     this thisValue: MockValue?,
     arguments: [MockValue],
     in context: MockContext
-  ) -> JSDriverResult<MockValue> {
+  ) -> JSResult<MockValue> {
     .value(
       MockValue(
         kind: "call", payload: "\(context.runtimeID):\(function.payload):\(arguments.count)"))
   }
 
   static func construct(_ constructor: MockValue, arguments: [MockValue], in context: MockContext)
-    -> JSDriverResult<MockValue>
+    -> JSResult<MockValue>
   {
     .value(MockValue(kind: "construct", payload: "\(context.runtimeID):\(arguments.count)"))
   }
 
-  static func toObject(_ value: MockValue, in context: MockContext) -> JSDriverResult<MockValue> {
+  static func toObject(_ value: MockValue, in context: MockContext) -> JSResult<MockValue> {
     .value(MockValue(kind: "object", payload: value.payload))
   }
 
@@ -288,7 +288,7 @@ private enum MockDriver: JSEngine {
     to value: MockValue,
     in context: MockContext,
     attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     .value(())
   }
 
@@ -298,14 +298,14 @@ private enum MockDriver: JSEngine {
     to value: MockValue,
     in context: MockContext,
     attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     .value(())
   }
 
   static func setProperty(
     at index: UInt32, on object: MockValue, to value: MockValue, in context: MockContext
   )
-    -> JSDriverResult<Void>
+    -> JSResult<Void>
   {
     .value(())
   }
@@ -328,7 +328,7 @@ private enum MockDriver: JSEngine {
 }
 
 extension MockDriver {
-  fileprivate static func resultHandle(from result: JSDriverResult<MockValue>)
+  fileprivate static func resultHandle(from result: JSResult<MockValue>)
     -> JSResult<JSValueHandle<MockEngine>>
   {
     switch result {

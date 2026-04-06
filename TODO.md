@@ -70,11 +70,12 @@
 - [x] JavaScriptCore backend：按注释标记清理 noop/inline helper（已移除 `JavaScriptCoreValueHandle` 的 `rawValue/init(rawValue:)` 与 `valueHandle` 包装，删除 class/typed array/descriptor/equality/undefined 的 backend 透传 helper，typed array 映射改为 `JSTypedArrayKind` 扩展，并内联删除 `JSEngineConversionBridge` 的 JSC 专用转换 noop；调用方、宏模板与 tests 已同步迁移）
 - [x] JavaScriptCore backend：继续清理 `JavaScriptCoreBackendDriver.swift` 文件级 helper（已将 callback/class/privateData/valueType/functionClass 等一次性或 facade 专用 helper 回迁到各调用文件顶级，测试改走 *ForHandle/上下文公开入口，Engine 内删除残余 `valueRef(from:)` 依赖并收紧 helper 可见性为 `private`/默认级别）
 - [x] JavaScriptCore backend：删除 `JavaScriptCoreValueHandle` 上仅供测试使用的 `type/toDouble/toString` 便捷入口，并统一改回 engine 的 `*ForHandle` 主入口
+- [x] Core：删除重复的 `JSDriverResult`，统一改用 `JSResult`，并清理 backend/mock 中仅作枚举重包装的转换 helper
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
 - [x] 删除未实现的 QuickJS 迁移脚手架：移除 `QuickJSEngine` 与仅其依赖的 `_JSErasedValueHandle`，并将 core tests 的相关覆盖切换到 `MockEngine`
-- [x] 将 `_JSEngineRuntimeDriver/_JSEnginePropertyDriver/_JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与 `JSDriverResult` 公开可见性）
+- [x] 将 `_JSEngineRuntimeDriver/_JSEnginePropertyDriver/_JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与统一结果类型公开可见性）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static value/function callback 的结果/异常包装改复用 backend helper）
 - [x] 继续收口 `JSClass` callback glue（已将 static function callback 的名称解析改走 `JSValue` helper，减少 backend 内部 raw context 构造）
 - [x] 继续收口 `JSClass` callback glue（已将 callback 输出归一化 helper 统一收口到 backend driver，facade 删除重复包装）
@@ -163,7 +164,7 @@
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补已下沉 core 类型语义测试）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 host descriptor/attributes 核心语义测试）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSHostTypeDescriptor` 可选绑定字段语义测试）
-- [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `JSDriverResult` 为独立文件）
+- [x] 继续迁移 core 类型到 `SwiftJavaScript`（已完成统一结果类型收口；原 `JSDriverResult` 已删除并并入 `JSResult`）
 - [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `_JSEngineDriver` 协议声明为独立文件）
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已抽离 `JSResult` 通用容器到 `SwiftJavaScript` 并在 facade 保留 `JSValue` 特化别名）
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已迁移 `Box` 与 `SendableBoxUnsafe` 到 `SwiftJavaScript`，并收敛为 `package` 可见性）

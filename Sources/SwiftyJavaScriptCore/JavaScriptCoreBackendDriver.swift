@@ -148,17 +148,6 @@ public enum JavaScriptCoreEngine: JSEngine {
     supportsPromiseJobQueueControl: false
   )
 
-  private static func resultHandle(
-    from result: JSDriverResult<JavaScriptCoreValueHandle>
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
-    switch result {
-    case .value(let value):
-      return .value(value)
-    case .exception(let exception):
-      return .exception(exception)
-    }
-  }
-
   public static func makeRuntimeHandle() -> JavaScriptCoreRuntimeHandle {
     JavaScriptCoreRuntimeHandle()
   }
@@ -257,15 +246,13 @@ public enum JavaScriptCoreEngine: JSEngine {
   public static func makeObjectResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(from: makeObject(in: context))
+    return makeObject(in: context)
   }
 
   public static func makeArrayResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(from: makeArray(in: context))
+    return makeArray(in: context)
   }
 
   public static func evaluateScriptResultHandle(
@@ -274,14 +261,11 @@ public enum JavaScriptCoreEngine: JSEngine {
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(
-      from: evaluateScript(
-        script,
-        in: context,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
+    return evaluateScript(
+      script,
+      in: context,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
     )
   }
 
@@ -345,8 +329,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(from: getProperty(key, on: object, in: context))
+    return getProperty(key, on: object, in: context)
   }
 
   public static func setStringPropertyHandle(
@@ -382,8 +365,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(from: getProperty(key, on: object, in: context))
+    return getProperty(key, on: object, in: context)
   }
 
   public static func getIndexPropertyHandle(
@@ -391,8 +373,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-
-    return resultHandle(from: getProperty(at: index, on: object, in: context))
+    return getProperty(at: index, on: object, in: context)
   }
 
   public static func setValuePropertyHandle(
@@ -483,13 +464,11 @@ public enum JavaScriptCoreEngine: JSEngine {
 
     let rawThisValue: JavaScriptCoreValueHandle? = thisValue
     let rawArguments = arguments
-    return resultHandle(
-      from: callFunction(
-        function,
-        this: rawThisValue,
-        arguments: rawArguments,
-        in: context
-      )
+    return callFunction(
+      function,
+      this: rawThisValue,
+      arguments: rawArguments,
+      in: context
     )
   }
 
@@ -500,8 +479,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
 
     let rawArguments = arguments
-    return resultHandle(
-      from: construct(constructor, arguments: rawArguments, in: context))
+    return construct(constructor, arguments: rawArguments, in: context)
   }
 
   public static func toObjectHandle(
@@ -509,7 +487,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
 
-    return resultHandle(from: toObject(value, in: context))
+    return toObject(value, in: context)
   }
 
   public static func isArrayHandle(
@@ -967,7 +945,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     in context: JavaScriptCoreContextHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     withJSString(script) { scriptRef in
       withOptionalJSString(sourceURL) { sourceURLRef in
         var exception: JSValueRef?
@@ -1010,7 +988,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   private static func makeObject(in context: JavaScriptCoreContextHandle)
-    -> JSDriverResult<JavaScriptCoreValueHandle>
+    -> JSResult<JavaScriptCoreValueHandle>
   {
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
       return .exception(makeUndefined(in: context))
@@ -1019,7 +997,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   }
 
   private static func makeArray(in context: JavaScriptCoreContextHandle)
-    -> JSDriverResult<JavaScriptCoreValueHandle>
+    -> JSResult<JavaScriptCoreValueHandle>
   {
     var exception: JSValueRef?
     let objectRef = JSObjectMakeArray(context.ref, 0, nil, &exception)
@@ -1064,7 +1042,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: String,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1087,7 +1065,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: JavaScriptCoreValueHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1102,7 +1080,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     at index: UInt32,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1147,7 +1125,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: String,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
       return .exception(())
@@ -1167,7 +1145,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ key: JavaScriptCoreValueHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
       return .exception(())
@@ -1186,7 +1164,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     this thisValue: JavaScriptCoreValueHandle?,
     arguments: [JavaScriptCoreValueHandle],
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: function, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1223,7 +1201,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     _ constructor: JavaScriptCoreValueHandle,
     arguments: [JavaScriptCoreValueHandle],
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: constructor, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1246,7 +1224,7 @@ public enum JavaScriptCoreEngine: JSEngine {
   private static func toObject(
     _ value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     switch objectRef(for: value, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -1277,7 +1255,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
       return .exception(())
@@ -1306,7 +1284,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
       return .exception(())
@@ -1332,7 +1310,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     on object: JavaScriptCoreValueHandle,
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<Void> {
+  ) -> JSResult<Void> {
     switch objectRef(for: object, in: context) {
     case .exception:
       return .exception(())
@@ -1364,7 +1342,7 @@ public enum JavaScriptCoreEngine: JSEngine {
     value resultRef: JSValueRef?,
     exception exceptionRef: JSValueRef?,
     in context: JavaScriptCoreContextHandle
-  ) -> JSDriverResult<JavaScriptCoreValueHandle> {
+  ) -> JSResult<JavaScriptCoreValueHandle> {
     if let exceptionRef {
       return .exception(JavaScriptCoreValueHandle(ref: exceptionRef, contextRef: context.ref))
     }
