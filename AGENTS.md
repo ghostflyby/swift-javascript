@@ -28,3 +28,10 @@ while exposing Swift-specific surfaces such as `Actor` and `~Copyable`.
 ## Code Style
 1. Run `swift format` for modified `.swift` files.
 2. Do not run `swift format` on Markdown files such as `TODO.md`.
+
+## Helper Hygiene
+1. Stop migration work when requested and prioritize cleanup of redundant code paths first.
+2. In `JSEngine` implementations, only keep helpers that are required by engine-required methods or truly shared low-level bridge operations.
+3. Do not add short one-off helpers for trivial expressions (for example optional fallback wrappers like `value ?? false`).
+4. For one-off complex logic, prefer top-level/local functions in the same file near the call site instead of adding global utility helpers to `JSEngine` types.
+5. Keep `JavaScriptCoreBackendDriver` focused on backend bridge responsibilities; do not use it as a catch-all helper container.

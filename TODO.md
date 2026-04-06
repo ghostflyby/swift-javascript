@@ -65,6 +65,7 @@
 - [x] 为 `JSClassAutoConvertible` 增加函数导出标记，支持参数/返回值/错误转换器覆盖
 
 ## 8. 多引擎架构迁移（进行中）
+- [x] 暂停迁移主线，优先清理无用 helper（按 AGENTS 约束：`JSEngine/JavaScriptCoreBackendDriver` 仅保留引擎必须或低层桥接复用 helper）
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
@@ -278,4 +279,9 @@
 - [x] 指标A：上述“目标清单”文件中的 `import JavaScriptCore` 数量从 `1` 降到 `0`
 - [x] 指标B：每次减少导入后保持 `swift build --build-tests` 通过
 - [x] 指标C：每次减少导入后保持 `swift test` 全量通过（当前基线：`91` tests passed）
+
+## 10. 无用 Helper 清理（进行中）
+- [ ] 清理 `JavaScriptCoreBackendDriver` 中短小一次性 fallback helper（`callbackBoolOrFalse` / `callbackObjectOrNil` / `callbackDidRun`），调用点就地内联
+- [ ] 清理 `JSClassValueConvertible` 内部同类短 helper（`autoCallbackValueOrUndefined` / `autoCallbackSucceededOrFalse`），调用点就地内联
+- [ ] 清理后执行 `swift build --build-tests` + `swift test` 并按单独 cleanup commit 收口
 
