@@ -39,7 +39,19 @@ enum UppercaseStringDecoder: JSValueDecoder {
     _ value: borrowing SwiftJavaScript.JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> String {
-    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    return decode(
+      SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
   }
 
   static func decode(

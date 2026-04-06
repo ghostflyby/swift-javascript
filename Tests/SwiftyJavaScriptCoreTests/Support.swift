@@ -13,9 +13,18 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
     self.init(
-      value: _bridgeJavaScriptCoreValue(value),
-      in: _bridgeJavaScriptCoreContext(context)
+      value: JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
     )
   }
 
@@ -33,7 +42,16 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
   }
 
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = self.toJSValue(
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 }
 
@@ -48,9 +66,18 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
     self.init(
-      value: _bridgeJavaScriptCoreValue(value),
-      in: _bridgeJavaScriptCoreContext(context)
+      value: JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
     )
   }
 
@@ -68,7 +95,16 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
   }
 
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = self.toJSValue(
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 }
 
@@ -83,9 +119,18 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
     self.init(
-      value: _bridgeJavaScriptCoreValue(value),
-      in: _bridgeJavaScriptCoreContext(context)
+      value: JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
     )
   }
 
@@ -103,6 +148,15 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
   }
 
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = self.toJSValue(
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 }

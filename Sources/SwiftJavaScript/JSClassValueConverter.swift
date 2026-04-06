@@ -1,4 +1,12 @@
-public protocol JSClassValueConverterCompatible: AnyObject {
+public protocol JSClassValueConverterCompatible: AnyObject, JSValueEncodable {
+  associatedtype Engine: JSEngine
+  associatedtype ParentClass: Sendable
+  associatedtype PropertyNameAccumulator
+
+  static var jsClassDefinition: JSClassDefinition<Engine, ParentClass, PropertyNameAccumulator> {
+    get
+  }
+
   static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>

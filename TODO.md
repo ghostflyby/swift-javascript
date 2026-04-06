@@ -67,7 +67,7 @@
 ## 8. 多引擎架构迁移（进行中）
 - [x] 暂停迁移主线，优先清理无用 helper（按 AGENTS 约束：`JSEngine/JavaScriptCoreBackendDriver` 仅保留引擎必须或低层桥接复用 helper）
 - [x] JavaScriptCore backend：内联同类型内仅单次调用的短 helper（test 调用不计），并将测试改为直接覆盖调用方（已内联 `makeRuntime`/`makeContext`/`globalObject`/`privateDataResult`/`makeNumber`/`makeBoolean`/`makeNull`/`makeSymbol`/`isArray`/`isDate`，并将 backend tests 改为经 `makeRuntimeHandle` 与 `makeBorrowedContextHandleFromRuntime` 建立上下文及使用 *ForHandle 调用方）
-- [x] JavaScriptCore backend：按注释标记清理 noop/inline helper（已移除 `JavaScriptCoreValueHandle` 的 `rawValue/init(rawValue:)` 与 `valueHandle` 包装，删除 class/typed array/descriptor/equality/undefined 的 backend 透传 helper，typed array 映射改为 `JSTypedArrayKind` 扩展，调用方与 tests 已同步迁移）
+- [x] JavaScriptCore backend：按注释标记清理 noop/inline helper（已移除 `JavaScriptCoreValueHandle` 的 `rawValue/init(rawValue:)` 与 `valueHandle` 包装，删除 class/typed array/descriptor/equality/undefined 的 backend 透传 helper，typed array 映射改为 `JSTypedArrayKind` 扩展，并内联删除 `JSEngineConversionBridge` 的 JSC 专用转换 noop；调用方、宏模板与 tests 已同步迁移）
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
@@ -78,6 +78,7 @@
 - [x] 继续收口 `JSClass` callback glue（已将 callback 输出归一化 helper 统一收口到 backend driver，facade 删除重复包装）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static function 名称解析改走 `JSValue` helper，减少 callback 内部 raw context 构造）
 - [x] 收口 `JSClassValueConvertible` 的 facade/raw JSC 直连（已迁 privateData 读取与 class-backed object 创建到 backend handle helper）
+- [x] 删除迁移半成品 `JSClassValueConvertible` 协议：将 `jsClassDefinition` 上收至 core `JSClassValueConverterCompatible`，JSC 专用默认实现改挂在其 facade 扩展，`JSClassAutoConvertible` 宏改为仅生成 core 协议 conformance
 - [x] 收口 `JSValue` symbol 构造的 facade 直连（已补 `_JSEngineDriver`/JSC backend 的 symbol bridge，并切 `JSValue(symbol:in:)` 到 context/handle helper）
 - [x] 收口 `JSCodableValueConverter` 的 facade/raw JSC 直连（已将 object/array 构造、属性读写以及 encoder 容器的 primitive/ref 级值构造统一迁到 handle/context helper；当前剩余 raw ref 主要是容器自身的内部存储模型）
 - [x] 让 `SwiftyJavaScriptCore` facade 内部开始消费 `SwiftJavaScript` handle（已迁 `JSInstantContext` 基础值/脚本求值、`JSValue` 的基础构造器与 call/construct/invokeMethod/toObject/type helpers/defineProperty，以及 `JSObject` 的 string-key/value-key/index 属性读写删查）
@@ -287,4 +288,3 @@
 - [x] 清理 `JSClassValueConvertible` 内部同类短 helper（已删除 `autoCallbackValueOrUndefined` / `autoCallbackSucceededOrFalse` 及单处包装型 bool helper，调用点就地内联）
 - [x] 清理 `JSClass` / `JSClassValueConvertible` 的纯转发 helper（已删除 `resolveParentDefinition` / `autoClassStorage` / `autoClassDefinition`，调用点改为就地闭包与表达式）
 - [x] 清理后执行 `swift build --build-tests` + `swift test` 并按单独 cleanup commit 收口（已验证 96 tests passed）
-

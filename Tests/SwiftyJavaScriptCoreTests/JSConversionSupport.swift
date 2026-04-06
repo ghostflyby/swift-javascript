@@ -9,14 +9,36 @@ enum ZeroOneBoolConverter: JSValueConverter {
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
-    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    return decode(
+      JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
   }
 
   static func encode<E: JSEngine>(
     _ value: Bool,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = encode(
+      value,
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 
   static func decode(
@@ -37,7 +59,16 @@ enum ZeroOneBoolConverter: JSValueConverter {
 
 struct FailingEncodeValue: JSValueEncodable {
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = self.toJSValue(
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 
   func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
@@ -73,7 +104,17 @@ enum ReturnPayloadEncoder: JSValueEncoder {
     _ value: ReturnPayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = encode(
+      value,
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(
@@ -96,7 +137,17 @@ enum FailurePayloadEncoder: JSValueEncoder {
     _ value: FailurePayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = encode(
+      value,
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(
@@ -142,7 +193,19 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> MacroDelegatedUser {
-    decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    return decode(
+      JSValue<JavaScriptCoreEngine>(
+        handleValue: unsafeBitCast(
+          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      ),
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
   }
 
   static func decode(
@@ -162,7 +225,17 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
     _ value: MacroDelegatedUser,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
+    precondition(
+      E.self == JavaScriptCoreEngine.self,
+      "This conversion path only supports JavaScriptCoreEngine"
+    )
+    let encoded = encode(
+      value,
+      in: JSInstantContext<JavaScriptCoreEngine>(
+        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+      )
+    )
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(

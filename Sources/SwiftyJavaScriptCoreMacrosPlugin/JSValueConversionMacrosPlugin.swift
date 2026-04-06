@@ -1228,9 +1228,17 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           value: borrowing JSValue<E>,
           in context: borrowing JSInstantContext<E>
         ) {
+          precondition(
+            E.self == JavaScriptCoreEngine.self,
+            "This conversion path only supports JavaScriptCoreEngine"
+          )
           self.init(
-            value: _bridgeJavaScriptCoreValue(value),
-            in: _bridgeJavaScriptCoreContext(context)
+            value: JSValue<JavaScriptCoreEngine>(
+              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+            ),
+            in: JSInstantContext<JavaScriptCoreEngine>(
+              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+            )
           )
         }
         """
@@ -1240,9 +1248,17 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           value: borrowing JSValue<E>,
           in context: borrowing JSInstantContext<E>
         ) {
+          precondition(
+            E.self == JavaScriptCoreEngine.self,
+            "This conversion path only supports JavaScriptCoreEngine"
+          )
           self.init(
-            value: _bridgeJavaScriptCoreValue(value),
-            in: _bridgeJavaScriptCoreContext(context)
+            value: JSValue<JavaScriptCoreEngine>(
+              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+            ),
+            in: JSInstantContext<JavaScriptCoreEngine>(
+              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+            )
           )
         }
         """
@@ -1256,24 +1272,52 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           _ value: borrowing JSValue<E>,
           in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> Self {
-          try Self.tryDecode(
-            _bridgeJavaScriptCoreValue(value),
-            in: _bridgeJavaScriptCoreContext(context)
+          precondition(
+            E.self == JavaScriptCoreEngine.self,
+            "This conversion path only supports JavaScriptCoreEngine"
+          )
+          return try Self.tryDecode(
+            JSValue<JavaScriptCoreEngine>(
+              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+            ),
+            in: JSInstantContext<JavaScriptCoreEngine>(
+              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+            )
           )
         }
 
         public func toJSValue<E: JSEngine>(
           in context: borrowing JSInstantContext<E>
         ) -> JSValue<E> {
-          let __encoded = self.toJSValue(in: _bridgeJavaScriptCoreContext(context))
-          return _asGenericValue(__encoded)
+          precondition(
+            E.self == JavaScriptCoreEngine.self,
+            "This conversion path only supports JavaScriptCoreEngine"
+          )
+          let __encoded = self.toJSValue(
+            in: JSInstantContext<JavaScriptCoreEngine>(
+              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+            )
+          )
+          return JSValue<E>(
+            handleValue: unsafeBitCast(__encoded.valueHandle(), to: JSValueHandle<E>.self)
+          )
         }
 
         public func tryEncode<E: JSEngine>(
           in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> JSValue<E> {
-          let __encoded = try self.tryEncode(in: _bridgeJavaScriptCoreContext(context))
-          return _asGenericValue(__encoded)
+          precondition(
+            E.self == JavaScriptCoreEngine.self,
+            "This conversion path only supports JavaScriptCoreEngine"
+          )
+          let __encoded = try self.tryEncode(
+            in: JSInstantContext<JavaScriptCoreEngine>(
+              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+            )
+          )
+          return JSValue<E>(
+            handleValue: unsafeBitCast(__encoded.valueHandle(), to: JSValueHandle<E>.self)
+          )
         }
 
         \(initSource)
@@ -1471,7 +1515,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let extSource = """
-      extension \(trimmed(type.description)): JSClassValueConvertible {}
+      extension \(trimmed(type.description)): JSClassValueConverterCompatible {}
       """
 
     let extDecl = DeclSyntax(stringLiteral: extSource)
