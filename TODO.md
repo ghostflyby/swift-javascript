@@ -66,6 +66,7 @@
 
 ## 8. 多引擎架构迁移（进行中）
 - [x] 暂停迁移主线，优先清理无用 helper（按 AGENTS 约束：`JSEngine/JavaScriptCoreBackendDriver` 仅保留引擎必须或低层桥接复用 helper）
+- [x] JavaScriptCore backend：内联同类型内仅单次调用的短 helper（test 调用不计），并将测试改为直接覆盖调用方（已内联 `makeRuntime`/`makeContext`/`globalObject`/`privateDataResult`/`makeNumber`/`makeBoolean`/`makeNull`/`makeSymbol`/`isArray`/`isDate`，并将 backend tests 改为经 `makeRuntimeHandle` 与 `makeBorrowedContextHandleFromRuntime` 建立上下文及使用 *ForHandle 调用方）
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
 - [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）

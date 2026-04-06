@@ -4,13 +4,17 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func javaScriptCoreBackendDriverSupportsPhaseOnePrimitivesAndProperties() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   #expect(JavaScriptCoreEngine.capabilities.supportsHostObjects)
   #expect(JavaScriptCoreEngine.capabilities.supportsSymbol)
 
-  let number = JavaScriptCoreEngine.makeNumber(42, in: context)
+  let number = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!.rawValue
   let string = JavaScriptCoreEngine.makeString("hello", in: context)
 
   #expect(number.type == .number)
@@ -27,7 +31,7 @@ import Testing
   case .exception:
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
-    let answer = JavaScriptCoreEngine.makeNumber(99, in: context)
+    let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!.rawValue
 
     switch JavaScriptCoreEngine.setProperty(
       "answer",
@@ -74,8 +78,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverReturnsExceptionsFromEvaluation() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.evaluateScript(
     "throw new Error('boom')",
@@ -92,8 +100,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsObjectArrayAndCalls() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.makeObject(in: context) {
   case .exception:
@@ -121,7 +133,7 @@ import Testing
     case .exception:
       Issue.record("expected receiver object creation to succeed")
     case .value(let thisObject):
-      let base = JavaScriptCoreEngine.makeNumber(10, in: context)
+      let base = JavaScriptCoreEngine.makeNumberValueHandle(10, context)!.rawValue
       _ = JavaScriptCoreEngine.setProperty(
         "base",
         on: thisObject,
@@ -129,8 +141,8 @@ import Testing
         in: context,
         attributes: .none
       )
-      let one = JavaScriptCoreEngine.makeNumber(1, in: context)
-      let two = JavaScriptCoreEngine.makeNumber(2, in: context)
+      let one = JavaScriptCoreEngine.makeNumberValueHandle(1, context)!.rawValue
+      let two = JavaScriptCoreEngine.makeNumberValueHandle(2, context)!.rawValue
 
       switch JavaScriptCoreEngine.callFunction(
         function,
@@ -149,8 +161,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsHasAndDeleteProperty() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.evaluateScript(
     "({})",
@@ -182,8 +198,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsObjectTypeHelpers() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.evaluateScript(
     "[1, 2, 3]", in: context, sourceURL: nil, startingLineNumber: 1)
@@ -203,14 +223,16 @@ import Testing
       case .exception:
         Issue.record("expected Array constructor evaluation to succeed")
       case .value(let arrayConstructor):
-        #expect(JavaScriptCoreEngine.isArray(array, in: context))
-        #expect(!JavaScriptCoreEngine.isDate(array, in: context))
-        #expect(JavaScriptCoreEngine.isDate(date, in: context))
+        let arrayHandle = JSValueHandle<JavaScriptCoreEngine>(rawValue: array)
+        let dateHandle = JSValueHandle<JavaScriptCoreEngine>(rawValue: date)
+        #expect(JavaScriptCoreEngine.isArrayHandle(arrayHandle, in: context) == true)
+        #expect(JavaScriptCoreEngine.isDateHandle(arrayHandle, in: context) == false)
+        #expect(JavaScriptCoreEngine.isDateHandle(dateHandle, in: context) == true)
         #expect(
           JavaScriptCoreEngine.isInstanceOf(
             array, constructor: arrayConstructor, in: context))
 
-        let primitive = JavaScriptCoreEngine.makeNumber(42, in: context)
+        let primitive = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!.rawValue
         switch JavaScriptCoreEngine.toObject(primitive, in: context) {
         case .exception:
           Issue.record("expected toObject to box primitive numbers")
@@ -223,8 +245,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverSupportsValueKeyAndIndexedProperties() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.makeObject(in: context) {
   case .exception:
@@ -252,7 +278,7 @@ import Testing
       }
     }
 
-    let indexedValue = JavaScriptCoreEngine.makeBoolean(true, in: context)
+    let indexedValue = JavaScriptCoreEngine.makeBooleanValueHandle(true, context)!.rawValue
     switch JavaScriptCoreEngine.setProperty(at: 2, on: object, to: indexedValue, in: context)
     {
     case .exception:
@@ -276,8 +302,12 @@ import Testing
 }
 
 @Test func javaScriptCoreBackendDriverEnumeratesPropertyNames() {
-  let runtime = JavaScriptCoreEngine.makeRuntime()
-  let context = JavaScriptCoreEngine.makeContext(in: runtime)
+  let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
+  guard let context = JavaScriptCoreEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  else {
+    Issue.record("expected runtime handle to create context handle")
+    return
+  }
 
   switch JavaScriptCoreEngine.evaluateScript(
     "({ alpha: 1, beta: 2 })",
