@@ -34,6 +34,18 @@ public actor JSContext<E: JSEngine> {
 }
 
 extension JSContext {
+  public func withIsolatedGlobalObject<R: Sendable>(
+    _ body:
+      @Sendable (
+        isolated JSContext<E>,
+        borrowing JSValue<E>
+      ) -> R
+  ) -> R {
+    withGlobalObject { globalObject in
+      body(self, globalObject)
+    }
+  }
+
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
   ) throws(Failure) -> R {

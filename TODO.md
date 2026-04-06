@@ -237,7 +237,7 @@
 - [x] 将 `JSResult.from(handleResult:)` 桥接下沉到 `SwiftJavaScript` core（泛型 `JSResult` 扩展），facade 仅保留 JSC 私有结果桥接
 - [x] 将 `JSValueConversion.swift` 除 alias 之外的内容迁移到新文件（协议与实现拆分，原文件仅保留类型别名）
 - [x] 删除 `JSResultHandle`，handle-result 统一改为 `JSResult<ValueHandle>`（含 driver 协议、JSC backend 与 core tests）
-- [x] 迁移 `JSContext` actor：将 JSC 特定上下文创建逻辑下沉到 `JavaScriptCoreContextHandle`，并收缩 actor 存储成员（已在 core 提供 0 参数与 `virtualMachine` 参数初始化器，facade 删除同功能 init）
+- [x] 迁移 `JSContext` actor：将 JSC 特定上下文创建逻辑下沉到 `JavaScriptCoreContextHandle`，并收缩 actor 存储成员（已在 core 提供 0 参数与 `virtualMachine` 参数初始化器，facade 删除同功能 init；`withIsolatedGlobalObject` 也已下沉到 core）
 - [x] 将参数容器主类型更名为 `SwiftJavaScript.JSArguments<E>`，移除 facade `JSArguments` 别名，并保留 `where E == JavaScriptCoreEngine` 的指针桥接初始化
 - [x] 将 `JSArrayBuffer` / `JSTypedArray` 下沉到 `SwiftJavaScript` core（新增 `JSArrayBuffer<E>` / `JSTypedArray<E>` 与 typed-array driver 协议；facade 收口为 typealias）
 - [x] 将 `JSObject` 属性访问与编解码重载下沉到 `SwiftJavaScript` core（核心改为 `JSValue<E>` 泛型实现，facade 保留 `JSString` 兼容包装）
