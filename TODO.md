@@ -233,7 +233,7 @@
 - [x] 将 `JSInstantContext` 主类型下沉为 `SwiftJavaScript.JSInstantContext<E>`，并删除 JSC facade 的同名 typealias（调用点改为显式 `JSInstantContext<JavaScriptCoreEngine>`）
 - [x] 将 `JSInstantContext` 的通用扩展（值构造）下沉到 `JSInstantContext` 同文件（脚本执行仍保留在 facade，待 runtime driver 结果类型统一后再继续下沉）
 - [x] 创建 `JSEngineVirtualMachine<E>` 泛型主类型，并在 facade 保留 `JSVirtualMachine` 兼容别名（`Hashable` 按 `RuntimeHandle: Hashable` 条件提供）
-- [x] 创建 `JSEngineContext<E>` 泛型主类型，并在 facade 保留 `JSContext` 兼容别名
+- [x] 创建 `JSContext<E>` 泛型主类型，并删除 facade `JSContext` 兼容别名（调用点改为泛型形式）
 - [x] 将 `JSResult.from(handleResult:)` 桥接下沉到 `SwiftJavaScript` core（泛型 `JSResult` 扩展），facade 仅保留 JSC 私有结果桥接
 - [x] 将 `JSValueConversion.swift` 除 alias 之外的内容迁移到新文件（协议与实现拆分，原文件仅保留类型别名）
 - [x] 删除 `JSResultHandle`，handle-result 统一改为 `JSResult<ValueHandle>`（含 driver 协议、JSC backend 与 core tests）

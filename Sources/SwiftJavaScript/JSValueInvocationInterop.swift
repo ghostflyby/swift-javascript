@@ -190,7 +190,7 @@ extension JSInstantContext {
 }
 
 extension JSValue {
-  public func call(in context: isolated JSEngineContext<E> = #isolation) -> JSResult<JSValue<E>> {
+  public func call(in context: isolated JSContext<E> = #isolation) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       call(in: callbackContext)
     }
@@ -202,7 +202,7 @@ extension JSValue {
 
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       call(arguments: repeat each arguments, in: callbackContext)
@@ -218,7 +218,7 @@ extension JSValue {
 
   public func call(
     this thisValue: borrowing JSValue<E>,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       call(this: thisValue, in: callbackContext)
@@ -235,7 +235,7 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
@@ -255,7 +255,7 @@ extension JSValue {
   }
 
   public func construct(
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       construct(in: callbackContext)
@@ -270,7 +270,7 @@ extension JSValue {
 
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       construct(arguments: repeat each arguments, in: callbackContext)
@@ -289,7 +289,7 @@ extension JSValue {
 
   public func invokeMethod<Name: JSString>(
     _ name: borrowing Name,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> where Name: ~Copyable {
     context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
@@ -306,7 +306,7 @@ extension JSValue {
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
     _ name: borrowing Name,
     arguments: repeat each A,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> where Name: ~Copyable {
     context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
@@ -325,7 +325,7 @@ extension JSValue {
     )
   }
 
-  public func toNumber(in context: isolated JSEngineContext<E> = #isolation) -> Double {
+  public func toNumber(in context: isolated JSContext<E> = #isolation) -> Double {
     toDouble(in: context)
   }
 
@@ -334,7 +334,7 @@ extension JSValue {
   }
 
   public func toObject(
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       toObject(in: callbackContext)
@@ -347,7 +347,7 @@ extension JSValue {
     context.toObject(self)
   }
 
-  public func isArray(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+  public func isArray(in context: isolated JSContext<E> = #isolation) -> Bool {
     context.withInstantContext { callbackContext in
       isArray(in: callbackContext)
     }
@@ -357,7 +357,7 @@ extension JSValue {
     context.isArray(self)
   }
 
-  public func isDate(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+  public func isDate(in context: isolated JSContext<E> = #isolation) -> Bool {
     context.withInstantContext { callbackContext in
       isDate(in: callbackContext)
     }
@@ -369,7 +369,7 @@ extension JSValue {
 
   public func isInstanceOf(
     _ constructor: borrowing JSValue<E>,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> Bool {
     context.withInstantContext { callbackContext in
       isInstanceOf(constructor, in: callbackContext)
@@ -387,7 +387,7 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: borrowing Key,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
   where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     context.withInstantContext { callbackContext in

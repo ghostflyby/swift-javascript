@@ -280,7 +280,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
   public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
-    in context: isolated JSContext = #isolation
+    in context: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine> = #isolation
   ) throws(JSValueConversionError) -> T {
     _ = type
     return try context.withInstantContext { callbackContext throws(JSValueConversionError) in

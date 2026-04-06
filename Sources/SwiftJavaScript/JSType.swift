@@ -10,7 +10,7 @@ public enum JSType: Sendable {
 }
 
 extension JSValue {
-  public func type(in context: borrowing JSEngineContext<E>) -> JSType {
+  public func type(in context: borrowing JSContext<E>) -> JSType {
     let instantContext = JSInstantContext<E>(handle: context.driverContextHandle)
     return type(in: instantContext)
   }
@@ -23,7 +23,7 @@ extension JSValue {
     return valueType
   }
 
-  public func isUndefined(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isUndefined(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .undefined
   }
 
@@ -31,7 +31,7 @@ extension JSValue {
     type(in: context) == .undefined
   }
 
-  public func isNull(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isNull(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .null
   }
 
@@ -39,7 +39,7 @@ extension JSValue {
     type(in: context) == .null
   }
 
-  public func isBoolean(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isBoolean(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .boolean
   }
 
@@ -47,7 +47,7 @@ extension JSValue {
     type(in: context) == .boolean
   }
 
-  public func isNumber(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isNumber(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .number
   }
 
@@ -55,7 +55,7 @@ extension JSValue {
     type(in: context) == .number
   }
 
-  public func isString(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isString(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .string
   }
 
@@ -63,7 +63,7 @@ extension JSValue {
     type(in: context) == .string
   }
 
-  public func isSymbol(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isSymbol(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .symbol
   }
 
@@ -71,7 +71,7 @@ extension JSValue {
     type(in: context) == .symbol
   }
 
-  public func isObject(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isObject(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .object
   }
 
@@ -79,7 +79,7 @@ extension JSValue {
     type(in: context) == .object
   }
 
-  public func isBigInt(in context: borrowing JSEngineContext<E>) -> Bool {
+  public func isBigInt(in context: borrowing JSContext<E>) -> Bool {
     type(in: context) == .bigInt
   }
 

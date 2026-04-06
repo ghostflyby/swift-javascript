@@ -1,4 +1,4 @@
-public actor JSEngineContext<E: JSEngine> {
+public actor JSContext<E: JSEngine> {
   nonisolated package let driverContextHandle: E.ContextHandle
   public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
@@ -12,7 +12,7 @@ public actor JSEngineContext<E: JSEngine> {
       let driverContextHandle = E.makeBorrowedContextHandleFromRuntime(
         in: virtualMachine.driverRuntimeHandle)
     else {
-      preconditionFailure("JSEngineContext could not create context handle from runtime")
+      preconditionFailure("JSContext could not create context handle from runtime")
     }
 
     self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
@@ -33,7 +33,7 @@ public actor JSEngineContext<E: JSEngine> {
   }
 }
 
-extension JSEngineContext {
+extension JSContext {
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
   ) throws(Failure) -> R {
@@ -237,13 +237,13 @@ extension JSEngineContext {
   }
 }
 
-extension JSEngineContext: Equatable where E.ContextHandle: Equatable {
-  nonisolated public static func == (lhs: JSEngineContext<E>, rhs: JSEngineContext<E>) -> Bool {
+extension JSContext: Equatable where E.ContextHandle: Equatable {
+  nonisolated public static func == (lhs: JSContext<E>, rhs: JSContext<E>) -> Bool {
     lhs.driverContextHandle == rhs.driverContextHandle
   }
 }
 
-extension JSEngineContext: Hashable where E.ContextHandle: Hashable {
+extension JSContext: Hashable where E.ContextHandle: Hashable {
   nonisolated public func hash(into hasher: inout Hasher) {
     hasher.combine(driverContextHandle)
   }

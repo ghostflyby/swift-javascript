@@ -15,7 +15,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     self.contextHandle = contextHandle
   }
 
-  public init(byteLength: Int, in context: isolated JSEngineContext<E> = #isolation) {
+  public init(byteLength: Int, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       JSArrayBuffer(byteLength: byteLength, in: callbackContext)
     }
@@ -42,7 +42,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     self.contextHandle = context.driverContextHandle
   }
 
-  public init(copying bytes: [UInt8], in context: isolated JSEngineContext<E> = #isolation) {
+  public init(copying bytes: [UInt8], in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       JSArrayBuffer(copying: bytes, in: callbackContext)
     }
@@ -54,7 +54,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
 
   public init(
     copying bytes: UnsafeRawBufferPointer,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       JSArrayBuffer(copying: bytes, in: callbackContext)
@@ -83,7 +83,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
   }
 
   public init?(
-    value: borrowing JSValue<E>, in context: isolated JSEngineContext<E> = #isolation
+    value: borrowing JSValue<E>, in context: isolated JSContext<E> = #isolation
   ) {
     guard
       let wrapped = context.withInstantContext({ callbackContext in
@@ -198,7 +198,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   public init(
     type: JSTypedArrayKind,
     length: Int,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       JSTypedArray(type: type, length: length, in: callbackContext)
@@ -227,7 +227,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     buffer: borrowing JSArrayBuffer<E>,
     byteOffset: Int = 0,
     length: Int? = nil,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       JSTypedArray(
@@ -289,7 +289,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   }
 
   public init?(
-    value: borrowing JSValue<E>, in context: isolated JSEngineContext<E> = #isolation
+    value: borrowing JSValue<E>, in context: isolated JSContext<E> = #isolation
   ) {
     guard
       let wrapped = context.withInstantContext({ callbackContext in
@@ -401,7 +401,7 @@ extension JSTypedArray: JSValueEncodable {
 }
 
 extension JSValue {
-  public func isArrayBuffer(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+  public func isArrayBuffer(in context: isolated JSContext<E> = #isolation) -> Bool {
     context.withInstantContext { callbackContext in
       isArrayBuffer(in: callbackContext)
     }
@@ -411,7 +411,7 @@ extension JSValue {
     E.isArrayBufferHandle(valueHandle(), in: context.driverContextHandle)
   }
 
-  public func typedArrayKind(in context: isolated JSEngineContext<E> = #isolation)
+  public func typedArrayKind(in context: isolated JSContext<E> = #isolation)
     -> JSTypedArrayKind?
   {
     context.withInstantContext { callbackContext in
@@ -423,7 +423,7 @@ extension JSValue {
     E.typedArrayKindForHandle(valueHandle(), in: context.driverContextHandle)
   }
 
-  public func isTypedArray(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+  public func isTypedArray(in context: isolated JSContext<E> = #isolation) -> Bool {
     context.withInstantContext { callbackContext in
       isTypedArray(in: callbackContext)
     }

@@ -9,7 +9,7 @@ public protocol JSValueDecodable: ~Copyable {
 extension JSValueDecodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       Self(value: value, in: callbackContext)
@@ -25,7 +25,7 @@ extension JSValueDecodable {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> Self {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryDecode(value, in: callbackContext)
@@ -42,7 +42,7 @@ public protocol JSValueEncodable: ~Copyable {
 
 extension JSValueEncodable {
   public func toJSValue<E: JSEngine>(
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
     context.withInstantContext { callbackContext in
       self.toJSValue(in: callbackContext)
@@ -56,7 +56,7 @@ extension JSValueEncodable {
   }
 
   public func tryEncode<E: JSEngine>(
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> JSValue<E> {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try self.tryEncode(in: callbackContext)
@@ -97,7 +97,7 @@ public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
 
 extension JSValueDecoder {
   public static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>, in context: isolated JSEngineContext<E>
+    _ value: borrowing JSValue<E>, in context: isolated JSContext<E>
   )
     -> SwiftType
   {
@@ -115,7 +115,7 @@ extension JSValueDecoder {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: isolated JSEngineContext<E>
+    in context: isolated JSContext<E>
   ) throws(JSValueConversionError) -> SwiftType {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryDecode(value, in: callbackContext)
@@ -126,7 +126,7 @@ extension JSValueDecoder {
 extension JSValueEncoder {
   public static func encode<E: JSEngine>(
     _ value: SwiftType,
-    in context: isolated JSEngineContext<E>
+    in context: isolated JSContext<E>
   )
     -> JSValue<E>
   {
@@ -144,7 +144,7 @@ extension JSValueEncoder {
 
   public static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
-    in context: isolated JSEngineContext<E>
+    in context: isolated JSContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
       try Self.tryEncode(value, in: callbackContext)

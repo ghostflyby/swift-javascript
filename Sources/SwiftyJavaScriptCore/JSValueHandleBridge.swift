@@ -3,7 +3,10 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   /// - Parameters:
   ///   - ref: The JavaScriptCoreValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
-  init(ref: JavaScriptCoreValueRef, ctx: isolated JSContext) {
+  init(
+    ref: JavaScriptCoreValueRef,
+    ctx: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine>
+  ) {
     let instant = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
       handle: ctx.driverContextHandle
     )

@@ -155,29 +155,29 @@ extension Never: JSValueEncodable {
 extension JSValue {
   public func tryDecode<T: JSValueDecodable>(
     as type: T.Type = T.self,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> T {
     _ = type
     return try T.tryDecode(self, in: context)
   }
 
-  public func toBool(in context: isolated JSEngineContext<E> = #isolation) -> Bool {
+  public func toBool(in context: isolated JSContext<E> = #isolation) -> Bool {
     Bool(value: self, in: context)
   }
 
-  public func toDouble(in context: isolated JSEngineContext<E> = #isolation) -> Double {
+  public func toDouble(in context: isolated JSContext<E> = #isolation) -> Double {
     Double(value: self, in: context)
   }
 
-  public func toInt32(in context: isolated JSEngineContext<E> = #isolation) -> Int32 {
+  public func toInt32(in context: isolated JSContext<E> = #isolation) -> Int32 {
     Int32(value: self, in: context)
   }
 
-  public func toUInt32(in context: isolated JSEngineContext<E> = #isolation) -> UInt32 {
+  public func toUInt32(in context: isolated JSContext<E> = #isolation) -> UInt32 {
     UInt32(value: self, in: context)
   }
 
-  public func toString(in context: isolated JSEngineContext<E> = #isolation) -> String {
+  public func toString(in context: isolated JSContext<E> = #isolation) -> String {
     String(value: self, in: context)
   }
 

@@ -759,9 +759,11 @@ extension JSClassDefinition {
   }
 }
 
-extension JSContext {
-  internal static func borrow(ctx: JavaScriptCoreContextRef) -> JSContext {
-    let context = Unmanaged<JSContext>.fromOpaque(
+extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
+  internal static func borrow(ctx: JavaScriptCoreContextRef)
+    -> SwiftJavaScript.JSContext<JavaScriptCoreEngine>
+  {
+    let context = Unmanaged<SwiftJavaScript.JSContext<JavaScriptCoreEngine>>.fromOpaque(
       JavaScriptCoreEngine.privateData(fromGlobalObjectIn: ctx)!
     ).takeUnretainedValue()
     return context

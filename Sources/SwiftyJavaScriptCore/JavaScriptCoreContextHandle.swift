@@ -40,7 +40,8 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     if let functionClass {
       return functionClass
     }
-    return JSContext.borrow(ctx: ref).driverContextHandle.functionClassRef
+    return SwiftJavaScript.JSContext<JavaScriptCoreEngine>.borrow(ctx: ref)
+      .driverContextHandle.functionClassRef
   }
 
   public func bindContextOwner(_ owner: AnyObject) {

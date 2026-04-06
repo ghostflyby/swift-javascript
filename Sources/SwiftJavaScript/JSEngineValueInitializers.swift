@@ -1,5 +1,5 @@
 extension JSValue {
-  public init(string value: String, in context: isolated JSEngineContext<E> = #isolation) {
+  public init(string value: String, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeString(value)
     }
@@ -10,7 +10,7 @@ extension JSValue {
   }
 
   public init(
-    string value: borrowing some JSString, in context: isolated JSEngineContext<E> = #isolation
+    string value: borrowing some JSString, in context: isolated JSContext<E> = #isolation
   ) {
     let stringValue = value.string
     self = context.withInstantContext { callbackContext in
@@ -24,7 +24,7 @@ extension JSValue {
     self = context.makeString(value.string)
   }
 
-  public init(number value: Double, in context: isolated JSEngineContext<E> = #isolation) {
+  public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)
     }
@@ -35,7 +35,7 @@ extension JSValue {
   }
 
   public init(
-    number value: some BinaryInteger, in context: isolated JSEngineContext<E> = #isolation
+    number value: some BinaryInteger, in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)
@@ -46,7 +46,7 @@ extension JSValue {
     self = context.makeNumber(value)
   }
 
-  public init(boolean value: Bool, in context: isolated JSEngineContext<E> = #isolation) {
+  public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeBoolean(value)
     }
@@ -56,7 +56,7 @@ extension JSValue {
     self = context.makeBoolean(value)
   }
 
-  public init(symbol: String, in context: isolated JSEngineContext<E> = #isolation) {
+  public init(symbol: String, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeSymbol(symbol)
     }
@@ -66,7 +66,7 @@ extension JSValue {
     self = context.makeSymbol(symbol)
   }
 
-  public init(nullIn context: isolated JSEngineContext<E> = #isolation) {
+  public init(nullIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNull()
     }
@@ -76,7 +76,7 @@ extension JSValue {
     self = context.makeNull()
   }
 
-  public init(undefinedIn context: isolated JSEngineContext<E> = #isolation) {
+  public init(undefinedIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeUndefined()
     }
@@ -86,7 +86,7 @@ extension JSValue {
     self = context.makeUndefined()
   }
 
-  public init(objectIn context: isolated JSEngineContext<E> = #isolation) {
+  public init(objectIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeObject()
     }
@@ -96,7 +96,7 @@ extension JSValue {
     self = context.makeObject()
   }
 
-  public init(arrayIn context: isolated JSEngineContext<E> = #isolation) {
+  public init(arrayIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeArray()
     }
@@ -111,7 +111,7 @@ extension JSValue where E.Engine == E {
   public init(
     name: String,
     callback: @escaping JSEngineFunctionCallback<E>,
-    in context: isolated JSEngineContext<E> = #isolation
+    in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
       JSValue(name: name, callback: callback, in: callbackContext)
@@ -131,7 +131,7 @@ extension JSValue where E.Engine == E {
     R: JSValueEncodable,
     Err: JSValueEncodable
   >(
-    in context: isolated JSEngineContext<E> = #isolation,
+    in context: isolated JSContext<E> = #isolation,
     name: String,
     function: @escaping @Sendable (repeat each A) throws(Err) -> R
   ) {
@@ -166,7 +166,7 @@ extension JSValue where E.Engine == E {
     RCoder: JSValueEncoder,
     ECoder: JSValueEncoder
   >(
-    in context: isolated JSEngineContext<E> = #isolation,
+    in context: isolated JSContext<E> = #isolation,
     name: String,
     converters: repeat (each C).Type,
     returnCoder: RCoder.Type,
