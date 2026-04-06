@@ -230,8 +230,8 @@
 - [ ] 先完成 8.2 的第 5/6 步，再展开全链路引擎泛型标记改造（避免两类大改叠加导致回归定位困难）
 
 阶段 A：先改 core，不改 facade 用户 API
-- [x] 将 `JSInstantContext` 主类型下沉为 `SwiftJavaScript.JSEngineInstantContext<E>`，并在 JSC facade 保留 `typealias JSInstantContext = JSEngineInstantContext<JavaScriptCoreEngine>`
-- [x] 将 `JSInstantContext` 的通用扩展（值构造）下沉到 `JSEngineInstantContext` 同文件（脚本执行仍保留在 facade，待 runtime driver 结果类型统一后再继续下沉）
+- [x] 将 `JSInstantContext` 主类型下沉为 `SwiftJavaScript.JSInstantContext<E>`，并删除 JSC facade 的同名 typealias（调用点改为显式 `JSInstantContext<JavaScriptCoreEngine>`）
+- [x] 将 `JSInstantContext` 的通用扩展（值构造）下沉到 `JSInstantContext` 同文件（脚本执行仍保留在 facade，待 runtime driver 结果类型统一后再继续下沉）
 - [x] 创建 `JSEngineVirtualMachine<E>` 泛型主类型，并在 facade 保留 `JSVirtualMachine` 兼容别名（`Hashable` 按 `RuntimeHandle: Hashable` 条件提供）
 - [x] 创建 `JSEngineContext<E>` 泛型主类型，并在 facade 保留 `JSContext` 兼容别名
 - [x] 将 `JSResult.from(handleResult:)` 桥接下沉到 `SwiftJavaScript` core（泛型 `JSResult` 扩展），facade 仅保留 JSC 私有结果桥接

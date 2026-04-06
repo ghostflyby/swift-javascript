@@ -35,9 +35,9 @@ public actor JSEngineContext<E: JSEngine> {
 
 extension JSEngineContext {
   public func withInstantContext<R: ~Copyable, Failure: Error>(
-    _ body: (borrowing JSEngineInstantContext<E>) throws(Failure) -> R
+    _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
   ) throws(Failure) -> R {
-    let instantContext = JSEngineInstantContext<E>(handle: driverContextHandle)
+    let instantContext = JSInstantContext<E>(handle: driverContextHandle)
     return try body(instantContext)
   }
 

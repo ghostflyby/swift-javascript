@@ -7,53 +7,57 @@ enum ZeroOneBoolConverter: JSValueConverter {
 
   static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> Bool {
     decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
   }
 
   static func encode<E: JSEngine>(
     _ value: Bool,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
   }
 
   static func decode(
     _ value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) -> Bool {
     value.toDouble(in: context) != 0
   }
 
-  static func encode(_ value: Bool, in context: borrowing JSInstantContext) -> JSValue<
-    JavaScriptCoreEngine
-  > {
+  static func encode(_ value: Bool, in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+    -> JSValue<
+      JavaScriptCoreEngine
+    >
+  {
     JSValue(number: value ? 1 : 0, in: context)
   }
 }
 
 struct FailingEncodeValue: JSValueEncodable {
-  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
     _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
   }
 
-  func toJSValue(in context: borrowing JSInstantContext)
+  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(undefinedIn: context)
   }
 
   func tryEncode<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     _ = context
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 
-  func tryEncode(in context: borrowing JSInstantContext) throws(JSValueConversionError) -> JSValue<
-    JavaScriptCoreEngine
-  > {
+  func tryEncode(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+    throws(JSValueConversionError) -> JSValue<
+      JavaScriptCoreEngine
+    >
+  {
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 }
@@ -67,12 +71,14 @@ enum ReturnPayloadEncoder: JSValueEncoder {
 
   static func encode<E: JSEngine>(
     _ value: ReturnPayload,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
   }
 
-  static func encode(_ value: ReturnPayload, in context: borrowing JSInstantContext) -> JSValue<
+  static func encode(
+    _ value: ReturnPayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<
     JavaScriptCoreEngine
   > {
     JSValue(number: value.value, in: context)
@@ -88,12 +94,14 @@ enum FailurePayloadEncoder: JSValueEncoder {
 
   static func encode<E: JSEngine>(
     _ value: FailurePayload,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
   }
 
-  static func encode(_ value: FailurePayload, in context: borrowing JSInstantContext) -> JSValue<
+  static func encode(
+    _ value: FailurePayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<
     JavaScriptCoreEngine
   > {
     switch value {
@@ -132,14 +140,14 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
 
   static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> MacroDelegatedUser {
     decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
   }
 
   static func decode(
     _ value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
     -> MacroDelegatedUser
   {
@@ -152,12 +160,14 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
 
   static func encode<E: JSEngine>(
     _ value: MacroDelegatedUser,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _asGenericValue(encode(value, in: _bridgeJavaScriptCoreContext(context)))
   }
 
-  static func encode(_ value: MacroDelegatedUser, in context: borrowing JSInstantContext)
+  static func encode(
+    _ value: MacroDelegatedUser, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  )
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(number: value.score, in: context)

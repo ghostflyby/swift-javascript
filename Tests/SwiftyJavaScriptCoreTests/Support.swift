@@ -11,7 +11,7 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
 
   init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self.init(
       value: _bridgeJavaScriptCoreValue(value),
@@ -21,18 +21,18 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
 
   init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isNumber(in: context) ? 1 : 0
   }
 
-  func toJSValue(in context: borrowing JSInstantContext)
+  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(number: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
     _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
   }
 }
@@ -46,7 +46,7 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
 
   init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self.init(
       value: _bridgeJavaScriptCoreValue(value),
@@ -56,18 +56,18 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
 
   init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isString(in: context) ? "string" : "other"
   }
 
-  func toJSValue(in context: borrowing JSInstantContext)
+  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(string: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
     _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
   }
 }
@@ -81,7 +81,7 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
 
   init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self.init(
       value: _bridgeJavaScriptCoreValue(value),
@@ -91,18 +91,18 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
 
   init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isBoolean(in: context)
   }
 
-  func toJSValue(in context: borrowing JSInstantContext)
+  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(boolean: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
     _asGenericValue(self.toJSValue(in: _bridgeJavaScriptCoreContext(context)))
   }
 }

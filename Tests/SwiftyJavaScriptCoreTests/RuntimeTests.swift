@@ -103,8 +103,8 @@ import Testing
   let sourceContext = JSContext(virtualMachine: vm)
   let targetContext = JSContext(virtualMachine: vm)
 
-  let sourceInstant = JSInstantContext(ctx: sourceContext.globalContextRef)
-  let targetInstant = JSInstantContext(ctx: targetContext.globalContextRef)
+  let sourceInstant = JSInstantContext<JavaScriptCoreEngine>(ctx: sourceContext.globalContextRef)
+  let targetInstant = JSInstantContext<JavaScriptCoreEngine>(ctx: targetContext.globalContextRef)
   let value = JSValue(number: 7, in: sourceInstant)
 
   #expect(value.toDouble(in: targetInstant) == 7)

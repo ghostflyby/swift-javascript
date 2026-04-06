@@ -11,7 +11,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
   }
 
   @inline(__always)
-  private func value(at index: Int, in context: borrowing JSEngineInstantContext<E>)
+  private func value(at index: Int, in context: borrowing JSInstantContext<E>)
     -> JSValue<E>
   {
     guard index >= 0 && index < count else {
@@ -27,7 +27,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 
   public func unpack<R: ~Copyable>(
     at: Int,
-    in context: borrowing JSEngineInstantContext<E>,
+    in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) -> R
   ) -> R {
     body(value(at: at, in: context))
@@ -46,7 +46,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 
 extension JSArguments {
   @inline(__always)
-  private func nextValue(_ index: inout Int, in context: borrowing JSEngineInstantContext<E>)
+  private func nextValue(_ index: inout Int, in context: borrowing JSInstantContext<E>)
     -> JSValue<E>
   {
     defer { index += 1 }
@@ -55,7 +55,7 @@ extension JSArguments {
 
   public func tryUnpack<each T: JSValueDecodable>(
     types: repeat (each T).Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> (repeat each T) {
     var idx = 0
     return (repeat try (each T).tryDecode(nextValue(&idx, in: context), in: context))
@@ -72,7 +72,7 @@ extension JSArguments {
 
   public func unpack<each T: JSValueDecodable>(
     types: repeat (each T).Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> (repeat each T) {
     var idx = 0
     return (repeat (each T).init(value: nextValue(&idx, in: context), in: context))
@@ -90,7 +90,7 @@ extension JSArguments {
   public func unpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> C.SwiftType {
     unpack(at: at, in: context) { value in
       converter.decode(value, in: context)
@@ -110,7 +110,7 @@ extension JSArguments {
   public func tryUnpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> C.SwiftType {
     try converter.tryDecode(value(at: at, in: context), in: context)
   }
@@ -127,7 +127,7 @@ extension JSArguments {
 
   public func unpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> (repeat (each C).SwiftType) {
     var idx = 0
     return (repeat (each C).decode(nextValue(&idx, in: context), in: context))
@@ -144,7 +144,7 @@ extension JSArguments {
 
   public func tryUnpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> (repeat (each C).SwiftType) {
     var idx = 0
     return (repeat try (each C).tryDecode(nextValue(&idx, in: context), in: context))

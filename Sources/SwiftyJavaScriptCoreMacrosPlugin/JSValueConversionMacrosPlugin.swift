@@ -947,7 +947,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         return try \(encoder).tryEncode(self, in: context)
         """
       initSource = """
-        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext<JavaScriptCoreEngine>) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1002,7 +1002,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       encodeLines.append("return object")
       encodeBody = encodeLines.joined(separator: "\n")
       initSource = """
-        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext<JavaScriptCoreEngine>) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1048,7 +1048,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       let initForwardArgs = properties.map { "\($0.name): __decoded.\($0.name)" }
         .joined(separator: ", ")
       initSource = """
-        public convenience init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
+        public convenience init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext<JavaScriptCoreEngine>) {
           do {
             let __decoded = try Self.tryDecode(value, in: context)
             self.init(\(initForwardArgs))
@@ -1085,7 +1085,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       )
       let rawValueTypeName = enumRawValueTypeName(from: enumDecl)
       initSource = """
-        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext) {
+        public init(value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, in context: borrowing JSInstantContext<JavaScriptCoreEngine>) {
           do {
             self = try Self.tryDecode(value, in: context)
           } catch {
@@ -1215,7 +1215,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       genericInitSource = """
         public convenience init<E: JSEngine>(
           value: borrowing JSValue<E>,
-          in context: borrowing JSEngineInstantContext<E>
+          in context: borrowing JSInstantContext<E>
         ) {
           self.init(
             value: _bridgeJavaScriptCoreValue(value),
@@ -1227,7 +1227,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       genericInitSource = """
         public init<E: JSEngine>(
           value: borrowing JSValue<E>,
-          in context: borrowing JSEngineInstantContext<E>
+          in context: borrowing JSInstantContext<E>
         ) {
           self.init(
             value: _bridgeJavaScriptCoreValue(value),
@@ -1243,7 +1243,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
         public static func tryDecode<E: JSEngine>(
           _ value: borrowing JSValue<E>,
-          in context: borrowing JSEngineInstantContext<E>
+          in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> Self {
           try Self.tryDecode(
             _bridgeJavaScriptCoreValue(value),
@@ -1252,14 +1252,14 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         }
 
         public func toJSValue<E: JSEngine>(
-          in context: borrowing JSEngineInstantContext<E>
+          in context: borrowing JSInstantContext<E>
         ) -> JSValue<E> {
           let __encoded = self.toJSValue(in: _bridgeJavaScriptCoreContext(context))
           return _asGenericValue(__encoded)
         }
 
         public func tryEncode<E: JSEngine>(
-          in context: borrowing JSEngineInstantContext<E>
+          in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> JSValue<E> {
           let __encoded = try self.tryEncode(in: _bridgeJavaScriptCoreContext(context))
           return _asGenericValue(__encoded)
@@ -1269,12 +1269,12 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
 
         public static func tryDecode(
           _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-          in context: borrowing JSInstantContext
+          in context: borrowing JSInstantContext<JavaScriptCoreEngine>
         ) throws(JSValueConversionError) -> Self {
           \(decodeBody)
         }
 
-        public func toJSValue(in context: borrowing JSInstantContext) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
+        public func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           do {
             return try self.tryEncode(in: context)
           } catch {
@@ -1283,7 +1283,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         }
 
         public func tryEncode(
-          in context: borrowing JSInstantContext
+          in context: borrowing JSInstantContext<JavaScriptCoreEngine>
         ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           \(encodeBody)
         }

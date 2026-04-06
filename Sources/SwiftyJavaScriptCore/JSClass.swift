@@ -145,16 +145,19 @@ private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterReg
 func makeRememberedClassCallbackContext(
   _ ctx: JavaScriptCoreContextRef, _ object: JavaScriptCoreObjectRef
 )
-  -> JSInstantContext
+  -> JSInstantContext<JavaScriptCoreEngine>
 {
   rememberClassObjectContext(ctx, object)
-  return JSInstantContext(ctx: ctx)
+  return JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
 }
 
 func withRememberedClassObjectValue<R>(
   _ ctx: JavaScriptCoreContextRef,
   object: JavaScriptCoreObjectRef,
-  _ body: (borrowing JSInstantContext, borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) -> R
+  _ body: (
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
 ) -> R {
   let context = makeRememberedClassCallbackContext(ctx, object)
   let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
@@ -163,12 +166,15 @@ func withRememberedClassObjectValue<R>(
 
 func withStoredClassObjectValue<R>(
   _ object: JavaScriptCoreObjectRef,
-  _ body: (borrowing JSInstantContext, borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) -> R
+  _ body: (
+    borrowing JSInstantContext<JavaScriptCoreEngine>,
+    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+  ) -> R
 ) -> R? {
   guard let objectContext = classObjectContext(object) else {
     return nil
   }
-  let context = JSInstantContext(ctx: objectContext)
+  let context = JSInstantContext<JavaScriptCoreEngine>(ctx: objectContext)
   let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: object, ctx: context)
   return body(context, thisValue)
 }

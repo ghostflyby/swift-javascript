@@ -21,7 +21,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     }
   }
 
-  public init(byteLength: Int, in context: borrowing JSEngineInstantContext<E>) {
+  public init(byteLength: Int, in context: borrowing JSInstantContext<E>) {
     precondition(byteLength >= 0, "ArrayBuffer byteLength must be non-negative")
 
     let bytes = Self.allocateZeroedBytes(byteLength: byteLength)
@@ -48,7 +48,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     }
   }
 
-  public init(copying bytes: [UInt8], in context: borrowing JSEngineInstantContext<E>) {
+  public init(copying bytes: [UInt8], in context: borrowing JSInstantContext<E>) {
     self.init(copying: bytes.withUnsafeBytes { $0 }, in: context)
   }
 
@@ -62,7 +62,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
   }
 
   public init(
-    copying bytes: UnsafeRawBufferPointer, in context: borrowing JSEngineInstantContext<E>
+    copying bytes: UnsafeRawBufferPointer, in context: borrowing JSInstantContext<E>
   ) {
     let copiedBytes = Self.allocateCopy(of: bytes)
     let handle = E.makeArrayBufferWithBytesNoCopyHandle(
@@ -95,7 +95,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     self = wrapped
   }
 
-  public init?(value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>) {
+  public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {
     guard value.isArrayBuffer(in: context) else {
       return nil
     }
@@ -167,7 +167,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
 
 extension JSArrayBuffer: JSValueEncodable {
   public func toJSValue<TargetEngine: JSEngine>(
-    in context: borrowing JSEngineInstantContext<TargetEngine>
+    in context: borrowing JSInstantContext<TargetEngine>
   ) -> JSValue<TargetEngine> {
     _ = context
     precondition(
@@ -180,7 +180,7 @@ extension JSArrayBuffer: JSValueEncodable {
   }
 
   public func tryEncode<TargetEngine: JSEngine>(
-    in context: borrowing JSEngineInstantContext<TargetEngine>
+    in context: borrowing JSInstantContext<TargetEngine>
   ) throws(JSValueConversionError) -> JSValue<TargetEngine> {
     toJSValue(in: context)
   }
@@ -205,8 +205,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     }
   }
 
-  public init(type: JSTypedArrayKind, length: Int, in context: borrowing JSEngineInstantContext<E>)
-  {
+  public init(type: JSTypedArrayKind, length: Int, in context: borrowing JSInstantContext<E>) {
     precondition(length >= 0, "TypedArray length must be non-negative")
 
     guard
@@ -246,7 +245,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     buffer: borrowing JSArrayBuffer<E>,
     byteOffset: Int = 0,
     length: Int? = nil,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     precondition(byteOffset >= 0, "TypedArray byteOffset must be non-negative")
     if let length {
@@ -302,7 +301,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     self = wrapped
   }
 
-  public init?(value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>) {
+  public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {
     guard value.typedArrayKind(in: context) != nil else {
       return nil
     }
@@ -382,7 +381,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
 
 extension JSTypedArray: JSValueEncodable {
   public func toJSValue<TargetEngine: JSEngine>(
-    in context: borrowing JSEngineInstantContext<TargetEngine>
+    in context: borrowing JSInstantContext<TargetEngine>
   ) -> JSValue<TargetEngine> {
     _ = context
     precondition(
@@ -395,7 +394,7 @@ extension JSTypedArray: JSValueEncodable {
   }
 
   public func tryEncode<TargetEngine: JSEngine>(
-    in context: borrowing JSEngineInstantContext<TargetEngine>
+    in context: borrowing JSInstantContext<TargetEngine>
   ) throws(JSValueConversionError) -> JSValue<TargetEngine> {
     toJSValue(in: context)
   }
@@ -408,7 +407,7 @@ extension JSValue {
     }
   }
 
-  public func isArrayBuffer(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+  public func isArrayBuffer(in context: borrowing JSInstantContext<E>) -> Bool {
     E.isArrayBufferHandle(valueHandle(), in: context.driverContextHandle)
   }
 
@@ -420,7 +419,7 @@ extension JSValue {
     }
   }
 
-  public func typedArrayKind(in context: borrowing JSEngineInstantContext<E>) -> JSTypedArrayKind? {
+  public func typedArrayKind(in context: borrowing JSInstantContext<E>) -> JSTypedArrayKind? {
     E.typedArrayKindForHandle(valueHandle(), in: context.driverContextHandle)
   }
 
@@ -430,7 +429,7 @@ extension JSValue {
     }
   }
 
-  public func isTypedArray(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+  public func isTypedArray(in context: borrowing JSInstantContext<E>) -> Bool {
     typedArrayKind(in: context) != nil
   }
 }

@@ -1,13 +1,13 @@
 extension Bool: JSValueDecodable, JSValueEncodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self = context.toBoolean(value)
   }
 
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.makeBoolean(self)
   }
@@ -16,7 +16,7 @@ extension Bool: JSValueDecodable, JSValueEncodable {
 extension Bool {
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Bool {
     guard value.isBoolean(in: context) else {
       throw .typeMismatch(expected: "boolean", actual: value.type(in: context))
@@ -28,13 +28,13 @@ extension Bool {
 extension Double: JSValueDecodable, JSValueEncodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self = context.toNumber(value)
   }
 
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.makeNumber(self)
   }
@@ -43,7 +43,7 @@ extension Double: JSValueDecodable, JSValueEncodable {
 extension Double {
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Double {
     guard value.isNumber(in: context) else {
       throw .typeMismatch(expected: "number", actual: value.type(in: context))
@@ -55,14 +55,14 @@ extension Double {
 extension Int32: JSValueDecodable, JSValueEncodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     let number = Double(value: value, in: context)
     self = Int32(number)
   }
 
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.makeNumber(self)
   }
@@ -71,7 +71,7 @@ extension Int32: JSValueDecodable, JSValueEncodable {
 extension Int32 {
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Int32 {
     let number = try Double.tryDecode(value, in: context)
     try validateIntegerDecode(
@@ -87,14 +87,14 @@ extension Int32 {
 extension UInt32: JSValueDecodable, JSValueEncodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     let number = Double(value: value, in: context)
     self = UInt32(number)
   }
 
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.makeNumber(self)
   }
@@ -103,7 +103,7 @@ extension UInt32: JSValueDecodable, JSValueEncodable {
 extension UInt32 {
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> UInt32 {
     let number = try Double.tryDecode(value, in: context)
     try validateIntegerDecode(
@@ -119,13 +119,13 @@ extension UInt32 {
 extension String: JSValueDecodable, JSValueEncodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self = context.toString(value)
   }
 
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.makeString(self)
   }
@@ -134,7 +134,7 @@ extension String: JSValueDecodable, JSValueEncodable {
 extension String {
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> String {
     guard value.isString(in: context) else {
       throw .typeMismatch(expected: "string", actual: value.type(in: context))
@@ -145,7 +145,7 @@ extension String {
 
 extension Never: JSValueEncodable {
   public func toJSValue<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _ = context
     switch self {}
@@ -181,23 +181,23 @@ extension JSValue {
     String(value: self, in: context)
   }
 
-  public func toBool(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+  public func toBool(in context: borrowing JSInstantContext<E>) -> Bool {
     Bool(value: self, in: context)
   }
 
-  public func toDouble(in context: borrowing JSEngineInstantContext<E>) -> Double {
+  public func toDouble(in context: borrowing JSInstantContext<E>) -> Double {
     Double(value: self, in: context)
   }
 
-  public func toInt32(in context: borrowing JSEngineInstantContext<E>) -> Int32 {
+  public func toInt32(in context: borrowing JSInstantContext<E>) -> Int32 {
     Int32(value: self, in: context)
   }
 
-  public func toUInt32(in context: borrowing JSEngineInstantContext<E>) -> UInt32 {
+  public func toUInt32(in context: borrowing JSInstantContext<E>) -> UInt32 {
     UInt32(value: self, in: context)
   }
 
-  public func toString(in context: borrowing JSEngineInstantContext<E>) -> String {
+  public func toString(in context: borrowing JSInstantContext<E>) -> String {
     String(value: self, in: context)
   }
 }

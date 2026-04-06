@@ -36,14 +36,14 @@ enum UppercaseStringDecoder: JSValueDecoder {
 
   static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> String {
     decode(_bridgeJavaScriptCoreValue(value), in: _bridgeJavaScriptCoreContext(context))
   }
 
   static func decode(
     _ value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
     -> String
   {

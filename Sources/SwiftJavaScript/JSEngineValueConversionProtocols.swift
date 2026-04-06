@@ -1,8 +1,8 @@
 public protocol JSValueDecodable: ~Copyable {
-  init<E: JSEngine>(value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>)
+  init<E: JSEngine>(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>)
   static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self
 }
 
@@ -18,7 +18,7 @@ extension JSValueDecodable {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self {
     Self(value: value, in: context)
   }
@@ -34,9 +34,9 @@ extension JSValueDecodable {
 }
 
 public protocol JSValueEncodable: ~Copyable {
-  func toJSValue<E: JSEngine>(in context: borrowing JSEngineInstantContext<E>) -> JSValue<E>
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E>
   func tryEncode<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
 }
 
@@ -50,7 +50,7 @@ extension JSValueEncodable {
   }
 
   public func tryEncode<E: JSEngine>(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     toJSValue(in: context)
   }
@@ -70,12 +70,12 @@ public protocol JSValueDecoder {
   associatedtype SwiftType
 
   static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>
+    _ value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>
   )
     -> SwiftType
   static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> SwiftType
 }
 
@@ -84,11 +84,11 @@ public protocol JSValueEncoder {
 
   static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
   static func encode<E: JSEngine>(
     _ value: SwiftType,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   )
     -> JSValue<E>
 }
@@ -108,7 +108,7 @@ extension JSValueDecoder {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> SwiftType {
     decode(value, in: context)
   }
@@ -137,7 +137,7 @@ extension JSValueEncoder {
 
   public static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     encode(value, in: context)
   }
@@ -156,7 +156,7 @@ public enum JSDefaultConverter<T: JSValueCodable>:
   JSValueConverter
 {
   public static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>, in context: borrowing JSEngineInstantContext<E>
+    _ value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>
   )
     -> T
   {
@@ -165,14 +165,14 @@ public enum JSDefaultConverter<T: JSValueCodable>:
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> T {
     try T.tryDecode(value, in: context)
   }
 
   public static func encode<E: JSEngine>(
     _ value: T,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   )
     -> JSValue<E>
   {
@@ -181,7 +181,7 @@ public enum JSDefaultConverter<T: JSValueCodable>:
 
   public static func tryEncode<E: JSEngine>(
     _ value: T,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     try value.tryEncode(in: context)
   }

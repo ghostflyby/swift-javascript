@@ -1,14 +1,14 @@
 @inline(__always)
 func _bridgeJavaScriptCoreContext<E: JSEngine>(
-  _ context: borrowing JSEngineInstantContext<E>
-) -> JSInstantContext {
+  _ context: borrowing SwiftJavaScript.JSInstantContext<E>
+) -> SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine> {
   precondition(
     E.self == JavaScriptCoreEngine.self,
     "This conversion path only supports JavaScriptCoreEngine"
   )
 
   let handle = unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-  return JSInstantContext(handle: handle)
+  return SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(handle: handle)
 }
 
 @inline(__always)

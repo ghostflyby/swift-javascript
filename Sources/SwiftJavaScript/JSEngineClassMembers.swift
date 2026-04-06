@@ -2,7 +2,7 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
-    @Sendable (borrowing JSEngineInstantContext<E>, borrowing JSValue<E>)
+    @Sendable (borrowing JSInstantContext<E>, borrowing JSValue<E>)
       -> JSResult<JSValue<E>>
 
   public init(
@@ -10,11 +10,11 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
     attributes: JSPropertyAttributes,
     getProperty:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>
+        borrowing JSInstantContext<E>, borrowing JSValue<E>
       ) -> JSResult<JSValue<E>>,
     setProperty:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
+        borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
       ) -> JSResult<JSValue<E>>
   ) {
     self.name = name
@@ -24,7 +24,7 @@ public struct JSEngineStaticValue<E: JSEngine>: Sendable {
   }
   public let setProperty:
     @Sendable (
-      borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
+      borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
     )
       -> JSResult<JSValue<E>>
 }
@@ -34,7 +34,7 @@ public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
     @Sendable (
-      borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
+      borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
     ) -> JSResult<JSValue<E>>
 
   public init(
@@ -42,7 +42,7 @@ public struct JSEngineStaticFunction<E: JSEngine>: Sendable {
     attributes: JSPropertyAttributes,
     callAsFunction:
       @escaping @Sendable (
-        borrowing JSEngineInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
+        borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
       ) -> JSResult<JSValue<E>>
   ) {
     self.name = name

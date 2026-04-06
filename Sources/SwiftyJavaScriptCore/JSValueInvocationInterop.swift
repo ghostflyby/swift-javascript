@@ -10,7 +10,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
   public func looselyEquals(
     _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
     -> Bool
   {
@@ -28,7 +28,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
   public func strictlyEquals(
     _ other: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
     -> Bool
   {

@@ -1,4 +1,4 @@
-extension JSEngineInstantContext {
+extension JSInstantContext {
   @inline(__always)
   package func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
     value.valueHandle()
@@ -196,7 +196,7 @@ extension JSValue {
     }
   }
 
-  public func call(in context: borrowing JSEngineInstantContext<E>) -> JSResult<JSValue<E>> {
+  public func call(in context: borrowing JSInstantContext<E>) -> JSResult<JSValue<E>> {
     context.call(function: self)
   }
 
@@ -211,7 +211,7 @@ extension JSValue {
 
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.call(function: self, arguments: repeat each arguments)
   }
@@ -227,7 +227,7 @@ extension JSValue {
 
   public func call(
     this thisValue: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.call(function: self, this: thisValue)
   }
@@ -245,7 +245,7 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.call(
       function: self,
@@ -263,7 +263,7 @@ extension JSValue {
   }
 
   public func construct(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.construct(constructor: self)
   }
@@ -279,7 +279,7 @@ extension JSValue {
 
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.construct(
       constructor: self,
@@ -298,7 +298,7 @@ extension JSValue {
 
   public func invokeMethod<Name: JSString>(
     _ name: borrowing Name,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> where Name: ~Copyable {
     context.invokeMethod(name.string, on: self)
   }
@@ -316,7 +316,7 @@ extension JSValue {
   public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
     _ name: borrowing Name,
     arguments: repeat each A,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> where Name: ~Copyable {
     context.invokeMethod(
       name.string,
@@ -329,7 +329,7 @@ extension JSValue {
     toDouble(in: context)
   }
 
-  public func toNumber(in context: borrowing JSEngineInstantContext<E>) -> Double {
+  public func toNumber(in context: borrowing JSInstantContext<E>) -> Double {
     toDouble(in: context)
   }
 
@@ -342,7 +342,7 @@ extension JSValue {
   }
 
   public func toObject(
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.toObject(self)
   }
@@ -353,7 +353,7 @@ extension JSValue {
     }
   }
 
-  public func isArray(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+  public func isArray(in context: borrowing JSInstantContext<E>) -> Bool {
     context.isArray(self)
   }
 
@@ -363,7 +363,7 @@ extension JSValue {
     }
   }
 
-  public func isDate(in context: borrowing JSEngineInstantContext<E>) -> Bool {
+  public func isDate(in context: borrowing JSInstantContext<E>) -> Bool {
     context.isDate(self)
   }
 
@@ -378,7 +378,7 @@ extension JSValue {
 
   public func isInstanceOf(
     _ constructor: borrowing JSValue<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> Bool {
     context.isInstanceOf(self, constructor: constructor)
   }
@@ -399,7 +399,7 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: borrowing Key,
     with attributes: JSPropertyAttributes = .none,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
   where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()

@@ -1,8 +1,18 @@
-/// Engine-agnostic instant context shell.
+/// A lightweight callback-facing context used for synchronous JavaScript interactions.
 ///
-/// Concrete engines provide API surface and bridge behaviors in facade
-/// modules via constrained extensions.
-public struct JSEngineInstantContext<E: JSEngine>: ~Copyable {
+/// `JSInstantContext` mirrors the user-facing API surface of `JSContext` for callback code,
+/// but avoids actor hops so callbacks can run in a tight synchronous path.
+///
+/// Design intent:
+/// - Provide a lightweight substitute for `JSContext` inside callback-heavy code paths.
+/// - Keep API semantics aligned with `JSContext` (`make*`, global property helpers,
+///   `evaluateScript`, etc.).
+///
+/// Non-goals:
+/// - It is not a generic low-level bridge layer.
+/// - Backend/handle/raw-context orchestration should stay in backend adapters or
+///   local call-site helpers unless it is part of this callback-facing API surface.
+public struct JSInstantContext<E: JSEngine>: ~Copyable {
   public let driverContextHandle: E.ContextHandle
 
   package init(handle: E.ContextHandle) {
@@ -10,7 +20,7 @@ public struct JSEngineInstantContext<E: JSEngine>: ~Copyable {
   }
 }
 
-extension JSEngineInstantContext {
+extension JSInstantContext {
   @inline(__always)
   private func valueFromHandle(
     _ handle: JSValueHandle<E>?,
@@ -38,21 +48,21 @@ extension JSEngineInstantContext {
   public func makeString(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeStringValueHandle(value, driverContextHandle),
-      "JSEngineInstantContext.makeString could not create handle"
+      "JSInstantContext.makeString could not create handle"
     )
   }
 
   package func makeSymbol(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeSymbolValueHandle(value, driverContextHandle),
-      "JSEngineInstantContext.makeSymbol could not create handle"
+      "JSInstantContext.makeSymbol could not create handle"
     )
   }
 
   public func makeNumber(_ value: Double) -> JSValue<E> {
     valueFromHandle(
       E.makeNumberValueHandle(value, driverContextHandle),
-      "JSEngineInstantContext.makeNumber could not create handle"
+      "JSInstantContext.makeNumber could not create handle"
     )
   }
 
@@ -63,21 +73,21 @@ extension JSEngineInstantContext {
   public func makeBoolean(_ value: Bool) -> JSValue<E> {
     valueFromHandle(
       E.makeBooleanValueHandle(value, driverContextHandle),
-      "JSEngineInstantContext.makeBoolean could not create handle"
+      "JSInstantContext.makeBoolean could not create handle"
     )
   }
 
   public func makeNull() -> JSValue<E> {
     valueFromHandle(
       E.makeNullValueHandle(driverContextHandle),
-      "JSEngineInstantContext.makeNull could not create handle"
+      "JSInstantContext.makeNull could not create handle"
     )
   }
 
   public func makeUndefined() -> JSValue<E> {
     valueFromHandle(
       E.makeUndefinedValueHandle(driverContextHandle),
-      "JSEngineInstantContext.makeUndefined could not create handle"
+      "JSInstantContext.makeUndefined could not create handle"
     )
   }
 
@@ -85,7 +95,7 @@ extension JSEngineInstantContext {
   private func globalObjectValue() -> JSValue<E> {
     valueFromHandle(
       E.globalObjectValueHandle(driverContextHandle),
-      "JSEngineInstantContext.globalObjectValue could not create handle"
+      "JSInstantContext.globalObjectValue could not create handle"
     )
   }
 
@@ -162,7 +172,7 @@ extension JSEngineInstantContext {
         callback: callback,
         in: driverContextHandle
       ),
-      "JSEngineInstantContext.makeFunction could not create handle"
+      "JSInstantContext.makeFunction could not create handle"
     )
   }
 

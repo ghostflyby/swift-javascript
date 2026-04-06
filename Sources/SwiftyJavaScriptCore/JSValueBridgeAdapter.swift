@@ -1,4 +1,4 @@
-extension JSInstantContext {
+extension SwiftJavaScript.JSInstantContext where E == JavaScriptCoreEngine {
   private func ensureSameVM(_ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>) {
     let valueHandle = value.valueHandle()
     guard

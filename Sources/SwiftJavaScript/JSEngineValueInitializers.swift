@@ -5,7 +5,7 @@ extension JSValue {
     }
   }
 
-  public init(string value: String, in context: borrowing JSEngineInstantContext<E>) {
+  public init(string value: String, in context: borrowing JSInstantContext<E>) {
     self = context.makeString(value)
   }
 
@@ -19,7 +19,7 @@ extension JSValue {
   }
 
   public init(
-    string value: borrowing some JSString, in context: borrowing JSEngineInstantContext<E>
+    string value: borrowing some JSString, in context: borrowing JSInstantContext<E>
   ) {
     self = context.makeString(value.string)
   }
@@ -30,7 +30,7 @@ extension JSValue {
     }
   }
 
-  public init(number value: Double, in context: borrowing JSEngineInstantContext<E>) {
+  public init(number value: Double, in context: borrowing JSInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
@@ -42,7 +42,7 @@ extension JSValue {
     }
   }
 
-  public init(number value: some BinaryInteger, in context: borrowing JSEngineInstantContext<E>) {
+  public init(number value: some BinaryInteger, in context: borrowing JSInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
@@ -52,7 +52,7 @@ extension JSValue {
     }
   }
 
-  public init(boolean value: Bool, in context: borrowing JSEngineInstantContext<E>) {
+  public init(boolean value: Bool, in context: borrowing JSInstantContext<E>) {
     self = context.makeBoolean(value)
   }
 
@@ -62,7 +62,7 @@ extension JSValue {
     }
   }
 
-  public init(symbol: String, in context: borrowing JSEngineInstantContext<E>) {
+  public init(symbol: String, in context: borrowing JSInstantContext<E>) {
     self = context.makeSymbol(symbol)
   }
 
@@ -72,7 +72,7 @@ extension JSValue {
     }
   }
 
-  public init(nullIn context: borrowing JSEngineInstantContext<E>) {
+  public init(nullIn context: borrowing JSInstantContext<E>) {
     self = context.makeNull()
   }
 
@@ -82,7 +82,7 @@ extension JSValue {
     }
   }
 
-  public init(undefinedIn context: borrowing JSEngineInstantContext<E>) {
+  public init(undefinedIn context: borrowing JSInstantContext<E>) {
     self = context.makeUndefined()
   }
 
@@ -92,7 +92,7 @@ extension JSValue {
     }
   }
 
-  public init(objectIn context: borrowing JSEngineInstantContext<E>) {
+  public init(objectIn context: borrowing JSInstantContext<E>) {
     self = context.makeObject()
   }
 
@@ -102,7 +102,7 @@ extension JSValue {
     }
   }
 
-  public init(arrayIn context: borrowing JSEngineInstantContext<E>) {
+  public init(arrayIn context: borrowing JSInstantContext<E>) {
     self = context.makeArray()
   }
 }
@@ -121,7 +121,7 @@ extension JSValue where E.Engine == E {
   public init(
     name: String,
     callback: @escaping JSEngineFunctionCallback<E>,
-    in context: borrowing JSEngineInstantContext<E>
+    in context: borrowing JSInstantContext<E>
   ) {
     self = context.makeFunction(named: name, callback: callback)
   }
