@@ -1,3 +1,68 @@
+package struct JSClassDefinitionLookup<
+  E: JSEngine,
+  ParentClass: Sendable,
+  PropertyNameAccumulator
+> {
+  package let resolveParentDefinition:
+    (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+
+  package init(
+    resolveParentDefinition:
+      @escaping (ParentClass) -> JSClassDefinition<
+        E, ParentClass, PropertyNameAccumulator
+      >?
+  ) {
+    self.resolveParentDefinition = resolveParentDefinition
+  }
+
+  package func inheritanceDepth(
+    of definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  ) -> Int {
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return 1
+    }
+    return 1 + inheritanceDepth(of: parentDefinition)
+  }
+
+  package func exportedDefinitionCount(
+    of definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  ) -> Int {
+    inheritanceDepth(of: definition)
+  }
+
+  package func inheritedStaticValue(
+    named name: String,
+    in definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  ) -> JSStaticValue<E>? {
+    if let value = definition.staticValues.first(where: { $0.name == name }) {
+      return value
+    }
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return inheritedStaticValue(named: name, in: parentDefinition)
+  }
+
+  package func inheritedStaticFunction(
+    named name: String,
+    in definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  ) -> JSStaticFunction<E>? {
+    if let function = definition.staticFunctions.first(where: { $0.name == name }) {
+      return function
+    }
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return inheritedStaticFunction(named: name, in: parentDefinition)
+  }
+}
+
 package struct JSClassStaticValueInstallationPlan: Sendable {
   package let name: String
   package let attributes: JSPropertyAttributes
@@ -165,19 +230,20 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
-    guard let parentClass,
-      let parentDefinition = resolveParentDefinition(parentClass)
-    else {
-      return 1
+    withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
+      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+        .inheritanceDepth(of: self)
     }
-    return 1 + parentDefinition.inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
   }
 
   public func exportedDefinitionCount(
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
-    inheritanceDepth(resolvingParentDefinition: resolveParentDefinition)
+    withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
+      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+        .exportedDefinitionCount(of: self)
+    }
   }
 
   public func inheritedStaticValue(
@@ -185,18 +251,10 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> JSStaticValue<E>? {
-    if let value = staticValues.first(where: { $0.name == name }) {
-      return value
+    withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
+      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+        .inheritedStaticValue(named: name, in: self)
     }
-    guard let parentClass,
-      let parentDefinition = resolveParentDefinition(parentClass)
-    else {
-      return nil
-    }
-    return parentDefinition.inheritedStaticValue(
-      named: name,
-      resolvingParentDefinition: resolveParentDefinition
-    )
   }
 
   public func inheritedStaticFunction(
@@ -204,18 +262,10 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> JSStaticFunction<E>? {
-    if let function = staticFunctions.first(where: { $0.name == name }) {
-      return function
+    withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
+      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+        .inheritedStaticFunction(named: name, in: self)
     }
-    guard let parentClass,
-      let parentDefinition = resolveParentDefinition(parentClass)
-    else {
-      return nil
-    }
-    return parentDefinition.inheritedStaticFunction(
-      named: name,
-      resolvingParentDefinition: resolveParentDefinition
-    )
   }
 
   package func installationPlan() -> JSClassDefinitionInstallationPlan<ParentClass> {

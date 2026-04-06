@@ -60,7 +60,7 @@ where
     let definition = jsClassDefinition
     let backing = JSClassAutoNativeClassBacking(
       definition: definition,
-      resolvingManagedParentDefinition: { classDefinition(for: $0.ref) }
+      lookup: javaScriptCoreClassDefinitionLookup()
     )
     let nativeDefinition = autoNativeDefinition(backing: backing)
     return JSClass(
@@ -166,7 +166,7 @@ where
     let storage = JSClassAutoObjectStorage(
       definition: definition,
       instance: value,
-      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+      lookup: javaScriptCoreClassDefinitionLookup()
     )
     let data = Unmanaged.passRetained(storage).toOpaque()
 
@@ -361,9 +361,9 @@ private func withAutoStaticValueCallbackInput<R>(
     engine: JavaScriptCoreEngine.self
   )
   guard
-    let valueDefinition = definition.inheritedStaticValue(
+    let valueDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticValue(
       named: name,
-      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+      in: definition
     )
   else {
     return nil
@@ -398,9 +398,9 @@ private func withAutoStaticFunctionCallbackInput<R>(
     )
     .toString(in: context)
     guard
-      let functionDefinition = definition.inheritedStaticFunction(
+      let functionDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticFunction(
         named: functionName,
-        resolvingParentDefinition: { classDefinition(for: $0.ref) }
+        in: definition
       )
     else {
       return nil

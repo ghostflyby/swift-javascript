@@ -57,6 +57,18 @@ private let classDefinitionRegistry = JavaScriptCoreClassDefinitionModelRegistry
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
+func javaScriptCoreClassDefinitionLookup()
+  -> SwiftJavaScript.JSClassDefinitionLookup<
+    JavaScriptCoreEngine,
+    JSClass,
+    JSPropertyNameAccumulatorRef
+  >
+{
+  SwiftJavaScript.JSClassDefinitionLookup {
+    classDefinition(for: $0.ref)
+  }
+}
+
 func makeRememberedClassCallbackContext(
   _ ctx: JSContextRef, _ object: JSObjectRef
 )
@@ -130,7 +142,7 @@ func rememberClassObjectDefinition(
   classObjectDefinitionRegistry.set(
     UInt(bitPattern: object),
     definition: definition,
-    depth: definition.inheritanceDepth(resolvingParentDefinition: { classDefinition(for: $0.ref) })
+    depth: javaScriptCoreClassDefinitionLookup().inheritanceDepth(of: definition)
   )
 }
 
@@ -139,8 +151,7 @@ func rememberClassObjectFinalizeCount(
 ) {
   classObjectFinalizeCounterRegistry.setMax(
     UInt(bitPattern: object),
-    count: definition.exportedDefinitionCount(
-      resolvingParentDefinition: { classDefinition(for: $0.ref) })
+    count: javaScriptCoreClassDefinitionLookup().exportedDefinitionCount(of: definition)
   )
 }
 
@@ -313,9 +324,9 @@ private func withJavaScriptCoreStaticValueCallbackInput<R>(
 
   rememberClassObjectContext(ctx, object)
   guard
-    let valueDefinition = definition.inheritedStaticValue(
+    let valueDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticValue(
       named: propertyName,
-      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+      in: definition
     )
   else {
     return nil
@@ -350,9 +361,9 @@ private func withJavaScriptCoreStaticFunctionCallbackInput<R>(
   )
   .toString(in: context)
   guard
-    let functionDefinition = definition.inheritedStaticFunction(
+    let functionDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticFunction(
       named: functionName,
-      resolvingParentDefinition: { classDefinition(for: $0.ref) }
+      in: definition
     )
   else {
     return nil

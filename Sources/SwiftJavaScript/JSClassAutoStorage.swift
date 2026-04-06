@@ -31,6 +31,18 @@ package final class JSClassAutoNativeClassBacking<
         != nil
     )
   }
+
+  package convenience init(
+    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    lookup: JSClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
+  ) {
+    self.init(
+      definition: definition,
+      usesManagedParent: definition.parentClass.flatMap {
+        lookup.resolveParentDefinition($0)
+      } != nil
+    )
+  }
 }
 
 package final class JSClassAutoObjectStorage<
@@ -64,6 +76,18 @@ package final class JSClassAutoObjectStorage<
       finalizeDepth: definition.exportedDefinitionCount(
         resolvingParentDefinition: resolvingParentDefinition
       )
+    )
+  }
+
+  package convenience init(
+    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    instance: AnyObject,
+    lookup: JSClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
+  ) {
+    self.init(
+      definition: definition,
+      instance: instance,
+      finalizeDepth: lookup.exportedDefinitionCount(of: definition)
     )
   }
 

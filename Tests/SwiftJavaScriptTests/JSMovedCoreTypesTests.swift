@@ -241,3 +241,48 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
   #expect(plan.callbacks.hasHasInstance)
   #expect(plan.callbacks.hasConvertToType)
 }
+
+@Test func jsClassDefinitionLookupTraversesParentChain() {
+  var grandparent = JSClassDefinition<MockEngine, String, Never>()
+  grandparent.className = "Grandparent"
+  grandparent.staticValues = [
+    JSStaticValue(
+      name: "grand",
+      attributes: [.readOnly],
+      getProperty: { _, _ in .value(mockUndefinedValue()) },
+      setProperty: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+
+  var parent = JSClassDefinition<MockEngine, String, Never>()
+  parent.className = "Parent"
+  parent.parentClass = "Grandparent"
+  parent.staticFunctions = [
+    JSStaticFunction(
+      name: "parentFn",
+      attributes: [.dontDelete],
+      callAsFunction: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+
+  var child = JSClassDefinition<MockEngine, String, Never>()
+  child.className = "Child"
+  child.parentClass = "Parent"
+
+  let lookup = JSClassDefinitionLookup<MockEngine, String, Never> { name in
+    switch name {
+    case "Parent":
+      parent
+    case "Grandparent":
+      grandparent
+    default:
+      nil
+    }
+  }
+
+  #expect(lookup.inheritanceDepth(of: child) == 3)
+  #expect(lookup.exportedDefinitionCount(of: child) == 3)
+  #expect(lookup.inheritedStaticValue(named: "grand", in: child)?.name == "grand")
+  #expect(lookup.inheritedStaticFunction(named: "parentFn", in: child)?.name == "parentFn")
+  #expect(lookup.inheritedStaticFunction(named: "missing", in: child) == nil)
+}
