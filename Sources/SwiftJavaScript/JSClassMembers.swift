@@ -106,6 +106,14 @@ extension JSStaticValueDefinition {
     JSClassStaticValueDefinition(name: name, attributes: attributes)
   }
 
+  package func setPropertyException(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    to newValue: borrowing JSValue<Engine>
+  ) -> JSValue<Engine>? {
+    takeExceptionValue(setProperty(context, thisValue, newValue))
+  }
+
   public func hostPropertyDescriptor(
     getterBinding: String? = nil,
     setterBinding: String? = nil

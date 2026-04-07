@@ -312,6 +312,39 @@ extension JSClassDefinition {
         .inheritedStaticFunction(named: name, in: self)
     }
   }
+
+  package func dynamicPropertyValue(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String
+  ) -> JSResult<JSValue<Engine>> {
+    getProperty?(context, thisValue, key) ?? .value(JSValue(undefinedIn: context))
+  }
+
+  package func setDynamicPropertyException(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String,
+    to newValue: borrowing JSValue<Engine>
+  ) -> JSValue<Engine>? {
+    setProperty?(context, thisValue, key, newValue)
+  }
+
+  package func hasDynamicProperty(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String
+  ) -> Bool {
+    hasProperty?(context, thisValue, key) ?? false
+  }
+
+  package func deleteDynamicProperty(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String
+  ) -> Bool {
+    deleteProperty?(context, thisValue, key) ?? false
+  }
 }
 
 public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Sendable {

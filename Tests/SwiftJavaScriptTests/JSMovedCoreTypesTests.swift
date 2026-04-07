@@ -125,6 +125,9 @@ import Testing
   case .exception(let value):
     #expect(value == 7)
   }
+
+  #expect(takeExceptionValue(JSResult<Int>.value(42)) == nil)
+  #expect(takeExceptionValue(JSResult<Int>.exception(7)) == 7)
 }
 
 @Test func utilityBoxesStoreAndExposePayload() {
@@ -221,7 +224,6 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let context = mockInstantContext()
   let thisValue = mockUndefinedValue()
   let arguments = JSArguments<MockEngine>(count: 0) { _, _ in nil }
-
   let staticValue = JSStaticValue<MockEngine>(
     name: "title",
     attributes: [.readOnly],
@@ -254,6 +256,21 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   case .exception:
     Issue.record("Expected static function call to succeed")
   }
+
+  let failingStaticValue = JSStaticValue<MockEngine>(
+    name: "broken",
+    attributes: [.none],
+    getProperty: { context, _ in .value(context.makeString("unused")) },
+    setProperty: { context, _, _ in .exception(context.makeString("error")) }
+  )
+
+  #expect(
+    failingStaticValue.setPropertyException(
+      in: context,
+      on: thisValue,
+      to: thisValue
+    )?.valueHandle().rawValue.payload == "runtime-token:error"
+  )
 }
 
 @Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {

@@ -311,9 +311,11 @@ private func autoDynamicGetPropertyCallbackValue(
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> JSValueRef? {
   return javaScriptCoreCallbackReturnValue(
-    (definition.getProperty?(context, thisValue, key)
-      ?? .value(SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)))
-      .toPrivateResult(),
+    definition.dynamicPropertyValue(
+      in: context,
+      on: thisValue,
+      forKey: key
+    ).toPrivateResult(),
     in: ctx,
     exception: exception
   )
@@ -329,10 +331,12 @@ private func autoDynamicSetPropertyCallbackResult(
   newValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> Bool {
-  guard let setProperty = definition.setProperty else {
-    return true
-  }
-  if let error = setProperty(context, thisValue, key, newValue) {
+  if let error = definition.setDynamicPropertyException(
+    in: context,
+    on: thisValue,
+    forKey: key,
+    to: newValue
+  ) {
     let privateResult = JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.exception(error)
       .toPrivateResult()
     guard case .exception(let errorRef) = privateResult else {
@@ -367,9 +371,9 @@ private func withAutoStaticValueCallbackInput<R>(
     engine: JavaScriptCoreEngine.self
   )
   guard
-    let valueDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticValue(
+    let valueDefinition = definition.inheritedStaticValue(
       named: name,
-      in: definition
+      resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
     )
   else {
     return nil
@@ -404,9 +408,9 @@ private func withAutoStaticFunctionCallbackInput<R>(
     )
     .toString(in: context)
     guard
-      let functionDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticFunction(
+      let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,
-        in: definition
+        resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
       )
     else {
       return nil
@@ -436,15 +440,14 @@ private func autoStaticSetPropertyCallbackResult(
   newValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> Bool {
-  switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
-  case .value:
-    return true
-  case .exception(let error):
-    return javaScriptCoreCallbackSucceeded(
-      exceptionValue: error,
-      exception: exception
-    )
-  }
+  javaScriptCoreCallbackSucceeded(
+    exceptionValue: valueDefinition.setPropertyException(
+      in: context,
+      on: thisValue,
+      to: newValue
+    )?.takeRef(),
+    exception: exception
+  )
 }
 
 private func autoStaticFunctionCallCallbackValue(
@@ -581,7 +584,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        definition.hasProperty?(context, thisValue, key) ?? false
+        definition.hasDynamicProperty(in: context, on: thisValue, forKey: key)
       }
       return hasProperty ?? false
     }
@@ -594,7 +597,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        definition.deleteProperty?(context, thisValue, key) ?? false
+        definition.deleteDynamicProperty(in: context, on: thisValue, forKey: key)
       }
       return didDelete ?? false
     }

@@ -14,6 +14,18 @@ extension JSResult {
       return true
     }
   }
+
+}
+
+package func takeExceptionValue<Value: ~Copyable>(
+  _ result: consuming JSResult<Value>
+) -> Value? {
+  switch consume result {
+  case .value:
+    return nil
+  case .exception(let exception):
+    return exception
+  }
 }
 
 public func bridgeHandleResult<E: JSEngine>(

@@ -93,6 +93,12 @@ private let classDefinitionRegistry = JavaScriptCoreClassDefinitionModelRegistry
 private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
+func resolveJavaScriptCoreParentClassDefinition(_ parentClass: JSClass)
+  -> JavaScriptCoreClassDefinitionModel?
+{
+  classDefinition(for: parentClass.ref)
+}
+
 func javaScriptCoreClassDefinitionLookup()
   -> SwiftJavaScript.JSEngineClassDefinitionLookup<
     JavaScriptCoreEngine,
@@ -101,7 +107,7 @@ func javaScriptCoreClassDefinitionLookup()
   >
 {
   SwiftJavaScript.JSEngineClassDefinitionLookup {
-    classDefinition(for: $0.ref)
+    resolveJavaScriptCoreParentClassDefinition($0)
   }
 }
 
@@ -360,9 +366,9 @@ private func withJavaScriptCoreStaticValueCallbackInput<R>(
 
   rememberClassObjectContext(ctx, object)
   guard
-    let valueDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticValue(
+    let valueDefinition = definition.inheritedStaticValue(
       named: propertyName,
-      in: definition
+      resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
     )
   else {
     return nil
@@ -397,9 +403,9 @@ private func withJavaScriptCoreStaticFunctionCallbackInput<R>(
   )
   .toString(in: context)
   guard
-    let functionDefinition = javaScriptCoreClassDefinitionLookup().inheritedStaticFunction(
+    let functionDefinition = definition.inheritedStaticFunction(
       named: functionName,
-      in: definition
+      resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
     )
   else {
     return nil
@@ -535,7 +541,7 @@ private func installHasPropertyCallbackIfNeeded(
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
-      definition.hasProperty!(context, thisValue, propertyName)
+      definition.hasDynamicProperty(in: context, on: thisValue, forKey: propertyName)
     }
     return hasProperty ?? false
   }
@@ -555,7 +561,7 @@ private func installDeletePropertyCallbackIfNeeded(
       object: object,
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
-      definition.deleteProperty!(context, thisValue, propertyName)
+      definition.deleteDynamicProperty(in: context, on: thisValue, forKey: propertyName)
     }
     return didDelete ?? false
   }
@@ -580,11 +586,11 @@ private func installSetPropertyCallbackIfNeeded(
     ) { definition, context, thisValue, propertyName in
       let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
       return javaScriptCoreCallbackSucceeded(
-        exceptionValue: definition.setProperty!(
-          context,
-          thisValue,
-          propertyName,
-          newValue
+        exceptionValue: definition.setDynamicPropertyException(
+          in: context,
+          on: thisValue,
+          forKey: propertyName,
+          to: newValue
         )?.takeRef(),
         exception: exception
       )
@@ -608,7 +614,11 @@ private func installGetPropertyCallbackIfNeeded(
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
       javaScriptCoreCallbackReturnValue(
-        definition.getProperty!(context, thisValue, propertyName).toPrivateResult(),
+        definition.dynamicPropertyValue(
+          in: context,
+          on: thisValue,
+          forKey: propertyName
+        ).toPrivateResult(),
         in: ctx,
         exception: exception
       )
@@ -904,15 +914,14 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
     let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
-    switch valueDefinition.setProperty(context, thisValue, newValue).toPrivateResult() {
-    case .value:
-      return true
-    case .exception(let error):
-      return javaScriptCoreCallbackSucceeded(
-        exceptionValue: error,
-        exception: exception
-      )
-    }
+    return javaScriptCoreCallbackSucceeded(
+      exceptionValue: valueDefinition.setPropertyException(
+        in: context,
+        on: thisValue,
+        to: newValue
+      )?.takeRef(),
+      exception: exception
+    )
   }
   return didSet ?? false
 }
