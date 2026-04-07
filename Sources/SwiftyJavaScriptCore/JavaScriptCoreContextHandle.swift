@@ -99,3 +99,9 @@ extension JavaScriptCoreContextHandle: Hashable {
     hasher.combine(ref)
   }
 }
+
+extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
+  nonisolated internal var javaScriptCoreContextRef: JSGlobalContextRef {
+    driverContextHandle.ref
+  }
+}

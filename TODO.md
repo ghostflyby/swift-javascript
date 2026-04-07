@@ -285,7 +285,7 @@
 
 Step 1：继续删 facade 薄包装
 - [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSValueResultBridge.swift` 中仅作 core `bridgeHandleResult` 薄封装的入口，调用点直接落到 core helper（已删除未使用的 `JSResult.from(handleResult:)` facade 包装）
-- [ ] 评估并删除 `Sources/SwiftyJavaScriptCore/JSInstantContext.swift` / `Sources/SwiftyJavaScriptCore/JSContext.swift` 中仅暴露 `globalContextRef` 的兼容扩展；若仍需要 raw context，改集中到 backend-only 桥接面（已删除 `JSInstantContext.globalContextRef`；`JSContext.globalContextRef` 仍保留给非isolated跨-context测试，待替换测试构造后再删）
+- [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSInstantContext.swift` / `Sources/SwiftyJavaScriptCore/JSContext.swift` 中仅暴露 `globalContextRef` 的兼容扩展；若仍需要 raw context，改集中到 backend-only 桥接面（已删除 `JSInstantContext.globalContextRef`；移除了 facade `JSContext.globalContextRef` 文件，剩余 raw context 访问收口为 JSC backend 内部桥接入口供测试/底层使用）
 - [x] 评估 `Sources/SwiftyJavaScriptCore/JSArguments.swift` 的 `pointer + count` 初始化是否仍值得保留在 facade；若只服务 callback glue，则收口到 callback 所在文件附近（已删除该 facade 文件；backend 改为就地构造 `JSArguments`，测试改为局部 helper）
 - [x] 收口 `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift` 中仅服务 callback/typed-array bridge 的 helper；driver 仅保留 core driver 协议要求的方法与直接实现（已将 callback glue、typed-array bridge、property-attributes 和 `JavaScriptCoreStringHandle` 拆到独立 bridge 文件）
 
