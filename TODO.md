@@ -310,8 +310,9 @@ Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
 Step 4.5：拆分 class definition 的结构与行为
 - [x] 引入 engine-agnostic 的 core class definition / static member descriptor，先承载 metadata、parent chain 和 static member 名称/属性
 - [x] 引入 core `JSClass<E>` 与 class handle 协议，让引擎绑定的 class 句柄从 `JSClassDefinition` 中分离出来（已新增 `JSClassManualReferenceCountedHandle` / core `JSClass<E>`，并让 JSC facade 收敛为 `JSClass<JavaScriptCoreEngine>` 特化）
-- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：已将纯结构层正式命名为 `JSClassDefinition`，并将带 `E` 的行为定义/lookup 更名为 `JSEngineClassDefinition` / `JSEngineClassDefinitionLookup`）
+- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：上一轮已将 `JSEngineClassDefinition` 收缩为 `definition + behavior` 组合；本轮已把 `JSClassDefinition` 名称收口为完整协议，原纯 metadata struct 更名为 `JSClassDefinitionMetadata`，并让 lookup / auto storage / converter helper 开始按协议消费，`JSEngineClassDefinition` 暂仍作为默认存储实现）
 - [ ] 后续再把 callbacks 和 engine-bound static member implementations 从 class definition 本体中进一步拆离
+- [x] 验证“完整定义协议 + 默认存储实现”模式能否复用于 static member 定义（已为 `JSStaticValue` / `JSStaticFunction` 引入完整定义协议并保持现有 concrete struct 作为默认实现；generic 消费与现有调用面兼容，后续可据此再评估是否上收到 `JSClassDefinition`，但不再继续拆成 descriptor/behavior 双主模型）
 
 Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 审查 `Sources/SwiftyJavaScriptCore/JSValueConversionMacros.swift` 中仍直接写死 `JavaScriptCoreEngine` / `JSClass` / `JSPropertyNameAccumulatorRef` 的说明与生成模板，优先改为引用 core converter/protocol 语义

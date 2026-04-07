@@ -1,3 +1,33 @@
+public protocol JSStaticValueDefinition: Sendable {
+  associatedtype Engine: JSEngine
+
+  var name: String { get }
+  var attributes: JSPropertyAttributes { get }
+  var getProperty:
+    @Sendable (borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>)
+      -> JSResult<JSValue<Engine>>
+  { get }
+  var setProperty:
+    @Sendable (
+      borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>,
+      borrowing JSValue<Engine>
+    ) -> JSResult<JSValue<Engine>>
+  { get }
+}
+
+public protocol JSStaticFunctionDefinition: Sendable {
+  associatedtype Engine: JSEngine
+
+  var name: String { get }
+  var attributes: JSPropertyAttributes { get }
+  var callAsFunction:
+    @Sendable (
+      borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>,
+      borrowing JSArguments<Engine>
+    ) -> JSResult<JSValue<Engine>>
+  { get }
+}
+
 public struct JSClassStaticValueDefinition: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
@@ -18,7 +48,7 @@ public struct JSClassStaticFunctionDefinition: Sendable {
   }
 }
 
-public struct JSStaticValue<E: JSEngine>: Sendable {
+public struct JSStaticValue<E: JSEngine>: JSStaticValueDefinition, Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
@@ -49,7 +79,7 @@ public struct JSStaticValue<E: JSEngine>: Sendable {
       -> JSResult<JSValue<E>>
 }
 
-public struct JSStaticFunction<E: JSEngine>: Sendable {
+public struct JSStaticFunction<E: JSEngine>: JSStaticFunctionDefinition, Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
@@ -71,7 +101,7 @@ public struct JSStaticFunction<E: JSEngine>: Sendable {
   }
 }
 
-extension JSStaticValue {
+extension JSStaticValueDefinition {
   public var definition: JSClassStaticValueDefinition {
     JSClassStaticValueDefinition(name: name, attributes: attributes)
   }
@@ -89,7 +119,7 @@ extension JSStaticValue {
   }
 }
 
-extension JSStaticFunction {
+extension JSStaticFunctionDefinition {
   public var definition: JSClassStaticFunctionDefinition {
     JSClassStaticFunctionDefinition(name: name, attributes: attributes)
   }
@@ -202,14 +232,22 @@ package func projectClassHostTypeDescriptor(
   )
 }
 
-package func projectClassHostTypeDescriptor<E: JSEngine>(
+package func projectClassHostTypeDescriptor<
+  StaticValues: Sequence,
+  StaticFunctions: Sequence
+>(
   className: String?,
   parentName: String?,
-  staticValues: [JSStaticValue<E>],
-  staticFunctions: [JSStaticFunction<E>],
+  staticValues: StaticValues,
+  staticFunctions: StaticFunctions,
   storagePolicy: JSHostObjectStoragePolicy,
   flags: JSClassHostDescriptorProjectionFlags
-) -> JSHostTypeDescriptor {
+) -> JSHostTypeDescriptor
+where
+  StaticValues.Element: JSStaticValueDefinition,
+  StaticFunctions.Element: JSStaticFunctionDefinition,
+  StaticValues.Element.Engine == StaticFunctions.Element.Engine
+{
   projectClassHostTypeDescriptor(
     className: className,
     parentName: parentName,

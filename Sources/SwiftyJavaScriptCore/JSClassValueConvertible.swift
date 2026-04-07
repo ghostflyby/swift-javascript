@@ -2,17 +2,21 @@ import Foundation
 import JavaScriptCore
 
 private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNativeClassBacking<
-  JavaScriptCoreEngine,
-  JSClass,
-  JSPropertyNameAccumulatorRef,
+  SwiftJavaScript.JSEngineClassDefinition<
+    JavaScriptCoreEngine,
+    JSClass,
+    JSPropertyNameAccumulatorRef
+  >,
   JavaScriptCore.JSStaticValue,
   JavaScriptCore.JSStaticFunction
 >
 
 private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectStorage<
-  JavaScriptCoreEngine,
-  JSClass,
-  JSPropertyNameAccumulatorRef
+  SwiftJavaScript.JSEngineClassDefinition<
+    JavaScriptCoreEngine,
+    JSClass,
+    JSPropertyNameAccumulatorRef
+  >
 >
 
 private let jsClassCacheRegistry = SwiftJavaScript.JSClassCacheRegistry<ObjectIdentifier, JSClass>()
@@ -47,7 +51,12 @@ extension JSClassValueConverterCompatible
 where
   Engine == JavaScriptCoreEngine,
   ParentClass == JSClass,
-  PropertyNameAccumulator == JSPropertyNameAccumulatorRef
+  PropertyNameAccumulator == JSPropertyNameAccumulatorRef,
+  ClassDefinition == SwiftJavaScript.JSEngineClassDefinition<
+    JavaScriptCoreEngine,
+    JSClass,
+    JSPropertyNameAccumulatorRef
+  >
 {
   public static var jsClass: JSClass {
     let key = ObjectIdentifier(Self.self)
