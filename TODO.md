@@ -304,7 +304,7 @@ Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
 - [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：auto storage 访问模板、definition 选择策略、callback 前后置模板（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板，以及 backing/storage 的 definition 选择模板已下沉到 core）
 - [x] 在 core 提炼“从 definition 解析 static value/function”的名称查找模板，JSC facade 仅负责从 `JSStringRef` / function object 上取出名字再调用模板；static member metadata 已直接消费 definition，不再经 installation plan 中转（`JSClass` / `JSClassValueConvertible` 已改为直接消费 core 的 `inheritedStaticValue/Function` 模板）
 - [x] 在 core 提炼 auto-convertible 的 definition 选择与 parent-definition 解析接口，JSC facade 只提供 `JSClassRef -> definition` 的适配闭包（已将 auto backing/storage 的 definition 选择模板下沉到 core，JSC 仅传入 lookup）
-- [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线（进行中：先把 dynamic property callback 的默认语义/可选 closure 正常化模板下沉到 core，JSC 仅保留 `JSValueRef`/exception bridging）
+- [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线（进行中：dynamic property 默认语义已下沉到 core；继续收口 static get/function call 的结果包装）
 - [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，优先改成 core 泛型接口 + facade 特化，而不是继续扩大 facade API 面
 
 Step 4.5：拆分 class definition 的结构与行为

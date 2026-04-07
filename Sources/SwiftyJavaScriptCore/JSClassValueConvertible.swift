@@ -419,20 +419,6 @@ private func withAutoStaticFunctionCallbackInput<R>(
   }
 }
 
-private func autoStaticGetPropertyCallbackValue(
-  valueDefinition: SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-  ctx: JSContextRef?,
-  exception: UnsafeMutablePointer<JSValueRef?>?
-) -> JSValueRef? {
-  javaScriptCoreCallbackReturnValue(
-    valueDefinition.getProperty(context, thisValue).toPrivateResult(),
-    in: ctx,
-    exception: exception
-  )
-}
-
 private func autoStaticSetPropertyCallbackResult(
   valueDefinition: SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
   context: borrowing JSInstantContext<JavaScriptCoreEngine>,
@@ -450,25 +436,6 @@ private func autoStaticSetPropertyCallbackResult(
   )
 }
 
-private func autoStaticFunctionCallCallbackValue(
-  functionDefinition: SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-  argumentCount: Int,
-  arguments: UnsafePointer<JSValueRef?>?,
-  ctx: JSContextRef?,
-  exception: UnsafeMutablePointer<JSValueRef?>?
-) -> JSValueRef? {
-  let result = withJavaScriptCoreArguments(arguments, count: argumentCount) { args in
-    functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
-  }
-  return javaScriptCoreCallbackReturnValue(
-    result,
-    in: ctx,
-    exception: exception
-  )
-}
-
 private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
   ctx, object, propertyName, exception in
   let value = withAutoStaticValueCallbackInput(
@@ -476,11 +443,9 @@ private let autoStaticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    autoStaticGetPropertyCallbackValue(
-      valueDefinition: valueDefinition,
-      context: context,
-      thisValue: thisValue,
-      ctx: ctx,
+    javaScriptCoreCallbackReturnValue(
+      valueDefinition.propertyValue(in: context, on: thisValue).toPrivateResult(),
+      in: ctx,
       exception: exception
     )
   }
@@ -516,13 +481,12 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
     function: function,
     thisObject: thisObject
   ) { functionDefinition, context, thisValue in
-    autoStaticFunctionCallCallbackValue(
-      functionDefinition: functionDefinition,
-      context: context,
-      thisValue: thisValue,
-      argumentCount: Int(argumentCount),
-      arguments: arguments,
-      ctx: ctx,
+    let result = withJavaScriptCoreArguments(arguments, count: Int(argumentCount)) { args in
+      functionDefinition.callResult(in: context, on: thisValue, with: args).toPrivateResult()
+    }
+    return javaScriptCoreCallbackReturnValue(
+      result,
+      in: ctx,
       exception: exception
     )
   }

@@ -106,6 +106,13 @@ extension JSStaticValueDefinition {
     JSClassStaticValueDefinition(name: name, attributes: attributes)
   }
 
+  package func propertyValue(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>
+  ) -> JSResult<JSValue<Engine>> {
+    getProperty(context, thisValue)
+  }
+
   package func setPropertyException(
     in context: borrowing JSInstantContext<Engine>,
     on thisValue: borrowing JSValue<Engine>,
@@ -130,6 +137,14 @@ extension JSStaticValueDefinition {
 extension JSStaticFunctionDefinition {
   public var definition: JSClassStaticFunctionDefinition {
     JSClassStaticFunctionDefinition(name: name, attributes: attributes)
+  }
+
+  package func callResult(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    with arguments: borrowing JSArguments<Engine>
+  ) -> JSResult<JSValue<Engine>> {
+    callAsFunction(context, thisValue, arguments)
   }
 
   public func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {

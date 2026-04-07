@@ -895,7 +895,7 @@ private let staticValueGetPropertyCallback: JSObjectGetPropertyCallback = {
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
     javaScriptCoreCallbackReturnValue(
-      valueDefinition.getProperty(context, thisValue).toPrivateResult(),
+      valueDefinition.propertyValue(in: context, on: thisValue).toPrivateResult(),
       in: ctx,
       exception: exception
     )
@@ -935,7 +935,7 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
   ) { functionDefinition, context, thisValue in
     let result = withJavaScriptCoreArguments(arguments, count: Int(argumentCount)) {
       args in
-      functionDefinition.callAsFunction(context, thisValue, args).toPrivateResult()
+      functionDefinition.callResult(in: context, on: thisValue, with: args).toPrivateResult()
     }
     return javaScriptCoreCallbackReturnValue(
       result,
