@@ -310,7 +310,7 @@ Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
 Step 4.5：拆分 class definition 的结构与行为
 - [x] 引入 engine-agnostic 的 core class definition / static member descriptor，先承载 metadata、parent chain 和 static member 名称/属性
 - [x] 引入 core `JSClass<E>` 与 class handle 协议，让引擎绑定的 class 句柄从 `JSClassDefinition` 中分离出来（已新增 `JSClassManualReferenceCountedHandle` / core `JSClass<E>`，并让 JSC facade 收敛为 `JSClass<JavaScriptCoreEngine>` 特化）
-- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：已新增 `coreDefinition` 导出，installation plan 已切到消费 core metadata）
+- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：已将纯结构层正式命名为 `JSClassDefinition`，并将带 `E` 的行为定义/lookup 更名为 `JSEngineClassDefinition` / `JSEngineClassDefinitionLookup`）
 - [ ] 后续再把 callbacks 和 engine-bound static member implementations 从 class definition 本体中进一步拆离
 
 Step 5：宏与公开文档去 JSC 硬编码

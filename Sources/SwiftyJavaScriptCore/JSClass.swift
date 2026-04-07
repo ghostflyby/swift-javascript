@@ -44,7 +44,7 @@ extension SwiftJavaScript.JSClassAttributes {
     rawValue: UInt32(kJSClassAttributeNoAutomaticPrototype))
 }
 
-typealias JavaScriptCoreClassDefinitionModel = SwiftJavaScript.JSClassDefinition<
+typealias JavaScriptCoreClassDefinitionModel = SwiftJavaScript.JSEngineClassDefinition<
   JavaScriptCoreEngine,
   JSClass,
   JSPropertyNameAccumulatorRef
@@ -54,7 +54,7 @@ typealias JSManualNativeClassBacking = SwiftJavaScript.JSClassManualNativeClassB
   JavaScriptCore.JSStaticFunction
 >
 
-extension SwiftJavaScript.JSClassDefinition
+extension SwiftJavaScript.JSEngineClassDefinition
 where
   E == JavaScriptCoreEngine,
   ParentClass == JSClass,
@@ -94,13 +94,13 @@ private let classObjectDefinitionRegistry = JSClassObjectDefinitionRegistry()
 private let classObjectFinalizeCounterRegistry = JSClassObjectFinalizeCounterRegistry()
 
 func javaScriptCoreClassDefinitionLookup()
-  -> SwiftJavaScript.JSClassDefinitionLookup<
+  -> SwiftJavaScript.JSEngineClassDefinitionLookup<
     JavaScriptCoreEngine,
     JSClass,
     JSPropertyNameAccumulatorRef
   >
 {
-  SwiftJavaScript.JSClassDefinitionLookup {
+  SwiftJavaScript.JSEngineClassDefinitionLookup {
     classDefinition(for: $0.ref)
   }
 }
@@ -978,7 +978,7 @@ extension SwiftJavaScript.JSClass where E == JavaScriptCoreEngine {
   }
 
   public convenience init(
-    defination: SwiftJavaScript.JSClassDefinition<
+    defination: SwiftJavaScript.JSEngineClassDefinition<
       JavaScriptCoreEngine,
       JSClass,
       JSPropertyNameAccumulatorRef

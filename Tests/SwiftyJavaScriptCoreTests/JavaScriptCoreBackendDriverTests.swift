@@ -356,7 +356,7 @@ private func makeBackendArray(
 }
 
 @Test func javaScriptCoreBackendDriverConsumesJSClassHostDescriptorBindings() {
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "BackendProjected"

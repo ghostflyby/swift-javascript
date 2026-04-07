@@ -3,7 +3,9 @@ public protocol JSClassValueConverterCompatible: AnyObject, JSValueEncodable {
   associatedtype ParentClass: Sendable
   associatedtype PropertyNameAccumulator
 
-  static var jsClassDefinition: JSClassDefinition<Engine, ParentClass, PropertyNameAccumulator> {
+  static var jsClassDefinition:
+    JSEngineClassDefinition<Engine, ParentClass, PropertyNameAccumulator>
+  {
     get
   }
 
@@ -53,14 +55,14 @@ extension JSClassValueConverterCompatible {
 }
 
 extension JSClassValueConverterCompatible {
-  package static func autoClassDefinition() -> JSClassDefinition<
+  package static func autoClassDefinition() -> JSEngineClassDefinition<
     Engine, ParentClass, PropertyNameAccumulator
   > {
     jsClassDefinition
   }
 
   package static func autoNativeClassBacking<NativeStaticValue, NativeStaticFunction>(
-    lookup: JSClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
+    lookup: JSEngineClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
   ) -> JSClassAutoNativeClassBacking<
     Engine,
     ParentClass,
@@ -76,7 +78,7 @@ extension JSClassValueConverterCompatible {
 
   package static func autoObjectStorage(
     instance: Self,
-    lookup: JSClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
+    lookup: JSEngineClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
   ) -> JSClassAutoObjectStorage<Engine, ParentClass, PropertyNameAccumulator> {
     JSClassAutoObjectStorage(
       definition: autoClassDefinition(),

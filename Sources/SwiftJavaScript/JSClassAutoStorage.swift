@@ -5,7 +5,7 @@ package final class JSClassAutoNativeClassBacking<
   NativeStaticValue,
   NativeStaticFunction
 >: @unchecked Sendable {
-  package let definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  package let definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   package let usesManagedParent: Bool
   package var staticValueNames: [ContiguousArray<CChar>] = []
   package var staticValues: [NativeStaticValue] = []
@@ -13,7 +13,7 @@ package final class JSClassAutoNativeClassBacking<
   package var staticFunctions: [NativeStaticFunction] = []
 
   package init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
     usesManagedParent: Bool
   ) {
     self.definition = definition
@@ -21,9 +21,9 @@ package final class JSClassAutoNativeClassBacking<
   }
 
   package convenience init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
     resolvingManagedParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) {
     self.init(
       definition: definition,
@@ -33,8 +33,8 @@ package final class JSClassAutoNativeClassBacking<
   }
 
   package convenience init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
-    lookup: JSClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    lookup: JSEngineClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
   ) {
     self.init(
       definition: definition,
@@ -50,12 +50,12 @@ package final class JSClassAutoObjectStorage<
   ParentClass: Sendable,
   PropertyNameAccumulator
 >: @unchecked Sendable {
-  package let definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+  package let definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   package let instance: AnyObject
   package let finalizeDepth: Int
 
   package init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
     instance: AnyObject,
     finalizeDepth: Int
   ) {
@@ -65,10 +65,10 @@ package final class JSClassAutoObjectStorage<
   }
 
   package convenience init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
     instance: AnyObject,
     resolvingParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) {
     self.init(
       definition: definition,
@@ -80,9 +80,9 @@ package final class JSClassAutoObjectStorage<
   }
 
   package convenience init(
-    definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>,
+    definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>,
     instance: AnyObject,
-    lookup: JSClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
+    lookup: JSEngineClassDefinitionLookup<E, ParentClass, PropertyNameAccumulator>
   ) {
     self.init(
       definition: definition,

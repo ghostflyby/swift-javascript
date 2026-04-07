@@ -37,7 +37,7 @@ import Testing
 }
 
 @Test func classDefinitionDefaultsAndClassCreation() {
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
 
@@ -59,7 +59,7 @@ import Testing
 }
 
 @Test func classDefinitionCallbacksAreSettable() {
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
 
@@ -97,13 +97,13 @@ import Testing
 }
 
 @Test func classDefinitionFullWiringSmoke() {
-  var base = SwiftJavaScript.JSClassDefinition<
+  var base = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   base.className = "Base"
   let baseClass = JSClass(defination: base)
 
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.version = 0
@@ -161,7 +161,7 @@ import Testing
 }
 
 @Test func classNameMutationStillBuildsClass() {
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "A"
@@ -177,13 +177,13 @@ import Testing
 }
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
-  var parentDefinition = SwiftJavaScript.JSClassDefinition<
+  var parentDefinition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   parentDefinition.className = "BaseType"
   let parentClass = JSClass(defination: parentDefinition)
 
-  var definition = SwiftJavaScript.JSClassDefinition<
+  var definition = SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "ProjectedType"

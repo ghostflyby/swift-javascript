@@ -270,7 +270,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    SwiftJavaScript.JSClassDefinition<
+    SwiftJavaScript.JSEngineClassDefinition<
       JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
     >, borrowing JSInstantContext<JavaScriptCoreEngine>,
     borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
@@ -292,7 +292,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
 }
 
 private func autoDynamicGetPropertyCallbackValue(
-  definition: SwiftJavaScript.JSClassDefinition<
+  definition: SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >,
   context: borrowing JSInstantContext<JavaScriptCoreEngine>,
@@ -311,7 +311,7 @@ private func autoDynamicGetPropertyCallbackValue(
 }
 
 private func autoDynamicSetPropertyCallbackResult(
-  definition: SwiftJavaScript.JSClassDefinition<
+  definition: SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
   >,
   context: borrowing JSInstantContext<JavaScriptCoreEngine>,

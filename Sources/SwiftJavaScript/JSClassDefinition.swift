@@ -1,13 +1,13 @@
-package struct JSClassDefinitionCoreLookup<ParentClass: Sendable> {
-  package let resolveParentDefinition: (ParentClass) -> JSClassDefinitionCore<ParentClass>?
+package struct JSClassDefinitionLookup<ParentClass: Sendable> {
+  package let resolveParentDefinition: (ParentClass) -> JSClassDefinition<ParentClass>?
 
   package init(
-    resolveParentDefinition: @escaping (ParentClass) -> JSClassDefinitionCore<ParentClass>?
+    resolveParentDefinition: @escaping (ParentClass) -> JSClassDefinition<ParentClass>?
   ) {
     self.resolveParentDefinition = resolveParentDefinition
   }
 
-  package func inheritanceDepth(of definition: JSClassDefinitionCore<ParentClass>) -> Int {
+  package func inheritanceDepth(of definition: JSClassDefinition<ParentClass>) -> Int {
     guard let parentClass = definition.parentClass,
       let parentDefinition = resolveParentDefinition(parentClass)
     else {
@@ -16,13 +16,13 @@ package struct JSClassDefinitionCoreLookup<ParentClass: Sendable> {
     return 1 + inheritanceDepth(of: parentDefinition)
   }
 
-  package func exportedDefinitionCount(of definition: JSClassDefinitionCore<ParentClass>) -> Int {
+  package func exportedDefinitionCount(of definition: JSClassDefinition<ParentClass>) -> Int {
     inheritanceDepth(of: definition)
   }
 
   package func inheritedStaticValue(
     named name: String,
-    in definition: JSClassDefinitionCore<ParentClass>
+    in definition: JSClassDefinition<ParentClass>
   ) -> JSClassStaticValueDefinition? {
     if let value = definition.staticValues.first(where: { $0.name == name }) {
       return value
@@ -37,7 +37,7 @@ package struct JSClassDefinitionCoreLookup<ParentClass: Sendable> {
 
   package func inheritedStaticFunction(
     named name: String,
-    in definition: JSClassDefinitionCore<ParentClass>
+    in definition: JSClassDefinition<ParentClass>
   ) -> JSClassStaticFunctionDefinition? {
     if let function = definition.staticFunctions.first(where: { $0.name == name }) {
       return function
@@ -51,17 +51,17 @@ package struct JSClassDefinitionCoreLookup<ParentClass: Sendable> {
   }
 }
 
-package struct JSClassDefinitionLookup<
+package struct JSEngineClassDefinitionLookup<
   E: JSEngine,
   ParentClass: Sendable,
   PropertyNameAccumulator
 > {
   package let resolveParentDefinition:
-    (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+    (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
 
   package init(
     resolveParentDefinition:
-      @escaping (ParentClass) -> JSClassDefinition<
+      @escaping (ParentClass) -> JSEngineClassDefinition<
         E, ParentClass, PropertyNameAccumulator
       >?
   ) {
@@ -69,7 +69,7 @@ package struct JSClassDefinitionLookup<
   }
 
   package func inheritanceDepth(
-    of definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+    of definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   ) -> Int {
     guard let parentClass = definition.parentClass,
       let parentDefinition = resolveParentDefinition(parentClass)
@@ -80,14 +80,14 @@ package struct JSClassDefinitionLookup<
   }
 
   package func exportedDefinitionCount(
-    of definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+    of definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   ) -> Int {
     inheritanceDepth(of: definition)
   }
 
   package func inheritedStaticValue(
     named name: String,
-    in definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+    in definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   ) -> JSStaticValue<E>? {
     if let value = definition.staticValues.first(where: { $0.name == name }) {
       return value
@@ -102,7 +102,7 @@ package struct JSClassDefinitionLookup<
 
   package func inheritedStaticFunction(
     named name: String,
-    in definition: JSClassDefinition<E, ParentClass, PropertyNameAccumulator>
+    in definition: JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>
   ) -> JSStaticFunction<E>? {
     if let function = definition.staticFunctions.first(where: { $0.name == name }) {
       return function
@@ -150,7 +150,7 @@ package struct JSClassDefinitionInstallationPlan<ParentClass: Sendable>: Sendabl
   package let callbacks: JSClassCallbackInstallationPlan
 }
 
-public struct JSClassDefinitionCore<ParentClass: Sendable>: Sendable {
+public struct JSClassDefinition<ParentClass: Sendable>: Sendable {
   public var version: Int32 = 0
   public var attributes: JSClassAttributes = .init(rawValue: 0)
   public var className: String? = nil
@@ -161,7 +161,7 @@ public struct JSClassDefinitionCore<ParentClass: Sendable>: Sendable {
   public init() {}
 }
 
-public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
+public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
   Sendable
 {
 
@@ -292,20 +292,20 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
 
   public func inheritanceDepth(
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
-      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+      JSEngineClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .inheritanceDepth(of: self)
     }
   }
 
   public func exportedDefinitionCount(
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> Int {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
-      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+      JSEngineClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .exportedDefinitionCount(of: self)
     }
   }
@@ -313,10 +313,10 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
   public func inheritedStaticValue(
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> JSStaticValue<E>? {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
-      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+      JSEngineClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .inheritedStaticValue(named: name, in: self)
     }
   }
@@ -324,23 +324,23 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
   public func inheritedStaticFunction(
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
-      (ParentClass) -> JSClassDefinition<E, ParentClass, PropertyNameAccumulator>?
+      (ParentClass) -> JSEngineClassDefinition<E, ParentClass, PropertyNameAccumulator>?
   ) -> JSStaticFunction<E>? {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
-      JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
+      JSEngineClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .inheritedStaticFunction(named: name, in: self)
     }
   }
 
   package func installationPlan() -> JSClassDefinitionInstallationPlan<ParentClass> {
-    let coreDefinition = coreDefinition
+    let definition = classDefinition
     return JSClassDefinitionInstallationPlan(
-      version: coreDefinition.version,
-      attributes: coreDefinition.attributes,
-      className: coreDefinition.className,
-      parentClass: coreDefinition.parentClass,
-      staticValues: coreDefinition.staticValues.map { $0.installationPlan() },
-      staticFunctions: coreDefinition.staticFunctions.map { $0.installationPlan() },
+      version: definition.version,
+      attributes: definition.attributes,
+      className: definition.className,
+      parentClass: definition.parentClass,
+      staticValues: definition.staticValues.map { $0.installationPlan() },
+      staticFunctions: definition.staticFunctions.map { $0.installationPlan() },
       callbacks: JSClassCallbackInstallationPlan(
         hasInitializer: initialize != nil,
         hasFinalizer: finalize != nil,
@@ -357,14 +357,14 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
     )
   }
 
-  public var coreDefinition: JSClassDefinitionCore<ParentClass> {
-    var coreDefinition = JSClassDefinitionCore<ParentClass>()
-    coreDefinition.version = version
-    coreDefinition.attributes = attributes
-    coreDefinition.className = className
-    coreDefinition.parentClass = parentClass
-    coreDefinition.staticValues = staticValues.map(\.definition)
-    coreDefinition.staticFunctions = staticFunctions.map(\.definition)
-    return coreDefinition
+  public var classDefinition: JSClassDefinition<ParentClass> {
+    var definition = JSClassDefinition<ParentClass>()
+    definition.version = version
+    definition.attributes = attributes
+    definition.className = className
+    definition.parentClass = parentClass
+    definition.staticValues = staticValues.map(\.definition)
+    definition.staticFunctions = staticFunctions.map(\.definition)
+    return definition
   }
 }
