@@ -321,7 +321,7 @@ public macro JSClassFunctionError(_ encoder: any JSValueEncoder.Type) =
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Generates a `SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef>` and `JSClassValueConverterCompatible` conformance for a
+/// Generates a `SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef>` and `JSClassValueConvertible` conformance for a
 /// Swift class.
 ///
 /// Unlike `JSValueAutoSerialization`, this macro preserves reference semantics by
@@ -333,7 +333,7 @@ public macro JSClassFunctionError(_ encoder: any JSValueEncoder.Type) =
 @attached(member, names: named(jsClassDefinition))
 @attached(
   extension,
-  conformances: JSClassValueConverterCompatible
+  conformances: JSClassValueConvertible
 )
 public macro JSClassAutoConvertible() =
   #externalMacro(

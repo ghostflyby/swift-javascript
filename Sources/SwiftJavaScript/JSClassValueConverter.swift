@@ -1,4 +1,4 @@
-public protocol JSClassValueConverterCompatible: AnyObject, JSValueEncodable {
+public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
   associatedtype Engine: JSEngine
   associatedtype ParentClass: Sendable
   associatedtype PropertyNameAccumulator
@@ -31,7 +31,7 @@ public protocol JSClassValueConverterCompatible: AnyObject, JSValueEncodable {
   ) throws(JSValueConversionError) -> JSValue<E>
 }
 
-extension JSClassValueConverterCompatible {
+extension JSClassValueConvertible {
   public static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
@@ -55,7 +55,7 @@ extension JSClassValueConverterCompatible {
   }
 }
 
-extension JSClassValueConverterCompatible {
+extension JSClassValueConvertible {
   package static func autoClassDefinition() -> ClassDefinition {
     jsClassDefinition
   }
@@ -85,7 +85,7 @@ extension JSClassValueConverterCompatible {
   }
 }
 
-public enum JSClassValueConverter<T: JSClassValueConverterCompatible>: JSValueConverter {
+public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter {
   public typealias SwiftType = T
 
   public static func decode<E: JSEngine>(

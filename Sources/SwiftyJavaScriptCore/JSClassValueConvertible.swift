@@ -47,7 +47,7 @@ private func makeJavaScriptCoreObjectResultHandle(
   return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
 }
 
-extension JSClassValueConverterCompatible
+extension JSClassValueConvertible
 where
   Engine == JavaScriptCoreEngine,
   ParentClass == JSClass,
@@ -203,7 +203,7 @@ where
 }
 
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
-  public func tryDecode<T: JSClassValueConverterCompatible>(
+  public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) throws(JSValueConversionError) -> T
@@ -215,7 +215,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     return try T.tryDecode(self, in: context)
   }
 
-  public func tryDecode<T: JSClassValueConverterCompatible>(
+  public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
     in context: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine> = #isolation
   ) throws(JSValueConversionError) -> T

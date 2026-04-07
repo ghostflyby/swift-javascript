@@ -81,7 +81,7 @@
 - [x] 继续收口 `JSClass` callback glue（已将 callback 输出归一化 helper 统一收口到 backend driver，facade 删除重复包装）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static function 名称解析改走 `JSValue` helper，减少 callback 内部 raw context 构造）
 - [x] 收口 `JSClassValueConvertible` 的 facade/raw JSC 直连（已迁 privateData 读取与 class-backed object 创建到 backend handle helper）
-- [x] 删除迁移半成品 `JSClassValueConvertible` 协议：将 `jsClassDefinition` 上收至 core `JSClassValueConverterCompatible`，JSC 专用默认实现改挂在其 facade 扩展，`JSClassAutoConvertible` 宏改为仅生成 core 协议 conformance
+- [x] 删除迁移半成品 `JSClassValueConvertible` 协议：将 `jsClassDefinition` 上收至 core `JSClassValueConvertible`，JSC 专用默认实现改挂在其 facade 扩展，`JSClassAutoConvertible` 宏改为仅生成 core 协议 conformance
 - [x] 收口 `JSValue` symbol 构造的 facade 直连（已补 `_JSEngineDriver`/JSC backend 的 symbol bridge，并切 `JSValue(symbol:in:)` 到 context/handle helper）
 - [x] 收口 `JSCodableValueConverter` 的 facade/raw JSC 直连（已将 object/array 构造、属性读写以及 encoder 容器的 primitive/ref 级值构造统一迁到 handle/context helper；当前剩余 raw ref 主要是容器自身的内部存储模型）
 - [x] 让 `SwiftyJavaScriptCore` facade 内部开始消费 `SwiftJavaScript` handle（已迁 `JSInstantContext` 基础值/脚本求值、`JSValue` 的基础构造器与 call/construct/invokeMethod/toObject/type helpers/defineProperty，以及 `JSObject` 的 string-key/value-key/index 属性读写删查）
@@ -256,7 +256,7 @@
 - [x] 继续下沉 `JSValueBridgeAdapter` 的通用调用桥接到 core（call/construct/invokeMethod/toObject/type helpers 已移除 facade 重复实现，跨 VM 校验改为 runtime driver 兼容性 hook）
 - [x] 修复 manual ref-count handle 字段的额外 retain 问题（`JSValue`、`JSStringManaged`、`JSStringValue` 的 handle 初始化不再额外 retain，保留复制路径显式 retain）
 - [x] 迁移 `JSCodableValueConverter` 到 core（`SwiftJavaScript` 提供通用实现，facade 收敛为 typealias 兼容层）
-- [x] 迁移 `JSClassValueConverter` 到 core（新增 `JSClassValueConverterCompatible`，facade `JSClassValueConvertible` 适配并移除重复 converter 定义）
+- [x] 迁移 `JSClassValueConverter` 到 core（新增 `JSClassValueConvertible`，facade `JSClassValueConvertible` 适配并移除重复 converter 定义）
 - [x] 迁移 `JSClassValueConvertible` 的 auto storage/container 到 core（已新增 `SwiftJavaScript` 的通用 auto storage 与 class cache registry，facade 收敛为 JSC 特化 typealias 与调用）
 - [x] 迁移 `JSClass` object-definition/finalize-counter registry 到 core（新增通用 depth/finalize registry，facade 仅保留 object key 适配）
 - [x] 迁移 `JSClass` object-context/class-definition registry 到 core（新增通用 map registry，facade 仅保留 key 计算与桥接调用）

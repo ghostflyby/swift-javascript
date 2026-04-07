@@ -140,7 +140,7 @@ import Testing
 
 private final class DummyJSClassInstance: Sendable {}
 
-private final class MockExportedJSClassInstance: JSClassValueConverterCompatible, Sendable {
+private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendable {
   typealias Engine = MockEngine
   typealias ParentClass = JSClass<MockEngine>
   typealias PropertyNameAccumulator = Never

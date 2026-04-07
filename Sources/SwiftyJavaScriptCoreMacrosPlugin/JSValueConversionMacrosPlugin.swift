@@ -1515,7 +1515,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let extSource = """
-      extension \(trimmed(type.description)): JSClassValueConverterCompatible {}
+      extension \(trimmed(type.description)): JSClassValueConvertible {}
       """
 
     let extDecl = DeclSyntax(stringLiteral: extSource)
