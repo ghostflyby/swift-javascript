@@ -52,6 +52,40 @@ extension JSClassValueConverterCompatible {
   }
 }
 
+extension JSClassValueConverterCompatible {
+  package static func autoClassDefinition() -> JSClassDefinition<
+    Engine, ParentClass, PropertyNameAccumulator
+  > {
+    jsClassDefinition
+  }
+
+  package static func autoNativeClassBacking<NativeStaticValue, NativeStaticFunction>(
+    lookup: JSClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
+  ) -> JSClassAutoNativeClassBacking<
+    Engine,
+    ParentClass,
+    PropertyNameAccumulator,
+    NativeStaticValue,
+    NativeStaticFunction
+  > {
+    JSClassAutoNativeClassBacking(
+      definition: autoClassDefinition(),
+      lookup: lookup
+    )
+  }
+
+  package static func autoObjectStorage(
+    instance: Self,
+    lookup: JSClassDefinitionLookup<Engine, ParentClass, PropertyNameAccumulator>
+  ) -> JSClassAutoObjectStorage<Engine, ParentClass, PropertyNameAccumulator> {
+    JSClassAutoObjectStorage(
+      definition: autoClassDefinition(),
+      instance: instance,
+      lookup: lookup
+    )
+  }
+}
+
 public enum JSClassValueConverter<T: JSClassValueConverterCompatible>: JSValueConverter {
   public typealias SwiftType = T
 

@@ -20,4 +20,6 @@ extension JSContextManualReferenceCountedHandle {
 
 public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
+public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+
 public protocol JSStringManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

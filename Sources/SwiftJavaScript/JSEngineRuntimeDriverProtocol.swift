@@ -3,6 +3,7 @@ public protocol _JSEngineRuntimeDriver {
   associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
+  associatedtype ClassHandle: JSClassManualReferenceCountedHandle
 
   static var capabilities: JSEngineCapabilities { get }
 

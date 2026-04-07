@@ -1,3 +1,23 @@
+public struct JSClassStaticValueDefinition: Sendable {
+  public let name: String
+  public let attributes: JSPropertyAttributes
+
+  public init(name: String, attributes: JSPropertyAttributes) {
+    self.name = name
+    self.attributes = attributes
+  }
+}
+
+public struct JSClassStaticFunctionDefinition: Sendable {
+  public let name: String
+  public let attributes: JSPropertyAttributes
+
+  public init(name: String, attributes: JSPropertyAttributes) {
+    self.name = name
+    self.attributes = attributes
+  }
+}
+
 public struct JSStaticValue<E: JSEngine>: Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
@@ -52,6 +72,10 @@ public struct JSStaticFunction<E: JSEngine>: Sendable {
 }
 
 extension JSStaticValue {
+  public var definition: JSClassStaticValueDefinition {
+    JSClassStaticValueDefinition(name: name, attributes: attributes)
+  }
+
   public func hostPropertyDescriptor(
     getterBinding: String? = nil,
     setterBinding: String? = nil
@@ -66,6 +90,10 @@ extension JSStaticValue {
 }
 
 extension JSStaticFunction {
+  public var definition: JSClassStaticFunctionDefinition {
+    JSClassStaticFunctionDefinition(name: name, attributes: attributes)
+  }
+
   public func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
     JSHostFunctionDescriptor(
       name: name,
@@ -86,6 +114,18 @@ extension JSClassStaticValueInstallationPlan {
       getterBinding: getterBinding,
       setterBinding: setterBinding
     )
+  }
+}
+
+extension JSClassStaticValueDefinition {
+  package func installationPlan() -> JSClassStaticValueInstallationPlan {
+    JSClassStaticValueInstallationPlan(name: name, attributes: attributes)
+  }
+}
+
+extension JSClassStaticFunctionDefinition {
+  package func installationPlan() -> JSClassStaticFunctionInstallationPlan {
+    JSClassStaticFunctionInstallationPlan(name: name, attributes: attributes)
   }
 }
 
@@ -174,10 +214,10 @@ package func projectClassHostTypeDescriptor<E: JSEngine>(
     className: className,
     parentName: parentName,
     staticValues: staticValues.map {
-      JSClassStaticValueInstallationPlan(name: $0.name, attributes: $0.attributes)
+      $0.definition.installationPlan()
     },
     staticFunctions: staticFunctions.map {
-      JSClassStaticFunctionInstallationPlan(name: $0.name, attributes: $0.attributes)
+      $0.definition.installationPlan()
     },
     storagePolicy: storagePolicy,
     flags: flags

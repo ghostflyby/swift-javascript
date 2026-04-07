@@ -57,9 +57,8 @@ where
   }
 
   fileprivate static func makeAutoJSClass() -> JSClass {
-    let definition = jsClassDefinition
-    let backing = JSClassAutoNativeClassBacking(
-      definition: definition,
+    let definition = Self.autoClassDefinition()
+    let backing: JSClassAutoNativeClassBacking = Self.autoNativeClassBacking(
       lookup: javaScriptCoreClassDefinitionLookup()
     )
     let nativeDefinition = autoNativeDefinition(backing: backing)
@@ -162,9 +161,7 @@ where
     _ value: Self,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-    let definition = Self.jsClassDefinition
-    let storage = JSClassAutoObjectStorage(
-      definition: definition,
+    let storage = Self.autoObjectStorage(
       instance: value,
       lookup: javaScriptCoreClassDefinitionLookup()
     )

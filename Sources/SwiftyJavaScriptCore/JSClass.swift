@@ -1,6 +1,42 @@
 import Foundation
 import JavaScriptCore
 
+public typealias JSClass = SwiftJavaScript.JSClass<JavaScriptCoreEngine>
+
+public struct JavaScriptCoreClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,
+  @unchecked Sendable
+{
+  public let ref: JSClassRef
+
+  public init(ref: JSClassRef) {
+    self.ref = ref
+  }
+
+  @discardableResult
+  public func retainReference() -> Bool {
+    JSClassRetain(ref)
+    return true
+  }
+
+  @discardableResult
+  public func releaseReference() -> Bool {
+    JSClassRelease(ref)
+    return true
+  }
+}
+
+extension JavaScriptCoreClassHandle: Hashable {
+  public static func == (lhs: JavaScriptCoreClassHandle, rhs: JavaScriptCoreClassHandle)
+    -> Bool
+  {
+    lhs.ref == rhs.ref
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(UInt(bitPattern: ref))
+  }
+}
+
 extension SwiftJavaScript.JSClassAttributes {
   public static let none = SwiftJavaScript.JSClassAttributes(
     rawValue: UInt32(kJSClassAttributeNone))
@@ -932,16 +968,16 @@ extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
   }
 }
 
-public class JSClass: @unchecked Sendable {
-  public let ref: JSClassRef
-  private let nativeBacking: AnyObject?
-
-  public init(ref: JSClassRef) {
-    self.ref = JSClassRetain(ref)
-    self.nativeBacking = nil
+extension SwiftJavaScript.JSClass where E == JavaScriptCoreEngine {
+  public var ref: JSClassRef {
+    classHandle().ref
   }
 
-  public init(
+  public convenience init(ref: JSClassRef) {
+    self.init(handleClass: JavaScriptCoreClassHandle(ref: ref))
+  }
+
+  public convenience init(
     defination: SwiftJavaScript.JSClassDefinition<
       JavaScriptCoreEngine,
       JSClass,
@@ -950,25 +986,27 @@ public class JSClass: @unchecked Sendable {
   ) {
     let backing = JSManualNativeClassBacking()
     var copy = defination.manualNativeDefinition(backing: backing)
-    self.ref = JSClassCreate(&copy)
-    self.nativeBacking = backing
-    rememberClassDefinition(defination, for: ref)
+    let ref = JSClassCreate(&copy)
+    self.init(
+      adoptingHandleClass: JavaScriptCoreClassHandle(ref: ref!),
+      retainedOwner: backing
+    )
+    rememberClassDefinition(defination, for: self.ref)
   }
 
-  init(
+  convenience init(
     nativeDefinition: JavaScriptCore.JSClassDefinition,
     retainedBacking: AnyObject?,
     rememberedDefinition: JavaScriptCoreClassDefinitionModel? = nil
   ) {
     var copy = nativeDefinition
-    self.ref = JSClassCreate(&copy)
-    self.nativeBacking = retainedBacking
+    let ref = JSClassCreate(&copy)
+    self.init(
+      adoptingHandleClass: JavaScriptCoreClassHandle(ref: ref!),
+      retainedOwner: retainedBacking
+    )
     if let rememberedDefinition {
-      rememberClassDefinition(rememberedDefinition, for: ref)
+      rememberClassDefinition(rememberedDefinition, for: self.ref)
     }
-  }
-
-  deinit {
-    JSClassRelease(ref)
   }
 }

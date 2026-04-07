@@ -1,3 +1,56 @@
+package struct JSClassDefinitionCoreLookup<ParentClass: Sendable> {
+  package let resolveParentDefinition: (ParentClass) -> JSClassDefinitionCore<ParentClass>?
+
+  package init(
+    resolveParentDefinition: @escaping (ParentClass) -> JSClassDefinitionCore<ParentClass>?
+  ) {
+    self.resolveParentDefinition = resolveParentDefinition
+  }
+
+  package func inheritanceDepth(of definition: JSClassDefinitionCore<ParentClass>) -> Int {
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return 1
+    }
+    return 1 + inheritanceDepth(of: parentDefinition)
+  }
+
+  package func exportedDefinitionCount(of definition: JSClassDefinitionCore<ParentClass>) -> Int {
+    inheritanceDepth(of: definition)
+  }
+
+  package func inheritedStaticValue(
+    named name: String,
+    in definition: JSClassDefinitionCore<ParentClass>
+  ) -> JSClassStaticValueDefinition? {
+    if let value = definition.staticValues.first(where: { $0.name == name }) {
+      return value
+    }
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return inheritedStaticValue(named: name, in: parentDefinition)
+  }
+
+  package func inheritedStaticFunction(
+    named name: String,
+    in definition: JSClassDefinitionCore<ParentClass>
+  ) -> JSClassStaticFunctionDefinition? {
+    if let function = definition.staticFunctions.first(where: { $0.name == name }) {
+      return function
+    }
+    guard let parentClass = definition.parentClass,
+      let parentDefinition = resolveParentDefinition(parentClass)
+    else {
+      return nil
+    }
+    return inheritedStaticFunction(named: name, in: parentDefinition)
+  }
+}
+
 package struct JSClassDefinitionLookup<
   E: JSEngine,
   ParentClass: Sendable,
@@ -95,6 +148,17 @@ package struct JSClassDefinitionInstallationPlan<ParentClass: Sendable>: Sendabl
   package let staticValues: [JSClassStaticValueInstallationPlan]
   package let staticFunctions: [JSClassStaticFunctionInstallationPlan]
   package let callbacks: JSClassCallbackInstallationPlan
+}
+
+public struct JSClassDefinitionCore<ParentClass: Sendable>: Sendable {
+  public var version: Int32 = 0
+  public var attributes: JSClassAttributes = .init(rawValue: 0)
+  public var className: String? = nil
+  public var parentClass: ParentClass? = nil
+  public var staticValues: [JSClassStaticValueDefinition] = []
+  public var staticFunctions: [JSClassStaticFunctionDefinition] = []
+
+  public init() {}
 }
 
 public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyNameAccumulator>:
@@ -269,17 +333,14 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
   }
 
   package func installationPlan() -> JSClassDefinitionInstallationPlan<ParentClass> {
-    JSClassDefinitionInstallationPlan(
-      version: version,
-      attributes: attributes,
-      className: className,
-      parentClass: parentClass,
-      staticValues: staticValues.map {
-        JSClassStaticValueInstallationPlan(name: $0.name, attributes: $0.attributes)
-      },
-      staticFunctions: staticFunctions.map {
-        JSClassStaticFunctionInstallationPlan(name: $0.name, attributes: $0.attributes)
-      },
+    let coreDefinition = coreDefinition
+    return JSClassDefinitionInstallationPlan(
+      version: coreDefinition.version,
+      attributes: coreDefinition.attributes,
+      className: coreDefinition.className,
+      parentClass: coreDefinition.parentClass,
+      staticValues: coreDefinition.staticValues.map { $0.installationPlan() },
+      staticFunctions: coreDefinition.staticFunctions.map { $0.installationPlan() },
       callbacks: JSClassCallbackInstallationPlan(
         hasInitializer: initialize != nil,
         hasFinalizer: finalize != nil,
@@ -294,5 +355,16 @@ public struct JSClassDefinition<E: JSEngine, ParentClass: Sendable, PropertyName
         hasConvertToType: convertToType != nil
       )
     )
+  }
+
+  public var coreDefinition: JSClassDefinitionCore<ParentClass> {
+    var coreDefinition = JSClassDefinitionCore<ParentClass>()
+    coreDefinition.version = version
+    coreDefinition.attributes = attributes
+    coreDefinition.className = className
+    coreDefinition.parentClass = parentClass
+    coreDefinition.staticValues = staticValues.map(\.definition)
+    coreDefinition.staticFunctions = staticFunctions.map(\.definition)
+    return coreDefinition
   }
 }

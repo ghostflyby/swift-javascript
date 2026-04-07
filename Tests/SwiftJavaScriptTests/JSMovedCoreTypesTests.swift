@@ -137,35 +137,89 @@ import Testing
 
 private final class DummyJSClassInstance: Sendable {}
 
+private final class MockExportedJSClassInstance: JSClassValueConverterCompatible, Sendable {
+  typealias Engine = MockEngine
+  typealias ParentClass = JSClass<MockEngine>
+  typealias PropertyNameAccumulator = Never
+
+  static var jsClassDefinition: JSClassDefinition<MockEngine, JSClass<MockEngine>, Never> {
+    var definition = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+    definition.className = "ExportedChild"
+    definition.parentClass = mockClass("Parent")
+    return definition
+  }
+
+  static func tryDecode<E: JSEngine>(
+    _ value: borrowing JSValue<E>,
+    in context: borrowing JSInstantContext<E>
+  ) throws(JSValueConversionError) -> MockExportedJSClassInstance {
+    _ = value
+    _ = context
+    return MockExportedJSClassInstance()
+  }
+
+  static func tryEncode<E: JSEngine>(
+    _ value: MockExportedJSClassInstance,
+    in context: borrowing JSInstantContext<E>
+  ) throws(JSValueConversionError) -> JSValue<E> {
+    _ = value
+    return JSValue<E>(undefinedIn: context)
+  }
+
+  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+    MockExportedJSClassInstance.encode(self, in: context)
+  }
+
+  func tryEncode<E: JSEngine>(
+    in context: borrowing JSInstantContext<E>
+  ) throws(JSValueConversionError) -> JSValue<E> {
+    try MockExportedJSClassInstance.tryEncode(self, in: context)
+  }
+}
+
 private func mockUndefinedValue() -> JSValue<MockEngine> {
   JSValue<MockEngine>(
     handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test"))
   )
 }
 
+private func mockClass(_ id: String) -> JSClass<MockEngine> {
+  JSClass(handleClass: MockClassHandle(rawClass: MockClass(id: id)))
+}
+
+@Test func jsClassWrapsEngineSpecificClassHandle() {
+  let handle = MockClassHandle(rawClass: MockClass(id: "Widget"))
+  let jsClass = JSClass<MockEngine>(handleClass: handle)
+
+  #expect(jsClass.classHandle() == handle)
+  #expect(jsClass == JSClass<MockEngine>(handleClass: handle))
+}
+
 @Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {
-  var parent = JSClassDefinition<MockEngine, String, Never>()
+  let parentClass = mockClass("Parent")
+
+  var parent = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   parent.className = "Parent"
 
-  var child = JSClassDefinition<MockEngine, String, Never>()
+  var child = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   child.className = "Child"
-  child.parentClass = "Parent"
+  child.parentClass = parentClass
 
   let backing = JSClassAutoNativeClassBacking<
     MockEngine,
-    String,
+    JSClass<MockEngine>,
     Never,
     Int,
     Int
-  >(definition: child) { parentName in
-    parentName == "Parent" ? parent : nil
+  >(definition: child) { jsClass in
+    jsClass == parentClass ? parent : nil
   }
 
   let storage = JSClassAutoObjectStorage(
     definition: child,
     instance: DummyJSClassInstance()
-  ) { parentName in
-    parentName == "Parent" ? parent : nil
+  ) { jsClass in
+    jsClass == parentClass ? parent : nil
   }
 
   #expect(backing.usesManagedParent)
@@ -174,7 +228,7 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
 
 @Test func jsClassAutoStorageTypedInstanceAccessIsSafe() {
   let instance = DummyJSClassInstance()
-  let storage = JSClassAutoObjectStorage<MockEngine, String, Never>(
+  let storage = JSClassAutoObjectStorage<MockEngine, JSClass<MockEngine>, Never>(
     definition: JSClassDefinition(),
     instance: instance,
     finalizeDepth: 1
@@ -185,11 +239,13 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
 }
 
 @Test func jsClassDefinitionInstallationPlanKeepsMemberAndCallbackShape() {
-  var definition = JSClassDefinition<MockEngine, String, Never>()
+  let parentClass = mockClass("Parent")
+
+  var definition = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   definition.version = 3
   definition.attributes = JSClassAttributes(rawValue: 0b101)
   definition.className = "Widget"
-  definition.parentClass = "Parent"
+  definition.parentClass = parentClass
   definition.staticValues = [
     JSStaticValue(
       name: "title",
@@ -222,7 +278,7 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
   #expect(plan.version == 3)
   #expect(plan.attributes == JSClassAttributes(rawValue: 0b101))
   #expect(plan.className == "Widget")
-  #expect(plan.parentClass == "Parent")
+  #expect(plan.parentClass == parentClass)
   #expect(plan.staticValues.map(\.name) == ["title"])
   #expect(plan.staticValues.count == 1)
   #expect(plan.staticValues[0].attributes == [.readOnly])
@@ -243,7 +299,10 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
 }
 
 @Test func jsClassDefinitionLookupTraversesParentChain() {
-  var grandparent = JSClassDefinition<MockEngine, String, Never>()
+  let grandparentClass = mockClass("Grandparent")
+  let parentClass = mockClass("Parent")
+
+  var grandparent = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   grandparent.className = "Grandparent"
   grandparent.staticValues = [
     JSStaticValue(
@@ -254,9 +313,9 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
     )
   ]
 
-  var parent = JSClassDefinition<MockEngine, String, Never>()
+  var parent = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   parent.className = "Parent"
-  parent.parentClass = "Grandparent"
+  parent.parentClass = grandparentClass
   parent.staticFunctions = [
     JSStaticFunction(
       name: "parentFn",
@@ -265,15 +324,15 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
     )
   ]
 
-  var child = JSClassDefinition<MockEngine, String, Never>()
+  var child = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
   child.className = "Child"
-  child.parentClass = "Parent"
+  child.parentClass = parentClass
 
-  let lookup = JSClassDefinitionLookup<MockEngine, String, Never> { name in
-    switch name {
-    case "Parent":
+  let lookup = JSClassDefinitionLookup<MockEngine, JSClass<MockEngine>, Never> { jsClass in
+    switch jsClass {
+    case parentClass:
       parent
-    case "Grandparent":
+    case grandparentClass:
       grandparent
     default:
       nil
@@ -285,4 +344,100 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
   #expect(lookup.inheritedStaticValue(named: "grand", in: child)?.name == "grand")
   #expect(lookup.inheritedStaticFunction(named: "parentFn", in: child)?.name == "parentFn")
   #expect(lookup.inheritedStaticFunction(named: "missing", in: child) == nil)
+}
+
+@Test func engineClassDefinitionExportsCoreDefinition() {
+  let parentClass = mockClass("Parent")
+
+  var definition = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  definition.version = 7
+  definition.attributes = JSClassAttributes(rawValue: 0b11)
+  definition.className = "Widget"
+  definition.parentClass = parentClass
+  definition.staticValues = [
+    JSStaticValue(
+      name: "title",
+      attributes: [.readOnly],
+      getProperty: { _, _ in .value(mockUndefinedValue()) },
+      setProperty: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+  definition.staticFunctions = [
+    JSStaticFunction(
+      name: "render",
+      attributes: [.dontDelete],
+      callAsFunction: { _, _, _ in .value(mockUndefinedValue()) }
+    )
+  ]
+
+  let coreDefinition = definition.coreDefinition
+
+  #expect(coreDefinition.version == 7)
+  #expect(coreDefinition.attributes == JSClassAttributes(rawValue: 0b11))
+  #expect(coreDefinition.className == "Widget")
+  #expect(coreDefinition.parentClass == parentClass)
+  #expect(coreDefinition.staticValues.map(\.name) == ["title"])
+  #expect(coreDefinition.staticFunctions.map(\.name) == ["render"])
+}
+
+@Test func coreClassDefinitionLookupTraversesParentChain() {
+  let grandparentClass = mockClass("Grandparent")
+  let parentClass = mockClass("Parent")
+
+  var grandparent = JSClassDefinitionCore<JSClass<MockEngine>>()
+  grandparent.className = "Grandparent"
+  grandparent.staticValues = [
+    JSClassStaticValueDefinition(name: "grand", attributes: [.readOnly])
+  ]
+
+  var parent = JSClassDefinitionCore<JSClass<MockEngine>>()
+  parent.className = "Parent"
+  parent.parentClass = grandparentClass
+  parent.staticFunctions = [
+    JSClassStaticFunctionDefinition(name: "parentFn", attributes: [.dontDelete])
+  ]
+
+  var child = JSClassDefinitionCore<JSClass<MockEngine>>()
+  child.className = "Child"
+  child.parentClass = parentClass
+
+  let lookup = JSClassDefinitionCoreLookup<JSClass<MockEngine>> { jsClass in
+    switch jsClass {
+    case parentClass:
+      parent
+    case grandparentClass:
+      grandparent
+    default:
+      nil
+    }
+  }
+
+  #expect(lookup.inheritanceDepth(of: child) == 3)
+  #expect(lookup.exportedDefinitionCount(of: child) == 3)
+  #expect(lookup.inheritedStaticValue(named: "grand", in: child)?.name == "grand")
+  #expect(lookup.inheritedStaticFunction(named: "parentFn", in: child)?.name == "parentFn")
+  #expect(lookup.inheritedStaticFunction(named: "missing", in: child) == nil)
+}
+
+@Test func jsClassValueConverterAutoHelpersUseDefinitionAndLookup() {
+  let parentClass = mockClass("Parent")
+
+  var parent = JSClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  parent.className = "Parent"
+
+  let lookup = JSClassDefinitionLookup<MockEngine, JSClass<MockEngine>, Never> { jsClass in
+    jsClass == parentClass ? parent : nil
+  }
+
+  let backing: JSClassAutoNativeClassBacking<MockEngine, JSClass<MockEngine>, Never, Int, Int> =
+    MockExportedJSClassInstance.autoNativeClassBacking(lookup: lookup)
+  let storage = MockExportedJSClassInstance.autoObjectStorage(
+    instance: MockExportedJSClassInstance(),
+    lookup: lookup
+  )
+
+  #expect(backing.definition.className == "ExportedChild")
+  #expect(backing.usesManagedParent)
+  #expect(storage.definition.className == "ExportedChild")
+  #expect(storage.finalizeDepth == 2)
 }

@@ -56,6 +56,28 @@ public struct MockValue: Sendable, Equatable {
   let payload: String
 }
 
+public struct MockClass: Sendable, Equatable, Hashable {
+  let id: String
+}
+
+public struct MockClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable,
+  Equatable, Hashable
+{
+  let rawClass: MockClass
+
+  init(rawClass: MockClass) {
+    self.rawClass = rawClass
+  }
+
+  public func retainReference() -> Bool {
+    true
+  }
+
+  public func releaseReference() -> Bool {
+    true
+  }
+}
+
 public final class MockStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable {
   private let count: Int
   private let storage: UnsafeMutablePointer<UInt16>
@@ -124,6 +146,7 @@ public enum MockEngine: JSEngine {
   public typealias RuntimeHandle = MockRuntimeHandle
   public typealias ContextHandle = MockContextHandle
   public typealias ValueHandle = MockValueHandle
+  public typealias ClassHandle = MockClassHandle
   public typealias StringHandle = MockStringHandle
 
   public static func stringLength(_ stringHandle: MockStringHandle) -> Int {
@@ -145,6 +168,7 @@ public enum MockEngine: JSEngine {
 
 private enum MockDriver: JSEngine {
   typealias ValueHandle = MockValueHandle
+  typealias ClassHandle = MockClassHandle
   typealias Engine = MockEngine
   typealias RuntimeHandle = MockRuntimeHandle
   typealias ContextHandle = MockContextHandle

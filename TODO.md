@@ -301,11 +301,17 @@ Step 3：继续下沉 `JSClass` 的定义组装逻辑
 - [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition plan” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
 
 Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
-- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板已下沉到 core）
+- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板，以及 backing/storage 的 definition 选择模板已下沉到 core）
 - [ ] 在 core 提炼“从 definition 解析 static value/function”的名称查找模板，JSC facade 仅负责从 `JSStringRef` / function object 上取出名字再调用模板
-- [ ] 在 core 提炼 auto-convertible 的 definition 选择与 parent-definition 解析接口，JSC facade 只提供 `JSClassRef -> definition` 的适配闭包
+- [x] 在 core 提炼 auto-convertible 的 definition 选择与 parent-definition 解析接口，JSC facade 只提供 `JSClassRef -> definition` 的适配闭包（已将 auto backing/storage 的 definition 选择模板下沉到 core，JSC 仅传入 lookup）
 - [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线
 - [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，优先改成 core 泛型接口 + facade 特化，而不是继续扩大 facade API 面
+
+Step 4.5：拆分 class definition 的结构与行为
+- [x] 引入 engine-agnostic 的 core class definition / static member descriptor，先承载 metadata、parent chain 和 static member 名称/属性
+- [x] 引入 core `JSClass<E>` 与 class handle 协议，让引擎绑定的 class 句柄从 `JSClassDefinition` 中分离出来（已新增 `JSClassManualReferenceCountedHandle` / core `JSClass<E>`，并让 JSC facade 收敛为 `JSClass<JavaScriptCoreEngine>` 特化）
+- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：已新增 `coreDefinition` 导出，installation plan 已切到消费 core metadata）
+- [ ] 后续再把 callbacks 和 engine-bound static member implementations 从 class definition 本体中进一步拆离
 
 Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 审查 `Sources/SwiftyJavaScriptCore/JSValueConversionMacros.swift` 中仍直接写死 `JavaScriptCoreEngine` / `JSClass` / `JSPropertyNameAccumulatorRef` 的说明与生成模板，优先改为引用 core converter/protocol 语义

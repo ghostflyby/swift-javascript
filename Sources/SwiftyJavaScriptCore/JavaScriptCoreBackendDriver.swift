@@ -9,6 +9,7 @@ private enum JavaScriptCoreObjectLookup {
 
 public enum JavaScriptCoreEngine: JSEngine {
   public typealias ValueHandle = JavaScriptCoreValueHandle
+  public typealias ClassHandle = JavaScriptCoreClassHandle
   public typealias Engine = JavaScriptCoreEngine
   public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
   public typealias ContextHandle = JavaScriptCoreContextHandle
