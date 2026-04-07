@@ -297,7 +297,7 @@ Step 3：继续下沉 `JSClass` 的定义组装逻辑
 - [x] 先在 core 提炼 `JSClassDefinition` 的“安装计划”接口：明确 metadata / static members / lifecycle / dynamic-property / callable 五组阶段，不直接携带任何 JSC callback 类型（已抽出 metadata / static-members / callback-flags 计划，`JSClass` / auto native definition 改为消费计划）
 - [x] 在 core 为 static members 增加可复用的安装规划数据，而不是直接迁移 `JavaScriptCore.JSStaticValue` / `JavaScriptCore.JSStaticFunction` 写入代码（已通过 installation plan 的 static-member 数据承载）
 - [x] 在 core 抽出 definition 继承链查找模板，供 `JSClass` 与 `JSClassValueConvertible` 共同消费，避免 facade 重复写 `classDefinition(for: $0.ref)` 闭包（已新增 `JSClassDefinitionLookup`，JSC 收口为单一 resolver 适配点）
-- [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只改为消费 core 安装计划
+- [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只消费 core metadata + callback flags；若 installation plan 只是原数据投影则继续删除（进行中）
 - [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition plan” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
 
 Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue

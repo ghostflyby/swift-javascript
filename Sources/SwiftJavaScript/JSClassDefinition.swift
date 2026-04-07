@@ -54,16 +54,6 @@ package struct JSClassDefinitionMetadataLookup<ParentClass: Sendable> {
   }
 }
 
-package struct JSClassStaticValueInstallationPlan: Sendable {
-  package let name: String
-  package let attributes: JSPropertyAttributes
-}
-
-package struct JSClassStaticFunctionInstallationPlan: Sendable {
-  package let name: String
-  package let attributes: JSPropertyAttributes
-}
-
 package struct JSClassCallbackInstallationPlan: Sendable {
   package let hasInitializer: Bool
   package let hasFinalizer: Bool
@@ -76,16 +66,6 @@ package struct JSClassCallbackInstallationPlan: Sendable {
   package let hasConstructor: Bool
   package let hasHasInstance: Bool
   package let hasConvertToType: Bool
-}
-
-package struct JSClassDefinitionInstallationPlan<ParentClass: Sendable>: Sendable {
-  package let version: Int32
-  package let attributes: JSClassAttributes
-  package let className: String?
-  package let parentClass: ParentClass?
-  package let staticValues: [JSClassStaticValueInstallationPlan]
-  package let staticFunctions: [JSClassStaticFunctionInstallationPlan]
-  package let callbacks: JSClassCallbackInstallationPlan
 }
 
 public protocol JSClassDefinition: Sendable {
@@ -266,31 +246,18 @@ extension JSClassDefinition {
     return definition
   }
 
-  package func installationPlan() -> JSClassDefinitionInstallationPlan<ParentClass> {
-    let definition = classDefinition
-    return JSClassDefinitionInstallationPlan(
-      version: definition.version,
-      attributes: definition.attributes,
-      className: definition.className,
-      parentClass: definition.parentClass,
-      staticValues: definition.staticValues.map { $0.installationPlan() },
-      staticFunctions: definition.staticFunctions.map { $0.installationPlan() },
-      callbacks: callbackInstallationPlan
-    )
-  }
-
   public func hostTypeDescriptor(
     storagePolicy: JSHostObjectStoragePolicy = .unmanagedOpaquePointer,
     parentName: String?
   ) -> JSHostTypeDescriptor {
-    let plan = installationPlan()
+    let definition = classDefinition
     return projectClassHostTypeDescriptor(
-      className: plan.className,
+      className: definition.className,
       parentName: parentName,
-      staticValues: plan.staticValues,
-      staticFunctions: plan.staticFunctions,
+      staticValues: definition.staticValues,
+      staticFunctions: definition.staticFunctions,
       storagePolicy: storagePolicy,
-      flags: plan.callbacks
+      flags: callbackInstallationPlan
     )
   }
 

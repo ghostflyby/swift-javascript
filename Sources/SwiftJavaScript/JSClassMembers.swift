@@ -133,7 +133,7 @@ extension JSStaticFunctionDefinition {
   }
 }
 
-extension JSClassStaticValueInstallationPlan {
+extension JSClassStaticValueDefinition {
   package func hostPropertyDescriptor(
     getterBinding: String? = nil,
     setterBinding: String? = nil
@@ -147,19 +147,7 @@ extension JSClassStaticValueInstallationPlan {
   }
 }
 
-extension JSClassStaticValueDefinition {
-  package func installationPlan() -> JSClassStaticValueInstallationPlan {
-    JSClassStaticValueInstallationPlan(name: name, attributes: attributes)
-  }
-}
-
 extension JSClassStaticFunctionDefinition {
-  package func installationPlan() -> JSClassStaticFunctionInstallationPlan {
-    JSClassStaticFunctionInstallationPlan(name: name, attributes: attributes)
-  }
-}
-
-extension JSClassStaticFunctionInstallationPlan {
   package func hostFunctionDescriptor(binding: String? = nil) -> JSHostFunctionDescriptor {
     JSHostFunctionDescriptor(
       name: name,
@@ -174,8 +162,8 @@ package typealias JSClassHostDescriptorProjectionFlags = JSClassCallbackInstalla
 package func projectClassHostTypeDescriptor(
   className: String?,
   parentName: String?,
-  staticValues: [JSClassStaticValueInstallationPlan],
-  staticFunctions: [JSClassStaticFunctionInstallationPlan],
+  staticValues: [JSClassStaticValueDefinition],
+  staticFunctions: [JSClassStaticFunctionDefinition],
   storagePolicy: JSHostObjectStoragePolicy,
   flags: JSClassHostDescriptorProjectionFlags
 ) -> JSHostTypeDescriptor {
@@ -251,12 +239,8 @@ where
   projectClassHostTypeDescriptor(
     className: className,
     parentName: parentName,
-    staticValues: staticValues.map {
-      $0.definition.installationPlan()
-    },
-    staticFunctions: staticFunctions.map {
-      $0.definition.installationPlan()
-    },
+    staticValues: staticValues.map(\.definition),
+    staticFunctions: staticFunctions.map(\.definition),
     storagePolicy: storagePolicy,
     flags: flags
   )

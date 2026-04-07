@@ -715,7 +715,7 @@ private func installCallAsConstructorCallbackIfNeeded(
 }
 
 private func installStaticValueMembers(
-  _ staticValues: [SwiftJavaScript.JSClassStaticValueInstallationPlan],
+  _ staticValues: [SwiftJavaScript.JSClassStaticValueDefinition],
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
@@ -743,7 +743,7 @@ private func installStaticValueMembers(
 }
 
 private func installStaticFunctionMembers(
-  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionInstallationPlan],
+  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionDefinition],
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
@@ -770,12 +770,12 @@ private func installStaticFunctionMembers(
 }
 
 private func installStaticMembers(
-  _ plan: SwiftJavaScript.JSClassDefinitionInstallationPlan<JSClass>,
+  _ definition: SwiftJavaScript.JSClassDefinitionMetadata<JSClass>,
   backing: JSManualNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  installStaticValueMembers(plan.staticValues, backing: backing, into: &cls)
-  installStaticFunctionMembers(plan.staticFunctions, backing: backing, into: &cls)
+  installStaticValueMembers(definition.staticValues, backing: backing, into: &cls)
+  installStaticFunctionMembers(definition.staticFunctions, backing: backing, into: &cls)
 }
 
 private func installLifecycleCallbacks(into cls: inout JavaScriptCore.JSClassDefinition) {
@@ -820,12 +820,12 @@ private func installClassName(
 }
 
 private func installClassMetadata(
-  from plan: SwiftJavaScript.JSClassDefinitionInstallationPlan<JSClass>,
+  from definition: SwiftJavaScript.JSClassDefinitionMetadata<JSClass>,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
-  cls.version = plan.version
-  cls.attributes = plan.attributes.rawValue
-  cls.parentClass = plan.parentClass?.ref
+  cls.version = definition.version
+  cls.attributes = definition.attributes.rawValue
+  cls.parentClass = definition.parentClass?.ref
 }
 
 private func installClassCallbacks(
@@ -943,15 +943,16 @@ extension JavaScriptCoreClassDefinitionModel {
     -> JavaScriptCore.JSClassDefinition
   {
     var cls = JavaScriptCore.kJSClassDefinitionEmpty
-    let plan = installationPlan()
+    let definition = classDefinition
+    let callbacks = callbackInstallationPlan
 
-    installClassMetadata(from: plan, into: &cls)
+    installClassMetadata(from: definition, into: &cls)
 
-    installClassName(plan.className, backing: backing, into: &cls)
+    installClassName(definition.className, backing: backing, into: &cls)
 
-    installStaticMembers(plan, backing: backing, into: &cls)
+    installStaticMembers(definition, backing: backing, into: &cls)
 
-    installClassCallbacks(plan.callbacks, into: &cls)
+    installClassCallbacks(callbacks, into: &cls)
 
     return cls
   }

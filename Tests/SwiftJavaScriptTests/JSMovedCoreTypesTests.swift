@@ -299,7 +299,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   #expect(storage.typedInstance(as: MockStringHandle.self) == nil)
 }
 
-@Test func jsClassDefinitionInstallationPlanKeepsMemberAndCallbackShape() {
+@Test func jsClassDefinitionMetadataAndCallbackFlagsKeepShape() {
   let parentClass = mockClass("Parent")
 
   var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
@@ -334,29 +334,30 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   definition.hasInstance = { _, _, _ in true }
   definition.convertToType = { _, _, _, _ in mockUndefinedValue() }
 
-  let plan = definition.installationPlan()
+  let metadata = definition.classDefinition
+  let callbacks = definition.callbackInstallationPlan
 
-  #expect(plan.version == 3)
-  #expect(plan.attributes == JSClassAttributes(rawValue: 0b101))
-  #expect(plan.className == "Widget")
-  #expect(plan.parentClass == parentClass)
-  #expect(plan.staticValues.map(\.name) == ["title"])
-  #expect(plan.staticValues.count == 1)
-  #expect(plan.staticValues[0].attributes == [.readOnly])
-  #expect(plan.staticFunctions.map(\.name) == ["render"])
-  #expect(plan.staticFunctions.count == 1)
-  #expect(plan.staticFunctions[0].attributes == [.dontDelete])
-  #expect(plan.callbacks.hasInitializer)
-  #expect(plan.callbacks.hasFinalizer)
-  #expect(plan.callbacks.hasDynamicPropertyGetter)
-  #expect(plan.callbacks.hasDynamicPropertySetter)
-  #expect(plan.callbacks.hasDynamicPropertyHas)
-  #expect(plan.callbacks.hasDynamicPropertyDelete)
-  #expect(plan.callbacks.hasPropertyEnumerator)
-  #expect(plan.callbacks.hasCallAsFunction)
-  #expect(plan.callbacks.hasConstructor)
-  #expect(plan.callbacks.hasHasInstance)
-  #expect(plan.callbacks.hasConvertToType)
+  #expect(metadata.version == 3)
+  #expect(metadata.attributes == JSClassAttributes(rawValue: 0b101))
+  #expect(metadata.className == "Widget")
+  #expect(metadata.parentClass == parentClass)
+  #expect(metadata.staticValues.map(\.name) == ["title"])
+  #expect(metadata.staticValues.count == 1)
+  #expect(metadata.staticValues[0].attributes == [.readOnly])
+  #expect(metadata.staticFunctions.map(\.name) == ["render"])
+  #expect(metadata.staticFunctions.count == 1)
+  #expect(metadata.staticFunctions[0].attributes == [.dontDelete])
+  #expect(callbacks.hasInitializer)
+  #expect(callbacks.hasFinalizer)
+  #expect(callbacks.hasDynamicPropertyGetter)
+  #expect(callbacks.hasDynamicPropertySetter)
+  #expect(callbacks.hasDynamicPropertyHas)
+  #expect(callbacks.hasDynamicPropertyDelete)
+  #expect(callbacks.hasPropertyEnumerator)
+  #expect(callbacks.hasCallAsFunction)
+  #expect(callbacks.hasConstructor)
+  #expect(callbacks.hasHasInstance)
+  #expect(callbacks.hasConvertToType)
 }
 
 @Test func jsClassDefinitionLookupTraversesParentChain() {

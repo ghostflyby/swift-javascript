@@ -602,7 +602,7 @@ private func installAutoDynamicCallbacks(
 }
 
 private func installAutoStaticValueMembers(
-  _ staticValues: [SwiftJavaScript.JSClassStaticValueInstallationPlan],
+  _ staticValues: [SwiftJavaScript.JSClassStaticValueDefinition],
   backing: JSClassAutoNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
@@ -630,7 +630,7 @@ private func installAutoStaticValueMembers(
 }
 
 private func installAutoStaticFunctionMembers(
-  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionInstallationPlan],
+  _ staticFunctions: [SwiftJavaScript.JSClassStaticFunctionDefinition],
   backing: JSClassAutoNativeClassBacking,
   into cls: inout JavaScriptCore.JSClassDefinition
 ) {
@@ -659,18 +659,19 @@ private func installAutoStaticFunctionMembers(
 private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   -> JavaScriptCore.JSClassDefinition
 {
-  let plan = backing.definition.installationPlan()
+  let definition = backing.definition.classDefinition
+  let callbacks = backing.definition.callbackInstallationPlan
   var cls = JavaScriptCore.kJSClassDefinitionEmpty
-  cls.version = plan.version
-  cls.attributes = plan.attributes.rawValue
-  cls.parentClass = plan.parentClass?.ref
+  cls.version = definition.version
+  cls.attributes = definition.attributes.rawValue
+  cls.parentClass = definition.parentClass?.ref
   cls.initialize = autoClassInitializeCallback
   cls.finalize = autoClassFinalizeCallback
 
-  installAutoStaticValueMembers(plan.staticValues, backing: backing, into: &cls)
-  installAutoStaticFunctionMembers(plan.staticFunctions, backing: backing, into: &cls)
+  installAutoStaticValueMembers(definition.staticValues, backing: backing, into: &cls)
+  installAutoStaticFunctionMembers(definition.staticFunctions, backing: backing, into: &cls)
 
-  installAutoDynamicCallbacks(plan.callbacks, into: &cls)
+  installAutoDynamicCallbacks(callbacks, into: &cls)
 
   return cls
 }
