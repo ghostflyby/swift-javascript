@@ -281,7 +281,7 @@
 - [ ] 仅迁移这些原始类型之上的引擎无关组装逻辑、结果桥接模板与可复用的定义投影逻辑
 - [ ] 不以“搬空 facade”为目标；后续迁移以“core 暴露接口/模板，JSC 保留具体实现”为准
 - [ ] 保留在 JSC 的内容包括：raw ref 生命周期、`JavaScriptCore.JSClassDefinition` / `JSStaticValue` / `JSStaticFunction` 字段写入、`JSObject*Callback` 接线、`JSObjectGetPrivate` / `JSObjectSetPrivate` / exception pointer 读写
-- [ ] 迁移到 core 的内容包括：definition 组装规则、安装计划/阶段划分、static member 查找模板、auto storage 状态计算、与具体引擎无关的 callback 前后置模板
+- [ ] 迁移到 core 的内容包括：definition 组装规则、static member 查找模板、auto storage 状态计算、与具体引擎无关的 callback 前后置模板（已删除冗余 static/definition installation plan，仅保留 callback flags）
 
 Step 1：继续删 facade 薄包装
 - [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSValueResultBridge.swift` 中仅作 core `bridgeHandleResult` 薄封装的入口，调用点直接落到 core helper（已删除未使用的 `JSResult.from(handleResult:)` facade 包装）
@@ -297,12 +297,12 @@ Step 3：继续下沉 `JSClass` 的定义组装逻辑
 - [x] 先在 core 提炼 `JSClassDefinition` 的“安装计划”接口：明确 metadata / static members / lifecycle / dynamic-property / callable 五组阶段，不直接携带任何 JSC callback 类型（已抽出 metadata / static-members / callback-flags 计划，`JSClass` / auto native definition 改为消费计划）
 - [x] 在 core 为 static members 增加可复用的安装规划数据，而不是直接迁移 `JavaScriptCore.JSStaticValue` / `JavaScriptCore.JSStaticFunction` 写入代码（已通过 installation plan 的 static-member 数据承载）
 - [x] 在 core 抽出 definition 继承链查找模板，供 `JSClass` 与 `JSClassValueConvertible` 共同消费，避免 facade 重复写 `classDefinition(for: $0.ref)` 闭包（已新增 `JSClassDefinitionLookup`，JSC 收口为单一 resolver 适配点）
-- [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只消费 core metadata + callback flags；若 installation plan 只是原数据投影则继续删除（进行中）
-- [ ] 审查 `JSClass.borrow(ctx:)` 与 `JSClass(ref:)` 周边是否还能进一步收口为 “JSC handle wrapper + core definition plan” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
+- [ ] JSC facade 继续保留 `kJSClassDefinitionEmpty`、`JSClassCreate/Retain/Release`、`JSClassDefinition` 字段赋值和各类 `JSObject*Callback` 接线，只消费 core metadata + callback flags（已删除冗余 static/definition installation plan）
+- [ ] 审查 `JSClass.borrow(ctx:)`、`JSClass(ref:)`、registry 与 raw lifecycle 周边是否还能进一步收口为 “JSC handle wrapper + core definition metadata/flags” 结构，避免 facade 同时承载定义模型和 raw class 生命周期
 
 Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
-- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：static value/function descriptor 投影、auto storage 访问模板、definition 选择策略（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板，以及 backing/storage 的 definition 选择模板已下沉到 core）
-- [ ] 在 core 提炼“从 definition 解析 static value/function”的名称查找模板，JSC facade 仅负责从 `JSStringRef` / function object 上取出名字再调用模板
+- [ ] 从 `Sources/SwiftyJavaScriptCore/JSClassValueConvertible.swift` 中继续迁移 auto native definition 的引擎无关组装步骤：auto storage 访问模板、definition 选择策略、callback 前后置模板（进行中：auto storage 的 `usesManagedParent` / `finalizeDepth` / typed instance 模板，以及 backing/storage 的 definition 选择模板已下沉到 core）
+- [ ] 在 core 提炼“从 definition 解析 static value/function”的名称查找模板，JSC facade 仅负责从 `JSStringRef` / function object 上取出名字再调用模板；static member metadata 已直接消费 definition，不再经 installation plan 中转
 - [x] 在 core 提炼 auto-convertible 的 definition 选择与 parent-definition 解析接口，JSC facade 只提供 `JSClassRef -> definition` 的适配闭包（已将 auto backing/storage 的 definition 选择模板下沉到 core，JSC 仅传入 lookup）
 - [ ] 将 `JSClassValueConvertible` 中剩余可通用的 callback 前后置模板继续下沉到 core，只保留 `JSObjectInitializeCallback` / `JSObjectFinalizeCallback` / `JSObjectGetPropertyCallback` / `JSObjectSetPropertyCallback` / `JSObjectCallAsFunctionCallback` 等 JSC C callback 接线
 - [ ] 收口 `JSClassValueConvertible` 中仍直接依赖 `JSClass` / `JSPropertyNameAccumulatorRef` 的公开约束，优先改成 core 泛型接口 + facade 特化，而不是继续扩大 facade API 面
@@ -310,7 +310,7 @@ Step 4：继续下沉 `JSClassValueConvertible` 的 auto glue
 Step 4.5：拆分 class definition 的结构与行为
 - [x] 引入 engine-agnostic 的 core class definition / static member descriptor，先承载 metadata、parent chain 和 static member 名称/属性
 - [x] 引入 core `JSClass<E>` 与 class handle 协议，让引擎绑定的 class 句柄从 `JSClassDefinition` 中分离出来（已新增 `JSClassManualReferenceCountedHandle` / core `JSClass<E>`，并让 JSC facade 收敛为 `JSClass<JavaScriptCoreEngine>` 特化）
-- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：上一轮已将 `JSEngineClassDefinition` 收缩为 `definition + behavior` 组合；本轮已把 `JSClassDefinition` 名称收口为完整协议，原纯 metadata struct 更名为 `JSClassDefinitionMetadata`，并让 lookup / auto storage / converter helper 开始按协议消费，`JSEngineClassDefinition` 暂仍作为默认存储实现）
+- [ ] 让现有 `JSClassDefinition<E, ...>` 导出并逐步消费新的 core definition，而不是继续把 metadata 和行为混在一个类型里（进行中：已把 `JSClassDefinition` 名称收口为完整协议，原纯 metadata struct 更名为 `JSClassDefinitionMetadata`，lookup / auto storage / converter helper 已开始按协议消费；`JSEngineClassDefinition` 暂仍作为默认存储实现，后续需继续收口命名与角色）
 - [ ] 后续再把 callbacks 和 engine-bound static member implementations 从 class definition 本体中进一步拆离
 - [x] 验证“完整定义协议 + 默认存储实现”模式能否复用于 static member 定义（已为 `JSStaticValue` / `JSStaticFunction` 引入完整定义协议并保持现有 concrete struct 作为默认实现；generic 消费与现有调用面兼容，后续可据此再评估是否上收到 `JSClassDefinition`，但不再继续拆成 descriptor/behavior 双主模型）
 
