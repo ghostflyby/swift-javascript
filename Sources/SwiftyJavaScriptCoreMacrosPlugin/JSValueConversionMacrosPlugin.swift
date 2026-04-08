@@ -579,7 +579,7 @@ private func makeMethodGetPropertyCase(_ method: MethodPlan) -> String {
   return [
     "            case \"\(method.jsName)\":",
     "              return .value(",
-    "                context.makeFunction(named: \"\(method.jsName)\") { context, _, this, arguments in",
+    "                context.makeFunction(named: \"\(method.jsName)\") { context, this, arguments in",
     "                  guard let instance = try? Self.tryDecode(this, in: context) else {",
     "                    return .exception(",
     "                      SwiftJavaScript.JSValue<JavaScriptCoreEngine>(string: \"failed to decode \\\\(Self.self) backing instance\", in: context)",

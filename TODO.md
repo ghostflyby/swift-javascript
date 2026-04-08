@@ -327,13 +327,13 @@ Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 当 QuickJS 实现受阻时，只允许两类修正：提升真正通用的 `public` core API，或回退不合理抽象；不为 QuickJS 添加第二套私有兼容层
 
 Step Q1：搭建最小 QuickJS 模块
-- [ ] 新增 QuickJS facade/backend target（建议命名与 `SwiftyJavaScriptCore` 对齐），先只接入 runtime/context/value 基础骨架（进行中：先搭建 `CQuickJS` 头文件导入模块，后续 Swift target 仅通过该模块接入 QuickJS C API）
-- [ ] 先实现最小竖切：`JSVirtualMachine` / `JSContext` / `evaluateScript`
-- [ ] 记录第一批为了 QuickJS 不得不新增或调整的 `public` core API，并回写到本 TODO
+- [x] 新增 QuickJS facade/backend target（建议命名与 `SwiftyJavaScriptCore` 对齐），先只接入 runtime/context/value 基础骨架（已新增 `SwiftyQuickJS` target/product、QuickJS handle 类型与最小 backend driver）
+- [x] 先实现最小竖切：`JSVirtualMachine` / `JSContext` / `evaluateScript`（已打通 runtime/context handle、脚本求值、基础值构造/转换，并补最小 QuickJS smoke tests）
+- [x] 记录第一批为了 QuickJS 不得不新增或调整的 `public` core API，并回写到本 TODO（已完成一处真实修正：`JSFunctionCallback<E>` 不再强制暴露当前 function object，QuickJS `makeFunction` 已按 `Unmanaged` boxed closure + C trampoline 接线）
 
 Step Q2：逐层验证 public 边界
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
-- [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器
+- [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：先移除 `JSFunctionCallback<E>` 对当前 function object 的强制要求，再接 QuickJS closure trampoline）
 - [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
 
 Step Q3：测试策略

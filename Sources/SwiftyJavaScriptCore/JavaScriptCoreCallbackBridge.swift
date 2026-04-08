@@ -11,12 +11,11 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
-  let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
   let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
   let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
-    callback(context, functionValue, thisValue, args).toPrivateResult()
+    callback(context, thisValue, args).toPrivateResult()
   }
 
   switch result {

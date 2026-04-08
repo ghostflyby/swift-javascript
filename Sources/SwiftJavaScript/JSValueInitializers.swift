@@ -137,7 +137,7 @@ extension JSValue where E.Engine == E {
   ) {
     let swiftFunction = function
     let count = countTypePack(repeat (each A).self)
-    let callback: JSFunctionCallback<E> = { context, function, this, arguments in
+    let callback: JSFunctionCallback<E> = { context, this, arguments in
       guard arguments.count == count else {
         return .value(JSValue(undefinedIn: context))
       }
@@ -177,7 +177,7 @@ extension JSValue where E.Engine == E {
     let swiftFunction = function
     let count = countTypePack(repeat (each C).self)
     let callback: JSFunctionCallback<E> = {
-      [swiftFunction] context, function, this, arguments in
+      [swiftFunction] context, this, arguments in
       guard arguments.count == count else {
         return .value(JSValue(undefinedIn: context))
       }

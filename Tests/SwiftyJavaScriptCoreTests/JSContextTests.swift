@@ -75,7 +75,7 @@ import Testing
     let flag = flagValue.toBool(in: context)
     #expect(flag)
 
-    context.installGlobalFunction(named: "bump") { context, _, _, arguments in
+    context.installGlobalFunction(named: "bump") { context, _, arguments in
       let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
       return .value(context.makeNumber(value + 1))
     }
@@ -103,7 +103,7 @@ import Testing
     let hasCount = context.hasGlobalProperty(countKey)
     #expect(hasCount)
 
-    context.installGlobalFunction(named: "double") { context, _, _, arguments in
+    context.installGlobalFunction(named: "double") { context, _, arguments in
       let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
       return .value(context.makeNumber(value * 2))
     }

@@ -17,6 +17,9 @@ let package = Package(
     .library(
       name: "SwiftyJavaScriptCore",
       targets: ["SwiftyJavaScriptCore"]),
+    .library(
+      name: "SwiftyQuickJS",
+      targets: ["SwiftyQuickJS"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
@@ -33,6 +36,13 @@ let package = Package(
       dependencies: [
         "SwiftJavaScript",
         "SwiftyJavaScriptCoreMacrosPlugin",
+      ]
+    ),
+    .target(
+      name: "SwiftyQuickJS",
+      dependencies: [
+        "SwiftJavaScript",
+        .product(name: "CQuickJS", package: "Swift-CQuickJS"),
       ]
     ),
     .macro(
@@ -57,6 +67,12 @@ let package = Package(
         "SwiftyJavaScriptCore",
         "SwiftyJavaScriptCoreMacrosPlugin",
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+      ]
+    ),
+    .testTarget(
+      name: "SwiftyQuickJSTests",
+      dependencies: [
+        "SwiftyQuickJS"
       ]
     ),
   ]
