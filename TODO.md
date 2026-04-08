@@ -319,6 +319,27 @@ Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 补一轮面向 `SwiftJavaScriptTests` 的迁移测试，把新下沉的 `JSClass` / auto-convertible 组装逻辑优先放到 core 测试覆盖，避免继续只能在 JSC facade tests 中验证
 - [ ] 为每一轮“core 接口 + JSC 实现”拆分补对应测试：core 侧测安装计划/解析模板，JSC 侧只测 raw callback wiring 与实际 JavaScriptCore 行为
 
+### 8.5 QuickJS 作为边界验证器（新）
+
+原则：
+- [ ] 新的 QuickJS 引擎实现模块只依赖 `SwiftJavaScript` 的 `public` API；不调用 `package` API，不复制 `SwiftyJavaScriptCore` 私有 helper
+- [ ] 将后续“是否应继续迁移到 core”的判断切换为：QuickJS 最小桥接是否被迫需要新的 `public` API；若需要，再重构接线边界，而不是继续只按 JSC 形状推断
+- [ ] 当 QuickJS 实现受阻时，只允许两类修正：提升真正通用的 `public` core API，或回退不合理抽象；不为 QuickJS 添加第二套私有兼容层
+
+Step Q1：搭建最小 QuickJS 模块
+- [ ] 新增 QuickJS facade/backend target（建议命名与 `SwiftyJavaScriptCore` 对齐），先只接入 runtime/context/value 基础骨架
+- [ ] 先实现最小竖切：`JSVirtualMachine` / `JSContext` / `evaluateScript`
+- [ ] 记录第一批为了 QuickJS 不得不新增或调整的 `public` core API，并回写到本 TODO
+
+Step Q2：逐层验证 public 边界
+- [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
+- [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器
+- [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
+
+Step Q3：测试策略
+- [ ] 为 QuickJS 增加最小共享行为测试，优先复用 `SwiftJavaScriptTests` 中已有的 engine-agnostic 覆盖
+- [ ] 每发现一处“JSC 迁移得来的边界不符合第二引擎实际”的案例，都在 TODO 里记录并据此调整剩余迁移优先级
+
 ## 9. JavaScriptCore 导入消除基线（进行中）
 
 ### 9.1 当前基线（2026-03-14）
