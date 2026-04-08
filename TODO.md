@@ -327,7 +327,7 @@ Step 5：宏与公开文档去 JSC 硬编码
 - [ ] 当 QuickJS 实现受阻时，只允许两类修正：提升真正通用的 `public` core API，或回退不合理抽象；不为 QuickJS 添加第二套私有兼容层
 
 Step Q1：搭建最小 QuickJS 模块
-- [ ] 新增 QuickJS facade/backend target（建议命名与 `SwiftyJavaScriptCore` 对齐），先只接入 runtime/context/value 基础骨架
+- [ ] 新增 QuickJS facade/backend target（建议命名与 `SwiftyJavaScriptCore` 对齐），先只接入 runtime/context/value 基础骨架（进行中：先搭建 `CQuickJS` 头文件导入模块，后续 Swift target 仅通过该模块接入 QuickJS C API）
 - [ ] 先实现最小竖切：`JSVirtualMachine` / `JSContext` / `evaluateScript`
 - [ ] 记录第一批为了 QuickJS 不得不新增或调整的 `public` core API，并回写到本 TODO
 

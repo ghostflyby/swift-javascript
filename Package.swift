@@ -19,7 +19,8 @@ let package = Package(
       targets: ["SwiftyJavaScriptCore"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0")
+    .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
+    .package(url: "https://github.com/ghostflyby/Swift-CQuickJS", branch: "main"),
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.

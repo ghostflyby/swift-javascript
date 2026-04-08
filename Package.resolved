@@ -1,6 +1,15 @@
 {
-  "originHash" : "3b8392d9e3da51bb51672caed041ea766f3488174c4edc070ce51db71918d247",
+  "originHash" : "9d75e2b48543c4b4078daf49f17a5998691bdb103b8127453dc5b35904d39382",
   "pins" : [
+    {
+      "identity" : "swift-cquickjs",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ghostflyby/Swift-CQuickJS",
+      "state" : {
+        "branch" : "main",
+        "revision" : "460f32d9510a3f92541764f7cb087e74269f6481"
+      }
+    },
     {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
