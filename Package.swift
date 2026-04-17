@@ -23,7 +23,7 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
-    .package(url: "https://github.com/ghostflyby/Swift-CQuickJS", branch: "main"),
+    .package(url: "https://github.com/ghostflyby/Swift-CQuickJS", from: "0.14.0-pack.1"),
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -42,7 +42,7 @@ let package = Package(
       name: "SwiftyQuickJS",
       dependencies: [
         "SwiftJavaScript",
-        .product(name: "CQuickJS", package: "Swift-CQuickJS"),
+        .product(name: "CQuickJSStatic", package: "Swift-CQuickJS"),
       ]
     ),
     .macro(

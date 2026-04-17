@@ -1,5 +1,12 @@
-import CQuickJS
 import SwiftJavaScript
+
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+  typealias CQuickJSValue = CQuickJSStatic.JSValue
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+  typealias CQuickJSValue = CQuickJSDynamic.JSValue
+#endif
 
 public enum QuickJSEngine: JSEngine {
   public typealias RuntimeHandle = QuickJSRuntimeHandle
@@ -35,7 +42,9 @@ public enum QuickJSEngine: JSEngine {
 
   public static func globalObjectValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle?
   {
-    QuickJSValueHandle(ref: JS_GetGlobalObject(context.ref), contextRef: context.ref)
+    let global = JS_GetGlobalObject(context.ref)
+    defer { JS_FreeValue(context.ref, global) }
+    return QuickJSValueHandle(ref: global, contextRef: context.ref)
   }
 
   public static func makeFunctionValueHandle(
@@ -248,13 +257,12 @@ public enum QuickJSEngine: JSEngine {
     in context: QuickJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    let duplicatedValue = JS_DupValue(context.ref, value.ref)
     let result = key.withCString {
       JS_DefinePropertyValueStr(
         context.ref,
         object.ref,
         $0,
-        duplicatedValue,
+        value.ref,
         propertyFlags(for: attributes)
       )
     }
@@ -297,8 +305,7 @@ public enum QuickJSEngine: JSEngine {
       return false
     }
     defer { JS_FreeAtom(context.ref, atom) }
-    let duplicatedValue = JS_DupValue(context.ref, value.ref)
-    return JS_SetProperty(context.ref, object.ref, atom, duplicatedValue) == 1
+    return JS_SetProperty(context.ref, object.ref, atom, value.ref) == 1
   }
 
   public static func setIndexPropertyHandle(
@@ -307,8 +314,7 @@ public enum QuickJSEngine: JSEngine {
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool {
-    let duplicatedValue = JS_DupValue(context.ref, value.ref)
-    return JS_SetPropertyUint32(context.ref, object.ref, index, duplicatedValue) == 1
+    return JS_SetPropertyUint32(context.ref, object.ref, index, value.ref) == 1
   }
 
   public static func hasStringPropertyHandle(
@@ -691,7 +697,7 @@ private func adjustedScriptSource(_ script: String, startingLineNumber: Int32) -
 }
 
 private func resultHandle(
-  for result: CQuickJS.JSValue,
+  for result: CQuickJSValue,
   in contextRef: OpaquePointer
 ) -> JSResult<QuickJSValueHandle> {
   if JS_IsException(result) {
@@ -703,12 +709,12 @@ private func resultHandle(
 
 private func quickJSFunctionCallback(
   contextRef: OpaquePointer?,
-  thisValueRef: CQuickJS.JSValue,
+  thisValueRef: CQuickJSValue,
   argumentCount: Int32,
-  arguments: UnsafeMutablePointer<CQuickJS.JSValue>?,
+  arguments: UnsafeMutablePointer<CQuickJSValue>?,
   _: Int32,
   opaque: UnsafeMutableRawPointer?
-) -> CQuickJS.JSValue {
+) -> CQuickJSValue {
   guard let contextRef, let opaque else {
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
@@ -719,7 +725,7 @@ private func quickJSFunctionCallback(
     .callback
   let thisValue = SwiftJavaScript.JSValue<QuickJSEngine>(
     handleValue: QuickJSValueHandle(
-      ref: JS_DupValue(contextRef, thisValueRef),
+      ref: thisValueRef,
       contextRef: contextRef
     )
   )
@@ -730,9 +736,9 @@ private func quickJSFunctionCallback(
 
   switch consume result {
   case .value(let value):
-    return JS_DupValue(contextRef, value.valueHandle().ref)
+    return value.valueHandle().ref
   case .exception(let error):
-    return JS_Throw(contextRef, JS_DupValue(contextRef, error.valueHandle().ref))
+    return JS_Throw(contextRef, error.valueHandle().ref)
   }
 }
 
@@ -744,7 +750,7 @@ private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?
 }
 
 private func withQuickJSArguments<R: ~Copyable>(
-  _ arguments: UnsafeMutablePointer<CQuickJS.JSValue>?,
+  _ arguments: UnsafeMutablePointer<CQuickJSValue>?,
   count: Int,
   contextRef: OpaquePointer,
   _ body: (borrowing JSArguments<QuickJSEngine>) -> R
@@ -761,7 +767,7 @@ private func withQuickJSArguments<R: ~Copyable>(
   return body(swiftArguments)
 }
 
-private func quickJSString(_ value: CQuickJS.JSValue, in contextRef: OpaquePointer) -> String? {
+private func quickJSString(_ value: CQuickJSValue, in contextRef: OpaquePointer) -> String? {
   var length = 0
   guard let cString = JS_ToCStringLen2(contextRef, &length, value, false) else {
     return nil
@@ -797,8 +803,8 @@ private func propertyFlags(for attributes: JSHostMemberAttributes) -> Int32 {
   return flags
 }
 
-private func quickJSImmediateValue(tag: Int32, payload: Int32 = 0) -> CQuickJS.JSValue {
-  CQuickJS.JSValue(u: CQuickJS.JSValueUnion(int32: payload), tag: Int64(tag))
+private func quickJSImmediateValue(tag: Int32, payload: Int32 = 0) -> CQuickJSValue {
+  CQuickJSValue(u: JSValueUnion(int32: payload), tag: Int64(tag))
 }
 
 private func quickJSArrayBufferFree(
@@ -811,4 +817,11 @@ private func quickJSArrayBufferFree(
   }
   let box = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
   box.deallocator(ptr, box.context)
+}
+
+extension JSVirtualMachine where E == QuickJSEngine {
+
+  public func gc() {
+    JS_RunGC(self.driverRuntimeHandle.ref)
+  }
 }

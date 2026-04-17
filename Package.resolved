@@ -1,13 +1,13 @@
 {
-  "originHash" : "9d75e2b48543c4b4078daf49f17a5998691bdb103b8127453dc5b35904d39382",
+  "originHash" : "f1e3ff7de4c64705338479936c51755268beabb267a67d439f425be305319c27",
   "pins" : [
     {
       "identity" : "swift-cquickjs",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ghostflyby/Swift-CQuickJS",
       "state" : {
-        "branch" : "main",
-        "revision" : "460f32d9510a3f92541764f7cb087e74269f6481"
+        "revision" : "922b41a0379188cc9fbb42cc00e1b5309570d378",
+        "version" : "0.14.0-pack.1"
       }
     },
     {

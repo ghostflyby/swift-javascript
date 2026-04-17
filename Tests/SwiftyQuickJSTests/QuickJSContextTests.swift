@@ -73,3 +73,27 @@ import Testing
     }
   }
 }
+
+@Test func quickJSFunction() async {
+  let context = JSContext<QuickJSEngine>()
+
+  await context.withInstantContext { context in
+    let function = context.makeFunction(
+      named: "bump",
+      callback: { context, thisValue, arguments in
+        let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
+        return .value(context.makeNumber(value + 1))
+      }
+    )
+
+    let result = function.call(arguments: 41, in: context)
+
+    switch consume result {
+    case .value(let value):
+      #expect(value.toDouble(in: context) == 42)
+    case .exception:
+      Issue.record("Expected QuickJS function to be callable")
+    }
+
+  }
+}

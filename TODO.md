@@ -333,7 +333,7 @@ Step Q1：搭建最小 QuickJS 模块
 
 Step Q2：逐层验证 public 边界
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
-- [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：先移除 `JSFunctionCallback<E>` 对当前 function object 的强制要求，再接 QuickJS closure trampoline）
+- [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：将 `JSValue` 收口为真正负责值句柄生命周期的 noncopyable 壳，并让 `QuickJSValueHandle` 改回普通 struct）
 - [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
 
 Step Q3：测试策略

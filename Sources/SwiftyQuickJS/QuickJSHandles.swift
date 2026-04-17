@@ -1,6 +1,11 @@
-import CQuickJS
 import Foundation
 import SwiftJavaScript
+
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#endif
 
 public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
   let ref: OpaquePointer
@@ -67,12 +72,12 @@ extension QuickJSContextHandle: Hashable {
 }
 
 public final class QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
-  let ref: CQuickJS.JSValue
+  let ref: CQuickJSValue
   let contextRef: OpaquePointer
   private let ownsValue: Bool
   private var released = false
 
-  init(ref: CQuickJS.JSValue, contextRef: OpaquePointer, ownsValue: Bool = true) {
+  init(ref: CQuickJSValue, contextRef: OpaquePointer, ownsValue: Bool = true) {
     self.ref = ref
     self.contextRef = contextRef
     self.ownsValue = ownsValue
