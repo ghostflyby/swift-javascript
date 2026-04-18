@@ -162,7 +162,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
 
     if value.isObject(in: context) {
-      let valueHandle = value.valueHandle()
+      let valueHandle = value.borrowHandle()
 
       if E.isArrayHandle(valueHandle, in: context.driverContextHandle) == true {
         let lengthValue = try readStringProperty("length", on: valueHandle, in: context)
@@ -226,8 +226,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         guard
           E.setIndexPropertyHandle(
             at: UInt32(index),
-            on: arrayValue.valueHandle(),
-            to: encoded.valueHandle(),
+            on: arrayValue.borrowHandle(),
+            to: encoded.borrowHandle(),
             in: context.driverContextHandle
           )
         else {
@@ -243,8 +243,8 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         guard
           E.setStringPropertyHandle(
             key,
-            on: objectValue.valueHandle(),
-            to: encoded.valueHandle(),
+            on: objectValue.borrowHandle(),
+            to: encoded.borrowHandle(),
             in: context.driverContextHandle,
             attributes: .none
           )

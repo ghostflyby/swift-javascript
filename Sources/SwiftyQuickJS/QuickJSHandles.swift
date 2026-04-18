@@ -71,35 +71,43 @@ extension QuickJSContextHandle: Hashable {
   }
 }
 
-public final class QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+
   let ref: CQuickJSValue
   let contextRef: OpaquePointer
-  private let ownsValue: Bool
-  private var released = false
 
   init(ref: CQuickJSValue, contextRef: OpaquePointer, ownsValue: Bool = true) {
     self.ref = ref
     self.contextRef = contextRef
-    self.ownsValue = ownsValue
-  }
-
-  deinit {
-    _ = releaseReference()
   }
 
   @discardableResult
   public func retainReference() -> Bool {
-    true
+    _ = JS_DupValue(contextRef, ref)
+    return true
   }
 
   @discardableResult
   public func releaseReference() -> Bool {
-    guard ownsValue, !released else {
-      return false
-    }
-    released = true
     JS_FreeValue(contextRef, ref)
     return true
+  }
+
+  public func bindToStorage(_ storage: inout InlineArray<3, UInt64>) {
+    precondition(
+      MemoryLayout<JSValueUnion>.size <= MemoryLayout<UInt64>.size,
+      "QuickJS JSValueUnion no longer fits in JSValue inline storage"
+    )
+    storage[0] = UInt64(bitPattern: ref.tag)
+    storage[1] = unsafeBitCast(ref.u, to: UInt64.self)
+    storage[2] = UInt64(UInt(bitPattern: contextRef))
+  }
+
+  public init(storage: InlineArray<3, UInt64>) {
+    let tag = Int64(bitPattern: storage[0])
+    let valueUnion = unsafeBitCast(storage[1], to: JSValueUnion.self)
+    self.ref = CQuickJSValue(u: valueUnion, tag: tag)
+    self.contextRef = unsafeBitCast(storage[2], to: OpaquePointer.self)
   }
 }
 

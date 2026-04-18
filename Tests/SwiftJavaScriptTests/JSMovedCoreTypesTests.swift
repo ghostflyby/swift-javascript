@@ -243,16 +243,16 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 
   switch readStaticValue(staticValue, in: context, from: thisValue) {
   case .value(let value):
-    #expect(value.valueHandle().rawValue.kind == "string")
-    #expect(value.valueHandle().rawValue.payload == "runtime-token:title")
+    #expect(value.borrowHandle().rawValue.kind == "string")
+    #expect(value.borrowHandle().rawValue.payload == "runtime-token:title")
   case .exception:
     Issue.record("Expected static value read to succeed")
   }
 
   switch callStaticFunction(staticFunction, in: context, on: thisValue, with: arguments) {
   case .value(let value):
-    #expect(value.valueHandle().rawValue.kind == "number")
-    #expect(value.valueHandle().rawValue.payload == "runtime-token:0.0")
+    #expect(value.borrowHandle().rawValue.kind == "number")
+    #expect(value.borrowHandle().rawValue.payload == "runtime-token:0.0")
   case .exception:
     Issue.record("Expected static function call to succeed")
   }
@@ -264,13 +264,15 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
     setProperty: { context, _, _ in .exception(context.makeString("error")) }
   )
 
-  #expect(
-    failingStaticValue.setPropertyException(
-      in: context,
-      on: thisValue,
-      to: thisValue
-    )?.valueHandle().rawValue.payload == "runtime-token:error"
-  )
+  if let exception = failingStaticValue.setPropertyException(
+    in: context,
+    on: thisValue,
+    to: thisValue
+  ) {
+    #expect(exception.borrowHandle().rawValue.payload == "runtime-token:error")
+  } else {
+    Issue.record("Expected static value setter to produce an exception")
+  }
 }
 
 @Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {

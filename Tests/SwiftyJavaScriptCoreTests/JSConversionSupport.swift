@@ -16,7 +16,7 @@ enum ZeroOneBoolConverter: JSValueConverter {
     return decode(
       JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -38,7 +38,7 @@ enum ZeroOneBoolConverter: JSValueConverter {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
   }
 
   static func decode(
@@ -68,7 +68,7 @@ struct FailingEncodeValue: JSValueEncodable {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
   }
 
   func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
@@ -114,7 +114,7 @@ enum ReturnPayloadEncoder: JSValueEncoder {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(
@@ -147,7 +147,7 @@ enum FailurePayloadEncoder: JSValueEncoder {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(
@@ -200,7 +200,7 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
     return decode(
       JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -235,7 +235,7 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
   }
 
   static func encode(

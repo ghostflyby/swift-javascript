@@ -100,12 +100,12 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
       return nil
     }
 
-    self.value = JSValue(handleValue: value.valueHandle())
+    self.value = JSValue(retaining: value)
     self.contextHandle = context.driverContextHandle
   }
 
   public var byteLength: Int {
-    guard let length = E.arrayBufferByteLengthForHandle(value.valueHandle(), in: contextHandle)
+    guard let length = E.arrayBufferByteLengthForHandle(value.borrowHandle(), in: contextHandle)
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
     }
@@ -118,7 +118,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
     let byteLength = self.byteLength
-    let access = E.arrayBufferBytesPtrForHandle(value.valueHandle(), in: contextHandle)
+    let access = E.arrayBufferBytesPtrForHandle(value.borrowHandle(), in: contextHandle)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -130,7 +130,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = E.arrayBufferBytesPtrForHandle(value.valueHandle(), in: contextHandle)
+    let access = E.arrayBufferBytesPtrForHandle(value.borrowHandle(), in: contextHandle)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -175,7 +175,7 @@ extension JSArrayBuffer: JSValueEncodable {
       "Cannot encode JSArrayBuffer across different JavaScript engine types"
     )
 
-    let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<TargetEngine>.self)
+    let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
     return JSValue(handleValue: handle)
   }
 
@@ -253,7 +253,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     }
 
     let handle: JSValueHandle<E>?
-    let bufferHandle = buffer.value.valueHandle()
+    let bufferHandle = buffer.value.borrowHandle()
 
     if let length {
       handle = E.makeTypedArrayHandle(
@@ -306,19 +306,19 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       return nil
     }
 
-    self.value = JSValue(handleValue: value.valueHandle())
+    self.value = JSValue(retaining: value)
     self.contextHandle = context.driverContextHandle
   }
 
   public var kind: JSTypedArrayKind {
-    guard let type = E.typedArrayKindForHandle(value.valueHandle(), in: contextHandle) else {
+    guard let type = E.typedArrayKindForHandle(value.borrowHandle(), in: contextHandle) else {
       preconditionFailure("Wrapped JSValue is not a TypedArray")
     }
     return type
   }
 
   public var length: Int {
-    guard let length = E.typedArrayLengthForHandle(value.valueHandle(), in: contextHandle)
+    guard let length = E.typedArrayLengthForHandle(value.borrowHandle(), in: contextHandle)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -326,7 +326,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   }
 
   public var byteLength: Int {
-    guard let length = E.typedArrayByteLengthForHandle(value.valueHandle(), in: contextHandle)
+    guard let length = E.typedArrayByteLengthForHandle(value.borrowHandle(), in: contextHandle)
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
     }
@@ -334,7 +334,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   }
 
   public var byteOffset: Int {
-    guard let offset = E.typedArrayByteOffsetForHandle(value.valueHandle(), in: contextHandle)
+    guard let offset = E.typedArrayByteOffsetForHandle(value.borrowHandle(), in: contextHandle)
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
     }
@@ -342,7 +342,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   }
 
   public var buffer: JSArrayBuffer<E> {
-    guard let bufferHandle = E.typedArrayBufferForHandle(value.valueHandle(), in: contextHandle)
+    guard let bufferHandle = E.typedArrayBufferForHandle(value.borrowHandle(), in: contextHandle)
     else {
       preconditionFailure("Failed to read TypedArray buffer")
     }
@@ -357,7 +357,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   }
 
   public borrowing func withUnsafeBytes<R: ~Copyable>(_ body: (UnsafeRawBufferPointer) -> R) -> R {
-    let access = E.typedArrayBytesPtrForHandle(value.valueHandle(), in: contextHandle)
+    let access = E.typedArrayBytesPtrForHandle(value.borrowHandle(), in: contextHandle)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -369,7 +369,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
   public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
-    let access = E.typedArrayBytesPtrForHandle(value.valueHandle(), in: contextHandle)
+    let access = E.typedArrayBytesPtrForHandle(value.borrowHandle(), in: contextHandle)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }
@@ -389,7 +389,7 @@ extension JSTypedArray: JSValueEncodable {
       "Cannot encode JSTypedArray across different JavaScript engine types"
     )
 
-    let handle = unsafeBitCast(value.valueHandle(), to: JSValueHandle<TargetEngine>.self)
+    let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
     return JSValue(handleValue: handle)
   }
 
@@ -408,7 +408,7 @@ extension JSValue {
   }
 
   public func isArrayBuffer(in context: borrowing JSInstantContext<E>) -> Bool {
-    E.isArrayBufferHandle(valueHandle(), in: context.driverContextHandle)
+    E.isArrayBufferHandle(borrowHandle(), in: context.driverContextHandle)
   }
 
   public func typedArrayKind(in context: isolated JSContext<E> = #isolation)
@@ -420,7 +420,7 @@ extension JSValue {
   }
 
   public func typedArrayKind(in context: borrowing JSInstantContext<E>) -> JSTypedArrayKind? {
-    E.typedArrayKindForHandle(valueHandle(), in: context.driverContextHandle)
+    E.typedArrayKindForHandle(borrowHandle(), in: context.driverContextHandle)
   }
 
   public func isTypedArray(in context: isolated JSContext<E> = #isolation) -> Bool {

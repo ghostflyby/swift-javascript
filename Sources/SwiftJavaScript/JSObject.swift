@@ -7,8 +7,8 @@ extension JSValue {
   ) {
     _ = E.setStringPropertyHandle(
       key,
-      on: valueHandle(),
-      to: value.valueHandle(),
+      on: borrowHandle(),
+      to: value.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -21,9 +21,9 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) {
     _ = E.setValuePropertyHandle(
-      key.valueHandle(),
-      on: valueHandle(),
-      to: value.valueHandle(),
+      key.borrowHandle(),
+      on: borrowHandle(),
+      to: value.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -36,8 +36,8 @@ extension JSValue {
   ) {
     _ = E.setIndexPropertyHandle(
       at: index,
-      on: valueHandle(),
-      to: value.valueHandle(),
+      on: borrowHandle(),
+      to: value.borrowHandle(),
       in: context.driverContextHandle
     )
   }
@@ -83,8 +83,8 @@ extension JSValue {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
     _ = E.setStringPropertyHandle(
       key,
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -98,9 +98,9 @@ extension JSValue {
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
     _ = E.setValuePropertyHandle(
-      key.valueHandle(),
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      key.borrowHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -114,8 +114,8 @@ extension JSValue {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
     _ = E.setIndexPropertyHandle(
       at: index,
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle
     )
   }
@@ -162,8 +162,8 @@ extension JSValue {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
     _ = E.setStringPropertyHandle(
       key,
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -178,9 +178,9 @@ extension JSValue {
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
     _ = E.setValuePropertyHandle(
-      key.valueHandle(),
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      key.borrowHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle,
       attributes: attributes.hostMemberAttributes
     )
@@ -195,8 +195,8 @@ extension JSValue {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
     _ = E.setIndexPropertyHandle(
       at: index,
-      on: valueHandle(),
-      to: encoded.valueHandle(),
+      on: borrowHandle(),
+      to: encoded.borrowHandle(),
       in: context.driverContextHandle
     )
   }
@@ -243,7 +243,7 @@ extension JSValue {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
       E.getStringPropertyHandle(
         key,
-        on: valueHandle(),
+        on: borrowHandle(),
         in: context.driverContextHandle
       ))
     switch consume result
@@ -261,8 +261,8 @@ extension JSValue {
   ) -> JSValue<E> {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
       E.getValuePropertyHandle(
-        key.valueHandle(),
-        on: valueHandle(),
+        key.borrowHandle(),
+        on: borrowHandle(),
         in: context.driverContextHandle
       ))
     switch consume result
@@ -281,7 +281,7 @@ extension JSValue {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
       E.getIndexPropertyHandle(
         at: index,
-        on: valueHandle(),
+        on: borrowHandle(),
         in: context.driverContextHandle
       ))
     switch consume result
@@ -380,7 +380,7 @@ extension JSValue {
   ) {
     _ = E.deleteStringPropertyHandle(
       key,
-      on: valueHandle(),
+      on: borrowHandle(),
       in: context.driverContextHandle
     )
   }
@@ -390,8 +390,8 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) {
     _ = E.deleteValuePropertyHandle(
-      key.valueHandle(),
-      on: valueHandle(),
+      key.borrowHandle(),
+      on: borrowHandle(),
       in: context.driverContextHandle
     )
   }
@@ -420,7 +420,7 @@ extension JSValue {
   ) -> Bool {
     E.hasStringPropertyHandle(
       key,
-      on: valueHandle(),
+      on: borrowHandle(),
       in: context.driverContextHandle
     ) ?? false
   }
@@ -430,8 +430,8 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
     E.hasValuePropertyHandle(
-      key.valueHandle(),
-      on: valueHandle(),
+      key.borrowHandle(),
+      on: borrowHandle(),
       in: context.driverContextHandle
     ) ?? false
   }

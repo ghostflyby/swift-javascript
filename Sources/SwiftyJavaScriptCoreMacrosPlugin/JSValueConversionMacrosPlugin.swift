@@ -1234,7 +1234,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
           self.init(
             value: JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
             ),
             in: JSInstantContext<JavaScriptCoreEngine>(
               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -1254,7 +1254,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
           self.init(
             value: JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
             ),
             in: JSInstantContext<JavaScriptCoreEngine>(
               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -1278,7 +1278,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
           return try Self.tryDecode(
             JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
             ),
             in: JSInstantContext<JavaScriptCoreEngine>(
               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -1299,7 +1299,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             )
           )
           return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.valueHandle(), to: JSValueHandle<E>.self)
+            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
           )
         }
 
@@ -1316,7 +1316,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             )
           )
           return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.valueHandle(), to: JSValueHandle<E>.self)
+            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
           )
         }
 

@@ -56,6 +56,14 @@ public struct MockValue: Sendable, Equatable {
   let payload: String
 }
 
+private final class MockValueHandleStorage: @unchecked Sendable {
+  let rawValue: MockValue
+
+  init(rawValue: MockValue) {
+    self.rawValue = rawValue
+  }
+}
+
 public struct MockClass: Sendable, Equatable, Hashable {
   let id: String
 }
@@ -123,10 +131,24 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   typealias Engine = MockEngine
   typealias RawValue = MockValue
 
-  let rawValue: MockValue
+  private let storagePointer: UnsafeMutableRawPointer
+
+  var rawValue: MockValue {
+    Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue().rawValue
+  }
 
   init(rawValue: MockValue) {
-    self.rawValue = rawValue
+    self.storagePointer = Unmanaged.passRetained(
+      MockValueHandleStorage(rawValue: rawValue)
+    ).toOpaque()
+  }
+
+  public func bindToStorage(_ storage: inout InlineArray<3, UInt64>) {
+    storage[0] = UInt64(UInt(bitPattern: storagePointer))
+  }
+
+  public init(storage: InlineArray<3, UInt64>) {
+    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storage[0]))!
   }
 
   var engineType: MockEngine.Type {
@@ -134,11 +156,14 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   }
 
   public func retainReference() -> Bool {
-    true
+    let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
+    _ = Unmanaged.passRetained(storage)
+    return true
   }
 
   public func releaseReference() -> Bool {
-    true
+    _ = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeRetainedValue()
+    return true
   }
 }
 
@@ -1424,7 +1449,7 @@ extension MockEngine {
   let handle = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "mock-value"))
   let value = JSValue<MockEngine>(handleValue: handle)
 
-  let storedHandle = value.valueHandle()
+  let storedHandle = value.borrowHandle()
 
   #expect(storedHandle.rawValue == MockValue(kind: "string", payload: "mock-value"))
   #expect(storedHandle.engineType == MockEngine.self)
@@ -1435,7 +1460,7 @@ extension MockEngine {
   let handle = JSValueHandle<MockEngine>(rawValue: payload)
   let value = JSValue<MockEngine>(handleValue: handle)
 
-  let roundtrip = value.valueHandle().rawValue
+  let roundtrip = value.borrowHandle().rawValue
 
   #expect(roundtrip == payload)
 }
@@ -1445,7 +1470,7 @@ extension MockEngine {
     rawValue: MockValue(kind: "string", payload: "moved-jsvalue"))
   let value = JSValue<MockEngine>(handleValue: handle)
 
-  let roundtripHandle = value._rawValue
+  let roundtripHandle = value.borrowHandle()
   #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))
   #expect(roundtripHandle.engineType == MockEngine.self)
 }

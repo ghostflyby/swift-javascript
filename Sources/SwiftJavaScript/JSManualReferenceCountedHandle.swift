@@ -18,7 +18,15 @@ extension JSContextManualReferenceCountedHandle {
   }
 }
 
-public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
+  /// Binds the handle's reference to the provided storage, which is used for storing the reference in a type-erased manner.
+  ///
+  /// Use a pointer-based storage if 24 bytes are insufficient
+  func bindToStorage(_ storage: inout InlineArray<3, UInt64>)
+
+  /// Initializes a handle from the provided storage, which is used for storing the reference in a type-erased manner.
+  init(storage: InlineArray<3, UInt64>)
+}
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 

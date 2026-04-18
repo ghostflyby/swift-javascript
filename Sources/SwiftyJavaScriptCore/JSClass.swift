@@ -591,7 +591,7 @@ private func installSetPropertyCallbackIfNeeded(
           on: thisValue,
           forKey: propertyName,
           to: newValue
-        )?.takeRef(),
+        )?.callbackRef(),
         exception: exception
       )
     }
@@ -868,7 +868,7 @@ private func installConvertToTypeCallbackIfNeeded(
       if exceptionValue.isUndefined(in: context) {
         exceptionRef = nil
       } else {
-        exceptionRef = exceptionValue.takeRef()
+        exceptionRef = exceptionValue.callbackRef()
         exceptionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
       }
       let conversion: JSResult<JSValueRef> =
@@ -919,7 +919,7 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
         in: context,
         on: thisValue,
         to: newValue
-      )?.takeRef(),
+      )?.callbackRef(),
       exception: exception
     )
   }

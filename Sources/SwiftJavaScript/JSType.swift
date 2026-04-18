@@ -16,7 +16,7 @@ extension JSValue {
   }
 
   public func type(in context: borrowing JSInstantContext<E>) -> JSType {
-    guard let valueType = E.valueTypeForHandle(_rawValue, in: context.driverContextHandle)
+    guard let valueType = E.valueTypeForHandle(borrowHandle(), in: context.driverContextHandle)
     else {
       preconditionFailure("JSValue.type(in:) could not query value type")
     }

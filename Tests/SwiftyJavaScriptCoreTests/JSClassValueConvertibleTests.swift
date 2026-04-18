@@ -46,7 +46,7 @@ enum UppercaseStringDecoder: JSValueDecoder {
     return decode(
       SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)

@@ -1,7 +1,7 @@
 extension JSInstantContext {
   @inline(__always)
   func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
-    let handle = value.valueHandle()
+    let handle = value.borrowHandle()
     precondition(
       E.isValueHandleCompatibleWithContext(handle, in: driverContextHandle),
       "Cross-VM JSValue operation is not allowed; pass a context from the same JSVirtualMachine"
@@ -24,11 +24,17 @@ extension JSInstantContext {
 
     func appendArgument<T: JSValueEncodable>(_ argument: T) {
       let encoded = (try? argument.tryEncode(in: self)) ?? makeUndefined()
-      values.append(valueHandle(for: encoded))
+      values.append(encoded.retainHandle())
     }
 
     repeat appendArgument(each arguments)
     return values
+  }
+
+  func releaseArguments(_ arguments: [JSValueHandle<E>]) {
+    for argument in arguments {
+      _ = argument.releaseReference()
+    }
   }
 
   func call(
@@ -72,7 +78,9 @@ extension JSInstantContext {
     function: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
-    call(function: function, arguments: encodeArguments(repeat each arguments))
+    let argumentHandles = encodeArguments(repeat each arguments)
+    defer { releaseArguments(argumentHandles) }
+    return call(function: function, arguments: argumentHandles)
   }
 
   func call<each A: JSValueEncodable>(
@@ -80,10 +88,12 @@ extension JSInstantContext {
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
-    call(
+    let argumentHandles = encodeArguments(repeat each arguments)
+    defer { releaseArguments(argumentHandles) }
+    return call(
       function: function,
       this: thisValue,
-      arguments: encodeArguments(repeat each arguments)
+      arguments: argumentHandles
     )
   }
 
@@ -107,7 +117,9 @@ extension JSInstantContext {
     constructor: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
-    construct(constructor: constructor, arguments: encodeArguments(repeat each arguments))
+    let argumentHandles = encodeArguments(repeat each arguments)
+    defer { releaseArguments(argumentHandles) }
+    return construct(constructor: constructor, arguments: argumentHandles)
   }
 
   func getStringProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<
@@ -162,7 +174,9 @@ extension JSInstantContext {
     on object: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
-    invokeMethod(name, on: object, arguments: encodeArguments(repeat each arguments))
+    let argumentHandles = encodeArguments(repeat each arguments)
+    defer { releaseArguments(argumentHandles) }
+    return invokeMethod(name, on: object, arguments: argumentHandles)
   }
 
   func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {

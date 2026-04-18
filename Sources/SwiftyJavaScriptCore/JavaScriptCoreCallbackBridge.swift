@@ -48,7 +48,8 @@ func withJavaScriptCoreArguments<R: ~Copyable>(
 ) -> R {
   var empty: JSValueRef? = nil
   return withUnsafePointer(to: &empty) { emptyPointer in
-    let arguments = JSArguments<JavaScriptCoreEngine>(count: count) { index, contextHandle in
+    let arguments = JSArguments<JavaScriptCoreEngine>(count: count, borrowsValueHandles: true) {
+      index, contextHandle in
       guard
         index >= 0,
         index < count,

@@ -734,12 +734,13 @@ private func quickJSFunctionCallback(
   let result = withQuickJSArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
     callback(context, thisValue, $0)
   }
+  thisValue.discard()
 
   switch consume result {
   case .value(let value):
-    return value.valueHandle().ref
+    return value.takeHandle().ref
   case .exception(let error):
-    return JS_Throw(contextRef, error.valueHandle().ref)
+    return JS_Throw(contextRef, error.takeHandle().ref)
   }
 }
 
@@ -756,12 +757,13 @@ private func withQuickJSArguments<R: ~Copyable>(
   contextRef: OpaquePointer,
   _ body: (borrowing JSArguments<QuickJSEngine>) -> R
 ) -> R {
-  let swiftArguments = JSArguments<QuickJSEngine>(count: count) { index, _ in
+  let swiftArguments = JSArguments<QuickJSEngine>(count: count, borrowsValueHandles: true) {
+    index, _ in
     guard index >= 0, index < count, let arguments else {
       return nil
     }
     return QuickJSValueHandle(
-      ref: JS_DupValue(contextRef, arguments[index]),
+      ref: arguments[index],
       contextRef: contextRef
     )
   }

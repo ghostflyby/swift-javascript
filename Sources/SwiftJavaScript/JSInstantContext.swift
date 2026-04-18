@@ -254,14 +254,14 @@ extension JSInstantContext {
   }
 
   public func toBoolean(_ value: borrowing JSValue<E>) -> Bool {
-    E.toBooleanForHandle(value.valueHandle(), in: driverContextHandle)
+    E.toBooleanForHandle(value.borrowHandle(), in: driverContextHandle)
   }
 
   public func toNumber(_ value: borrowing JSValue<E>) -> Double {
-    E.toNumberForHandle(value.valueHandle(), in: driverContextHandle)
+    E.toNumberForHandle(value.borrowHandle(), in: driverContextHandle)
   }
 
   public func toString(_ value: borrowing JSValue<E>) -> String {
-    E.toStringForHandle(value.valueHandle(), in: driverContextHandle) ?? ""
+    E.toStringForHandle(value.borrowHandle(), in: driverContextHandle) ?? ""
   }
 }

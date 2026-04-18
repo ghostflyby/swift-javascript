@@ -24,7 +24,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
   /// tansfer ownership of the underlying JSValueRef out of this value, consuming self in the process.
   consuming func takeRef() -> JSValueRef {
-    return _rawValue.ref
+    return takeHandle().ref
   }
 }
 
@@ -41,6 +41,6 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   }
 
   var ref: JSValueRef {
-    _rawValue.ref
+    borrowHandle().ref
   }
 }

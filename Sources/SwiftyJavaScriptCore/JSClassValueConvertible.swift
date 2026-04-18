@@ -98,7 +98,7 @@ where
       "This conversion path only supports JavaScriptCoreEngine"
     )
     let jscValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
-      handleValue: unsafeBitCast(value.valueHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+      handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
     )
     let jscContext = JSInstantContext<JavaScriptCoreEngine>(
       handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -118,7 +118,7 @@ where
       handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
     )
     let encoded = try tryEncode(value, in: jscContext)
-    let handle = unsafeBitCast(encoded.valueHandle(), to: JSValueHandle<E>.self)
+    let handle = unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self)
     return SwiftJavaScript.JSValue<E>(handleValue: handle)
   }
 
@@ -131,7 +131,7 @@ where
     }
     let privateData: UnsafeMutableRawPointer?
     switch javaScriptCorePrivateData(
-      from: value.valueHandle(),
+      from: value.borrowHandle(),
       in: context.driverContextHandle
     ) {
     case .exception:
@@ -431,7 +431,7 @@ private func autoStaticSetPropertyCallbackResult(
       in: context,
       on: thisValue,
       to: newValue
-    )?.takeRef(),
+    )?.callbackRef(),
     exception: exception
   )
 }
