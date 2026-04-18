@@ -7,22 +7,21 @@ package final class JSClassMapRegistry<Key: Hashable, Value>: @unchecked Sendabl
   package init() {}
 
   package func set(_ key: Key, value: Value) {
-    lock.lock()
-    map[key] = value
-    lock.unlock()
+    lock.withLock {
+      map[key] = value
+    }
   }
 
   package func get(_ key: Key) -> Value? {
-    lock.lock()
-    let value = map[key]
-    lock.unlock()
-    return value
+    lock.withLock {
+      map[key]
+    }
   }
 
   package func remove(_ key: Key) {
-    lock.lock()
-    map.removeValue(forKey: key)
-    lock.unlock()
+    _ = lock.withLock {
+      map.removeValue(forKey: key)
+    }
   }
 }
 
@@ -33,26 +32,24 @@ package final class JSClassDefinitionDepthRegistry<Key: Hashable, Definition>: @
   package init() {}
 
   package func set(_ key: Key, definition: Definition, depth: Int) {
-    lock.lock()
-    if let current = map[key], current.depth > depth {
-      lock.unlock()
-      return
+    lock.withLock {
+      if let current = map[key], current.depth > depth {
+        return
+      }
+      map[key] = (definition, depth)
     }
-    map[key] = (definition, depth)
-    lock.unlock()
   }
 
   package func get(_ key: Key) -> Definition? {
-    lock.lock()
-    let value = map[key]?.definition
-    lock.unlock()
-    return value
+    lock.withLock {
+      map[key]?.definition
+    }
   }
 
   package func remove(_ key: Key) {
-    lock.lock()
-    map.removeValue(forKey: key)
-    lock.unlock()
+    _ = lock.withLock {
+      map.removeValue(forKey: key)
+    }
   }
 }
 
@@ -63,21 +60,21 @@ package final class JSClassFinalizeCounterRegistry<Key: Hashable>: @unchecked Se
   package init() {}
 
   package func setMax(_ key: Key, count: Int) {
-    lock.lock()
-    map[key] = max(count, map[key] ?? 0)
-    lock.unlock()
+    lock.withLock {
+      map[key] = max(count, map[key] ?? 0)
+    }
   }
 
   package func decrement(_ key: Key) -> Int {
-    lock.lock()
-    let current = map[key] ?? 1
-    let next = current - 1
-    if next <= 0 {
-      map.removeValue(forKey: key)
-    } else {
-      map[key] = next
+    lock.withLock {
+      let current = map[key] ?? 1
+      let next = current - 1
+      if next <= 0 {
+        map.removeValue(forKey: key)
+      } else {
+        map[key] = next
+      }
+      return next
     }
-    lock.unlock()
-    return next
   }
 }
