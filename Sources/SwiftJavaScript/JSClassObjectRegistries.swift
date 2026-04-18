@@ -18,8 +18,20 @@ package final class JSClassMapRegistry<Key: Hashable, Value>: @unchecked Sendabl
     }
   }
 
-  package func remove(_ key: Key) {
-    _ = lock.withLock {
+  package func getOrSet(_ key: Key, defaultValue: () -> Value) -> Value {
+    lock.withLock {
+      if let existing = map[key] {
+        return existing
+      }
+      let newValue = defaultValue()
+      map[key] = newValue
+      return newValue
+    }
+  }
+
+  @discardableResult
+  package func remove(_ key: Key) -> Value? {
+    lock.withLock {
       map.removeValue(forKey: key)
     }
   }
