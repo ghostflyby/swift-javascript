@@ -262,7 +262,7 @@ public enum QuickJSEngine: JSEngine {
         context.ref,
         object.ref,
         $0,
-        value.ref,
+        JS_DupValue(context.ref, value.ref),
         propertyFlags(for: attributes)
       )
     }
@@ -305,7 +305,7 @@ public enum QuickJSEngine: JSEngine {
       return false
     }
     defer { JS_FreeAtom(context.ref, atom) }
-    return JS_SetProperty(context.ref, object.ref, atom, value.ref) == 1
+    return JS_SetProperty(context.ref, object.ref, atom, JS_DupValue(context.ref, value.ref)) == 1
   }
 
   public static func setIndexPropertyHandle(
@@ -314,7 +314,8 @@ public enum QuickJSEngine: JSEngine {
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool {
-    return JS_SetPropertyUint32(context.ref, object.ref, index, value.ref) == 1
+    return JS_SetPropertyUint32(context.ref, object.ref, index, JS_DupValue(context.ref, value.ref))
+      == 1
   }
 
   public static func hasStringPropertyHandle(

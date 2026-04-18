@@ -13,4 +13,8 @@ public struct JSValue<E: JSEngine>: ~Copyable {
   public func valueHandle() -> JSValueHandle<E> {
     _rawValue
   }
+
+  deinit {
+    _ = _rawValue.releaseReference()
+  }
 }
