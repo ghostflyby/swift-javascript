@@ -2,6 +2,16 @@ import Testing
 
 @testable import SwiftyQuickJS
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+  typealias CQuickJSValue = CQuickJSStatic.JSValue
+  typealias CQuickJSValueUnion = CQuickJSStatic.JSValueUnion
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+  typealias CQuickJSValue = CQuickJSDynamic.JSValue
+  typealias CQuickJSValueUnion = CQuickJSDynamic.JSValueUnion
+#endif
+
 @Test func quickJSValueHandleStorageRoundTripsTagUnionAndContextWords() async {
   let context = JSContext(virtualMachine: JSVirtualMachine<QuickJSEngine>())
 
@@ -121,4 +131,9 @@ import Testing
     }
 
   }
+}
+
+@Test func quickJSValueStorageLayout() {
+  #expect(MemoryLayout<CQuickJSValue>.stride == 2 * MemoryLayout<UInt64>.stride)
+  #expect(MemoryLayout<CQuickJSValueUnion>.size == MemoryLayout<UInt64>.size)
 }

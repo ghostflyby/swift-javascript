@@ -94,10 +94,6 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
   }
 
   public func bindToStorage(_ storage: inout JSValueStorage) {
-    precondition(
-      MemoryLayout<JSValueUnion>.size == MemoryLayout<UInt64>.size,
-      "QuickJS JSValueUnion no longer fits in JSValue inline storage"
-    )
     storage.word0 = UInt64(bitPattern: ref.tag)
     storage.word1 = unsafeBitCast(ref.u, to: UInt64.self)
     storage.word2 = UInt64(UInt(bitPattern: contextRef))

@@ -205,6 +205,11 @@ public enum MockEngine: JSEngine {
   #expect(restored.rawValue == handle.rawValue)
 }
 
+@Test func jsValueStorageKeepsThreeWordLayout() {
+  #expect(MemoryLayout<JSValueStorage>.size == 3 * MemoryLayout<UInt64>.size)
+  #expect(MemoryLayout<JSValueStorage>.stride == 3 * MemoryLayout<UInt64>.stride)
+}
+
 private enum MockDriver: JSEngine {
   typealias ValueHandle = MockValueHandle
   typealias ClassHandle = MockClassHandle
