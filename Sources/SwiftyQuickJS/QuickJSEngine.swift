@@ -55,7 +55,7 @@ public enum QuickJSEngine: JSEngine {
     callback: @escaping JSFunctionCallback<QuickJSEngine>,
     in context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
-    let callbackBox = Unmanaged.passRetained(QuickJSFunctionCallbackBox(callback: callback))
+    let callbackBox = Unmanaged.passRetained(Box(callback))
     let function = name.withCString {
       JS_NewCClosure(
         context.ref,
@@ -721,8 +721,9 @@ private func quickJSFunctionCallback(
 
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let callback = Unmanaged<QuickJSFunctionCallbackBox>.fromOpaque(opaque).takeUnretainedValue()
-    .callback
+  let callback = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
+    .takeUnretainedValue()
+    .value
   let thisValue = SwiftJavaScript.JSValue<QuickJSEngine>(
     handleValue: QuickJSValueHandle(
       ref: thisValueRef,
@@ -747,7 +748,7 @@ private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?
   guard let opaque else {
     return
   }
-  _ = Unmanaged<QuickJSFunctionCallbackBox>.fromOpaque(opaque).takeRetainedValue()
+  _ = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque).takeRetainedValue()
 }
 
 private func withQuickJSArguments<R: ~Copyable>(

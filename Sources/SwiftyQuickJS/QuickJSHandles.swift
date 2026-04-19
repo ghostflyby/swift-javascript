@@ -163,14 +163,6 @@ public final class QuickJSStringHandle: JSStringManualReferenceCountedHandle, @u
   }
 }
 
-final class QuickJSFunctionCallbackBox: @unchecked Sendable {
-  let callback: JSFunctionCallback<QuickJSEngine>
-
-  init(callback: @escaping JSFunctionCallback<QuickJSEngine>) {
-    self.callback = callback
-  }
-}
-
 final class QuickJSArrayBufferDeallocatorBox: @unchecked Sendable {
   let deallocator: @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
   let context: UnsafeMutableRawPointer?

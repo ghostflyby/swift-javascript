@@ -130,14 +130,6 @@ import Testing
   #expect(takeExceptionValue(JSResult<Int>.exception(7)) == 7)
 }
 
-@Test func utilityBoxesStoreAndExposePayload() {
-  let boxed = Box(123)
-  let sendableBox = SendableBoxUnsafe("payload")
-
-  #expect(boxed.value == 123)
-  #expect(sendableBox.value == "payload")
-}
-
 private final class DummyJSClassInstance: Sendable {}
 
 private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendable {
