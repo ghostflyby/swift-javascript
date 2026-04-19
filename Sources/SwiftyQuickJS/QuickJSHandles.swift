@@ -100,17 +100,19 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
     return true
   }
 
-  public func bindToStorage(_ storage: inout JSValueStorage) {
-    storage.word0 = UInt64(bitPattern: ref.tag)
-    storage.word1 = unsafeBitCast(ref.u, to: UInt64.self)
-    storage.word2 = UInt64(UInt(bitPattern: contextRef))
+  public var storageWords: JSValueStorageWords {
+    (
+      word0: UInt64(bitPattern: ref.tag),
+      word1: unsafeBitCast(ref.u, to: UInt64.self),
+      word2: UInt64(UInt(bitPattern: contextRef))
+    )
   }
 
-  public init(storage: JSValueStorage) {
-    let tag = Int64(bitPattern: storage.word0)
-    let valueUnion = unsafeBitCast(storage.word1, to: JSValueUnion.self)
+  public init(storageWords: JSValueStorageWords) {
+    let tag = Int64(bitPattern: storageWords.word0)
+    let valueUnion = unsafeBitCast(storageWords.word1, to: JSValueUnion.self)
     self.ref = CQuickJSValue(u: valueUnion, tag: tag)
-    self.contextRef = OpaquePointer(bitPattern: UInt(storage.word2))!
+    self.contextRef = OpaquePointer(bitPattern: UInt(storageWords.word2))!
   }
 }
 

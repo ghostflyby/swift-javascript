@@ -18,22 +18,19 @@ import Testing
   await context.withInstantContext { context in
     let value = context.makeNumber(42)
     let handle = value.borrowHandle()
-    var storage = SwiftJavaScript.JSValueStorage()
+    let storageWords = handle.storageWords
 
-    handle.bindToStorage(&storage)
+    #expect(storageWords.word0 == UInt64(bitPattern: handle.ref.tag))
+    #expect(storageWords.word2 == UInt64(UInt(bitPattern: handle.contextRef)))
 
-    #expect(storage.word0 == UInt64(bitPattern: handle.ref.tag))
-    #expect(storage.word2 == UInt64(UInt(bitPattern: handle.contextRef)))
-
-    let restored = QuickJSValueHandle(storage: storage)
+    let restored = QuickJSValueHandle(storageWords: storageWords)
     #expect(restored.ref.tag == handle.ref.tag)
     #expect(restored.contextRef == handle.contextRef)
 
-    var reboundStorage = SwiftJavaScript.JSValueStorage()
-    restored.bindToStorage(&reboundStorage)
-    #expect(reboundStorage.word0 == storage.word0)
-    #expect(reboundStorage.word1 == storage.word1)
-    #expect(reboundStorage.word2 == storage.word2)
+    let reboundStorageWords = restored.storageWords
+    #expect(reboundStorageWords.word0 == storageWords.word0)
+    #expect(reboundStorageWords.word1 == storageWords.word1)
+    #expect(reboundStorageWords.word2 == storageWords.word2)
   }
 }
 
@@ -133,7 +130,7 @@ import Testing
   }
 }
 
-@Test func quickJSValueStorageLayout() {
+@Test func quickJSHandleStorageWordsLayout() {
   #expect(MemoryLayout<CQuickJSValue>.stride == 2 * MemoryLayout<UInt64>.stride)
   #expect(MemoryLayout<CQuickJSValueUnion>.size == MemoryLayout<UInt64>.size)
 }

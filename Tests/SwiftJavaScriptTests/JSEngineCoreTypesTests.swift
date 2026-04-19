@@ -148,12 +148,16 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
     ).toOpaque()
   }
 
-  public func bindToStorage(_ storage: inout JSValueStorage) {
-    storage.word0 = UInt64(UInt(bitPattern: storagePointer))
+  public var storageWords: JSValueStorageWords {
+    (
+      word0: UInt64(UInt(bitPattern: storagePointer)),
+      word1: 0,
+      word2: 0
+    )
   }
 
-  public init(storage: JSValueStorage) {
-    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storage.word0))!
+  public init(storageWords: JSValueStorageWords) {
+    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!
   }
 
   var engineType: MockEngine.Type {
@@ -196,23 +200,22 @@ public enum MockEngine: JSEngine {
   }
 }
 
-@Test func jsValueStorageRoundTripsMockHandlePointerWord() {
+@Test func jsValueHandleStorageWordsRoundTripMockHandlePointerWord() {
   let handle = MockValueHandle(rawValue: MockValue(kind: "number", payload: "42"))
   defer { _ = handle.releaseReference() }
 
-  var storage = JSValueStorage()
-  handle.bindToStorage(&storage)
+  let storageWords = handle.storageWords
 
-  #expect(storage.word1 == 0)
-  #expect(storage.word2 == 0)
+  #expect(storageWords.word1 == 0)
+  #expect(storageWords.word2 == 0)
 
-  let restored = MockValueHandle(storage: storage)
+  let restored = MockValueHandle(storageWords: storageWords)
   #expect(restored.rawValue == handle.rawValue)
 }
 
-@Test func jsValueStorageKeepsThreeWordLayout() {
-  #expect(MemoryLayout<JSValueStorage>.size == 3 * MemoryLayout<UInt64>.size)
-  #expect(MemoryLayout<JSValueStorage>.stride == 3 * MemoryLayout<UInt64>.stride)
+@Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
+  #expect(MemoryLayout<JSValueStorageWords>.size == 3 * MemoryLayout<UInt64>.size)
+  #expect(MemoryLayout<JSValueStorageWords>.stride == 3 * MemoryLayout<UInt64>.stride)
 }
 
 private enum MockDriver: JSEngine {

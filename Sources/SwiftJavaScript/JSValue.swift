@@ -4,14 +4,14 @@
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
 public struct JSValue<E: JSEngine>: ~Copyable {
-  var storage: JSValueStorage
+  var storage: JSValueStorageWords
 
   var handle: JSValueHandle<E> {
     get {
-      .init(storage: storage)
+      .init(storageWords: storage)
     }
     set {
-      newValue.bindToStorage(&storage)
+      storage = newValue.storageWords
     }
   }
 
@@ -20,8 +20,7 @@ public struct JSValue<E: JSEngine>: ~Copyable {
   }
 
   public init(handleValue: JSValueHandle<E>) {
-    self.storage = JSValueStorage()
-    handle = handleValue
+    self.storage = handleValue.storageWords
   }
 
   public init(retaining value: borrowing JSValue<E>) {

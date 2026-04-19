@@ -16,14 +16,17 @@ public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedH
   func bindContextOwner<E: JSEngine>(_ owner: JSContext<E>) where E.ContextHandle == Self
 }
 
-public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
-  /// Binds the handle's reference to the provided storage, which is used for storing the reference in a type-erased manner.
-  ///
-  /// Use a pointer-based storage if 24 bytes are insufficient
-  func bindToStorage(_ storage: inout JSValueStorage)
+/// Fixed-width words used by `JSValue` to store an engine-specific value handle.
+///
+/// Use a pointer-based storage if 24 bytes are insufficient.
+public typealias JSValueStorageWords = (word0: UInt64, word1: UInt64, word2: UInt64)
 
-  /// Initializes a handle from the provided storage, which is used for storing the reference in a type-erased manner.
-  init(storage: JSValueStorage)
+public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
+  /// The handle's reference encoded as fixed-width storage words.
+  var storageWords: JSValueStorageWords { get }
+
+  /// Initializes a handle from fixed-width storage words.
+  init(storageWords: JSValueStorageWords)
 }
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
