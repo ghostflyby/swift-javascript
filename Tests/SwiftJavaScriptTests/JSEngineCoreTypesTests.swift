@@ -38,6 +38,11 @@ public struct MockContextHandle: JSContextManualReferenceCountedHandle, @uncheck
     self.rawContext = rawContext
   }
 
+  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
+  where MockContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
+
+  }
+
   var engineType: MockEngine.Type {
     MockEngine.self
   }

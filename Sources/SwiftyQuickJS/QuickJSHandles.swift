@@ -50,6 +50,11 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
     self.ref = ref
   }
 
+  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
+  where QuickJSContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
+
+  }
+
   @discardableResult
   public func retainReference() -> Bool {
     let duplicated = JS_DupContext(ref)

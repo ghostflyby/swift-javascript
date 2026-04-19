@@ -9,13 +9,11 @@ public protocol JSManualReferenceCountedHandle: Sendable {
 public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
 public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {
-  func bindContextOwner(_ owner: AnyObject)
-}
-
-extension JSContextManualReferenceCountedHandle {
-  public func bindContextOwner(_ owner: AnyObject) {
-    _ = owner
-  }
+  /// Binds the JSContext reference to the native handle,
+  /// which can be used to later retrieve the JSContext instance associated with the handle.
+  ///
+  /// Provide a empty implementation if recovering the JSContext instance from the handle is not needed or not possible.
+  func bindContextOwner<E: JSEngine>(_ owner: JSContext<E>) where E.ContextHandle == Self
 }
 
 public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {

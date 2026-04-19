@@ -44,7 +44,8 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
       .driverContextHandle.functionClassRef
   }
 
-  public func bindContextOwner(_ owner: AnyObject) {
+  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
+  where JavaScriptCoreContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
     JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(owner).toOpaque())
   }
 
