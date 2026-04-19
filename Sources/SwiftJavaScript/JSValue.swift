@@ -4,7 +4,7 @@
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
 public struct JSValue<E: JSEngine>: ~Copyable {
-  var storage: InlineArray<3, UInt64>
+  var storage: JSValueStorage
 
   var handle: JSValueHandle<E> {
     get {
@@ -20,7 +20,7 @@ public struct JSValue<E: JSEngine>: ~Copyable {
   }
 
   public init(handleValue: JSValueHandle<E>) {
-    self.storage = InlineArray<3, UInt64>(repeating: 0)
+    self.storage = JSValueStorage()
     handle = handleValue
   }
 

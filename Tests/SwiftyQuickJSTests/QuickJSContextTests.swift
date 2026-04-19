@@ -2,6 +2,31 @@ import Testing
 
 @testable import SwiftyQuickJS
 
+@Test func quickJSValueHandleStorageRoundTripsTagUnionAndContextWords() async {
+  let context = JSContext(virtualMachine: JSVirtualMachine<QuickJSEngine>())
+
+  await context.withInstantContext { context in
+    let value = context.makeNumber(42)
+    let handle = value.borrowHandle()
+    var storage = SwiftJavaScript.JSValueStorage()
+
+    handle.bindToStorage(&storage)
+
+    #expect(storage.word0 == UInt64(bitPattern: handle.ref.tag))
+    #expect(storage.word2 == UInt64(UInt(bitPattern: handle.contextRef)))
+
+    let restored = QuickJSValueHandle(storage: storage)
+    #expect(restored.ref.tag == handle.ref.tag)
+    #expect(restored.contextRef == handle.contextRef)
+
+    var reboundStorage = SwiftJavaScript.JSValueStorage()
+    restored.bindToStorage(&reboundStorage)
+    #expect(reboundStorage.word0 == storage.word0)
+    #expect(reboundStorage.word1 == storage.word1)
+    #expect(reboundStorage.word2 == storage.word2)
+  }
+}
+
 @Test func quickJSEvaluateScriptReturnsValue() async {
   let context = JSContext(virtualMachine: JSVirtualMachine<QuickJSEngine>())
 

@@ -143,12 +143,12 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
     ).toOpaque()
   }
 
-  public func bindToStorage(_ storage: inout InlineArray<3, UInt64>) {
-    storage[0] = UInt64(UInt(bitPattern: storagePointer))
+  public func bindToStorage(_ storage: inout JSValueStorage) {
+    storage.word0 = UInt64(UInt(bitPattern: storagePointer))
   }
 
-  public init(storage: InlineArray<3, UInt64>) {
-    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storage[0]))!
+  public init(storage: JSValueStorage) {
+    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storage.word0))!
   }
 
   var engineType: MockEngine.Type {
@@ -189,6 +189,20 @@ public enum MockEngine: JSEngine {
   public static func stringEquals(_ lhs: MockStringHandle, _ rhs: MockStringHandle) -> Bool {
     lhs.string == rhs.string
   }
+}
+
+@Test func jsValueStorageRoundTripsMockHandlePointerWord() {
+  let handle = MockValueHandle(rawValue: MockValue(kind: "number", payload: "42"))
+  defer { _ = handle.releaseReference() }
+
+  var storage = JSValueStorage()
+  handle.bindToStorage(&storage)
+
+  #expect(storage.word1 == 0)
+  #expect(storage.word2 == 0)
+
+  let restored = MockValueHandle(storage: storage)
+  #expect(restored.rawValue == handle.rawValue)
 }
 
 private enum MockDriver: JSEngine {

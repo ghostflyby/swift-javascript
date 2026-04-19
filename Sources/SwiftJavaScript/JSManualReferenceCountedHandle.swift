@@ -22,10 +22,10 @@ public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHan
   /// Binds the handle's reference to the provided storage, which is used for storing the reference in a type-erased manner.
   ///
   /// Use a pointer-based storage if 24 bytes are insufficient
-  func bindToStorage(_ storage: inout InlineArray<3, UInt64>)
+  func bindToStorage(_ storage: inout JSValueStorage)
 
   /// Initializes a handle from the provided storage, which is used for storing the reference in a type-erased manner.
-  init(storage: InlineArray<3, UInt64>)
+  init(storage: JSValueStorage)
 }
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

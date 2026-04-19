@@ -11,14 +11,14 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
     self.contextRef = contextRef
   }
 
-  public func bindToStorage(_ storage: inout InlineArray<3, UInt64>) {
-    storage[0] = UInt64(UInt(bitPattern: ref))
-    storage[1] = UInt64(UInt(bitPattern: contextRef))
+  public func bindToStorage(_ storage: inout JSValueStorage) {
+    storage.word0 = UInt64(UInt(bitPattern: ref))
+    storage.word1 = UInt64(UInt(bitPattern: contextRef))
   }
 
-  public init(storage: InlineArray<3, UInt64>) {
-    self.ref = unsafeBitCast(storage[0], to: JSValueRef.self)
-    self.contextRef = unsafeBitCast(storage[1], to: JSGlobalContextRef.self)
+  public init(storage: JSValueStorage) {
+    self.ref = JSValueRef(bitPattern: UInt(storage.word0))!
+    self.contextRef = JSGlobalContextRef(bitPattern: UInt(storage.word1))!
   }
 
   @discardableResult

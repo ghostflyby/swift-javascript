@@ -2,6 +2,28 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
+@Test func javaScriptCoreValueHandleStorageRoundTripsPointerWords() async {
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
+
+  await context.withInstantContext { context in
+    let value = JSValue(number: 42, in: context)
+    let handle = value.borrowHandle()
+    var storage = SwiftJavaScript.JSValueStorage()
+
+    handle.bindToStorage(&storage)
+
+    let restored = JavaScriptCoreValueHandle(storage: storage)
+    #expect(restored.ref == handle.ref)
+    #expect(restored.contextRef == handle.contextRef)
+
+    var reboundStorage = SwiftJavaScript.JSValueStorage()
+    restored.bindToStorage(&reboundStorage)
+    #expect(reboundStorage.word0 == storage.word0)
+    #expect(reboundStorage.word1 == storage.word1)
+    #expect(reboundStorage.word2 == storage.word2)
+  }
+}
+
 @Test func jsValueObjectAndTypeHelpersWork() async {
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
