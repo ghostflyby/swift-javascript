@@ -223,7 +223,10 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func staticMemberProtocolsSupportGenericConsumption() {
   let context = mockInstantContext()
   let thisValue = mockUndefinedValue()
-  let arguments = JSArguments<MockEngine>(count: 0) { _, _ in nil }
+  let arguments = JSArguments<MockEngine>(
+    count: 0,
+    borrowedValueHandleAt: { _, _ in nil }
+  )
   let staticValue = JSStaticValue<MockEngine>(
     name: "title",
     attributes: [.readOnly],

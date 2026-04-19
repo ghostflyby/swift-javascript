@@ -757,16 +757,18 @@ private func withQuickJSArguments<R: ~Copyable>(
   contextRef: OpaquePointer,
   _ body: (borrowing JSArguments<QuickJSEngine>) -> R
 ) -> R {
-  let swiftArguments = JSArguments<QuickJSEngine>(count: count, borrowsValueHandles: true) {
-    index, _ in
-    guard index >= 0, index < count, let arguments else {
-      return nil
+  let swiftArguments = JSArguments<QuickJSEngine>(
+    count: count,
+    borrowedValueHandleAt: { index, contextHandle in
+      guard index >= 0, index < count, let arguments else {
+        return nil
+      }
+      return QuickJSValueHandle(
+        ref: arguments[index],
+        contextRef: contextHandle.ref
+      )
     }
-    return QuickJSValueHandle(
-      ref: arguments[index],
-      contextRef: contextRef
-    )
-  }
+  )
   return body(swiftArguments)
 }
 

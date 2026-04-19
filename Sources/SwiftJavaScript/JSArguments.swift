@@ -1,27 +1,13 @@
 public struct JSArguments<E: JSEngine>: ~Copyable {
   public let count: Int
-  private let borrowsValueHandles: Bool
-  private let valueHandleAt: (Int, E.ContextHandle) -> JSValueHandle<E>?
+  private let borrowedValueHandleAt: (Int, E.ContextHandle) -> JSValueHandle<E>?
 
   public init(
     count: Int,
-    valueHandleAt: @escaping (Int, E.ContextHandle) -> JSValueHandle<E>?
-  ) {
-    self.init(
-      count: count,
-      borrowsValueHandles: false,
-      valueHandleAt: valueHandleAt
-    )
-  }
-
-  public init(
-    count: Int,
-    borrowsValueHandles: Bool,
-    valueHandleAt: @escaping (Int, E.ContextHandle) -> JSValueHandle<E>?
+    borrowedValueHandleAt: @escaping (Int, E.ContextHandle) -> JSValueHandle<E>?
   ) {
     self.count = count
-    self.borrowsValueHandles = borrowsValueHandles
-    self.valueHandleAt = valueHandleAt
+    self.borrowedValueHandleAt = borrowedValueHandleAt
   }
 
   @inline(__always)
@@ -32,11 +18,11 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
       fatalError("Index out of bounds")
     }
 
-    if let handle = valueHandleAt(index, context.driverContextHandle) {
-      return JSValue(handleValue: handle)
+    guard let handle = borrowedValueHandleAt(index, context.driverContextHandle) else {
+      fatalError("JSArgument handle is unavailable")
     }
 
-    return context.makeUndefined()
+    return JSValue(handleValue: handle)
   }
 
   @inline(__always)
@@ -45,15 +31,12 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) -> R
   ) -> R {
-    if borrowsValueHandles {
-      let value = value(at: index, in: context)
-      let result = body(value)
-      // Borrowed callback arguments are owned by the engine call frame.
-      // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
-      value.discard()
-      return result
-    }
-    return body(value(at: index, in: context))
+    let value = value(at: index, in: context)
+    let result = body(value)
+    // Borrowed callback arguments are owned by the engine call frame.
+    // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
+    value.discard()
+    return result
   }
 
   @inline(__always)
@@ -62,21 +45,18 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) throws(JSValueConversionError) -> R
   ) throws(JSValueConversionError) -> R {
-    if borrowsValueHandles {
-      let value = value(at: index, in: context)
-      do {
-        let result = try body(value)
-        // Borrowed callback arguments are owned by the engine call frame.
-        // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
-        value.discard()
-        return result
-      } catch {
-        // Keep the borrow balanced even when decoding throws.
-        value.discard()
-        throw error
-      }
+    let value = value(at: index, in: context)
+    do {
+      let result = try body(value)
+      // Borrowed callback arguments are owned by the engine call frame.
+      // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
+      value.discard()
+      return result
+    } catch {
+      // Keep the borrow balanced even when decoding throws.
+      value.discard()
+      throw error
     }
-    return try body(value(at: index, in: context))
   }
 
   public func unpack<R: ~Copyable>(

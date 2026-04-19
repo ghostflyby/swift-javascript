@@ -7,12 +7,15 @@ private func makeJavaScriptCoreArguments(
   _ pointer: UnsafePointer<JSValueRef?>,
   count: Int
 ) -> JSArguments<JavaScriptCoreEngine> {
-  JSArguments<JavaScriptCoreEngine>(count: count) { index, contextHandle in
-    guard index >= 0, index < count, let valueRef = pointer[index] else {
-      return nil
+  JSArguments<JavaScriptCoreEngine>(
+    count: count,
+    borrowedValueHandleAt: { index, contextHandle in
+      guard index >= 0, index < count, let valueRef = pointer[index] else {
+        return nil
+      }
+      return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
     }
-    return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
-  }
+  )
 }
 
 @Test func builtinCodableRoundtrip() async {
