@@ -66,14 +66,14 @@ where
     hostTypeDescriptor(
       storagePolicy: storagePolicy,
       parentName: parentClass.flatMap {
-        classDefinitionRegistry.get(UInt(bitPattern: $0.ref))?.className
+        classDefinitionRegistry[UInt(bitPattern: $0.ref)]?.className
       }
     )
   }
 }
 
 private typealias JSClassObjectContextRegistry = SwiftJavaScript.JSClassMapRegistry<
-  UInt, JSContextRef
+  UInt, UInt
 >
 private typealias JavaScriptCoreClassDefinitionModelRegistry = SwiftJavaScript.JSClassMapRegistry<
   UInt,
@@ -159,15 +159,18 @@ func classPropertyName(_ propertyName: JSStringRef?) -> String? {
 }
 
 func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
-  classObjectContextRegistry.set(UInt(bitPattern: object), value: ctx)
+  classObjectContextRegistry[UInt(bitPattern: object)] = UInt(bitPattern: ctx)
 }
 
 func classObjectContext(_ object: JSObjectRef) -> JSContextRef? {
-  classObjectContextRegistry.get(UInt(bitPattern: object))
+  guard let contextAddress = classObjectContextRegistry[UInt(bitPattern: object)] else {
+    return nil
+  }
+  return JSContextRef(bitPattern: contextAddress)
 }
 
 func removeClassObjectContext(_ object: JSObjectRef) {
-  classObjectContextRegistry.remove(UInt(bitPattern: object))
+  classObjectContextRegistry.removeValue(forKey: UInt(bitPattern: object))
 }
 
 func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionModel? {
@@ -175,7 +178,7 @@ func classDefinition(from object: JSObjectRef) -> JavaScriptCoreClassDefinitionM
 }
 
 func classDefinition(for jsClass: JSClassRef) -> JavaScriptCoreClassDefinitionModel? {
-  classDefinitionRegistry.get(UInt(bitPattern: jsClass))
+  classDefinitionRegistry[UInt(bitPattern: jsClass)]
 }
 
 func rememberClassObjectDefinition(
@@ -204,7 +207,7 @@ private func finalizeCountAfterDecrement(_ object: JSObjectRef) -> Int {
 private func rememberClassDefinition(
   _ definition: JavaScriptCoreClassDefinitionModel, for jsClass: JSClassRef
 ) {
-  classDefinitionRegistry.set(UInt(bitPattern: jsClass), value: definition)
+  classDefinitionRegistry[UInt(bitPattern: jsClass)] = definition
 }
 
 private func withJavaScriptCoreDynamicPropertyCallbackInput<R>(

@@ -1,90 +1,97 @@
-import Foundation
+import Synchronization
 
-package final class JSClassMapRegistry<Key: Hashable, Value>: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [Key: Value] = [:]
+package struct JSClassMapRegistry<Key: Hashable & Sendable, Value: Sendable>:
+  Sendable, ~Copyable
+{
+  private let map = Mutex<[Key: Value]>([:])
 
   package init() {}
 
-  package func set(_ key: Key, value: Value) {
-    lock.withLock {
-      map[key] = value
+  package subscript(_ key: Key) -> Value? {
+    get {
+      map.withLock {
+        $0[key]
+      }
+    }
+    nonmutating set {
+      map.withLock {
+        $0[key] = newValue
+      }
     }
   }
 
-  package func get(_ key: Key) -> Value? {
-    lock.withLock {
-      map[key]
+  package func value(forKey key: Key, orInsert makeValue: () -> Value) -> Value {
+    if let existing = self[key] {
+      return existing
     }
-  }
 
-  package func getOrSet(_ key: Key, defaultValue: () -> Value) -> Value {
-    lock.withLock {
-      if let existing = map[key] {
+    let created = makeValue()
+
+    return map.withLock {
+      if let existing = $0[key] {
         return existing
       }
-      let newValue = defaultValue()
-      map[key] = newValue
-      return newValue
+      $0[key] = created
+      return created
     }
   }
 
   @discardableResult
-  package func remove(_ key: Key) -> Value? {
-    lock.withLock {
-      map.removeValue(forKey: key)
+  package func removeValue(forKey key: Key) -> Value? {
+    map.withLock {
+      $0.removeValue(forKey: key)
     }
   }
 }
 
-package final class JSClassDefinitionDepthRegistry<Key: Hashable, Definition>: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [Key: (definition: Definition, depth: Int)] = [:]
+package struct JSClassDefinitionDepthRegistry<Key: Hashable & Sendable, Definition: Sendable>:
+  Sendable, ~Copyable
+{
+  private let map = Mutex<[Key: (definition: Definition, depth: Int)]>([:])
 
   package init() {}
 
   package func set(_ key: Key, definition: Definition, depth: Int) {
-    lock.withLock {
-      if let current = map[key], current.depth > depth {
+    map.withLock {
+      if let current = $0[key], current.depth > depth {
         return
       }
-      map[key] = (definition, depth)
+      $0[key] = (definition, depth)
     }
   }
 
   package func get(_ key: Key) -> Definition? {
-    lock.withLock {
-      map[key]?.definition
+    map.withLock {
+      $0[key]?.definition
     }
   }
 
   package func remove(_ key: Key) {
-    _ = lock.withLock {
-      map.removeValue(forKey: key)
+    _ = map.withLock {
+      $0.removeValue(forKey: key)
     }
   }
 }
 
-package final class JSClassFinalizeCounterRegistry<Key: Hashable>: @unchecked Sendable {
-  private let lock = NSLock()
-  private var map: [Key: Int] = [:]
+package struct JSClassFinalizeCounterRegistry<Key: Hashable & Sendable>: Sendable, ~Copyable {
+  private let map = Mutex<[Key: Int]>([:])
 
   package init() {}
 
   package func setMax(_ key: Key, count: Int) {
-    lock.withLock {
-      map[key] = max(count, map[key] ?? 0)
+    map.withLock {
+      $0[key] = max(count, $0[key] ?? 0)
     }
   }
 
   package func decrement(_ key: Key) -> Int {
-    lock.withLock {
-      let current = map[key] ?? 1
+    map.withLock {
+      let current = $0[key] ?? 1
       let next = current - 1
       if next <= 0 {
-        map.removeValue(forKey: key)
+        $0.removeValue(forKey: key)
       } else {
-        map[key] = next
+        $0[key] = next
       }
       return next
     }

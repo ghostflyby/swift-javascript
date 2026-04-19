@@ -19,7 +19,7 @@ private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectSt
   >
 >
 
-private let jsClassCacheRegistry = SwiftJavaScript.JSClassCacheRegistry<ObjectIdentifier, JSClass>()
+private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSClass>()
 
 private func javaScriptCorePrivateData(
   from value: JSValueHandle<JavaScriptCoreEngine>,
@@ -60,9 +60,7 @@ where
 {
   public static var jsClass: JSClass {
     let key = ObjectIdentifier(Self.self)
-    return jsClassCacheRegistry.value(for: key) {
-      Self.makeAutoJSClass()
-    }
+    return jsClassRegistry.value(forKey: key, orInsert: Self.makeAutoJSClass)
   }
 
   fileprivate static func makeAutoJSClass() -> JSClass {
