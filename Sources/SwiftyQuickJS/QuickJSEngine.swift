@@ -97,31 +97,26 @@ public enum QuickJSEngine: JSEngine {
     _ value: QuickJSValueHandle,
     in _: QuickJSContextHandle
   ) -> JSType? {
-    if JS_IsUndefined(value.ref) {
+    switch Int(value.ref.tag) {
+    case JS_TAG_UNDEFINED:
       return .undefined
-    }
-    if JS_IsNull(value.ref) {
+    case JS_TAG_NULL:
       return .null
-    }
-    if JS_IsBool(value.ref) {
+    case JS_TAG_BOOL:
       return .boolean
-    }
-    if JS_IsBigInt(value.ref) {
+    case JS_TAG_BIG_INT, JS_TAG_SHORT_BIG_INT:
       return .bigInt
-    }
-    if JS_IsNumber(value.ref) {
+    case JS_TAG_FLOAT64, JS_TAG_INT:
       return .number
-    }
-    if JS_IsString(value.ref) {
+    case JS_TAG_STRING:
       return .string
-    }
-    if JS_IsSymbol(value.ref) {
+    case JS_TAG_SYMBOL:
       return .symbol
-    }
-    if JS_IsObject(value.ref) {
+    case JS_TAG_OBJECT:
       return .object
+    default:
+      return nil
     }
-    return nil
   }
 
   public static func toBooleanForHandle(
@@ -174,7 +169,8 @@ public enum QuickJSEngine: JSEngine {
     _ value: Bool,
     _ context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
-    QuickJSValueHandle(ref: JS_NewBool(context.ref, value), contextRef: context.ref)
+    let ref = CQuickJSValue(u: .init(int32: Int32(value ? 1 : 0)), tag: Int64(JS_TAG_BOOL))
+    return QuickJSValueHandle(ref: ref, contextRef: context.ref)
   }
 
   public static func makeNullValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle? {
