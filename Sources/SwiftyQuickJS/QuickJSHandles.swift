@@ -5,6 +5,8 @@ import SwiftJavaScript
   import CQuickJSStatic
 #elseif canImport(CQuickJSDynamic)
   import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
 #endif
 
 public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {

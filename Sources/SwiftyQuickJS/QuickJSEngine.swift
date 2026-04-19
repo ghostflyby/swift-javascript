@@ -6,6 +6,9 @@ import SwiftJavaScript
 #elseif canImport(CQuickJSDynamic)
   import CQuickJSDynamic
   typealias CQuickJSValue = CQuickJSDynamic.JSValue
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+  typealias CQuickJSValue = CQuickJSSystem.JSValue
 #endif
 
 public enum QuickJSEngine: JSEngine {
