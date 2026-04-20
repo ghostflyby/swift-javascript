@@ -46,7 +46,6 @@ public enum QuickJSEngine: JSEngine {
   public static func globalObjectValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle?
   {
     let global = JS_GetGlobalObject(context.ref)
-    defer { JS_FreeValue(context.ref, global) }
     return QuickJSValueHandle(ref: global, contextRef: context.ref)
   }
 

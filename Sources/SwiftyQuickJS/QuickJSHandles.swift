@@ -10,12 +10,22 @@ import SwiftJavaScript
 #endif
 
 public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
-  let ref: OpaquePointer
+  private let rawRef: OpaquePointer
   let ownsRuntime: Bool
 
   init(ref: OpaquePointer, ownsRuntime: Bool = true) {
-    self.ref = ref
+    self.rawRef = ref
     self.ownsRuntime = ownsRuntime
+  }
+
+  var ref: OpaquePointer {
+    updateStackTop()
+    return rawRef
+  }
+
+  @inline(__always)
+  func updateStackTop() {
+    JS_UpdateStackTop(rawRef)
   }
 
   @discardableResult
@@ -35,19 +45,29 @@ public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unch
 
 extension QuickJSRuntimeHandle: Hashable {
   public static func == (lhs: QuickJSRuntimeHandle, rhs: QuickJSRuntimeHandle) -> Bool {
-    lhs.ref == rhs.ref
+    lhs.rawRef == rhs.rawRef
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(ref)
+    hasher.combine(rawRef)
   }
 }
 
 public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable {
-  let ref: OpaquePointer
+  private let rawRef: OpaquePointer
 
   init(ref: OpaquePointer) {
-    self.ref = ref
+    self.rawRef = ref
+  }
+
+  var ref: OpaquePointer {
+    updateStackTop()
+    return rawRef
+  }
+
+  @inline(__always)
+  func updateStackTop() {
+    JS_UpdateStackTop(JS_GetRuntime(rawRef))
   }
 
   public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
@@ -70,49 +90,67 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
 
 extension QuickJSContextHandle: Hashable {
   public static func == (lhs: QuickJSContextHandle, rhs: QuickJSContextHandle) -> Bool {
-    lhs.ref == rhs.ref
+    lhs.rawRef == rhs.rawRef
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(ref)
+    hasher.combine(rawRef)
   }
 }
 
 public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
 
-  let ref: CQuickJSValue
-  let contextRef: OpaquePointer
+  private let rawRef: CQuickJSValue
+  private let rawContextRef: OpaquePointer
 
   init(ref: CQuickJSValue, contextRef: OpaquePointer, ownsValue: Bool = true) {
-    self.ref = ref
-    self.contextRef = contextRef
+    self.rawRef = ref
+    self.rawContextRef = contextRef
+  }
+
+  var ref: CQuickJSValue {
+    updateStackTop()
+    return rawRef
+  }
+
+  var contextRef: OpaquePointer {
+    updateStackTop()
+    return rawContextRef
+  }
+
+  @inline(__always)
+  func updateStackTop() {
+    JS_UpdateStackTop(JS_GetRuntime(rawContextRef))
   }
 
   @discardableResult
   public func retainReference() -> Bool {
-    _ = JS_DupValue(contextRef, ref)
+    updateStackTop()
+    _ = JS_DupValue(rawContextRef, rawRef)
     return true
   }
 
   @discardableResult
   public func releaseReference() -> Bool {
-    JS_FreeValue(contextRef, ref)
+    updateStackTop()
+    JS_FreeValue(rawContextRef, rawRef)
     return true
   }
 
   public var storageWords: JSValueStorageWords {
-    (
-      word0: UInt64(bitPattern: ref.tag),
-      word1: unsafeBitCast(ref.u, to: UInt64.self),
-      word2: UInt64(UInt(bitPattern: contextRef))
+    updateStackTop()
+    return (
+      word0: UInt64(bitPattern: rawRef.tag),
+      word1: unsafeBitCast(rawRef.u, to: UInt64.self),
+      word2: UInt64(UInt(bitPattern: rawContextRef))
     )
   }
 
   public init(storageWords: JSValueStorageWords) {
     let tag = Int64(bitPattern: storageWords.word0)
     let valueUnion = unsafeBitCast(storageWords.word1, to: JSValueUnion.self)
-    self.ref = CQuickJSValue(u: valueUnion, tag: tag)
-    self.contextRef = OpaquePointer(bitPattern: UInt(storageWords.word2))!
+    self.rawRef = CQuickJSValue(u: valueUnion, tag: tag)
+    self.rawContextRef = OpaquePointer(bitPattern: UInt(storageWords.word2))!
   }
 }
 

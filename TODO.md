@@ -45,7 +45,8 @@
 - [x] 为 TypedArray/ArrayBuffer 新增 Swift Testing 用例（已补 ArrayBuffer 与 TypedArray 的创建、buffer/offset、字节可见性与包装用例）
 - [x] 为 JSClass 全部回调路径新增 Swift Testing 用例
 - [x] `swift build --build-tests` 持续绿灯
-- [x] `swift test` 在本地环境稳定通过（已验证：73/73 通过）
+- [x] `swift test` 在本地环境稳定通过（已验证：112/112 通过）
+- [x] 迁移部分引擎无关运行时测试为 JSC/QuickJS 多引擎参数化测试（已新增共享 engine test target，覆盖脚本执行、全局 helper、属性访问、调用/构造/方法调用与基础值语义）
 
 ## 6. 类型转换体系
 - [x] 读写分离协议（`JSValueDecodable` / `JSValueEncodable`）

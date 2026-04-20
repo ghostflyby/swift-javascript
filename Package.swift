@@ -62,6 +62,14 @@ let package = Package(
       ]
     ),
     .testTarget(
+      name: "SwiftJavaScriptEngineTests",
+      dependencies: [
+        "SwiftJavaScript",
+        "SwiftyJavaScriptCore",
+        "SwiftyQuickJS",
+      ]
+    ),
+    .testTarget(
       name: "SwiftyJavaScriptCoreTests",
       dependencies: [
         "SwiftyJavaScriptCore",
