@@ -7,7 +7,7 @@ private enum JavaScriptCoreObjectLookup {
   case exception(JavaScriptCoreValueHandle)
 }
 
-public enum JavaScriptCoreEngine: JSEngine {
+public enum JavaScriptCoreEngine: Sendable, SendableMetatype {
   public typealias ValueHandle = JavaScriptCoreValueHandle
   public typealias ClassHandle = JavaScriptCoreClassHandle
   public typealias Engine = JavaScriptCoreEngine

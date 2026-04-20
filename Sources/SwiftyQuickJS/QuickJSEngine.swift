@@ -11,7 +11,7 @@ import SwiftJavaScript
   typealias CQuickJSValue = CQuickJSSystem.JSValue
 #endif
 
-public enum QuickJSEngine: JSEngine {
+public enum QuickJSEngine: Sendable, SendableMetatype {
   public typealias RuntimeHandle = QuickJSRuntimeHandle
   public typealias ContextHandle = QuickJSContextHandle
   public typealias ValueHandle = QuickJSValueHandle

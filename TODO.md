@@ -333,8 +333,15 @@ Step Q1：搭建最小 QuickJS 模块
 - [x] 记录第一批为了 QuickJS 不得不新增或调整的 `public` core API，并回写到本 TODO（已完成一处真实修正：`JSFunctionCallback<E>` 不再强制暴露当前 function object，QuickJS `makeFunction` 已按 `Unmanaged` boxed closure + C trampoline 接线）
 
 Step Q2：逐层验证 public 边界
+- [x] 将 `JSEngine` 收敛为能力协议组合别名，并拆分 JSC/QuickJS 各能力 conformance 文件；同步记录后续协议职责重排线索（已验证 `swift build` 与 `swift test` 112/112 通过）
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
 - [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：将 `JSValue` 收口为真正负责值句柄生命周期的 noncopyable 壳，并让 `QuickJSValueHandle` 改回普通 struct）
+- [ ] 后续重排线索：`_JSEngineRuntimeDriver` 同时承担 runtime/context 生命周期、脚本求值、基础值工厂、函数工厂、判型与基础转换；可评估拆出 lifecycle/evaluation/value-factory/value-conversion 协议
+- [ ] 后续重排线索：`_JSEngineInvocationDriver` 同时承担 call/construct/toObject、Array/Date/instanceof 判定与 equality；可评估将 equality 与对象判型迁到 value/object semantics 协议
+- [ ] 后续重排线索：`_JSEngineTypedArrayDriver` 同时承担 ArrayBuffer 外部内存、TypedArray 构造、字节视图与类型判定；QuickJS 目前只有部分构造能力，适合按 capability 拆分 ArrayBuffer 与 TypedArray factory/introspection
+- [ ] 后续重排线索：`_JSEnginePropertyDriver` 混合 string/value/index 属性读写、删除、存在性检查与 propertyNames 枚举；可评估拆分 keyed/indexed property 与 enumeration 能力
+- [ ] 后续重排线索：`_JSEngineStringDriver` 当前独立于 runtime/context，但 runtime 协议也包含字符串值构造/转换；后续需确认保留独立 string-handle 协议还是合并进 value conversion 边界
+- [ ] 后续重排线索：`ClassHandle` 目前挂在 `_JSEngineRuntimeDriver`，但 class/host object lifecycle 尚未形成独立能力协议；后续迁移 `JSClass`/host object 时需确认是否拆出 class bridge driver
 - [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
 
 Step Q3：测试策略

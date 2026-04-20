@@ -1,4 +1,3 @@
-public protocol JSEngine: Sendable, SendableMetatype, _JSEngineRuntimeDriver,
-  _JSEnginePropertyDriver,
-  _JSEngineInvocationDriver, _JSEngineTypedArrayDriver, _JSEngineStringDriver
-{}
+public typealias JSEngine = Sendable & SendableMetatype & _JSEngineRuntimeDriver
+  & _JSEnginePropertyDriver & _JSEngineInvocationDriver & _JSEngineTypedArrayDriver
+  & _JSEngineStringDriver
