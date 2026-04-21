@@ -129,7 +129,7 @@ public enum JSResult<E: JSEngine>: ~Copyable {
 ```swift
 public protocol JSEngine {}
 
-internal protocol _JSEngineDriver {
+internal protocol JSEngineDriver {
   associatedtype Engine: JSEngine
   associatedtype RawRuntime
   associatedtype RawContext

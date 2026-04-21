@@ -1,4 +1,4 @@
-public protocol _JSEnginePropertyDriver: _JSEngineRuntimeDriver {
+public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
   static func propertyNamesForHandle(
     on object: ValueHandle,
     in context: ContextHandle

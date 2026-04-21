@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: _JSEngineRuntimeDriver {
+extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,

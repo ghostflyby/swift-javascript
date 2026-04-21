@@ -1,6 +1,6 @@
 import SwiftJavaScript
 
-extension QuickJSEngine: _JSEngineStringDriver {
+extension QuickJSEngine: JSEngineStringDriver {
   public static func stringLength(_ stringHandle: QuickJSStringHandle) -> Int {
     stringHandle.length
   }

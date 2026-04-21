@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: _JSEngineInvocationDriver {
+extension JavaScriptCoreEngine: JSEngineInvocationDriver {
   public static func callFunctionHandle(
     _ function: JSValueHandle<JavaScriptCoreEngine>,
     this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,

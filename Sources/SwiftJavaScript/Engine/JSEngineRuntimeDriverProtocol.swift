@@ -1,4 +1,4 @@
-public protocol _JSEngineRuntimeDriver {
+public protocol JSEngineRuntimeDriver {
   associatedtype Engine: JSEngine = Self
   associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
@@ -87,7 +87,7 @@ public protocol _JSEngineRuntimeDriver {
   ) -> Bool
 }
 
-extension _JSEngineRuntimeDriver {
+extension JSEngineRuntimeDriver {
   public static func isValueHandleCompatibleWithContext(
     _ value: ValueHandle,
     in context: ContextHandle

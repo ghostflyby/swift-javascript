@@ -8,7 +8,7 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: _JSEngineInvocationDriver {
+extension QuickJSEngine: JSEngineInvocationDriver {
   public static func callFunctionHandle(
     _ function: QuickJSValueHandle,
     this thisValue: QuickJSValueHandle?,

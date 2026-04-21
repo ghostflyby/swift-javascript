@@ -8,7 +8,7 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: _JSEngineTypedArrayDriver {
+extension QuickJSEngine: JSEngineTypedArrayDriver {
   public static func makeArrayBufferWithBytesNoCopyHandle(
     in context: QuickJSContextHandle,
     bytes: UnsafeMutableRawPointer?,

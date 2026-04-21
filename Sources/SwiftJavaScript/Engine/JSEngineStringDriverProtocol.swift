@@ -1,4 +1,4 @@
-public protocol _JSEngineStringDriver {
+public protocol JSEngineStringDriver {
   associatedtype StringHandle: JSStringManualReferenceCountedHandle
 
   static func stringLength(_ stringHandle: StringHandle) -> Int

@@ -8,7 +8,7 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: _JSEnginePropertyDriver {
+extension QuickJSEngine: JSEnginePropertyDriver {
   public static func propertyNamesForHandle(
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle

@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: _JSEngineTypedArrayDriver {
+extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   public static func makeArrayBufferWithBytesNoCopyHandle(
     in context: JavaScriptCoreContextHandle,
     bytes: UnsafeMutableRawPointer?,

@@ -2,7 +2,7 @@ import Foundation
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: _JSEngineStringDriver {
+extension JavaScriptCoreEngine: JSEngineStringDriver {
   public static func stringLength(_ stringHandle: JavaScriptCoreStringHandle) -> Int {
     JSStringGetLength(stringHandle.ref)
   }

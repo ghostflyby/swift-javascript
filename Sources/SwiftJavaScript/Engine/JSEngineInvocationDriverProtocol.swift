@@ -1,4 +1,4 @@
-public protocol _JSEngineInvocationDriver: _JSEngineRuntimeDriver {
+public protocol JSEngineInvocationDriver: JSEngineRuntimeDriver {
   static func callFunctionHandle(
     _ function: ValueHandle,
     this thisValue: ValueHandle?,

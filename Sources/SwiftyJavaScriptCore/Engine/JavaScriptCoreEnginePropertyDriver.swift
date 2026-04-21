@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: _JSEnginePropertyDriver {
+extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle

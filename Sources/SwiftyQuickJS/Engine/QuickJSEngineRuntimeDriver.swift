@@ -8,7 +8,7 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: _JSEngineRuntimeDriver {
+extension QuickJSEngine: JSEngineRuntimeDriver {
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,

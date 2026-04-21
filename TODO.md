@@ -74,19 +74,19 @@
 - [x] Core：删除重复的 `JSDriverResult`，统一改用 `JSResult`，并清理 backend/mock 中仅作枚举重包装的转换 helper
 - [x] JavaScriptCore backend：移除 `JavaScriptCoreRawRuntimeStorage`，并让 `JSVirtualMachine/JSContext` 生命周期走 runtime/context handle 的手动引用计数链路
 - [x] JavaScriptCore backend：去除 `JavaScriptCoreRawContext` 的 class 包装，改为 handle-first 的值语义上下文载体
-- [x] 合并引擎协议职责第一阶段：移除 `_JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
+- [x] 合并引擎协议职责第一阶段：移除 `JSEngineDriver` 组合协议，改为由实现类型直接 conform `JSEngine + runtime/property/invocation` 子协议，并将通用 handle helper 扩展挂到 `JSEngine`（保持现有 API 与测试稳定）
 - [x] 删除未实现的 QuickJS 迁移脚手架：移除 `QuickJSEngine` 与仅其依赖的 `_JSErasedValueHandle`，并将 core tests 的相关覆盖切换到 `MockEngine`
-- [x] 将 `_JSEngineRuntimeDriver/_JSEnginePropertyDriver/_JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与统一结果类型公开可见性）
+- [x] 将 `JSEngineRuntimeDriver/JSEnginePropertyDriver/JSEngineInvocationDriver` 公开化，并将 `JSEngine` 调整为能力协议组合（补充默认未实现行为与统一结果类型公开可见性）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static value/function callback 的结果/异常包装改复用 backend helper）
 - [x] 继续收口 `JSClass` callback glue（已将 static function callback 的名称解析改走 `JSValue` helper，减少 backend 内部 raw context 构造）
 - [x] 继续收口 `JSClass` callback glue（已将 callback 输出归一化 helper 统一收口到 backend driver，facade 删除重复包装）
 - [x] 继续收口 `JSClassValueConvertible` callback glue（已将 static function 名称解析改走 `JSValue` helper，减少 callback 内部 raw context 构造）
 - [x] 收口 `JSClassValueConvertible` 的 facade/raw JSC 直连（已迁 privateData 读取与 class-backed object 创建到 backend handle helper）
 - [x] 删除迁移半成品 `JSClassValueConvertible` 协议：将 `jsClassDefinition` 上收至 core `JSClassValueConvertible`，JSC 专用默认实现改挂在其 facade 扩展，`JSClassAutoConvertible` 宏改为仅生成 core 协议 conformance
-- [x] 收口 `JSValue` symbol 构造的 facade 直连（已补 `_JSEngineDriver`/JSC backend 的 symbol bridge，并切 `JSValue(symbol:in:)` 到 context/handle helper）
+- [x] 收口 `JSValue` symbol 构造的 facade 直连（已补 `JSEngineDriver`/JSC backend 的 symbol bridge，并切 `JSValue(symbol:in:)` 到 context/handle helper）
 - [x] 收口 `JSCodableValueConverter` 的 facade/raw JSC 直连（已将 object/array 构造、属性读写以及 encoder 容器的 primitive/ref 级值构造统一迁到 handle/context helper；当前剩余 raw ref 主要是容器自身的内部存储模型）
 - [x] 让 `SwiftyJavaScriptCore` facade 内部开始消费 `SwiftJavaScript` handle（已迁 `JSInstantContext` 基础值/脚本求值、`JSValue` 的基础构造器与 call/construct/invokeMethod/toObject/type helpers/defineProperty，以及 `JSObject` 的 string-key/value-key/index 属性读写删查）
-- [x] 将 `SwiftJavaScript` 迁移期 generic handle 接到 `_JSEngineDriver`（已补 runtime/context/value/result 的通用桥接构造、脚本求值与基础属性操作，并用 mock driver tests 验证；当前先以 copyable scaffolding 形态打通桥接）
+- [x] 将 `SwiftJavaScript` 迁移期 generic handle 接到 `JSEngineDriver`（已补 runtime/context/value/result 的通用桥接构造、脚本求值与基础属性操作，并用 mock driver tests 验证；当前先以 copyable scaffolding 形态打通桥接）
 - [x] 扩展 `SwiftJavaScript` generic handle 的公共语义桥接（已补 object/array、call/construct、toObject 与类型辅助，并以 mock driver tests 验证）
 - [x] 在 `SwiftJavaScript` 中引入迁移期的引擎无关 concrete handle 类型（已补 `JSRuntimeHandle`/`JSBorrowedContextHandle`/`JSValueHandle`/`JSResultHandle` 骨架与 core tests，作为后续替换最终命名的迁移脚手架）
 - [x] 收尾迁移脚手架：删除 `JSBorrowedContextHandle`，测试改为引擎自有 `ContextHandle` 的 `rawContext` 语义
@@ -166,7 +166,7 @@
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 host descriptor/attributes 核心语义测试）
 - [x] 继续迁移通用测试到 `SwiftJavaScriptTests`（已补 `JSHostTypeDescriptor` 可选绑定字段语义测试）
 - [x] 继续迁移 core 类型到 `SwiftJavaScript`（已完成统一结果类型收口；原 `JSDriverResult` 已删除并并入 `JSResult`）
-- [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `_JSEngineDriver` 协议声明为独立文件）
+- [x] 继续迁移 core 类型到 `SwiftJavaScript`（已拆分 `JSEngineDriver` 协议声明为独立文件）
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已抽离 `JSResult` 通用容器到 `SwiftJavaScript` 并在 facade 保留 `JSValue` 特化别名）
 - [x] 继续迁移通用类型离开 JSC 到 SJS（已迁移 `Box` 与 `SendableBoxUnsafe` 到 `SwiftJavaScript`，并收敛为 `package` 可见性）
 - [x] 继续迁移通用实现细节离开 JSC 到 SJS（已迁移 `countTypePack` 到 `SwiftJavaScript` 并保持 `package` 可见性）
@@ -181,7 +181,7 @@
 - [x] 继续迁移 core 描述类型到 SJS（按“一次完成”原则，已整体拆分 `JSHostDescriptors.swift` 剩余类型并删除聚合文件）
 - [x] 继续迁移 core 类型到 SJS（已按一次完成原则拆分 `JSEngine.swift` 中协议与引擎标记类型）
 - [x] 继续迁移 core 实现细节到 SJS（按一次完成原则拆分 `JSEngineDriver.swift` 聚合 extension）
-- [x] 继续迁移 core 协议结构到 SJS（按一次完成原则将 `_JSEngineDriver` 拆分为 runtime/property/invocation 子协议并保留组合门面）
+- [x] 继续迁移 core 协议结构到 SJS（按一次完成原则将 `JSEngineDriver` 拆分为 runtime/property/invocation 子协议并保留组合门面）
 - [x] 继续收口 facade 结构复杂度（已将 `JSValue` 的 handle/result bridge 从主文件拆分为独立文件，行为保持不变）
 - [x] 继续收口 facade 结构复杂度（已将 `JSValue` 的调用/对象互操作 extension 拆分到独立文件，便于后续移动类型位置）
 - [x] 中期解耦推进：`JSValue` 内部存储已由直接 `ref/ctx` 切换为 backend raw value 持有（对外 API 与行为保持兼容）
@@ -251,7 +251,7 @@
 - [x] 将 `JSArrayBuffer` / `JSTypedArray` 下沉到 `SwiftJavaScript` core（新增 `JSArrayBuffer<E>` / `JSTypedArray<E>` 与 typed-array driver 协议；facade 收口为 typealias）
 - [x] 将 `JSObject` 属性访问与编解码重载下沉到 `SwiftJavaScript` core（核心改为 `JSValue<E>` 泛型实现，facade 保留 `JSString` 兼容包装）
 - [x] 将 `JSString` 协议定义下沉到 `SwiftJavaScript` core（facade 侧保留 `ref` 兼容包装）
-- [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `_JSEngineStringDriver` 与 JSC/mock 实现）
+- [x] 将 `JSStringManaged` / `JSStringValue` 下沉到 `SwiftJavaScript` core，并在 facade 保留 `ref` 兼容包装（已补 `JSEngineStringDriver` 与 JSC/mock 实现）
 - [ ] 在 `SwiftJavaScript` core 层补齐引擎泛型约束，先覆盖 handle/result/driver 协议签名（进行中：conversion 协议去引擎参数化）
 - [x] 继续下沉 Context 全局对象/全局属性通用能力到 core（已补 runtime driver 的 global object handle 抽象，并将 JSInstantContext/JSContext 全局对象与全局属性通用方法下沉到 core）
 - [x] 继续下沉 `JSValueBridgeAdapter` 的通用调用桥接到 core（call/construct/invokeMethod/toObject/type helpers 已移除 facade 重复实现，跨 VM 校验改为 runtime driver 兼容性 hook）
@@ -288,7 +288,7 @@ Step 1：继续删 facade 薄包装
 - [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSValueResultBridge.swift` 中仅作 core `bridgeHandleResult` 薄封装的入口，调用点直接落到 core helper（已删除未使用的 `JSResult.from(handleResult:)` facade 包装）
 - [x] 评估并删除 `Sources/SwiftyJavaScriptCore/JSInstantContext.swift` / `Sources/SwiftyJavaScriptCore/JSContext.swift` 中仅暴露 `globalContextRef` 的兼容扩展；若仍需要 raw context，改集中到 backend-only 桥接面（已删除 `JSInstantContext.globalContextRef`；移除了 facade `JSContext.globalContextRef` 文件，剩余 raw context 访问收口为 JSC backend 内部桥接入口供测试/底层使用）
 - [x] 评估 `Sources/SwiftyJavaScriptCore/JSArguments.swift` 的 `pointer + count` 初始化是否仍值得保留在 facade；若只服务 callback glue，则收口到 callback 所在文件附近（已删除该 facade 文件；backend 改为就地构造 `JSArguments`，测试改为局部 helper）
-- [x] 收口 `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift` 中仅服务 callback/typed-array bridge 的 helper；driver 仅保留 core driver 协议要求的方法与直接实现（已将 callback glue、typed-array bridge、property-attributes 和 `JavaScriptCoreStringHandle` 拆到独立 bridge 文件）
+- [x] 收口 `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreBackendDriver.swift` 中仅服务 callback/typed-array bridge 的 helper；driver 仅保留 core driver 协议要求的方法与直接实现（已将 callback glue、typed-array bridge、property-attributes 和 `JavaScriptCoreStringHandle` 拆到独立 bridge 文件）
 
 Step 2：为剩余值语义 API 决定是否扩 core driver
 - [x] 评估 `Sources/SwiftyJavaScriptCore/JSValueBridgeAdapter.swift` / `Sources/SwiftyJavaScriptCore/JSValueInvocationInterop.swift` 的 `looselyEquals/strictlyEquals` 是否提升为 core driver 协议能力；若决定不通用，则明确标注为 JSC-only API（已决定上收到 core driver）
@@ -335,14 +335,15 @@ Step Q1：搭建最小 QuickJS 模块
 Step Q2：逐层验证 public 边界
 - [x] 将 `JSEngine` 收敛为能力协议组合别名，并拆分 JSC/QuickJS 各能力 conformance 文件；同步记录后续协议职责重排线索（已验证 `swift build` 与 `swift test` 112/112 通过）
 - [x] 将 JSC/QuickJS 各 driver conformance 的具体实现移动到对应 `*Engine*Driver.swift` 文件，保留少量跨能力共享 bridge helper（已验证 `swift build` 与 `swift test` 112/112 通过）
+- [x] 整理 engine 协议与 driver/conformance 实现到各 target 的 `Engine/` 子目录，降低源根目录文件数量
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
 - [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：将 `JSValue` 收口为真正负责值句柄生命周期的 noncopyable 壳，并让 `QuickJSValueHandle` 改回普通 struct）
-- [ ] 后续重排线索：`_JSEngineRuntimeDriver` 同时承担 runtime/context 生命周期、脚本求值、基础值工厂、函数工厂、判型与基础转换；可评估拆出 lifecycle/evaluation/value-factory/value-conversion 协议
-- [ ] 后续重排线索：`_JSEngineInvocationDriver` 同时承担 call/construct/toObject、Array/Date/instanceof 判定与 equality；可评估将 equality 与对象判型迁到 value/object semantics 协议
-- [ ] 后续重排线索：`_JSEngineTypedArrayDriver` 同时承担 ArrayBuffer 外部内存、TypedArray 构造、字节视图与类型判定；QuickJS 目前只有部分构造能力，适合按 capability 拆分 ArrayBuffer 与 TypedArray factory/introspection
-- [ ] 后续重排线索：`_JSEnginePropertyDriver` 混合 string/value/index 属性读写、删除、存在性检查与 propertyNames 枚举；可评估拆分 keyed/indexed property 与 enumeration 能力
-- [ ] 后续重排线索：`_JSEngineStringDriver` 当前独立于 runtime/context，但 runtime 协议也包含字符串值构造/转换；后续需确认保留独立 string-handle 协议还是合并进 value conversion 边界
-- [ ] 后续重排线索：`ClassHandle` 目前挂在 `_JSEngineRuntimeDriver`，但 class/host object lifecycle 尚未形成独立能力协议；后续迁移 `JSClass`/host object 时需确认是否拆出 class bridge driver
+- [ ] 后续重排线索：`JSEngineRuntimeDriver` 同时承担 runtime/context 生命周期、脚本求值、基础值工厂、函数工厂、判型与基础转换；可评估拆出 lifecycle/evaluation/value-factory/value-conversion 协议
+- [ ] 后续重排线索：`JSEngineInvocationDriver` 同时承担 call/construct/toObject、Array/Date/instanceof 判定与 equality；可评估将 equality 与对象判型迁到 value/object semantics 协议
+- [ ] 后续重排线索：`JSEngineTypedArrayDriver` 同时承担 ArrayBuffer 外部内存、TypedArray 构造、字节视图与类型判定；QuickJS 目前只有部分构造能力，适合按 capability 拆分 ArrayBuffer 与 TypedArray factory/introspection
+- [ ] 后续重排线索：`JSEnginePropertyDriver` 混合 string/value/index 属性读写、删除、存在性检查与 propertyNames 枚举；可评估拆分 keyed/indexed property 与 enumeration 能力
+- [ ] 后续重排线索：`JSEngineStringDriver` 当前独立于 runtime/context，但 runtime 协议也包含字符串值构造/转换；后续需确认保留独立 string-handle 协议还是合并进 value conversion 边界
+- [ ] 后续重排线索：`ClassHandle` 目前挂在 `JSEngineRuntimeDriver`，但 class/host object lifecycle 尚未形成独立能力协议；后续迁移 `JSClass`/host object 时需确认是否拆出 class bridge driver
 - [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
 
 Step Q3：测试策略
@@ -354,7 +355,7 @@ Step Q3：测试策略
 ### 9.1 当前基线（2026-03-14）
 - 当前 `Sources/**/*.swift` 中 `import JavaScriptCore` 总计：`1` 处
 - backend 适配层保留导入：`1` 处
-	- `Sources/SwiftyJavaScriptCore/JavaScriptCoreBackendDriver.swift`
+	- `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreBackendDriver.swift`
 - 需在重构中彻底消除导入（目标清单）：`0` 处（已清零）
 
 ### 9.2 阶段性指标（消除导入且保持功能）

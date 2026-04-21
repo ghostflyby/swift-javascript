@@ -1,4 +1,4 @@
-public protocol _JSEngineTypedArrayDriver: _JSEngineRuntimeDriver {
+public protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver {
   static func makeArrayBufferWithBytesNoCopyHandle(
     in context: ContextHandle,
     bytes: UnsafeMutableRawPointer?,
