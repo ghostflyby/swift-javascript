@@ -336,6 +336,7 @@ Step Q2：逐层验证 public 边界
 - [x] 将 `JSEngine` 收敛为能力协议组合别名，并拆分 JSC/QuickJS 各能力 conformance 文件；同步记录后续协议职责重排线索（已验证 `swift build` 与 `swift test` 112/112 通过）
 - [x] 将 JSC/QuickJS 各 driver conformance 的具体实现移动到对应 `*Engine*Driver.swift` 文件，保留少量跨能力共享 bridge helper（已验证 `swift build` 与 `swift test` 112/112 通过）
 - [x] 整理 engine 协议与 driver/conformance 实现到各 target 的 `Engine/` 子目录，降低源根目录文件数量
+- [x] 整理 `SwiftJavaScript` core 内 `JSClass` 与 host descriptor 相关源码到子目录，降低 core 源根目录文件数量
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
 - [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：将 `JSValue` 收口为真正负责值句柄生命周期的 noncopyable 壳，并让 `QuickJSValueHandle` 改回普通 struct）
 - [ ] 后续重排线索：`JSEngineRuntimeDriver` 同时承担 runtime/context 生命周期、脚本求值、基础值工厂、函数工厂、判型与基础转换；可评估拆出 lifecycle/evaluation/value-factory/value-conversion 协议
