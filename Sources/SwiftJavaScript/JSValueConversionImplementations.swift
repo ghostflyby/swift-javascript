@@ -6,6 +6,7 @@ extension Bool: JSValueDecodable, JSValueEncodable {
     self = context.toBoolean(value)
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -33,6 +34,7 @@ extension Double: JSValueDecodable, JSValueEncodable {
     self = context.toNumber(value)
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -61,6 +63,7 @@ extension Int32: JSValueDecodable, JSValueEncodable {
     self = Int32(number)
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -93,6 +96,7 @@ extension UInt32: JSValueDecodable, JSValueEncodable {
     self = UInt32(number)
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -124,6 +128,7 @@ extension String: JSValueDecodable, JSValueEncodable {
     self = context.toString(value)
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -144,6 +149,7 @@ extension String {
 }
 
 extension Never: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -155,30 +161,36 @@ extension Never: JSValueEncodable {
 extension JSValue {
   public func tryDecode<T: JSValueDecodable>(
     as type: T.Type = T.self,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> T {
     _ = type
-    return try T.tryDecode(self, in: context)
+    let instantContext = JSInstantContext<E>(context: context)
+    return try T.tryDecode(self, in: instantContext)
   }
 
-  public func toBool(in context: isolated JSContext<E> = #isolation) -> Bool {
-    Bool(value: self, in: context)
+  public func toBool(in context: borrowing isolated JSContext<E> = #isolation) -> Bool {
+    let instantContext = JSInstantContext<E>(context: context)
+    return Bool(value: self, in: instantContext)
   }
 
-  public func toDouble(in context: isolated JSContext<E> = #isolation) -> Double {
-    Double(value: self, in: context)
+  public func toDouble(in context: borrowing isolated JSContext<E> = #isolation) -> Double {
+    let instantContext = JSInstantContext<E>(context: context)
+    return Double(value: self, in: instantContext)
   }
 
-  public func toInt32(in context: isolated JSContext<E> = #isolation) -> Int32 {
-    Int32(value: self, in: context)
+  public func toInt32(in context: borrowing isolated JSContext<E> = #isolation) -> Int32 {
+    let instantContext = JSInstantContext<E>(context: context)
+    return Int32(value: self, in: instantContext)
   }
 
-  public func toUInt32(in context: isolated JSContext<E> = #isolation) -> UInt32 {
-    UInt32(value: self, in: context)
+  public func toUInt32(in context: borrowing isolated JSContext<E> = #isolation) -> UInt32 {
+    let instantContext = JSInstantContext<E>(context: context)
+    return UInt32(value: self, in: instantContext)
   }
 
-  public func toString(in context: isolated JSContext<E> = #isolation) -> String {
-    String(value: self, in: context)
+  public func toString(in context: borrowing isolated JSContext<E> = #isolation) -> String {
+    let instantContext = JSInstantContext<E>(context: context)
+    return String(value: self, in: instantContext)
   }
 
   public func toBool(in context: borrowing JSInstantContext<E>) -> Bool {

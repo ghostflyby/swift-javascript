@@ -86,20 +86,8 @@ public protocol JSClassDefinition: Sendable {
   var hasProperty:
     (@Sendable (borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>, String) -> Bool)?
   { get set }
-  var getProperty:
-    (
-      @Sendable (borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>, String)
-        -> JSResult<JSValue<Engine>>
-    )?
-  { get set }
-  var setProperty:
-    (
-      @Sendable (
-        borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>, String,
-        borrowing JSValue<Engine>
-      ) -> JSValue<Engine>?
-    )?
-  { get set }
+  var hasDynamicPropertyGetter: Bool { get }
+  var hasDynamicPropertySetter: Bool { get }
   var deleteProperty:
     (@Sendable (borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>, String) -> Bool)?
   { get set }
@@ -110,26 +98,8 @@ public protocol JSClassDefinition: Sendable {
       ) -> Void
     )?
   { get set }
-  var callAsFunction:
-    (
-      @Sendable (
-        borrowing JSInstantContext<Engine>,
-        inout JSValue<Engine>,
-        inout JSValue<Engine>,
-        borrowing JSArguments<Engine>
-      ) -> JSValue<Engine>
-    )?
-  { get set }
-  var callAsConstructor:
-    (
-      @Sendable (
-        borrowing JSInstantContext<Engine>,
-        inout JSValue<Engine>,
-        inout JSValue<Engine>,
-        borrowing JSArguments<Engine>
-      ) -> JSValue<Engine>
-    )?
-  { get set }
+  var hasCallAsFunction: Bool { get }
+  var hasConstructor: Bool { get }
   var hasInstance:
     (
       @Sendable (
@@ -137,13 +107,46 @@ public protocol JSClassDefinition: Sendable {
       ) -> Bool
     )?
   { get set }
-  var convertToType:
-    (
-      @Sendable (
-        borrowing JSInstantContext<Engine>, inout JSValue<Engine>, JSType, inout JSValue<Engine>
-      ) -> JSValue<Engine>
-    )?
-  { get set }
+  var hasConvertToType: Bool { get }
+
+  @_lifetime(immortal)
+  func dynamicPropertyValue(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String
+  ) -> JSResult<JSValue<Engine>>
+
+  @_lifetime(immortal)
+  func setDynamicPropertyException(
+    in context: borrowing JSInstantContext<Engine>,
+    on thisValue: borrowing JSValue<Engine>,
+    forKey key: String,
+    to newValue: borrowing JSValue<Engine>
+  ) -> JSValue<Engine>?
+
+  @_lifetime(immortal)
+  func callAsFunctionValue(
+    in context: borrowing JSInstantContext<Engine>,
+    function: inout JSValue<Engine>,
+    this thisValue: inout JSValue<Engine>,
+    arguments: borrowing JSArguments<Engine>
+  ) -> JSValue<Engine>?
+
+  @_lifetime(immortal)
+  func callAsConstructorValue(
+    in context: borrowing JSInstantContext<Engine>,
+    constructor: inout JSValue<Engine>,
+    this thisValue: inout JSValue<Engine>,
+    arguments: borrowing JSArguments<Engine>
+  ) -> JSValue<Engine>?
+
+  @_lifetime(immortal)
+  func convertToTypeValue(
+    in context: borrowing JSInstantContext<Engine>,
+    value: inout JSValue<Engine>,
+    type: JSType,
+    exception: inout JSValue<Engine>
+  ) -> JSValue<Engine>?
 }
 
 public struct JSClassDefinitionMetadata<ParentClass: Sendable>: Sendable {
@@ -223,15 +226,15 @@ extension JSClassDefinition {
     JSClassCallbackInstallationPlan(
       hasInitializer: initialize != nil,
       hasFinalizer: finalize != nil,
-      hasDynamicPropertyGetter: getProperty != nil,
-      hasDynamicPropertySetter: setProperty != nil,
+      hasDynamicPropertyGetter: hasDynamicPropertyGetter,
+      hasDynamicPropertySetter: hasDynamicPropertySetter,
       hasDynamicPropertyHas: hasProperty != nil,
       hasDynamicPropertyDelete: deleteProperty != nil,
       hasPropertyEnumerator: getPropertyNames != nil,
-      hasCallAsFunction: callAsFunction != nil,
-      hasConstructor: callAsConstructor != nil,
+      hasCallAsFunction: hasCallAsFunction,
+      hasConstructor: hasConstructor,
       hasHasInstance: hasInstance != nil,
-      hasConvertToType: convertToType != nil
+      hasConvertToType: hasConvertToType
     )
   }
 
@@ -313,23 +316,6 @@ extension JSClassDefinition {
     }
   }
 
-  package func dynamicPropertyValue(
-    in context: borrowing JSInstantContext<Engine>,
-    on thisValue: borrowing JSValue<Engine>,
-    forKey key: String
-  ) -> JSResult<JSValue<Engine>> {
-    getProperty?(context, thisValue, key) ?? .value(JSValue(undefinedIn: context))
-  }
-
-  package func setDynamicPropertyException(
-    in context: borrowing JSInstantContext<Engine>,
-    on thisValue: borrowing JSValue<Engine>,
-    forKey key: String,
-    to newValue: borrowing JSValue<Engine>
-  ) -> JSValue<Engine>? {
-    setProperty?(context, thisValue, key, newValue)
-  }
-
   package func hasDynamicProperty(
     in context: borrowing JSInstantContext<Engine>,
     on thisValue: borrowing JSValue<Engine>,
@@ -362,10 +348,7 @@ public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Senda
       nil
 
   public var getProperty:
-    (
-      @Sendable (borrowing JSInstantContext<E>, borrowing JSValue<E>, String)
-        -> JSResult<JSValue<E>>
-    )? =
+    (@Sendable (E.ContextHandle, JSValueHandle<E>, String) -> (Bool, JSValueHandle<E>))? =
       nil
 
   public var setProperty:
@@ -374,7 +357,7 @@ public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Senda
         borrowing JSInstantContext<E>, borrowing JSValue<E>, String,
         borrowing JSValue<E>
       )
-        -> JSValue<E>?
+        -> sending JSValueHandle<E>?
     )? =
       nil
 
@@ -397,7 +380,7 @@ public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Senda
         inout JSValue<E>,
         inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSValue<E>
+      ) -> sending JSValueHandle<E>
     )? = nil
 
   public var callAsConstructor:
@@ -407,7 +390,7 @@ public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Senda
         inout JSValue<E>,
         inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSValue<E>
+      ) -> sending JSValueHandle<E>
     )? = nil
 
   public var hasInstance:
@@ -424,7 +407,7 @@ public struct JSEngineClassBehavior<E: JSEngine, PropertyNameAccumulator>: Senda
       @Sendable (
         borrowing JSInstantContext<E>, inout JSValue<E>, JSType, inout JSValue<E>
       )
-        -> JSValue<E>
+        -> sending JSValueHandle<E>
     )? =
       nil
 
@@ -488,14 +471,35 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
     set { behavior.hasProperty = newValue }
   }
 
+  public var hasDynamicPropertyGetter: Bool {
+    behavior.getProperty != nil
+  }
+
   public var getProperty:
     (
       @Sendable (borrowing JSInstantContext<E>, borrowing JSValue<E>, String)
-        -> JSResult<JSValue<E>>
+        -> sending JSResult<JSValue<E>>
     )?
   {
-    get { behavior.getProperty }
-    set { behavior.getProperty = newValue }
+    get { nil }
+    set {
+      guard let newValue else {
+        behavior.getProperty = nil
+        return
+      }
+      behavior.getProperty = { contextHandle, thisHandle, key in
+        let context = JSInstantContext<E>(handle: contextHandle)
+        let thisValue = JSValue<E>(handleValue: thisHandle)
+        let result = retainResult(newValue(context, thisValue, key))
+        thisValue.discard()
+        switch consume result {
+        case .value(let value):
+          return (false, value.takeHandle())
+        case .exception(let exception):
+          return (true, exception.takeHandle())
+        }
+      }
+    }
   }
 
   public var setProperty:
@@ -504,11 +508,26 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         borrowing JSInstantContext<E>, borrowing JSValue<E>, String,
         borrowing JSValue<E>
       )
-        -> JSValue<E>?
+        -> sending JSValue<E>?
     )?
   {
-    get { behavior.setProperty }
-    set { behavior.setProperty = newValue }
+    get { nil }
+    set {
+      guard let newValue else {
+        behavior.setProperty = nil
+        return
+      }
+      behavior.setProperty = { context, thisValue, key, propertyValue in
+        guard let exception = newValue(context, thisValue, key, propertyValue) else {
+          return nil
+        }
+        return JSValue(retaining: exception).takeHandle()
+      }
+    }
+  }
+
+  public var hasDynamicPropertySetter: Bool {
+    behavior.setProperty != nil
   }
 
   public var deleteProperty:
@@ -536,11 +555,24 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         inout JSValue<E>,
         inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSValue<E>
+      ) -> sending JSValue<E>
     )?
   {
-    get { behavior.callAsFunction }
-    set { behavior.callAsFunction = newValue }
+    get { nil }
+    set {
+      guard let newValue else {
+        behavior.callAsFunction = nil
+        return
+      }
+      behavior.callAsFunction = { context, function, thisValue, arguments in
+        let value = newValue(context, &function, &thisValue, arguments)
+        return JSValue(retaining: value).takeHandle()
+      }
+    }
+  }
+
+  public var hasCallAsFunction: Bool {
+    behavior.callAsFunction != nil
   }
 
   public var callAsConstructor:
@@ -550,11 +582,24 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         inout JSValue<E>,
         inout JSValue<E>,
         borrowing JSArguments<E>
-      ) -> JSValue<E>
+      ) -> sending JSValue<E>
     )?
   {
-    get { behavior.callAsConstructor }
-    set { behavior.callAsConstructor = newValue }
+    get { nil }
+    set {
+      guard let newValue else {
+        behavior.callAsConstructor = nil
+        return
+      }
+      behavior.callAsConstructor = { context, constructor, thisValue, arguments in
+        let value = newValue(context, &constructor, &thisValue, arguments)
+        return JSValue(retaining: value).takeHandle()
+      }
+    }
+  }
+
+  public var hasConstructor: Bool {
+    behavior.callAsConstructor != nil
   }
 
   public var hasInstance:
@@ -574,10 +619,94 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
       @Sendable (
         borrowing JSInstantContext<E>, inout JSValue<E>, JSType, inout JSValue<E>
       )
-        -> JSValue<E>
+        -> sending JSValue<E>
     )?
   {
-    get { behavior.convertToType }
-    set { behavior.convertToType = newValue }
+    get { nil }
+    set {
+      guard let newValue else {
+        behavior.convertToType = nil
+        return
+      }
+      behavior.convertToType = { context, value, type, exception in
+        let converted = newValue(context, &value, type, &exception)
+        return JSValue(retaining: converted).takeHandle()
+      }
+    }
+  }
+
+  public var hasConvertToType: Bool {
+    behavior.convertToType != nil
+  }
+
+  @_lifetime(immortal)
+  public func dynamicPropertyValue(
+    in context: borrowing JSInstantContext<E>,
+    on thisValue: borrowing JSValue<E>,
+    forKey key: String
+  ) -> JSResult<JSValue<E>> {
+    guard let getProperty = behavior.getProperty else {
+      guard let handle = E.makeUndefinedValueHandle(context.driverContextHandle) else {
+        preconditionFailure("JSEngineClassDefinition could not create undefined handle")
+      }
+      return .value(JSValue(handleValue: handle))
+    }
+    let result = getProperty(context.driverContextHandle, thisValue.borrowHandle(), key)
+    if result.0 {
+      return .exception(JSValue(handleValue: result.1))
+    }
+    return .value(JSValue(handleValue: result.1))
+  }
+
+  @_lifetime(immortal)
+  public func setDynamicPropertyException(
+    in context: borrowing JSInstantContext<E>,
+    on thisValue: borrowing JSValue<E>,
+    forKey key: String,
+    to newValue: borrowing JSValue<E>
+  ) -> JSValue<E>? {
+    guard let handle = behavior.setProperty?(context, thisValue, key, newValue) else {
+      return nil
+    }
+    return JSValue(handleValue: handle)
+  }
+
+  @_lifetime(immortal)
+  public func callAsFunctionValue(
+    in context: borrowing JSInstantContext<E>,
+    function: inout JSValue<E>,
+    this thisValue: inout JSValue<E>,
+    arguments: borrowing JSArguments<E>
+  ) -> JSValue<E>? {
+    guard let callAsFunction = behavior.callAsFunction else {
+      return nil
+    }
+    return JSValue(handleValue: callAsFunction(context, &function, &thisValue, arguments))
+  }
+
+  @_lifetime(immortal)
+  public func callAsConstructorValue(
+    in context: borrowing JSInstantContext<E>,
+    constructor: inout JSValue<E>,
+    this thisValue: inout JSValue<E>,
+    arguments: borrowing JSArguments<E>
+  ) -> JSValue<E>? {
+    guard let callAsConstructor = behavior.callAsConstructor else {
+      return nil
+    }
+    return JSValue(handleValue: callAsConstructor(context, &constructor, &thisValue, arguments))
+  }
+
+  @_lifetime(immortal)
+  public func convertToTypeValue(
+    in context: borrowing JSInstantContext<E>,
+    value: inout JSValue<E>,
+    type: JSType,
+    exception: inout JSValue<E>
+  ) -> JSValue<E>? {
+    guard let convertToType = behavior.convertToType else {
+      return nil
+    }
+    return JSValue(handleValue: convertToType(context, &value, type, &exception))
   }
 }

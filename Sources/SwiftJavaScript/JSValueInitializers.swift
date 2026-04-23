@@ -1,123 +1,136 @@
 extension JSValue {
-  public init(string value: String, in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeString(value)
-    }
+  @_lifetime(borrow context)
+  public init(string value: String, in context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeString(value)
   }
 
+  @_lifetime(borrow context)
   public init(string value: String, in context: borrowing JSInstantContext<E>) {
     self = context.makeString(value)
   }
 
+  @_lifetime(borrow context)
   public init(
-    string value: borrowing some JSString, in context: isolated JSContext<E> = #isolation
+    string value: borrowing some JSString,
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    let stringValue = value.string
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeString(stringValue)
-    }
+    self = context.makeString(value.string)
   }
 
+  @_lifetime(borrow context)
   public init(
     string value: borrowing some JSString, in context: borrowing JSInstantContext<E>
   ) {
     self = context.makeString(value.string)
   }
 
-  public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeNumber(value)
-    }
+  @_lifetime(borrow context)
+  public init(number value: Double, in context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeNumber(value)
   }
 
+  @_lifetime(borrow context)
   public init(number value: Double, in context: borrowing JSInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
+  @_lifetime(borrow context)
   public init(
-    number value: some BinaryInteger, in context: isolated JSContext<E> = #isolation
+    number value: some BinaryInteger,
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeNumber(value)
-    }
+    self = context.makeNumber(Double(value))
   }
 
+  @_lifetime(borrow context)
   public init(number value: some BinaryInteger, in context: borrowing JSInstantContext<E>) {
     self = context.makeNumber(value)
   }
 
-  public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeBoolean(value)
-    }
+  @_lifetime(borrow context)
+  public init(boolean value: Bool, in context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeBoolean(value)
   }
 
+  @_lifetime(borrow context)
   public init(boolean value: Bool, in context: borrowing JSInstantContext<E>) {
     self = context.makeBoolean(value)
   }
 
-  public init(symbol: String, in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeSymbol(symbol)
+  @_lifetime(borrow context)
+  public init(symbol: String, in context: borrowing isolated JSContext<E> = #isolation) {
+    guard let handle = E.makeSymbolValueHandle(symbol, context.driverContextHandle) else {
+      preconditionFailure("JSValue.init(symbol:in:) could not create handle")
     }
+    self = JSValue(handleValue: handle)
   }
 
+  @_lifetime(borrow context)
   public init(symbol: String, in context: borrowing JSInstantContext<E>) {
     self = context.makeSymbol(symbol)
   }
 
-  public init(nullIn context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeNull()
-    }
+  @_lifetime(borrow context)
+  public init(nullIn context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeNull()
   }
 
+  @_lifetime(borrow context)
   public init(nullIn context: borrowing JSInstantContext<E>) {
     self = context.makeNull()
   }
 
-  public init(undefinedIn context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeUndefined()
-    }
+  @_lifetime(borrow context)
+  public init(undefinedIn context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeUndefined()
   }
 
+  @_lifetime(borrow context)
   public init(undefinedIn context: borrowing JSInstantContext<E>) {
     self = context.makeUndefined()
   }
 
-  public init(objectIn context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeObject()
-    }
+  @_lifetime(borrow context)
+  public init(objectIn context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeObject()
   }
 
+  @_lifetime(borrow context)
   public init(objectIn context: borrowing JSInstantContext<E>) {
     self = context.makeObject()
   }
 
-  public init(arrayIn context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeArray()
-    }
+  @_lifetime(borrow context)
+  public init(arrayIn context: borrowing isolated JSContext<E> = #isolation) {
+    self = context.makeArray()
   }
 
+  @_lifetime(borrow context)
   public init(arrayIn context: borrowing JSInstantContext<E>) {
     self = context.makeArray()
   }
 }
 
 extension JSValue where E.Engine == E {
+  @_lifetime(borrow context)
   public init(
     name: String,
     callback: @escaping JSFunctionCallback<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      JSValue(name: name, callback: callback, in: callbackContext)
+    guard
+      let handle = E.makeFunctionValueHandle(
+        named: name,
+        callback: retainedFunctionCallback(callback),
+        in: context.driverContextHandle
+      )
+    else {
+      preconditionFailure("JSValue.init(name:callback:in:) could not create handle")
     }
+    self = JSValue(handleValue: handle)
   }
 
+  @_lifetime(borrow context)
   public init(
     name: String,
     callback: @escaping JSFunctionCallback<E>,
@@ -126,12 +139,13 @@ extension JSValue where E.Engine == E {
     self = context.makeFunction(named: name, callback: callback)
   }
 
+  @_lifetime(borrow context)
   public init<
     each A: JSValueDecodable,
     R: JSValueEncodable,
     Err: JSValueEncodable
   >(
-    in context: isolated JSContext<E> = #isolation,
+    in context: borrowing isolated JSContext<E> = #isolation,
     name: String,
     function: @escaping @Sendable (repeat each A) throws(Err) -> R
   ) {
@@ -139,7 +153,8 @@ extension JSValue where E.Engine == E {
     let count = countTypePack(repeat (each A).self)
     let callback: JSFunctionCallback<E> = { context, this, arguments in
       guard arguments.count == count else {
-        return .value(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .value(JSValue(retaining: undefined))
       }
       do {
         let typedArgs: (repeat each A) = try arguments.tryUnpack(
@@ -148,25 +163,28 @@ extension JSValue where E.Engine == E {
         )
         let r: R = try swiftFunction(repeat each typedArgs)
         let encoded = try r.tryEncode(in: context)
-        return .value(encoded)
+        return .value(JSValue(retaining: encoded))
       } catch let error as Err {
         if let encoded = try? error.tryEncode(in: context) {
-          return .exception(encoded)
+          return .exception(JSValue(retaining: encoded))
         }
-        return .exception(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .exception(JSValue(retaining: undefined))
       } catch {
-        return .exception(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .exception(JSValue(retaining: undefined))
       }
     }
     self.init(name: name, callback: callback, in: context)
   }
 
+  @_lifetime(borrow context)
   public init<
     each C: JSValueDecoder,
     RCoder: JSValueEncoder,
     ECoder: JSValueEncoder
   >(
-    in context: isolated JSContext<E> = #isolation,
+    in context: borrowing isolated JSContext<E> = #isolation,
     name: String,
     converters: repeat (each C).Type,
     returnCoder: RCoder.Type,
@@ -179,7 +197,8 @@ extension JSValue where E.Engine == E {
     let callback: JSFunctionCallback<E> = {
       [swiftFunction] context, this, arguments in
       guard arguments.count == count else {
-        return .value(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .value(JSValue(retaining: undefined))
       }
       do {
         let typedArgs: (repeat (each C).SwiftType) = try arguments.tryUnpack(
@@ -188,14 +207,16 @@ extension JSValue where E.Engine == E {
         )
         let r: RCoder.SwiftType = try swiftFunction(repeat each typedArgs)
         let encoded = try RCoder.tryEncode(r, in: context)
-        return .value(encoded)
+        return .value(JSValue(retaining: encoded))
       } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
-          return .exception(encoded)
+          return .exception(JSValue(retaining: encoded))
         }
-        return .exception(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .exception(JSValue(retaining: undefined))
       } catch {
-        return .exception(JSValue(undefinedIn: context))
+        let undefined = JSValue(undefinedIn: context)
+        return .exception(JSValue(retaining: undefined))
       }
     }
     self.init(name: name, callback: callback, in: context)

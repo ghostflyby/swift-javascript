@@ -49,44 +49,79 @@ extension JSContext {
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
   ) throws(Failure) -> R {
-    let instantContext = JSInstantContext<E>(handle: driverContextHandle)
+    let instantContext = JSInstantContext<E>(context: self)
     return try body(instantContext)
   }
 
+  @inline(__always)
+  @_lifetime(borrow self)
+  private func valueFromHandle(
+    _ handle: JSValueHandle<E>?,
+    _ failureMessage: StaticString
+  ) -> JSValue<E> {
+    guard let handle else {
+      preconditionFailure(String(describing: failureMessage))
+    }
+    return JSValue(handleValue: handle)
+  }
+
+  @inline(__always)
+  @_lifetime(borrow self)
+  private func valueFromResultHandle(
+    _ handleResult: consuming JSResult<JSValueHandle<E>>?
+  ) -> JSValue<E> {
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(handleResult)
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception(let exception):
+      return exception
+    }
+  }
+
+  @_lifetime(borrow self)
   public func makeString(_ value: String) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeString(value)
-    }
+    valueFromHandle(
+      E.makeStringValueHandle(value, driverContextHandle),
+      "JSContext.makeString could not create handle"
+    )
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: Double) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeNumber(value)
-    }
+    valueFromHandle(
+      E.makeNumberValueHandle(value, driverContextHandle),
+      "JSContext.makeNumber could not create handle"
+    )
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeNumber(value)
-    }
+    makeNumber(Double(value))
   }
 
+  @_lifetime(borrow self)
   public func makeBoolean(_ value: Bool) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeBoolean(value)
-    }
+    valueFromHandle(
+      E.makeBooleanValueHandle(value, driverContextHandle),
+      "JSContext.makeBoolean could not create handle"
+    )
   }
 
+  @_lifetime(borrow self)
   public func makeNull() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeNull()
-    }
+    valueFromHandle(
+      E.makeNullValueHandle(driverContextHandle),
+      "JSContext.makeNull could not create handle"
+    )
   }
 
+  @_lifetime(borrow self)
   public func makeUndefined() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeUndefined()
-    }
+    valueFromHandle(
+      E.makeUndefinedValueHandle(driverContextHandle),
+      "JSContext.makeUndefined could not create handle"
+    )
   }
 
   public func withGlobalObject<R: ~Copyable>(
@@ -118,9 +153,23 @@ extension JSContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func getGlobalProperty(forKey key: String) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.getGlobalProperty(forKey: key)
+    let globalObject = valueFromHandle(
+      E.globalObjectValueHandle(driverContextHandle),
+      "JSContext.getGlobalProperty could not read global object"
+    )
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
+      E.getStringPropertyHandle(
+        key,
+        on: globalObject.borrowHandle(),
+        in: driverContextHandle
+      ))
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception(let exception):
+      return exception
     }
   }
 
@@ -145,25 +194,29 @@ extension JSContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeObject() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeObject()
-    }
+    valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle))
   }
 
+  @_lifetime(borrow self)
   public func makeArray() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.makeArray()
-    }
+    valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
   }
 
+  @_lifetime(borrow self)
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<E>
   ) -> JSValue<E> where E.Engine == E {
-    withInstantContext { instantContext in
-      instantContext.makeFunction(named: name, callback: callback)
-    }
+    valueFromHandle(
+      E.makeFunctionValueHandle(
+        named: name,
+        callback: retainedFunctionCallback(callback),
+        in: driverContextHandle
+      ),
+      "JSContext.makeFunction could not create handle"
+    )
   }
 
   public func installGlobalFunction(
@@ -176,76 +229,84 @@ extension JSContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script)
-    }
+    bridgeHandleResult(
+      E.evaluateScriptResultHandle(
+        script,
+        driverContextHandle,
+        sourceURL: nil,
+        startingLineNumber: 1
+      ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
-    }
+    bridgeHandleResult(
+      E.evaluateScriptResultHandle(
+        script.string,
+        driverContextHandle,
+        sourceURL: nil,
+        startingLineNumber: startingLineNumber
+      ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
+    evaluateScript(
+      script.string,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<SourceURL>(
     _ script: String,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
+    evaluateScript(
+      script,
+      sourceURL: sourceURL.string,
+      startingLineNumber: startingLineNumber
+    )
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: String,
     sourceURL: String,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
+    bridgeHandleResult(
+      E.evaluateScriptResultHandle(
         script,
+        driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
-      )
-    }
+      ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script, SourceURL>(
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>>
   where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
+    evaluateScript(
+      script.string,
+      sourceURL: sourceURL.string,
+      startingLineNumber: startingLineNumber
+    )
   }
 }
 

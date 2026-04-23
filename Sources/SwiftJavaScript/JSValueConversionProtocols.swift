@@ -9,11 +9,10 @@ public protocol JSValueDecodable: ~Copyable {
 extension JSValueDecodable {
   public init<E: JSEngine>(
     value: borrowing JSValue<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      Self(value: value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    self = Self(value: value, in: instantContext)
   }
 
   public static func tryDecode<E: JSEngine>(
@@ -25,42 +24,46 @@ extension JSValueDecodable {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> Self {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try Self.tryDecode(value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    return try Self.tryDecode(value, in: instantContext)
   }
 }
 
-public protocol JSValueEncodable: ~Copyable {
+public protocol JSValueEncodable: ~Copyable, ~Escapable {
+  @_lifetime(borrow context)
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E>
+  @_lifetime(borrow context)
   func tryEncode<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
 }
 
 extension JSValueEncodable {
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
-    context.withInstantContext { callbackContext in
-      self.toJSValue(in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    let value = toJSValue(in: instantContext)
+    return JSValue(retaining: value)
   }
 
+  @_lifetime(borrow context)
   public func tryEncode<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     toJSValue(in: context)
   }
 
+  @_lifetime(borrow context)
   public func tryEncode<E: JSEngine>(
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> JSValue<E> {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try self.tryEncode(in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    let value = try tryEncode(in: instantContext)
+    return JSValue(retaining: value)
   }
 }
 
@@ -82,10 +85,12 @@ public protocol JSValueDecoder {
 public protocol JSValueEncoder {
   associatedtype SwiftType
 
+  @_lifetime(borrow context)
   static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
+  @_lifetime(borrow context)
   static func encode<E: JSEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
@@ -97,13 +102,12 @@ public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
 
 extension JSValueDecoder {
   public static func decode<E: JSEngine>(
-    _ value: borrowing JSValue<E>, in context: isolated JSContext<E>
+    _ value: borrowing JSValue<E>, in context: borrowing isolated JSContext<E>
   )
     -> SwiftType
   {
-    context.withInstantContext { callbackContext in
-      Self.decode(value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    return Self.decode(value, in: instantContext)
   }
 
   public static func tryDecode<E: JSEngine>(
@@ -115,26 +119,27 @@ extension JSValueDecoder {
 
   public static func tryDecode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
-    in context: isolated JSContext<E>
+    in context: borrowing isolated JSContext<E>
   ) throws(JSValueConversionError) -> SwiftType {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try Self.tryDecode(value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    return try Self.tryDecode(value, in: instantContext)
   }
 }
 
 extension JSValueEncoder {
+  @_lifetime(borrow context)
   public static func encode<E: JSEngine>(
     _ value: SwiftType,
-    in context: isolated JSContext<E>
+    in context: borrowing isolated JSContext<E>
   )
     -> JSValue<E>
   {
-    context.withInstantContext { callbackContext in
-      Self.encode(value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    let value = Self.encode(value, in: instantContext)
+    return JSValue(retaining: value)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
@@ -142,13 +147,14 @@ extension JSValueEncoder {
     encode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: SwiftType,
-    in context: isolated JSContext<E>
+    in context: borrowing isolated JSContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try Self.tryEncode(value, in: callbackContext)
-    }
+    let instantContext = JSInstantContext<E>(context: context)
+    let value = try Self.tryEncode(value, in: instantContext)
+    return JSValue(retaining: value)
   }
 }
 
@@ -170,6 +176,7 @@ public enum JSDefaultConverter<T: JSValueCodable>:
     try T.tryDecode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func encode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
@@ -179,6 +186,7 @@ public enum JSDefaultConverter<T: JSValueCodable>:
     value.toJSValue(in: context)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>

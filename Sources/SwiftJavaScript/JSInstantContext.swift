@@ -12,9 +12,16 @@
 /// - It is not a generic low-level bridge layer.
 /// - Backend/handle/raw-context orchestration should stay in backend adapters or
 ///   local call-site helpers unless it is part of this callback-facing API surface.
-public struct JSInstantContext<E: JSEngine>: ~Copyable {
+public struct JSInstantContext<E: JSEngine>: ~Copyable, ~Escapable {
   public let driverContextHandle: E.ContextHandle
 
+  @_lifetime(borrow context)
+  package init(context: borrowing isolated JSContext<E>) {
+    let handle = context.driverContextHandle
+    self.driverContextHandle = handle
+  }
+
+  @_lifetime(immortal)
   package init(handle: E.ContextHandle) {
     self.driverContextHandle = handle
   }
@@ -22,6 +29,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
 extension JSInstantContext {
   @inline(__always)
+  @_lifetime(borrow self)
   private func valueFromHandle(
     _ handle: JSValueHandle<E>?,
     _ failureMessage: StaticString
@@ -33,8 +41,9 @@ extension JSInstantContext {
   }
 
   @inline(__always)
+  @_lifetime(borrow self)
   private func valueFromResultHandle(
-    _ handleResult: JSResult<JSValueHandle<E>>?
+    _ handleResult: consuming JSResult<JSValueHandle<E>>?
   ) -> JSValue<E> {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(handleResult)
     switch consume result {
@@ -45,6 +54,7 @@ extension JSInstantContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeString(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeStringValueHandle(value, driverContextHandle),
@@ -52,6 +62,7 @@ extension JSInstantContext {
     )
   }
 
+  @_lifetime(borrow self)
   func makeSymbol(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeSymbolValueHandle(value, driverContextHandle),
@@ -59,6 +70,7 @@ extension JSInstantContext {
     )
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: Double) -> JSValue<E> {
     valueFromHandle(
       E.makeNumberValueHandle(value, driverContextHandle),
@@ -66,10 +78,12 @@ extension JSInstantContext {
     )
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
     makeNumber(Double(value))
   }
 
+  @_lifetime(borrow self)
   public func makeBoolean(_ value: Bool) -> JSValue<E> {
     valueFromHandle(
       E.makeBooleanValueHandle(value, driverContextHandle),
@@ -77,6 +91,7 @@ extension JSInstantContext {
     )
   }
 
+  @_lifetime(borrow self)
   public func makeNull() -> JSValue<E> {
     valueFromHandle(
       E.makeNullValueHandle(driverContextHandle),
@@ -84,6 +99,7 @@ extension JSInstantContext {
     )
   }
 
+  @_lifetime(borrow self)
   public func makeUndefined() -> JSValue<E> {
     valueFromHandle(
       E.makeUndefinedValueHandle(driverContextHandle),
@@ -92,6 +108,7 @@ extension JSInstantContext {
   }
 
   @inline(__always)
+  @_lifetime(borrow self)
   private func globalObjectValue() -> JSValue<E> {
     valueFromHandle(
       E.globalObjectValueHandle(driverContextHandle),
@@ -127,10 +144,10 @@ extension JSInstantContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func getGlobalProperty(forKey key: String) -> JSValue<E> {
-    withGlobalObject { globalObject in
-      globalObject.getProperty(forKey: key, in: self)
-    }
+    let globalObject = globalObjectValue()
+    return globalObject.getProperty(forKey: key, in: self)
   }
 
   public func getGlobalProperty<C: JSValueDecoder>(
@@ -154,14 +171,17 @@ extension JSInstantContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeObject() -> JSValue<E> {
     valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle))
   }
 
+  @_lifetime(borrow self)
   public func makeArray() -> JSValue<E> {
     valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
   }
 
+  @_lifetime(borrow self)
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<E>
@@ -169,7 +189,7 @@ extension JSInstantContext {
     valueFromHandle(
       E.makeFunctionValueHandle(
         named: name,
-        callback: callback,
+        callback: retainedFunctionCallback(callback),
         in: driverContextHandle
       ),
       "JSInstantContext.makeFunction could not create handle"
@@ -187,6 +207,7 @@ extension JSInstantContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
       E.evaluateScriptResultHandle(
@@ -197,6 +218,7 @@ extension JSInstantContext {
       ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: String,
     sourceURL: String,
@@ -211,6 +233,7 @@ extension JSInstantContext {
       ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     startingLineNumber: Int32 = 1
@@ -224,6 +247,7 @@ extension JSInstantContext {
       ))
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script>(
     _ script: borrowing Script,
     sourceURL: String,
@@ -232,6 +256,7 @@ extension JSInstantContext {
     evaluateScript(script.string, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<SourceURL>(
     _ script: String,
     sourceURL: borrowing SourceURL,
@@ -240,6 +265,7 @@ extension JSInstantContext {
     evaluateScript(script, sourceURL: sourceURL.string, startingLineNumber: startingLineNumber)
   }
 
+  @_lifetime(borrow self)
   public func evaluateScript<Script, SourceURL>(
     _ script: borrowing Script,
     sourceURL: borrowing SourceURL,

@@ -42,7 +42,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<QuickJSEngine>,
+    callback: @escaping JSRetainedFunctionCallback<QuickJSEngine>,
     in context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let callbackBox = Unmanaged.passRetained(Box(callback))
@@ -64,6 +64,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
     return QuickJSValueHandle(ref: function, contextRef: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func evaluateScriptResultHandle(
     _ script: String,
     _ context: QuickJSContextHandle,
@@ -182,12 +183,14 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
     )
   }
 
+  @_lifetime(immortal)
   public static func makeObjectResultHandle(
     _ context: QuickJSContextHandle
   ) -> JSResult<QuickJSValueHandle>? {
     quickJSResultHandle(for: JS_NewObject(context.ref), in: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func makeArrayResultHandle(
     _ context: QuickJSContextHandle
   ) -> JSResult<QuickJSValueHandle>? {
@@ -223,7 +226,7 @@ private func quickJSFunctionCallback(
 
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let callback = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
+  let callback = Unmanaged<Box<JSRetainedFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
     .takeUnretainedValue()
     .value
   let thisValue = SwiftJavaScript.JSValue<QuickJSEngine>(
@@ -233,24 +236,34 @@ private func quickJSFunctionCallback(
     )
   )
 
-  let result = withQuickJSArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
-    callback(context, thisValue, $0)
-  }
+  let args = JSArguments<QuickJSEngine>(
+    count: Int(argumentCount),
+    borrowedValueHandleAt: { index, contextHandle in
+      guard index >= 0, index < Int(argumentCount), let arguments else {
+        return nil
+      }
+      return QuickJSValueHandle(
+        ref: arguments[index],
+        contextRef: contextHandle.ref
+      )
+    }
+  )
+  let result = callback(context, thisValue, args)
   thisValue.discard()
 
-  switch consume result {
-  case .value(let value):
-    return value.takeHandle().ref
-  case .exception(let error):
-    return JS_Throw(contextRef, error.takeHandle().ref)
+  if result.isException {
+    return JS_Throw(contextRef, result.handle.ref)
   }
+  return result.handle.ref
 }
 
 private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?) {
   guard let opaque else {
     return
   }
-  _ = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque).takeRetainedValue()
+  _ =
+    Unmanaged<Box<JSRetainedFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
+    .takeRetainedValue()
 }
 
 private func withQuickJSArguments<R: ~Copyable>(

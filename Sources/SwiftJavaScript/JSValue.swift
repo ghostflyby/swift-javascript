@@ -3,7 +3,7 @@
 /// `JSValue` intentionally does not retain a context reference.
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
-public struct JSValue<E: JSEngine>: ~Copyable {
+public struct JSValue<E: JSEngine>: ~Copyable, ~Escapable {
   var storage: JSValueStorageWords
 
   var handle: JSValueHandle<E> {
@@ -19,10 +19,12 @@ public struct JSValue<E: JSEngine>: ~Copyable {
     handle
   }
 
-  public init(handleValue: JSValueHandle<E>) {
+  @_lifetime(immortal)
+  package init(handleValue: JSValueHandle<E>) {
     self.storage = handleValue.storageWords
   }
 
+  @_lifetime(immortal)
   public init(retaining value: borrowing JSValue<E>) {
     self.init(handleValue: value.retainHandle())
   }

@@ -5,16 +5,19 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   /// - Parameters:
   ///   - ref: The JSValueRef to wrap
   ///   - ctx: The JSContext in which the value exists
+  @_lifetime(immortal)
   init(
     ref: JSValueRef,
-    ctx: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine>
+    ctx: borrowing isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine>
   ) {
-    let instant = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
-      handle: ctx.driverContextHandle
+    let handle = JavaScriptCoreValueHandle(
+      ref: ref,
+      contextRef: ctx.driverContextHandle.ref
     )
-    self.init(ref: ref, in: instant)
+    self.init(handleValue: handle)
   }
 
+  @_lifetime(borrow ctx)
   init(
     ref: JSValueRef,
     ctx: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
@@ -29,6 +32,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 }
 
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
+  @_lifetime(borrow context)
   init(
     ref: JSValueRef,
     in context: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>

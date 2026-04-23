@@ -125,6 +125,9 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
 
   @discardableResult
   public func retainReference() -> Bool {
+    guard ref.tag < 0 else {
+      return true
+    }
     updateStackTop()
     _ = JS_DupValue(rawContextRef, rawRef)
     return true
@@ -132,6 +135,9 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
 
   @discardableResult
   public func releaseReference() -> Bool {
+    guard ref.tag < 0 else {
+      return true
+    }
     updateStackTop()
     JS_FreeValue(rawContextRef, rawRef)
     return true

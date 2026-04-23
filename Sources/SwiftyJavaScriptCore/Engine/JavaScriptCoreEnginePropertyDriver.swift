@@ -9,6 +9,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     propertyNames(on: object, in: context)
   }
 
+  @_lifetime(immortal)
   public static func getStringPropertyHandle(
     _ key: String,
     on object: JSValueHandle<JavaScriptCoreEngine>,
@@ -32,6 +33,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   public static func getValuePropertyHandle(
     _ key: JSValueHandle<JavaScriptCoreEngine>,
     on object: JSValueHandle<JavaScriptCoreEngine>,
@@ -40,6 +42,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     getProperty(key, on: object, in: context)
   }
 
+  @_lifetime(immortal)
   public static func getIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JavaScriptCoreEngine>,
@@ -147,6 +150,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func getProperty(
     _ key: String,
     on object: JavaScriptCoreValueHandle,
@@ -156,14 +160,15 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        let valueRef = JSObjectGetProperty(context.ref, objectRef, keyRef, &exception)
-        return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
-      }
+      let keyRef = JSStringCreateWithCFString(key as CFString)!
+      defer { JSStringRelease(keyRef) }
+      var exception: JSValueRef?
+      let valueRef = JSObjectGetProperty(context.ref, objectRef, keyRef, &exception)
+      return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
 
+  @_lifetime(immortal)
   private static func getProperty(
     _ key: JavaScriptCoreValueHandle,
     on object: JavaScriptCoreValueHandle,
@@ -179,6 +184,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func getProperty(
     at index: UInt32,
     on object: JavaScriptCoreValueHandle,
@@ -194,6 +200,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func setProperty(
     _ key: String,
     on object: JavaScriptCoreValueHandle,
@@ -205,24 +212,25 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return .exception(())
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        JSObjectSetProperty(
-          context.ref,
-          objectRef,
-          keyRef,
-          value.ref,
-          javaScriptCorePropertyAttributes(from: attributes),
-          &exception
-        )
-        if exception != nil {
-          return .exception(())
-        }
-        return .value(())
+      let keyRef = JSStringCreateWithCFString(key as CFString)!
+      defer { JSStringRelease(keyRef) }
+      var exception: JSValueRef?
+      JSObjectSetProperty(
+        context.ref,
+        objectRef,
+        keyRef,
+        value.ref,
+        javaScriptCorePropertyAttributes(from: attributes),
+        &exception
+      )
+      if exception != nil {
+        return .exception(())
       }
+      return .value(())
     }
   }
 
+  @_lifetime(immortal)
   private static func setProperty(
     _ key: JavaScriptCoreValueHandle,
     on object: JavaScriptCoreValueHandle,
@@ -250,6 +258,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func setProperty(
     at index: UInt32,
     on object: JavaScriptCoreValueHandle,
@@ -299,6 +308,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func deleteProperty(
     _ key: String,
     on object: JavaScriptCoreValueHandle,
@@ -308,17 +318,18 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return .exception(())
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        JSObjectDeleteProperty(context.ref, objectRef, keyRef, &exception)
-        if exception != nil {
-          return .exception(())
-        }
-        return .value(())
+      let keyRef = JSStringCreateWithCFString(key as CFString)!
+      defer { JSStringRelease(keyRef) }
+      var exception: JSValueRef?
+      JSObjectDeleteProperty(context.ref, objectRef, keyRef, &exception)
+      if exception != nil {
+        return .exception(())
       }
+      return .value(())
     }
   }
 
+  @_lifetime(immortal)
   private static func deleteProperty(
     _ key: JavaScriptCoreValueHandle,
     on object: JavaScriptCoreValueHandle,

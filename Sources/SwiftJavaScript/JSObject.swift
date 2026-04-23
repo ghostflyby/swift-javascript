@@ -46,7 +46,7 @@ extension JSValue {
     _ value: borrowing JSValue<E>,
     forKey key: String,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, with: attributes, in: callbackContext)
@@ -57,7 +57,7 @@ extension JSValue {
     _ value: borrowing JSValue<E>,
     forKey key: borrowing JSValue<E>,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, with: attributes, in: callbackContext)
@@ -67,7 +67,7 @@ extension JSValue {
   public func setProperty(
     _ value: borrowing JSValue<E>,
     at index: UInt32,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, at: index, in: callbackContext)
@@ -79,8 +79,13 @@ extension JSValue {
     forKey key: String,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
-  ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
+    let encoded: JSValue<E>
+    do {
+      encoded = try value.tryEncode(in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setStringPropertyHandle(
       key,
       on: borrowHandle(),
@@ -95,8 +100,13 @@ extension JSValue {
     forKey key: borrowing JSValue<E>,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
-  ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
+    let encoded: JSValue<E>
+    do {
+      encoded = try value.tryEncode(in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setValuePropertyHandle(
       key.borrowHandle(),
       on: borrowHandle(),
@@ -110,8 +120,13 @@ extension JSValue {
     _ value: borrowing Val,
     at index: UInt32,
     in context: borrowing JSInstantContext<E>
-  ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
+    let encoded: JSValue<E>
+    do {
+      encoded = try value.tryEncode(in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setIndexPropertyHandle(
       at: index,
       on: borrowHandle(),
@@ -124,8 +139,8 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: String,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+    in context: borrowing isolated JSContext<E> = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
@@ -135,8 +150,8 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: borrowing JSValue<E>,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+    in context: borrowing isolated JSContext<E> = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
@@ -145,8 +160,8 @@ extension JSValue {
   public func setProperty<Val>(
     _ value: borrowing Val,
     at index: UInt32,
-    in context: isolated JSContext<E> = #isolation
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+    in context: borrowing isolated JSContext<E> = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
     context.withInstantContext { callbackContext in
       setProperty(value, at: index, in: callbackContext)
     }
@@ -159,7 +174,12 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded: JSValue<E>
+    do {
+      encoded = try converter.tryEncode(value, in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setStringPropertyHandle(
       key,
       on: borrowHandle(),
@@ -176,7 +196,12 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded: JSValue<E>
+    do {
+      encoded = try converter.tryEncode(value, in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setValuePropertyHandle(
       key.borrowHandle(),
       on: borrowHandle(),
@@ -192,7 +217,12 @@ extension JSValue {
     using converter: C.Type,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded: JSValue<E>
+    do {
+      encoded = try converter.tryEncode(value, in: context)
+    } catch {
+      encoded = context.makeUndefined()
+    }
     _ = E.setIndexPropertyHandle(
       at: index,
       on: borrowHandle(),
@@ -206,7 +236,7 @@ extension JSValue {
     forKey key: String,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
@@ -218,7 +248,7 @@ extension JSValue {
     forKey key: borrowing JSValue<E>,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, forKey: key, using: converter, with: attributes, in: callbackContext)
@@ -229,13 +259,14 @@ extension JSValue {
     _ value: C.SwiftType,
     at index: UInt32,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
       setProperty(value, at: index, using: converter, in: callbackContext)
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: String,
     in context: borrowing JSInstantContext<E>
@@ -255,6 +286,7 @@ extension JSValue {
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
@@ -274,6 +306,7 @@ extension JSValue {
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     at index: UInt32,
     in context: borrowing JSInstantContext<E>
@@ -293,30 +326,60 @@ extension JSValue {
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: String,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
-    context.withInstantContext { callbackContext in
-      getProperty(forKey: key, in: callbackContext)
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
+      E.getStringPropertyHandle(
+        key,
+        on: borrowHandle(),
+        in: context.driverContextHandle
+      ))
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception:
+      return context.makeUndefined()
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: borrowing JSValue<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
-    context.withInstantContext { callbackContext in
-      getProperty(forKey: key, in: callbackContext)
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
+      E.getValuePropertyHandle(
+        key.borrowHandle(),
+        on: borrowHandle(),
+        in: context.driverContextHandle
+      ))
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception:
+      return context.makeUndefined()
     }
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     at index: UInt32,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
-    context.withInstantContext { callbackContext in
-      getProperty(at: index, in: callbackContext)
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
+      E.getIndexPropertyHandle(
+        at: index,
+        on: borrowHandle(),
+        in: context.driverContextHandle
+      ))
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception:
+      return context.makeUndefined()
     }
   }
 
@@ -350,28 +413,28 @@ extension JSValue {
   public func getProperty<C: JSValueDecoder>(
     forKey key: String,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
-    let value = getProperty(forKey: key, in: context)
-    return converter.decode(value, in: context)
+    let callbackContext = JSInstantContext<E>(context: context)
+    return getProperty(forKey: key, using: converter, in: callbackContext)
   }
 
   public func getProperty<C: JSValueDecoder>(
     forKey key: borrowing JSValue<E>,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
-    let value = getProperty(forKey: key, in: context)
-    return converter.decode(value, in: context)
+    let callbackContext = JSInstantContext<E>(context: context)
+    return getProperty(forKey: key, using: converter, in: callbackContext)
   }
 
   public func getProperty<C: JSValueDecoder>(
     at index: UInt32,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
-    let value = getProperty(at: index, in: context)
-    return converter.decode(value, in: context)
+    let callbackContext = JSInstantContext<E>(context: context)
+    return getProperty(at: index, using: converter, in: callbackContext)
   }
 
   public func deleteProperty(
@@ -398,20 +461,24 @@ extension JSValue {
 
   public func deleteProperty(
     forKey key: String,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    context.withInstantContext { callbackContext in
-      deleteProperty(forKey: key, in: callbackContext)
-    }
+    _ = E.deleteStringPropertyHandle(
+      key,
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    )
   }
 
   public func deleteProperty(
     forKey key: borrowing JSValue<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    context.withInstantContext { callbackContext in
-      deleteProperty(forKey: key, in: callbackContext)
-    }
+    _ = E.deleteValuePropertyHandle(
+      key.borrowHandle(),
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    )
   }
 
   public func hasProperty(
@@ -438,20 +505,24 @@ extension JSValue {
 
   public func hasProperty(
     _ key: String,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> Bool {
-    context.withInstantContext { callbackContext in
-      hasProperty(key, in: callbackContext)
-    }
+    E.hasStringPropertyHandle(
+      key,
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    ) ?? false
   }
 
   public func hasProperty(
     _ key: borrowing JSValue<E>,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> Bool {
-    context.withInstantContext { callbackContext in
-      hasProperty(key, in: callbackContext)
-    }
+    E.hasValuePropertyHandle(
+      key.borrowHandle(),
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    ) ?? false
   }
 }
 
@@ -492,9 +563,15 @@ extension JSValue {
     _ value: borrowing JSValue<E>,
     forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    setProperty(value, forKey: key.string, with: attributes, in: context)
+    _ = E.setStringPropertyHandle(
+      key.string,
+      on: borrowHandle(),
+      to: value.borrowHandle(),
+      in: context.driverContextHandle,
+      attributes: attributes.hostMemberAttributes
+    )
   }
 
   public func setProperty<Val>(
@@ -502,7 +579,7 @@ extension JSValue {
     forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
     setProperty(value, forKey: key.string, with: attributes, in: context)
   }
 
@@ -510,9 +587,10 @@ extension JSValue {
     _ value: borrowing Val,
     forKey key: borrowing some JSString,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
-  ) where Val: JSValueEncodable, Val: ~Copyable {
-    setProperty(value, forKey: key.string, with: attributes, in: context)
+    in context: borrowing isolated JSContext<E> = #isolation
+  ) where Val: JSValueEncodable, Val: ~Copyable, Val: ~Escapable {
+    let callbackContext = JSInstantContext<E>(context: context)
+    setProperty(value, forKey: key.string, with: attributes, in: callbackContext)
   }
 
   public func setProperty<C: JSValueEncoder>(
@@ -530,11 +608,13 @@ extension JSValue {
     forKey key: borrowing some JSString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    setProperty(value, forKey: key.string, using: converter, with: attributes, in: context)
+    let callbackContext = JSInstantContext<E>(context: context)
+    setProperty(value, forKey: key.string, using: converter, with: attributes, in: callbackContext)
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: borrowing some JSString,
     in context: borrowing JSInstantContext<E>
@@ -542,11 +622,23 @@ extension JSValue {
     getProperty(forKey: key.string, in: context)
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     forKey key: borrowing some JSString,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
-    getProperty(forKey: key.string, in: context)
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(
+      E.getStringPropertyHandle(
+        key.string,
+        on: borrowHandle(),
+        in: context.driverContextHandle
+      ))
+    switch consume result {
+    case .value(let value):
+      return value
+    case .exception:
+      return context.makeUndefined()
+    }
   }
 
   public func getProperty<C: JSValueDecoder>(
@@ -560,9 +652,10 @@ extension JSValue {
   public func getProperty<C: JSValueDecoder>(
     forKey key: borrowing some JSString,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
-    getProperty(forKey: key.string, using: converter, in: context)
+    let callbackContext = JSInstantContext<E>(context: context)
+    return getProperty(forKey: key.string, using: converter, in: callbackContext)
   }
 
   public func deleteProperty(
@@ -574,9 +667,13 @@ extension JSValue {
 
   public func deleteProperty(
     forKey key: borrowing some JSString,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) {
-    deleteProperty(forKey: key.string, in: context)
+    _ = E.deleteStringPropertyHandle(
+      key.string,
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    )
   }
 
   public func hasProperty(
@@ -588,8 +685,12 @@ extension JSValue {
 
   public func hasProperty(
     _ key: borrowing some JSString,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> Bool {
-    hasProperty(key.string, in: context)
+    E.hasStringPropertyHandle(
+      key.string,
+      on: borrowHandle(),
+      in: context.driverContextHandle
+    ) ?? false
   }
 }

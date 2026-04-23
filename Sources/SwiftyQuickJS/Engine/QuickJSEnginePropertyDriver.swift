@@ -38,6 +38,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     }
   }
 
+  @_lifetime(immortal)
   public static func getStringPropertyHandle(
     _ key: String,
     on object: QuickJSValueHandle,
@@ -66,6 +67,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return result == 1
   }
 
+  @_lifetime(immortal)
   public static func getValuePropertyHandle(
     _ key: QuickJSValueHandle,
     on object: QuickJSValueHandle,
@@ -79,6 +81,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: JS_GetProperty(context.ref, object.ref, atom), in: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func getIndexPropertyHandle(
     at index: UInt32,
     on object: QuickJSValueHandle,

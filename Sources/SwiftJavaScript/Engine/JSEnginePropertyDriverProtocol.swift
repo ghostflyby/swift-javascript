@@ -4,6 +4,7 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> [String]?
 
+  @_lifetime(immortal)
   static func getStringPropertyHandle(
     _ key: String,
     on object: ValueHandle,
@@ -18,12 +19,14 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     attributes: JSHostMemberAttributes
   ) -> Bool
 
+  @_lifetime(immortal)
   static func getValuePropertyHandle(
     _ key: ValueHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
+  @_lifetime(immortal)
   static func getIndexPropertyHandle(
     at index: UInt32,
     on object: ValueHandle,

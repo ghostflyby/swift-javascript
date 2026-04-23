@@ -182,7 +182,8 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
 
       context.installGlobalFunction(named: "bump") { context, _, arguments in
         let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-        return .value(context.makeNumber(value + 1))
+        let result = context.makeNumber(value + 1)
+        return .value(JSValue(retaining: result))
       }
 
       let result = context.evaluateScript("bump(answer)")
@@ -208,7 +209,8 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
     await context.withInstantContext { context in
       let function = context.makeFunction(named: "bump") { context, _, arguments in
         let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-        return .value(context.makeNumber(value + 1))
+        let result = context.makeNumber(value + 1)
+        return .value(JSValue(retaining: result))
       }
 
       let result = function.call(arguments: 41, in: context)

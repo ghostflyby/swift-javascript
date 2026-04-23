@@ -32,12 +32,12 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
+    callback: @escaping JSRetainedFunctionCallback<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
     guard let functionRef = JSObjectMake(context.ref, context.functionClassRef, callbackRef) else {
-      let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
+      let callback = Unmanaged<Box<JSRetainedFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
         callbackRef
       )
       .takeRetainedValue()
@@ -60,26 +60,31 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
     return JavaScriptCoreValueHandle(ref: functionRef, contextRef: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func evaluateScriptResultHandle(
     _ script: String,
     _ context: JavaScriptCoreContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    withJavaScriptCoreString(script) { scriptRef in
-      withOptionalJavaScriptCoreString(sourceURL) { sourceURLRef in
-        var exception: JSValueRef?
-        let resultRef = JSEvaluateScript(
-          context.ref,
-          scriptRef,
-          nil,
-          sourceURLRef,
-          startingLineNumber,
-          &exception
-        )
-        return javaScriptCoreResult(value: resultRef, exception: exception, in: context)
+    let scriptRef = JSStringCreateWithCFString(script as CFString)!
+    defer { JSStringRelease(scriptRef) }
+    let sourceURLRef = sourceURL.map { JSStringCreateWithCFString($0 as CFString)! }
+    defer {
+      if let sourceURLRef {
+        JSStringRelease(sourceURLRef)
       }
     }
+    var exception: JSValueRef?
+    let resultRef = JSEvaluateScript(
+      context.ref,
+      scriptRef,
+      nil,
+      sourceURLRef,
+      startingLineNumber,
+      &exception
+    )
+    return javaScriptCoreResult(value: resultRef, exception: exception, in: context)
   }
 
   public static func valueTypeForHandle(
@@ -183,6 +188,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
     javaScriptCoreMakeUndefined(in: context)
   }
 
+  @_lifetime(immortal)
   public static func makeObjectResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
@@ -192,6 +198,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
     return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
   }
 
+  @_lifetime(immortal)
   public static func makeArrayResultHandle(
     _ context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {

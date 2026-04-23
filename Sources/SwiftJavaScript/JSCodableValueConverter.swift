@@ -105,6 +105,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
+  @_lifetime(borrow context)
   public static func encode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
@@ -116,6 +117,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
@@ -202,6 +204,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     throw .typeMismatch(expected: "codable compatible JSValue", actual: value.type(in: context))
   }
 
+  @_lifetime(borrow context)
   fileprivate static func jsValueFromNode<E: JSEngine>(
     _ node: JSCodableNode,
     in context: borrowing JSInstantContext<E>
@@ -256,6 +259,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
+  @_lifetime(borrow context)
   private static func readStringProperty<E: JSEngine>(
     _ key: String,
     on object: JSValueHandle<E>,
@@ -277,6 +281,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
+  @_lifetime(borrow context)
   private static func readIndexProperty<E: JSEngine>(
     _ index: UInt32,
     on object: JSValueHandle<E>,

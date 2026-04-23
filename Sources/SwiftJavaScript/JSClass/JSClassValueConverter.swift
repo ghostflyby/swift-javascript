@@ -20,11 +20,13 @@ public protocol JSClassValueConvertible: AnyObject, JSValueEncodable {
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self
 
+  @_lifetime(borrow context)
   static func encode<E: JSEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E>
 
+  @_lifetime(borrow context)
   static func tryEncode<E: JSEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
@@ -43,6 +45,7 @@ extension JSClassValueConvertible {
     }
   }
 
+  @_lifetime(borrow context)
   public static func encode<E: JSEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
@@ -102,6 +105,7 @@ public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter 
     try T.tryDecode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func encode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
@@ -109,6 +113,7 @@ public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter 
     T.encode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>

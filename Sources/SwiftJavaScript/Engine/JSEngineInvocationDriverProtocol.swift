@@ -1,4 +1,5 @@
 public protocol JSEngineInvocationDriver: JSEngineRuntimeDriver {
+  @_lifetime(immortal)
   static func callFunctionHandle(
     _ function: ValueHandle,
     this thisValue: ValueHandle?,
@@ -6,12 +7,14 @@ public protocol JSEngineInvocationDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
+  @_lifetime(immortal)
   static func constructHandle(
     _ constructor: ValueHandle,
     arguments: [ValueHandle],
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
+  @_lifetime(immortal)
   static func toObjectHandle(
     _ value: ValueHandle,
     in context: ContextHandle

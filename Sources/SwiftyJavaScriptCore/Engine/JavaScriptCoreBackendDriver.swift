@@ -30,6 +30,7 @@ func javaScriptCoreObjectRef(
   return .object(objectRef)
 }
 
+@_lifetime(immortal)
 func javaScriptCoreResult(
   value resultRef: JSValueRef?,
   exception exceptionRef: JSValueRef?,
@@ -73,13 +74,19 @@ func javaScriptCoreString(_ value: JSValueRef, in context: JSContextRef) -> Stri
   )
 }
 
-func withJavaScriptCoreString<R>(_ string: String, _ body: (JSStringRef) -> R) -> R {
+func withJavaScriptCoreString<R>(
+  _ string: String,
+  _ body: (JSStringRef) -> R
+) -> R {
   let stringHandle = JSStringCreateWithCFString(string as CFString)!
   defer { JSStringRelease(stringHandle) }
   return body(stringHandle)
 }
 
-func withOptionalJavaScriptCoreString<R>(_ string: String?, _ body: (JSStringRef?) -> R) -> R {
+func withOptionalJavaScriptCoreString<R>(
+  _ string: String?,
+  _ body: (JSStringRef?) -> R
+) -> R {
   guard let string else {
     return body(nil)
   }

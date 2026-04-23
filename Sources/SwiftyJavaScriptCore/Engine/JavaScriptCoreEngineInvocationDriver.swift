@@ -2,6 +2,7 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JavaScriptCoreEngine: JSEngineInvocationDriver {
+  @_lifetime(immortal)
   public static func callFunctionHandle(
     _ function: JSValueHandle<JavaScriptCoreEngine>,
     this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
@@ -11,6 +12,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     callFunction(function, this: thisValue, arguments: arguments, in: context)
   }
 
+  @_lifetime(immortal)
   public static func constructHandle(
     _ constructor: JSValueHandle<JavaScriptCoreEngine>,
     arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
@@ -19,6 +21,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     construct(constructor, arguments: arguments, in: context)
   }
 
+  @_lifetime(immortal)
   public static func toObjectHandle(
     _ value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
@@ -64,6 +67,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     JSValueIsStrictEqual(context.ref, lhs.ref, rhs.ref)
   }
 
+  @_lifetime(immortal)
   private static func callFunction(
     _ function: JavaScriptCoreValueHandle,
     this thisValue: JavaScriptCoreValueHandle?,
@@ -102,6 +106,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func construct(
     _ constructor: JavaScriptCoreValueHandle,
     arguments: [JavaScriptCoreValueHandle],
@@ -126,6 +131,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     }
   }
 
+  @_lifetime(immortal)
   private static func toObject(
     _ value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle

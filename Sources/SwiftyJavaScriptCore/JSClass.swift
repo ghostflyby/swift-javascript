@@ -111,6 +111,7 @@ func javaScriptCoreClassDefinitionLookup()
   }
 }
 
+@_lifetime(immortal)
 func makeRememberedClassCallbackContext(
   _ ctx: JSContextRef, _ object: JSObjectRef
 )
@@ -645,17 +646,29 @@ private func installCallAsFunctionCallbackIfNeeded(
       functionRef: functionRef,
       thisObjectRef: thisObjectRef
     ) { definition, context, functionValue, thisValue in
-      let callbackResult: JSResult<JSValueRef> =
-        withJavaScriptCoreArguments(
-          arguments,
-          count: Int(argumentCount)
-        ) { args in
-          let result =
-            definition.callAsFunction?(context, &functionValue, &thisValue, args)
-            ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
-          return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
-            .toPrivateResult()
+      let args = JSArguments<JavaScriptCoreEngine>(
+        count: Int(argumentCount),
+        borrowedValueHandleAt: { index, contextHandle in
+          guard index >= 0, index < Int(argumentCount), let valueRef = arguments?[index] else {
+            return nil
+          }
+          return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
         }
+      )
+      let result: SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+      if let callbackValue = definition.callAsFunctionValue(
+        in: context,
+        function: &functionValue,
+        this: &thisValue,
+        arguments: args
+      ) {
+        result = callbackValue
+      } else {
+        result = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+      }
+      let callbackResult = retainResult(
+        JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
+      ).toPrivateResult()
       return javaScriptCoreCallbackReturnValue(
         callbackResult,
         in: ctx,
@@ -700,23 +713,38 @@ private func installCallAsConstructorCallbackIfNeeded(
       ctx: ctx,
       constructorRef: constructorRef
     ) { definition, context, constructorValue, thisValue in
-      let callbackResult: JSResult<JSValueRef> =
-        withJavaScriptCoreArguments(
-          arguments,
-          count: Int(argumentCount)
-        ) { args in
-          let result =
-            definition.callAsConstructor?(context, &constructorValue, &thisValue, args)
-            ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
-          guard result.isObject(in: context) else {
-            return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(
-              SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
-            )
-            .toPrivateResult()
+      let args = JSArguments<JavaScriptCoreEngine>(
+        count: Int(argumentCount),
+        borrowedValueHandleAt: { index, contextHandle in
+          guard index >= 0, index < Int(argumentCount), let valueRef = arguments?[index] else {
+            return nil
           }
-          return JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
-            .toPrivateResult()
+          return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
         }
+      )
+      let result: SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+      if let callbackValue = definition.callAsConstructorValue(
+        in: context,
+        constructor: &constructorValue,
+        this: &thisValue,
+        arguments: args
+      ) {
+        result = callbackValue
+      } else {
+        result = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+      }
+      let callbackResult: JSResult<JSValueRef>
+      if result.isObject(in: context) {
+        callbackResult = retainResult(
+          JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
+        ).toPrivateResult()
+      } else {
+        callbackResult = retainResult(
+          JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(
+            SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+          )
+        ).toPrivateResult()
+      }
       return javaScriptCoreConstructorCallbackReturnValue(
         callbackResult,
         in: ctx,
@@ -864,21 +892,31 @@ private func installConvertToTypeCallbackIfNeeded(
       objectRef: objectRef,
       jsType: javaScriptCoreType(from: type)
     ) { definition, context, objectValue, jsType, exceptionValue in
-      let result =
-        definition.convertToType?(context, &objectValue, jsType, &exceptionValue)
-        ?? SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+      let result: SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+      if let converted = definition.convertToTypeValue(
+        in: context,
+        value: &objectValue,
+        type: jsType,
+        exception: &exceptionValue
+      ) {
+        result = converted
+      } else {
+        result = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+      }
       let exceptionRef: JSValueRef?
       if exceptionValue.isUndefined(in: context) {
         exceptionRef = nil
       } else {
-        exceptionRef = exceptionValue.callbackRef()
-        exceptionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+        exceptionRef = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(retaining: exceptionValue)
+          .callbackRef()
       }
       let conversion: JSResult<JSValueRef> =
         if let exceptionRef {
           .exception(exceptionRef)
         } else {
-          JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result).toPrivateResult()
+          retainResult(
+            JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.value(result)
+          ).toPrivateResult()
         }
       return javaScriptCoreCallbackReturnValue(
         conversion,
@@ -936,10 +974,17 @@ private let staticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCallback
     function: function,
     thisObject: thisObject
   ) { functionDefinition, context, thisValue in
-    let result = withJavaScriptCoreArguments(arguments, count: Int(argumentCount)) {
-      args in
-      functionDefinition.callResult(in: context, on: thisValue, with: args).toPrivateResult()
-    }
+    let args = JSArguments<JavaScriptCoreEngine>(
+      count: Int(argumentCount),
+      borrowedValueHandleAt: { index, contextHandle in
+        guard index >= 0, index < Int(argumentCount), let valueRef = arguments?[index] else {
+          return nil
+        }
+        return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+      }
+    )
+    let result = retainResult(functionDefinition.callResult(in: context, on: thisValue, with: args))
+      .toPrivateResult()
     return javaScriptCoreCallbackReturnValue(
       result,
       in: ctx,

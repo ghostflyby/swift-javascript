@@ -427,10 +427,10 @@ private enum MockDriver: JSEngine {
 }
 
 extension MockDriver {
-  fileprivate static func resultHandle(from result: JSResult<MockValue>)
+  fileprivate static func resultHandle(from result: consuming JSResult<MockValue>)
     -> JSResult<JSValueHandle<MockEngine>>
   {
-    switch result {
+    switch consume result {
     case .value(let value):
       return .value(JSValueHandle<MockEngine>(rawValue: value))
     case .exception(let exception):
@@ -457,7 +457,7 @@ extension MockDriver {
 
   fileprivate static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<MockEngine>,
+    callback: @escaping JSRetainedFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     _ = callback
@@ -970,7 +970,7 @@ extension MockEngine {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<MockEngine>,
+    callback: @escaping JSRetainedFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: context)

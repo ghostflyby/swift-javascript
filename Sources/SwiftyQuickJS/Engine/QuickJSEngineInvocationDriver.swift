@@ -9,6 +9,7 @@ import SwiftJavaScript
 #endif
 
 extension QuickJSEngine: JSEngineInvocationDriver {
+  @_lifetime(immortal)
   public static func callFunctionHandle(
     _ function: QuickJSValueHandle,
     this thisValue: QuickJSValueHandle?,
@@ -29,6 +30,7 @@ extension QuickJSEngine: JSEngineInvocationDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func constructHandle(
     _ constructor: QuickJSValueHandle,
     arguments: [QuickJSValueHandle],
@@ -41,6 +43,7 @@ extension QuickJSEngine: JSEngineInvocationDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
+  @_lifetime(immortal)
   public static func toObjectHandle(
     _ value: QuickJSValueHandle,
     in context: QuickJSContextHandle

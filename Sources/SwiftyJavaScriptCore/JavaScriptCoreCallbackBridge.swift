@@ -8,23 +8,32 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   }
 
   let context = JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
-  let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
+  let callback = Unmanaged<Box<JSRetainedFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
   let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
-    callback(context, thisValue, args).toPrivateResult()
-  }
+  let args = JSArguments<JavaScriptCoreEngine>(
+    count: Int(argumentCount),
+    borrowedValueHandleAt: { index, contextHandle in
+      guard
+        index >= 0,
+        index < Int(argumentCount),
+        let valueRef = argumentsPointer?[index]
+      else {
+        return nil
+      }
+      return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+    }
+  )
+  let result = callback(context, thisValue, args)
 
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
+  if result.isException {
+    exception?.pointee = result.handle.ref
     return JSValueMakeUndefined(ctx)
   }
+  return result.handle.ref
 }
 
 func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
@@ -34,7 +43,8 @@ func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefini
     guard let function, let privateData = JSObjectGetPrivate(function) else {
       return
     }
-    let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(privateData)
+    let callback =
+      Unmanaged<Box<JSRetainedFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(privateData)
       .takeRetainedValue()
     _ = callback.value
   }
@@ -46,21 +56,18 @@ func withJavaScriptCoreArguments<R: ~Copyable>(
   count: Int,
   _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
 ) -> R {
-  var empty: JSValueRef? = nil
-  return withUnsafePointer(to: &empty) { emptyPointer in
-    let arguments = JSArguments<JavaScriptCoreEngine>(
-      count: count,
-      borrowedValueHandleAt: { index, contextHandle in
-        guard
-          index >= 0,
-          index < count,
-          let valueRef = (pointer ?? emptyPointer)[index]
-        else {
-          return nil
-        }
-        return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+  let arguments = JSArguments<JavaScriptCoreEngine>(
+    count: count,
+    borrowedValueHandleAt: { index, contextHandle in
+      guard
+        index >= 0,
+        index < count,
+        let valueRef = pointer?[index]
+      else {
+        return nil
       }
-    )
-    return body(arguments)
-  }
+      return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+    }
+  )
+  return body(arguments)
 }

@@ -1,6 +1,7 @@
 import JavaScriptCore
 
 extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
+  @_lifetime(immortal)
   consuming func toPrivateResult() -> JSResult<JSValueRef> {
     switch consume self {
     case .value(let v):

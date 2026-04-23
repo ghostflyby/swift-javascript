@@ -21,6 +21,7 @@ private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectSt
 
 private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSClass>()
 
+@_lifetime(immortal)
 private func javaScriptCorePrivateData(
   from value: JSValueHandle<JavaScriptCoreEngine>,
   in context: JavaScriptCoreContextHandle
@@ -32,6 +33,7 @@ private func javaScriptCorePrivateData(
   return .value(JSObjectGetPrivate(objectRef))
 }
 
+@_lifetime(immortal)
 private func makeJavaScriptCoreObjectResultHandle(
   of jsClass: JSClassRef,
   privateData: UnsafeMutableRawPointer?,
@@ -104,6 +106,7 @@ where
     return try tryDecode(jscValue, in: jscContext)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<E: JSEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
@@ -150,6 +153,7 @@ where
     return instance
   }
 
+  @_lifetime(borrow context)
   public static func encode(
     _ value: Self, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   )
@@ -164,6 +168,7 @@ where
     }
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode(
     _ value: Self,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
@@ -187,12 +192,14 @@ where
     }
   }
 
+  @_lifetime(borrow context)
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> SwiftJavaScript.JSValue<E> {
     Self.encode(self, in: context)
   }
 
+  @_lifetime(borrow context)
   public func tryEncode<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<E> {
@@ -479,9 +486,17 @@ private let autoStaticFunctionCallAsFunctionCallback: JSObjectCallAsFunctionCall
     function: function,
     thisObject: thisObject
   ) { functionDefinition, context, thisValue in
-    let result = withJavaScriptCoreArguments(arguments, count: Int(argumentCount)) { args in
-      functionDefinition.callResult(in: context, on: thisValue, with: args).toPrivateResult()
-    }
+    let args = JSArguments<JavaScriptCoreEngine>(
+      count: Int(argumentCount),
+      borrowedValueHandleAt: { index, contextHandle in
+        guard index >= 0, index < Int(argumentCount), let valueRef = arguments?[index] else {
+          return nil
+        }
+        return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
+      }
+    )
+    let result = retainResult(functionDefinition.callResult(in: context, on: thisValue, with: args))
+      .toPrivateResult()
     return javaScriptCoreCallbackReturnValue(
       result,
       in: ctx,

@@ -14,10 +14,11 @@ public protocol JSEngineRuntimeDriver {
 
   static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<Engine>,
+    callback: @escaping JSRetainedFunctionCallback<Engine>,
     in context: ContextHandle
   ) -> ValueHandle?
 
+  @_lifetime(immortal)
   static func evaluateScriptResultHandle(
     _ script: String,
     _ context: ContextHandle,
@@ -73,10 +74,12 @@ public protocol JSEngineRuntimeDriver {
     _ context: ContextHandle
   ) -> ValueHandle?
 
+  @_lifetime(immortal)
   static func makeObjectResultHandle(
     _ context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
+  @_lifetime(immortal)
   static func makeArrayResultHandle(
     _ context: ContextHandle
   ) -> JSResult<ValueHandle>?

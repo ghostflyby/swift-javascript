@@ -11,6 +11,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
   }
 
   @inline(__always)
+  @_lifetime(borrow context)
   private func value(at index: Int, in context: borrowing JSInstantContext<E>)
     -> JSValue<E>
   {
@@ -69,12 +70,11 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 
   public func unpack<R: ~Copyable>(
     at: Int,
-    in context: isolated JSContext<E> = #isolation,
+    in context: borrowing isolated JSContext<E> = #isolation,
     _ body: (borrowing JSValue<E>) -> R
   ) -> R {
-    context.withInstantContext { callbackContext in
-      unpack(at: at, in: callbackContext, body)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return unpack(at: at, in: callbackContext, body)
   }
 }
 
@@ -137,11 +137,10 @@ extension JSArguments {
 
   public func tryUnpack<each T: JSValueDecodable>(
     types: repeat (each T).Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> (repeat each T) {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try tryUnpack(types: repeat (each T).self, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return try tryUnpack(types: repeat (each T).self, in: callbackContext)
   }
 
   public func unpack<each T: JSValueDecodable>(
@@ -154,11 +153,10 @@ extension JSArguments {
 
   public func unpack<each T: JSValueDecodable>(
     types: repeat (each T).Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> (repeat each T) {
-    context.withInstantContext { callbackContext in
-      unpack(types: repeat (each T).self, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return unpack(types: repeat (each T).self, in: callbackContext)
   }
 
   public func unpack<C: JSValueDecoder>(
@@ -174,11 +172,10 @@ extension JSArguments {
   public func unpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
-    context.withInstantContext { callbackContext in
-      unpack(at: at, using: converter, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return unpack(at: at, using: converter, in: callbackContext)
   }
 
   public func tryUnpack<C: JSValueDecoder>(
@@ -194,11 +191,10 @@ extension JSArguments {
   public func tryUnpack<C: JSValueDecoder>(
     at: Int,
     using converter: C.Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> C.SwiftType {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try tryUnpack(at: at, using: converter, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return try tryUnpack(at: at, using: converter, in: callbackContext)
   }
 
   public func unpack<each C: JSValueDecoder>(
@@ -211,11 +207,10 @@ extension JSArguments {
 
   public func unpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) -> (repeat (each C).SwiftType) {
-    context.withInstantContext { callbackContext in
-      unpack(using: repeat (each C).self, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return unpack(using: repeat (each C).self, in: callbackContext)
   }
 
   public func tryUnpack<each C: JSValueDecoder>(
@@ -228,10 +223,9 @@ extension JSArguments {
 
   public func tryUnpack<each C: JSValueDecoder>(
     using converters: repeat (each C).Type,
-    in context: isolated JSContext<E> = #isolation
+    in context: borrowing isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> (repeat (each C).SwiftType) {
-    try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try tryUnpack(using: repeat (each C).self, in: callbackContext)
-    }
+    let callbackContext = JSInstantContext<E>(context: context)
+    return try tryUnpack(using: repeat (each C).self, in: callbackContext)
   }
 }

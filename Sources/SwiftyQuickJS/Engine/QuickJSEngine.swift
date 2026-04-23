@@ -19,6 +19,7 @@ public enum QuickJSEngine: Sendable, SendableMetatype {
   public typealias StringHandle = QuickJSStringHandle
 }
 
+@_lifetime(immortal)
 func quickJSResultHandle(
   for result: CQuickJSValue,
   in contextRef: OpaquePointer
