@@ -96,6 +96,13 @@
 
 - [ ] 补齐基础值构造、判型与基础转换；如果需要新接口，只提升到 `SwiftJavaScript public`
 - [ ] 补齐 object/property 与 call/construct/invoke；继续以第二引擎实现作为接线边界的验真器（进行中：将 `JSValue` 收口为真正负责值句柄生命周期的 noncopyable 壳，并让 `QuickJSValueHandle` 改回普通 struct）
+- [ ] 对齐 QuickJS 与 JSC 的属性写入语义：`QuickJSEnginePropertyDriver.setValuePropertyHandle` 目前忽略 `JSHostMemberAttributes`，需要与 string-key 路径和 JSC 的 value-key 路径一样保留 `readOnly` / `dontEnum` / `dontDelete` 行为
+- [ ] 明确并测试 propertyNames 的跨引擎契约：QuickJS 当前使用 `JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY`，JSC 使用 `JSObjectCopyPropertyNames`；需定义 own/inherited、enumerable/non-enumerable、string/index/symbol 的期望行为后再对齐实现
+- [ ] 对齐 QuickJS ArrayBuffer 创建失败路径：`JS_NewArrayBuffer` 返回 exception 时不应继续包装成普通 `QuickJSValueHandle`，并要释放已经 retain 的 deallocator box；JSC 路径当前会在 exception 时返回 `nil`
+- [ ] 补齐 QuickJS typed array 工厂：`makeTypedArrayHandle` 的 length / ArrayBuffer / ArrayBuffer+offset 三个重载目前返回 `nil`，导致 `JSTypedArray` 的公开初始化器在 QuickJS 上不可用；同时补跨引擎测试覆盖构造、kind、length、byteLength、byteOffset、buffer 与 bytes 访问
+- [ ] 校准 typed array bytes 指针契约：QuickJS `typedArrayBytesPtrForHandle` 当前返回 backing buffer 指针，JSC 使用 `JSObjectGetTypedArrayBytesPtr`；先定义 driver 应返回 buffer base 还是 typed-array view base，再修正 `JSTypedArray.withUnsafeBytes` 的 `byteOffset` 叠加逻辑并补非零 offset 共享测试
+- [ ] 补齐 QuickJS host object / `JSClass` 边界：当前 `supportsHostObjects == false` 且 `QuickJSClassHandle` 只是 class id 壳；迁移 `JSClass` / callback / auto-convertible 前，先确认 QuickJS 需要的 class id、finalizer、private data、prototype/static member wiring 是否能消费现有 core definition/public API
+- [ ] 明确 QuickJS module 与 job queue 能力边界：capabilities 标记 `supportsESModules == true`，但当前 `evaluateScriptResultHandle` 仅按 global script 路径求值，且 `supportsPromiseJobQueueControl == false`；后续需决定是补 module evaluation/job pumping public API，还是降低/拆细 capability 标记
 - [ ] 后续重排线索：`JSEngineRuntimeDriver` 同时承担 runtime/context 生命周期、脚本求值、基础值工厂、函数工厂、判型与基础转换；可评估拆出 lifecycle/evaluation/value-factory/value-conversion 协议
 - [ ] 后续重排线索：`JSEngineInvocationDriver` 同时承担 call/construct/toObject、Array/Date/instanceof 判定与 equality；可评估将 equality 与对象判型迁到 value/object semantics 协议
 - [ ] 后续重排线索：`JSEngineTypedArrayDriver` 同时承担 ArrayBuffer 外部内存、TypedArray 构造、字节视图与类型判定；QuickJS 目前只有部分构造能力，适合按 capability 拆分 ArrayBuffer 与 TypedArray factory/introspection
@@ -107,4 +114,5 @@
 #### Step Q3：测试策略
 
 - [ ] 为 QuickJS 增加最小共享行为测试，优先复用 `SwiftJavaScriptTests` 中已有的 engine-agnostic 覆盖
+- [ ] 将当前 shared engine tests 从 runtime/property/call 基线扩展到 ArrayBuffer/TypedArray、property attributes、function name/exception callback、Date/Array/instanceof、跨 context 兼容性；每项都同时跑 JSC 与 QuickJS
 - [ ] 每发现一处“JSC 迁移得来的边界不符合第二引擎实际”的案例，都在 TODO 里记录并据此调整剩余迁移优先级
