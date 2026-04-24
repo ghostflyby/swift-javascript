@@ -1,15 +1,13 @@
-import Testing
+import SwiftyJavaScriptCore
 
-@testable import SwiftyJavaScriptCore
+package struct TestNumberMarshal: Sendable, JSValueCodable {
+  package let value: Double
 
-struct TestNumberMarshal: Sendable, JSValueCodable {
-  let value: Double
-
-  init(_ value: Double) {
+  package init(_ value: Double) {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  package init<E: JSEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -28,41 +26,36 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     )
   }
 
-  init(
+  package init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isNumber(in: context) ? 1 : 0
   }
 
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+  @_lifetime(borrow context)
+  package func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(number: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+  @_lifetime(borrow context)
+  package func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(number: value, in: jscContext).takeHandle()
+    }
   }
 }
 
-struct TestStringMarshal: Sendable, JSValueCodable, Error {
-  let value: String
+package struct TestStringMarshal: Sendable, JSValueCodable, Error {
+  package let value: String
 
-  init(_ value: String) {
+  package init(_ value: String) {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  package init<E: JSEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -81,41 +74,36 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     )
   }
 
-  init(
+  package init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isString(in: context) ? "string" : "other"
   }
 
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+  @_lifetime(borrow context)
+  package func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(string: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+  @_lifetime(borrow context)
+  package func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(string: value, in: jscContext).takeHandle()
+    }
   }
 }
 
-struct TestBoolMarshal: Sendable, JSValueCodable {
-  let value: Bool
+package struct TestBoolMarshal: Sendable, JSValueCodable {
+  package let value: Bool
 
-  init(_ value: Bool) {
+  package init(_ value: Bool) {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  package init<E: JSEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -134,29 +122,24 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     )
   }
 
-  init(
+  package init(
     value: borrowing JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) {
     self.value = value.isBoolean(in: context)
   }
 
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+  @_lifetime(borrow context)
+  package func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(boolean: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+  @_lifetime(borrow context)
+  package func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(boolean: value, in: jscContext).takeHandle()
+    }
   }
 }

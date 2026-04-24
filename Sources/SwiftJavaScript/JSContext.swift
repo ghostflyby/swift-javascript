@@ -168,8 +168,8 @@ extension JSContext {
     switch consume result {
     case .value(let value):
       return value
-    case .exception(let exception):
-      return exception
+    case .exception:
+      return makeUndefined()
     }
   }
 

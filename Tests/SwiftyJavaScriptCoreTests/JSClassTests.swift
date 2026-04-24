@@ -15,10 +15,12 @@ import Testing
     name: "value",
     attributes: .readOnly,
     getProperty: { context, _ in
-      .value(JSValue(number: 1, in: context))
+      let value = JSValue(number: 1, in: context)
+      return .value(JSValue(retaining: value))
     },
     setProperty: { context, _, _ in
-      .value(JSValue(undefinedIn: context))
+      let value = JSValue(undefinedIn: context)
+      return .value(JSValue(retaining: value))
     }
   )
 
@@ -26,7 +28,8 @@ import Testing
     name: "fn",
     attributes: .dontEnum,
     callAsFunction: { context, _, _ in
-      .value(JSValue(undefinedIn: context))
+      let value = JSValue(undefinedIn: context)
+      return .value(JSValue(retaining: value))
     }
   )
 
@@ -67,20 +70,24 @@ import Testing
   definition.finalize = { _ in }
   definition.hasProperty = { _, _, name in name == "x" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(undefinedIn: context))
+    let value = JSValue(undefinedIn: context)
+    return .value(JSValue(retaining: value))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
 
   #expect(definition.initialize != nil)
@@ -115,10 +122,12 @@ import Testing
       name: "version",
       attributes: .readOnly,
       getProperty: { context, _ in
-        .value(JSValue(number: 1, in: context))
+        let value = JSValue(number: 1, in: context)
+        return .value(JSValue(retaining: value))
       },
       setProperty: { context, _, _ in
-        .value(JSValue(undefinedIn: context))
+        let value = JSValue(undefinedIn: context)
+        return .value(JSValue(retaining: value))
       }
     )
   ]
@@ -127,7 +136,8 @@ import Testing
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
-        .value(JSValue(string: "pong", in: context))
+        let value = JSValue(string: "pong", in: context)
+        return .value(JSValue(retaining: value))
       }
     )
   ]
@@ -135,20 +145,24 @@ import Testing
   definition.finalize = { _ in }
   definition.hasProperty = { _, _, name in name == "version" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(number: 42, in: context))
+    let value = JSValue(number: 42, in: context)
+    return .value(JSValue(retaining: value))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
 
   let cls = JSClass(defination: definition)
@@ -193,10 +207,12 @@ import Testing
       name: "version",
       attributes: [.readOnly, .dontDelete],
       getProperty: { context, _ in
-        .value(JSValue(number: 1, in: context))
+        let value = JSValue(number: 1, in: context)
+        return .value(JSValue(retaining: value))
       },
       setProperty: { context, _, _ in
-        .value(JSValue(undefinedIn: context))
+        let value = JSValue(undefinedIn: context)
+        return .value(JSValue(retaining: value))
       }
     )
   ]
@@ -205,27 +221,32 @@ import Testing
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
-        .value(JSValue(string: "pong", in: context))
+        let value = JSValue(string: "pong", in: context)
+        return .value(JSValue(retaining: value))
       }
     )
   ]
   definition.initialize = { _, _ in }
   definition.hasProperty = { _, _, name in name == "version" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(number: 1, in: context))
+    let value = JSValue(number: 1, in: context)
+    return .value(JSValue(retaining: value))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    let value = JSValue(undefinedIn: context)
+    return JSValue(retaining: value)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(objectIn: context)
+    let value = JSValue(objectIn: context)
+    return JSValue(retaining: value)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(string: "converted", in: context)
+    let value = JSValue(string: "converted", in: context)
+    return JSValue(retaining: value)
   }
   definition.finalize = { _ in }
 

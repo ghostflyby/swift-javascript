@@ -1,11 +1,9 @@
-import Testing
+import SwiftyJavaScriptCore
 
-@testable import SwiftyJavaScriptCore
+package enum ZeroOneBoolConverter: JSValueConverter {
+  package typealias SwiftType = Bool
 
-enum ZeroOneBoolConverter: JSValueConverter {
-  typealias SwiftType = Bool
-
-  static func decode<E: JSEngine>(
+  package static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
@@ -24,137 +22,118 @@ enum ZeroOneBoolConverter: JSValueConverter {
     )
   }
 
-  static func encode<E: JSEngine>(
+  @_lifetime(borrow context)
+  package static func encode<E: JSEngine>(
     _ value: Bool,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(number: value ? 1 : 0, in: jscContext).takeHandle()
+    }
   }
 
-  static func decode(
+  package static func decode(
     _ value: borrowing JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) -> Bool {
     value.toDouble(in: context) != 0
   }
 
-  static func encode(_ value: Bool, in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<
-      JavaScriptCoreEngine
-    >
-  {
+  @_lifetime(borrow context)
+  package static func encode(
+    _ value: Bool,
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<JavaScriptCoreEngine> {
     JSValue(number: value ? 1 : 0, in: context)
   }
 }
 
-struct FailingEncodeValue: JSValueEncodable {
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+package struct FailingEncodeValue: JSValueEncodable {
+  package init() {}
+
+  @_lifetime(borrow context)
+  package func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(undefinedIn: jscContext).takeHandle()
+    }
   }
 
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
+  @_lifetime(borrow context)
+  package func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
     -> JSValue<JavaScriptCoreEngine>
   {
     JSValue(undefinedIn: context)
   }
 
-  func tryEncode<E: JSEngine>(
+  @_lifetime(borrow context)
+  package func tryEncode<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     _ = context
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 
-  func tryEncode(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    throws(JSValueConversionError) -> JSValue<
-      JavaScriptCoreEngine
-    >
-  {
+  @_lifetime(borrow context)
+  package func tryEncode(
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) throws(JSValueConversionError) -> JSValue<JavaScriptCoreEngine> {
+    _ = context
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 }
 
-struct ReturnPayload {
-  let value: Double
+package struct ReturnPayload {
+  package let value: Double
+
+  package init(value: Double) {
+    self.value = value
+  }
 }
 
-enum ReturnPayloadEncoder: JSValueEncoder {
-  typealias SwiftType = ReturnPayload
+package enum ReturnPayloadEncoder: JSValueEncoder {
+  package typealias SwiftType = ReturnPayload
 
-  static func encode<E: JSEngine>(
+  @_lifetime(borrow context)
+  package static func encode<E: JSEngine>(
     _ value: ReturnPayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(number: value.value, in: jscContext).takeHandle()
+    }
   }
 
-  static func encode(
-    _ value: ReturnPayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> JSValue<
-    JavaScriptCoreEngine
-  > {
+  @_lifetime(borrow context)
+  package static func encode(
+    _ value: ReturnPayload,
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<JavaScriptCoreEngine> {
     JSValue(number: value.value, in: context)
   }
 }
 
-enum FailurePayload: Error {
+package enum FailurePayload: Error {
   case bad
 }
 
-enum FailurePayloadEncoder: JSValueEncoder {
-  typealias SwiftType = FailurePayload
+package enum FailurePayloadEncoder: JSValueEncoder {
+  package typealias SwiftType = FailurePayload
 
-  static func encode<E: JSEngine>(
+  @_lifetime(borrow context)
+  package static func encode<E: JSEngine>(
     _ value: FailurePayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(string: "bad", in: jscContext).takeHandle()
+    }
   }
 
-  static func encode(
-    _ value: FailurePayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> JSValue<
-    JavaScriptCoreEngine
-  > {
+  @_lifetime(borrow context)
+  package static func encode(
+    _ value: FailurePayload,
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<JavaScriptCoreEngine> {
     switch value {
     case .bad:
       return JSValue(string: "bad", in: context)
@@ -162,34 +141,56 @@ enum FailurePayloadEncoder: JSValueEncoder {
   }
 }
 
-struct CodableAddress: Codable, Equatable {
-  let city: String
-  let zip: Int
+package struct CodableAddress: Codable, Equatable {
+  package let city: String
+  package let zip: Int
+
+  package init(city: String, zip: Int) {
+    self.city = city
+    self.zip = zip
+  }
 }
 
-struct CodableUser: Codable, Equatable {
-  let name: String
-  let age: Int
-  let active: Bool
-  let tags: [String]
-  let address: CodableAddress
+package struct CodableUser: Codable, Equatable {
+  package let name: String
+  package let age: Int
+  package let active: Bool
+  package let tags: [String]
+  package let address: CodableAddress
+
+  package init(name: String, age: Int, active: Bool, tags: [String], address: CodableAddress) {
+    self.name = name
+    self.age = age
+    self.active = active
+    self.tags = tags
+    self.address = address
+  }
 }
 
 @JSValueAutoSerialization
-struct MacroDefaultUser: Equatable {
-  let name: String
-  let age: Double
+package struct MacroDefaultUser: Equatable {
+  package let name: String
+  package let age: Double
+
+  package init(name: String, age: Double) {
+    self.name = name
+    self.age = age
+  }
 }
 
 @JSValueAutoSerialization(MacroDelegatedUserDecoder.self, MacroDelegatedUserEncoder.self)
-struct MacroDelegatedUser: Equatable {
-  let score: Double
+package struct MacroDelegatedUser: Equatable {
+  package let score: Double
+
+  package init(score: Double) {
+    self.score = score
+  }
 }
 
-enum MacroDelegatedUserDecoder: JSValueDecoder {
-  typealias SwiftType = MacroDelegatedUser
+package enum MacroDelegatedUserDecoder: JSValueDecoder {
+  package typealias SwiftType = MacroDelegatedUser
 
-  static func decode<E: JSEngine>(
+  package static func decode<E: JSEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> MacroDelegatedUser {
@@ -208,83 +209,79 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
     )
   }
 
-  static func decode(
+  package static func decode(
     _ value: borrowing JSValue<JavaScriptCoreEngine>,
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> MacroDelegatedUser
-  {
+  ) -> MacroDelegatedUser {
     MacroDelegatedUser(score: value.toDouble(in: context))
   }
 }
 
-enum MacroDelegatedUserEncoder: JSValueEncoder {
-  typealias SwiftType = MacroDelegatedUser
+package enum MacroDelegatedUserEncoder: JSValueEncoder {
+  package typealias SwiftType = MacroDelegatedUser
 
-  static func encode<E: JSEngine>(
+  @_lifetime(borrow context)
+  package static func encode<E: JSEngine>(
     _ value: MacroDelegatedUser,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+    bridgeJavaScriptCoreValue(in: context) { jscContext in
+      JSValue(number: value.score, in: jscContext).takeHandle()
+    }
   }
 
-  static func encode(
-    _ value: MacroDelegatedUser, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> JSValue<JavaScriptCoreEngine>
-  {
+  @_lifetime(borrow context)
+  package static func encode(
+    _ value: MacroDelegatedUser,
+    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+  ) -> JSValue<JavaScriptCoreEngine> {
     JSValue(number: value.score, in: context)
   }
 }
 
 @JSValueAutoSerialization
-struct MacroFieldOverrideUser: Equatable {
-  let name: String
+package struct MacroFieldOverrideUser: Equatable {
+  package let name: String
   @JSValueFieldCoding(ZeroOneBoolConverter.self)
-  let active: Bool
+  package let active: Bool
+
+  package init(name: String, active: Bool) {
+    self.name = name
+    self.active = active
+  }
 }
 
 @JSValueAutoSerialization
-final class MacroSerializedClass: Equatable {
-  let name: String
+package final class MacroSerializedClass: Equatable {
+  package let name: String
   @JSValueFieldCoding(ZeroOneBoolConverter.self)
-  var active: Bool
+  package var active: Bool
 
-  init(name: String, active: Bool) {
+  package init(name: String, active: Bool) {
     self.name = name
     self.active = active
   }
 
-  static func == (lhs: MacroSerializedClass, rhs: MacroSerializedClass) -> Bool {
+  package static func == (lhs: MacroSerializedClass, rhs: MacroSerializedClass) -> Bool {
     lhs.name == rhs.name && lhs.active == rhs.active
   }
 }
 
 @JSValueAutoSerialization
-enum MacroStringEnum: Equatable {
+package enum MacroStringEnum: Equatable {
   case pending
   case running
   case done
 }
 
 @JSValueAutoSerialization
-enum MacroRawEnum: String, Equatable {
+package enum MacroRawEnum: String, Equatable {
   case alpha = "A"
   case beta = "B"
 }
 
 @JSValueAutoSerialization
-enum MacroAssociatedEnum: Equatable {
+package enum MacroAssociatedEnum: Equatable {
   case idle
   case count(Int32)
   case range(Int32, Int32)
@@ -292,14 +289,14 @@ enum MacroAssociatedEnum: Equatable {
 }
 
 @JSValueAutoSerialization(tagKey: "type", payloadKey: "data")
-enum MacroCustomKeyAssociatedEnum: Equatable {
+package enum MacroCustomKeyAssociatedEnum: Equatable {
   case idle
   case count(Int32)
   case user(id: Int32, name: String)
 }
 
 @JSValueAutoSerialization
-enum MacroFlattenedAssociatedEnum: Equatable {
+package enum MacroFlattenedAssociatedEnum: Equatable {
   case rgb(r: Int32, g: Int32, b: Int32)
   case named(name: String)
   case idle
@@ -310,7 +307,7 @@ enum MacroFlattenedAssociatedEnum: Equatable {
 @JSValueFieldCoding("pair.1", ZeroOneBoolConverter.self)
 @JSValueFieldCoding("flags.enabled", ZeroOneBoolConverter.self)
 @JSValueAutoSerialization
-enum MacroAssociatedOverrideEnum: Equatable {
+package enum MacroAssociatedOverrideEnum: Equatable {
   case enabled(Bool)
   case pair(Bool, Bool)
   case flags(id: Int32, enabled: Bool)

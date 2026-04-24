@@ -48,6 +48,20 @@ let package = Package(
       ],
       swiftSettings: [.enableExperimentalFeature("Lifetimes")]
     ),
+    .target(
+      name: "SwiftJavaScriptTestSupport",
+      dependencies: [
+        "SwiftJavaScript"
+      ],
+      swiftSettings: [.enableExperimentalFeature("Lifetimes")]
+    ),
+    .target(
+      name: "SwiftyJavaScriptCoreTestSupport",
+      dependencies: [
+        "SwiftyJavaScriptCore"
+      ],
+      swiftSettings: [.enableExperimentalFeature("Lifetimes")]
+    ),
     .macro(
       name: "SwiftyJavaScriptCoreMacrosPlugin",
       dependencies: [
@@ -61,7 +75,8 @@ let package = Package(
     .testTarget(
       name: "SwiftJavaScriptTests",
       dependencies: [
-        "SwiftJavaScript"
+        "SwiftJavaScript",
+        "SwiftJavaScriptTestSupport",
       ]
     ),
     .testTarget(
@@ -76,9 +91,11 @@ let package = Package(
       name: "SwiftyJavaScriptCoreTests",
       dependencies: [
         "SwiftyJavaScriptCore",
+        "SwiftyJavaScriptCoreTestSupport",
         "SwiftyJavaScriptCoreMacrosPlugin",
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
-      ]
+      ],
+      swiftSettings: [.enableExperimentalFeature("Lifetimes")]
     ),
     .testTarget(
       name: "SwiftyQuickJSTests",

@@ -420,6 +420,44 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
 {
   public var definition: JSClassDefinitionMetadata<ParentClass> = .init()
   public var behavior: JSEngineClassBehavior<E, PropertyNameAccumulator> = .init()
+  private var storedGetProperty:
+    (
+      @Sendable (borrowing JSInstantContext<E>, borrowing JSValue<E>, String)
+        -> sending JSResult<JSValue<E>>
+    )? = nil
+  private var storedSetProperty:
+    (
+      @Sendable (
+        borrowing JSInstantContext<E>, borrowing JSValue<E>, String,
+        borrowing JSValue<E>
+      )
+        -> sending JSValue<E>?
+    )? = nil
+  private var storedCallAsFunction:
+    (
+      @Sendable (
+        borrowing JSInstantContext<E>,
+        inout JSValue<E>,
+        inout JSValue<E>,
+        borrowing JSArguments<E>
+      ) -> sending JSValue<E>
+    )? = nil
+  private var storedCallAsConstructor:
+    (
+      @Sendable (
+        borrowing JSInstantContext<E>,
+        inout JSValue<E>,
+        inout JSValue<E>,
+        borrowing JSArguments<E>
+      ) -> sending JSValue<E>
+    )? = nil
+  private var storedConvertToType:
+    (
+      @Sendable (
+        borrowing JSInstantContext<E>, inout JSValue<E>, JSType, inout JSValue<E>
+      )
+        -> sending JSValue<E>
+    )? = nil
 
   public init() {}
 
@@ -481,8 +519,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         -> sending JSResult<JSValue<E>>
     )?
   {
-    get { nil }
+    get { storedGetProperty }
     set {
+      storedGetProperty = newValue
       guard let newValue else {
         behavior.getProperty = nil
         return
@@ -511,8 +550,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         -> sending JSValue<E>?
     )?
   {
-    get { nil }
+    get { storedSetProperty }
     set {
+      storedSetProperty = newValue
       guard let newValue else {
         behavior.setProperty = nil
         return
@@ -558,8 +598,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
       ) -> sending JSValue<E>
     )?
   {
-    get { nil }
+    get { storedCallAsFunction }
     set {
+      storedCallAsFunction = newValue
       guard let newValue else {
         behavior.callAsFunction = nil
         return
@@ -585,8 +626,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
       ) -> sending JSValue<E>
     )?
   {
-    get { nil }
+    get { storedCallAsConstructor }
     set {
+      storedCallAsConstructor = newValue
       guard let newValue else {
         behavior.callAsConstructor = nil
         return
@@ -622,8 +664,9 @@ public struct JSEngineClassDefinition<E: JSEngine, ParentClass: Sendable, Proper
         -> sending JSValue<E>
     )?
   {
-    get { nil }
+    get { storedConvertToType }
     set {
+      storedConvertToType = newValue
       guard let newValue else {
         behavior.convertToType = nil
         return

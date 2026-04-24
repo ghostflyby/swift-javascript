@@ -1,3 +1,4 @@
+import SwiftJavaScriptTestSupport
 import Testing
 
 @testable import SwiftJavaScript
@@ -130,80 +131,6 @@ import Testing
   #expect(takeExceptionValue(JSResult<Int>.exception(7)) == 7)
 }
 
-private final class DummyJSClassInstance: Sendable {}
-
-private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendable {
-  typealias Engine = MockEngine
-  typealias ParentClass = JSClass<MockEngine>
-  typealias PropertyNameAccumulator = Never
-  typealias ClassDefinition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>
-
-  static var jsClassDefinition: JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never> {
-    var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
-    definition.className = "ExportedChild"
-    definition.parentClass = mockClass("Parent")
-    return definition
-  }
-
-  static func tryDecode<E: JSEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> MockExportedJSClassInstance {
-    _ = value
-    _ = context
-    return MockExportedJSClassInstance()
-  }
-
-  static func tryEncode<E: JSEngine>(
-    _ value: MockExportedJSClassInstance,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    _ = value
-    return JSValue<E>(undefinedIn: context)
-  }
-
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    MockExportedJSClassInstance.encode(self, in: context)
-  }
-
-  func tryEncode<E: JSEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    try MockExportedJSClassInstance.tryEncode(self, in: context)
-  }
-}
-
-private func mockUndefinedValue() -> JSValue<MockEngine> {
-  JSValue<MockEngine>(
-    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test"))
-  )
-}
-
-private func mockClass(_ id: String) -> JSClass<MockEngine> {
-  JSClass(handleClass: MockClassHandle(rawClass: MockClass(id: id)))
-}
-
-private func mockInstantContext() -> JSInstantContext<MockEngine> {
-  JSInstantContext(handle: MockContextHandle(rawContext: MockContext(runtimeID: "runtime-token")))
-}
-
-private func readStaticValue<D: JSStaticValueDefinition>(
-  _ definition: D,
-  in context: borrowing JSInstantContext<D.Engine>,
-  from thisValue: borrowing JSValue<D.Engine>
-) -> JSResult<JSValue<D.Engine>> {
-  definition.getProperty(context, thisValue)
-}
-
-private func callStaticFunction<D: JSStaticFunctionDefinition>(
-  _ definition: D,
-  in context: borrowing JSInstantContext<D.Engine>,
-  on thisValue: borrowing JSValue<D.Engine>,
-  with arguments: borrowing JSArguments<D.Engine>
-) -> JSResult<JSValue<D.Engine>> {
-  definition.callAsFunction(context, thisValue, arguments)
-}
-
 @Test func jsClassWrapsEngineSpecificClassHandle() {
   let handle = MockClassHandle(rawClass: MockClass(id: "Widget"))
   let jsClass = JSClass<MockEngine>(handleClass: handle)
@@ -222,13 +149,22 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let staticValue = JSStaticValue<MockEngine>(
     name: "title",
     attributes: [.readOnly],
-    getProperty: { context, _ in .value(context.makeString("title")) },
-    setProperty: { context, _, _ in .value(context.makeString("set")) }
+    getProperty: { context, _ in
+      let value = context.makeString("title")
+      return .value(JSValue(retaining: value))
+    },
+    setProperty: { context, _, _ in
+      let value = context.makeString("set")
+      return .value(JSValue(retaining: value))
+    }
   )
   let staticFunction = JSStaticFunction<MockEngine>(
     name: "render",
     attributes: [.dontDelete],
-    callAsFunction: { context, _, arguments in .value(context.makeNumber(arguments.count)) }
+    callAsFunction: { context, _, arguments in
+      let value = context.makeNumber(arguments.count)
+      return .value(JSValue(retaining: value))
+    }
   )
 
   #expect(staticValue.definition.name == "title")
@@ -255,8 +191,14 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let failingStaticValue = JSStaticValue<MockEngine>(
     name: "broken",
     attributes: [.none],
-    getProperty: { context, _ in .value(context.makeString("unused")) },
-    setProperty: { context, _, _ in .exception(context.makeString("error")) }
+    getProperty: { context, _ in
+      let value = context.makeString("unused")
+      return .value(JSValue(retaining: value))
+    },
+    setProperty: { context, _, _ in
+      let error = context.makeString("error")
+      return .exception(JSValue(retaining: error))
+    }
   )
 
   if let exception = failingStaticValue.setPropertyException(

@@ -106,7 +106,7 @@ extension JSStaticValueDefinition {
     JSClassStaticValueDefinition(name: name, attributes: attributes)
   }
 
-  @_lifetime(borrow self, borrow context)
+  @_lifetime(borrow context)
   package func propertyValue(
     in context: borrowing JSInstantContext<Engine>,
     on thisValue: borrowing JSValue<Engine>
@@ -114,7 +114,7 @@ extension JSStaticValueDefinition {
     retainResult(getProperty(context, thisValue))
   }
 
-  @_lifetime(borrow self, borrow context)
+  @_lifetime(borrow context)
   package func setPropertyException(
     in context: borrowing JSInstantContext<Engine>,
     on thisValue: borrowing JSValue<Engine>,
@@ -141,7 +141,7 @@ extension JSStaticFunctionDefinition {
     JSClassStaticFunctionDefinition(name: name, attributes: attributes)
   }
 
-  @_lifetime(borrow self, borrow context)
+  @_lifetime(borrow context)
   package func callResult(
     in context: borrowing JSInstantContext<Engine>,
     on thisValue: borrowing JSValue<Engine>,

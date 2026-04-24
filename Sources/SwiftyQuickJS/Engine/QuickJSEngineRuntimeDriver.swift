@@ -42,7 +42,12 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSRetainedFunctionCallback<QuickJSEngine>,
+    callback:
+      @escaping (
+        _ context: borrowing JSInstantContext<QuickJSEngine>,
+        _ this: borrowing SwiftJavaScript.JSValue<QuickJSEngine>,
+        _ arguments: borrowing JSArguments<QuickJSEngine>
+      ) -> (isException: Bool, handle: QuickJSValueHandle),
     in context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let callbackBox = Unmanaged.passRetained(Box(callback))
@@ -235,20 +240,13 @@ private func quickJSFunctionCallback(
       contextRef: contextRef
     )
   )
-
-  let args = JSArguments<QuickJSEngine>(
+  let result = withQuickJSArguments(
+    arguments,
     count: Int(argumentCount),
-    borrowedValueHandleAt: { index, contextHandle in
-      guard index >= 0, index < Int(argumentCount), let arguments else {
-        return nil
-      }
-      return QuickJSValueHandle(
-        ref: arguments[index],
-        contextRef: contextHandle.ref
-      )
-    }
-  )
-  let result = callback(context, thisValue, args)
+    contextRef: contextRef
+  ) { args in
+    callback(context, thisValue, args)
+  }
   thisValue.discard()
 
   if result.isException {

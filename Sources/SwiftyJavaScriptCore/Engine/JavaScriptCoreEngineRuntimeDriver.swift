@@ -32,7 +32,12 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSRetainedFunctionCallback<JavaScriptCoreEngine>,
+    callback:
+      @escaping (
+        _ context: borrowing JSInstantContext<JavaScriptCoreEngine>,
+        _ this: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+        _ arguments: borrowing JSArguments<JavaScriptCoreEngine>
+      ) -> (isException: Bool, handle: JavaScriptCoreValueHandle),
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()

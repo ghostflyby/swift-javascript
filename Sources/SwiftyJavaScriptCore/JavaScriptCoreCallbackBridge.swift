@@ -14,20 +14,9 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
   let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
   let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let args = JSArguments<JavaScriptCoreEngine>(
-    count: Int(argumentCount),
-    borrowedValueHandleAt: { index, contextHandle in
-      guard
-        index >= 0,
-        index < Int(argumentCount),
-        let valueRef = argumentsPointer?[index]
-      else {
-        return nil
-      }
-      return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
-    }
-  )
-  let result = callback(context, thisValue, args)
+  let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
+    callback(context, thisValue, args)
+  }
 
   if result.isException {
     exception?.pointee = result.handle.ref

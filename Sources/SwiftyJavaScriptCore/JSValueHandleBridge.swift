@@ -48,3 +48,37 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     borrowHandle().ref
   }
 }
+
+@_lifetime(borrow context)
+package func bridgeJavaScriptCoreValue<E: JSEngine>(
+  in context: borrowing SwiftJavaScript.JSInstantContext<E>,
+  _ body: (borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>)
+    -> sending SwiftJavaScript.JSValueHandle<JavaScriptCoreEngine>
+) -> SwiftJavaScript.JSValue<E> {
+  precondition(
+    E.self == JavaScriptCoreEngine.self,
+    "This conversion path only supports JavaScriptCoreEngine"
+  )
+  let jscContext = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
+    handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+  )
+  let handle = unsafeBitCast(body(jscContext), to: SwiftJavaScript.JSValueHandle<E>.self)
+  return SwiftJavaScript.JSValue<E>(handleValue: handle)
+}
+
+@_lifetime(borrow context)
+package func bridgeJavaScriptCoreValue<E: JSEngine>(
+  in context: borrowing SwiftJavaScript.JSInstantContext<E>,
+  _ body: (borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>)
+    throws -> sending SwiftJavaScript.JSValueHandle<JavaScriptCoreEngine>
+) rethrows -> SwiftJavaScript.JSValue<E> {
+  precondition(
+    E.self == JavaScriptCoreEngine.self,
+    "This conversion path only supports JavaScriptCoreEngine"
+  )
+  let jscContext = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
+    handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+  )
+  let handle = unsafeBitCast(try body(jscContext), to: SwiftJavaScript.JSValueHandle<E>.self)
+  return SwiftJavaScript.JSValue<E>(handleValue: handle)
+}

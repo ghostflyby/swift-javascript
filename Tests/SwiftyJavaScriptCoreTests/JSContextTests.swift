@@ -13,7 +13,8 @@ import Testing
 
     context.installGlobalFunction(named: "double") { context, _, arguments in
       let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-      return .value(context.makeNumber(value * 2))
+      let result = context.makeNumber(value * 2)
+      return .value(JSValue(retaining: result))
     }
 
     let result = context.evaluateScript("double(count)")
@@ -32,5 +33,31 @@ import Testing
     context.deleteGlobalProperty(forKey: countKey)
     let hasCountAfterDelete = context.hasGlobalProperty(countKey)
     #expect(!hasCountAfterDelete)
+  }
+}
+
+@Test func contextGlobalPropertyGetterThrowNormalizesToUndefined() async {
+  let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
+
+  await context.withIsolatedGlobalObject { context, _ in
+    let install = context.evaluateScript(
+      """
+      Object.defineProperty(globalThis, "boom", {
+        configurable: true,
+        get() { throw new Error("boom") }
+      })
+      """
+    )
+
+    switch consume install {
+    case .value:
+      break
+    case .exception:
+      Issue.record("Expected throwing getter installation to succeed")
+      return
+    }
+
+    let value = context.getGlobalProperty(forKey: "boom")
+    #expect(value.isUndefined(in: context))
   }
 }

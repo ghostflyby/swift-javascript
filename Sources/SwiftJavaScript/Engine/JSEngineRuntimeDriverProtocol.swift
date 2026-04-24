@@ -14,7 +14,12 @@ public protocol JSEngineRuntimeDriver {
 
   static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSRetainedFunctionCallback<Engine>,
+    callback:
+      @escaping (
+        _ context: borrowing JSInstantContext<Engine>,
+        _ this: borrowing JSValue<Engine>,
+        _ arguments: borrowing JSArguments<Engine>
+      ) -> (isException: Bool, handle: ValueHandle),
     in context: ContextHandle
   ) -> ValueHandle?
 

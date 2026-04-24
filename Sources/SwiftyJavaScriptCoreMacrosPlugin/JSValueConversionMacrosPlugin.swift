@@ -1286,38 +1286,32 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
         }
 
+        @_lifetime(borrow context)
         public func toJSValue<E: JSEngine>(
           in context: borrowing JSInstantContext<E>
         ) -> JSValue<E> {
-          precondition(
-            E.self == JavaScriptCoreEngine.self,
-            "This conversion path only supports JavaScriptCoreEngine"
-          )
-          let __encoded = self.toJSValue(
-            in: JSInstantContext<JavaScriptCoreEngine>(
-              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-            )
-          )
-          return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
-          )
+          do {
+            return try self.tryEncode(in: context)
+          } catch {
+            return bridgeJavaScriptCoreValue(in: context) { jscContext in
+              SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: jscContext).takeHandle()
+            }
+          }
         }
 
+        @_lifetime(borrow context)
         public func tryEncode<E: JSEngine>(
           in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> JSValue<E> {
-          precondition(
-            E.self == JavaScriptCoreEngine.self,
-            "This conversion path only supports JavaScriptCoreEngine"
-          )
-          let __encoded = try self.tryEncode(
-            in: JSInstantContext<JavaScriptCoreEngine>(
-              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-            )
-          )
-          return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
-          )
+          do {
+            return try bridgeJavaScriptCoreValue(in: context) { jscContext in
+              try self.tryEncode(in: jscContext).takeHandle()
+            }
+          } catch let error as JSValueConversionError {
+            throw error
+          } catch {
+            fatalError("Unexpected JavaScriptCore encode error: \\(error)")
+          }
         }
 
         \(initSource)
@@ -1329,6 +1323,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           \(decodeBody)
         }
 
+        @_lifetime(borrow context)
         public func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           do {
             return try self.tryEncode(in: context)
@@ -1337,6 +1332,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }
         }
 
+        @_lifetime(borrow context)
         public func tryEncode(
           in context: borrowing JSInstantContext<JavaScriptCoreEngine>
         ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {

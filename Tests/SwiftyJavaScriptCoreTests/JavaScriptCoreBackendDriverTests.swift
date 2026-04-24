@@ -1,40 +1,8 @@
 import JavaScriptCore
+import SwiftyJavaScriptCoreTestSupport
 import Testing
 
 @testable import SwiftyJavaScriptCore
-
-private func makeBackendString(
-  _ value: String,
-  in context: JavaScriptCoreContextHandle
-) -> JSValueHandle<JavaScriptCoreEngine> {
-  JavaScriptCoreEngine.makeStringValueHandle(value, context)!
-}
-
-private func evaluateBackendScript(
-  _ script: String,
-  in context: JavaScriptCoreContextHandle,
-  sourceURL: String? = nil,
-  startingLineNumber: Int32 = 1
-) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
-  JavaScriptCoreEngine.evaluateScriptResultHandle(
-    script,
-    context,
-    sourceURL: sourceURL,
-    startingLineNumber: startingLineNumber
-  )!
-}
-
-private func makeBackendObject(
-  in context: JavaScriptCoreContextHandle
-) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
-  JavaScriptCoreEngine.makeObjectResultHandle(context)!
-}
-
-private func makeBackendArray(
-  in context: JavaScriptCoreContextHandle
-) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
-  JavaScriptCoreEngine.makeArrayResultHandle(context)!
-}
 
 @Test func javaScriptCoreBackendDriverSupportsPhaseOnePrimitivesAndProperties() {
   let runtimeHandle = JavaScriptCoreEngine.makeRuntimeHandle()
@@ -77,7 +45,9 @@ private func makeBackendArray(
     }
 
     switch JavaScriptCoreEngine.getStringPropertyHandle("answer", on: object, in: context) {
-    case .none, .some(.exception):
+    case .none:
+      Issue.record("expected property read to succeed")
+    case .some(.exception):
       Issue.record("expected property read to succeed")
     case .some(.value(let property)):
       #expect(JavaScriptCoreEngine.valueTypeForHandle(property, in: context) == .number)
@@ -180,7 +150,9 @@ private func makeBackendArray(
         arguments: [one, two],
         in: context
       ) {
-      case .none, .some(.exception):
+      case .none:
+        Issue.record("expected backend function call to succeed")
+      case .some(.exception):
         Issue.record("expected backend function call to succeed")
       case .some(.value(let result)):
         #expect(JavaScriptCoreEngine.valueTypeForHandle(result, in: context) == .number)
@@ -264,7 +236,9 @@ private func makeBackendArray(
 
         let primitive = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!
         switch JavaScriptCoreEngine.toObjectHandle(primitive, in: context) {
-        case .none, .some(.exception):
+        case .none:
+          Issue.record("expected toObject to box primitive numbers")
+        case .some(.exception):
           Issue.record("expected toObject to box primitive numbers")
         case .some(.value(let object)):
           #expect(JavaScriptCoreEngine.valueTypeForHandle(object, in: context) == .object)
@@ -300,7 +274,9 @@ private func makeBackendArray(
     } else {
       #expect(JavaScriptCoreEngine.hasValuePropertyHandle(key, on: object, in: context) == true)
       switch JavaScriptCoreEngine.getValuePropertyHandle(key, on: object, in: context) {
-      case .none, .some(.exception):
+      case .none:
+        Issue.record("expected value-key property get to succeed")
+      case .some(.exception):
         Issue.record("expected value-key property get to succeed")
       case .some(.value(let stored)):
         #expect(JavaScriptCoreEngine.toStringForHandle(stored, in: context) == "driverValue")
@@ -317,7 +293,9 @@ private func makeBackendArray(
       Issue.record("expected indexed property set to succeed")
     } else {
       switch JavaScriptCoreEngine.getIndexPropertyHandle(at: 2, on: object, in: context) {
-      case .none, .some(.exception):
+      case .none:
+        Issue.record("expected indexed property get to succeed")
+      case .some(.exception):
         Issue.record("expected indexed property get to succeed")
       case .some(.value(let stored)):
         #expect(JavaScriptCoreEngine.valueTypeForHandle(stored, in: context) == .boolean)
@@ -356,49 +334,7 @@ private func makeBackendArray(
 }
 
 @Test func javaScriptCoreBackendDriverConsumesJSClassHostDescriptorBindings() {
-  var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >()
-  definition.className = "BackendProjected"
-  definition.staticValues = [
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
-      name: "version",
-      attributes: .readOnly,
-      getProperty: { context, _ in
-        .value(JSValue(number: 1, in: context))
-      },
-      setProperty: { context, _, _ in
-        .value(JSValue(undefinedIn: context))
-      }
-    )
-  ]
-  definition.staticFunctions = [
-    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
-      name: "ping",
-      attributes: .dontEnum,
-      callAsFunction: { context, _, _ in
-        .value(JSValue(string: "pong", in: context))
-      }
-    )
-  ]
-  definition.getProperty = { context, _, _ in
-    .value(JSValue(undefinedIn: context))
-  }
-  definition.setProperty = { _, _, _, _ in nil }
-  definition.hasProperty = { _, _, _ in true }
-  definition.deleteProperty = { _, _, _ in true }
-  definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
-  }
-  definition.callAsConstructor = { context, _, _, _ in
-    JSValue(objectIn: context)
-  }
-  definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { context, _, _, _ in
-    JSValue(undefinedIn: context)
-  }
-
+  let definition = makeBackendProjectedDefinition()
   let descriptor = definition.hostTypeDescriptor()
 
   #expect(descriptor.name == "BackendProjected")
