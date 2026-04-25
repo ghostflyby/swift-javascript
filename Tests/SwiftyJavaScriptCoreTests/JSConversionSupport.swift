@@ -9,71 +9,19 @@ enum ZeroOneBoolConverter: JSValueConverter {
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    return decode(
-      JSValue<JavaScriptCoreEngine>(
-        handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
-      ),
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
+    value.toDouble(in: context) != 0
   }
 
   static func encode<E: JSEngine>(
     _ value: Bool,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
-  }
-
-  static func decode(
-    _ value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> Bool {
-    value.toDouble(in: context) != 0
-  }
-
-  static func encode(_ value: Bool, in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<
-      JavaScriptCoreEngine
-    >
-  {
     JSValue(number: value ? 1 : 0, in: context)
   }
 }
 
 struct FailingEncodeValue: JSValueEncodable {
   func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
-  }
-
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<JavaScriptCoreEngine>
-  {
     JSValue(undefinedIn: context)
   }
 
@@ -84,13 +32,6 @@ struct FailingEncodeValue: JSValueEncodable {
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
 
-  func tryEncode(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    throws(JSValueConversionError) -> JSValue<
-      JavaScriptCoreEngine
-    >
-  {
-    throw .nonFiniteNumber(target: "FailingEncodeValue")
-  }
 }
 
 struct ReturnPayload {
@@ -104,24 +45,6 @@ enum ReturnPayloadEncoder: JSValueEncoder {
     _ value: ReturnPayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
-  }
-
-  static func encode(
-    _ value: ReturnPayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> JSValue<
-    JavaScriptCoreEngine
-  > {
     JSValue(number: value.value, in: context)
   }
 }
@@ -137,24 +60,6 @@ enum FailurePayloadEncoder: JSValueEncoder {
     _ value: FailurePayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
-  }
-
-  static func encode(
-    _ value: FailurePayload, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) -> JSValue<
-    JavaScriptCoreEngine
-  > {
     switch value {
     case .bad:
       return JSValue(string: "bad", in: context)

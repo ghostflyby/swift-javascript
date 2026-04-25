@@ -115,4 +115,6 @@
 
 - [x] 为 QuickJS 增加最小共享行为测试，优先复用 `SwiftJavaScriptTests` 中已有的 engine-agnostic 覆盖（已扩展 `SwiftJavaScriptEngineTests`）
 - [x] 将当前 shared engine tests 从 runtime/property/call 基线扩展到 ArrayBuffer/TypedArray、property attributes、function name/exception callback、Date/Array/instanceof、跨 context 兼容性；每项都同时跑 JSC 与 QuickJS
+- [x] 按 `JSEngine` 组合协议来源重排 shared engine tests：`EngineRuntimeDriverTests`、`EnginePropertyDriverTests`、`EngineInvocationDriverTests`、`EngineTypedArrayDriverTests`、`EngineStringDriverTests`、`EngineValueConversionTests` 分别覆盖对应 public API 边界
+- [x] 迁移更多 JSC-only public API tests 到 shared engine tests：`JSString`、`JSContext` thin wrapper、runtime/context identity、ArrayBuffer/TypedArray 细分行为、`JSValue` object/type helpers、`defineProperty`、codable/value converter 与 callback return/error coder；本轮迁移未暴露新的 QuickJS/JSC 行为不一致
 - [ ] 每发现一处“JSC 迁移得来的边界不符合第二引擎实际”的案例，都在 TODO 里记录并据此调整剩余迁移优先级
