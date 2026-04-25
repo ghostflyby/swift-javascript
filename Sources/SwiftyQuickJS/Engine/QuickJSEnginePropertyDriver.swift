@@ -54,14 +54,23 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     in context: QuickJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    let result = key.withCString {
-      JS_DefinePropertyValueStr(
-        context.ref,
-        object.ref,
-        $0,
-        JS_DupValue(context.ref, value.ref),
-        propertyFlags(for: attributes)
-      )
+    let result = key.withCString { keyPointer in
+      if attributes.isEmpty {
+        JS_SetPropertyStr(
+          context.ref,
+          object.ref,
+          keyPointer,
+          JS_DupValue(context.ref, value.ref)
+        )
+      } else {
+        JS_DefinePropertyValueStr(
+          context.ref,
+          object.ref,
+          keyPointer,
+          JS_DupValue(context.ref, value.ref),
+          propertyFlags(for: attributes)
+        )
+      }
     }
     return result == 1
   }
@@ -95,14 +104,24 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     on object: QuickJSValueHandle,
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle,
-    attributes _: JSHostMemberAttributes
+    attributes: JSHostMemberAttributes
   ) -> Bool {
     let atom = JS_ValueToAtom(context.ref, key.ref)
     guard atom != 0 else {
       return false
     }
     defer { JS_FreeAtom(context.ref, atom) }
-    return JS_SetProperty(context.ref, object.ref, atom, JS_DupValue(context.ref, value.ref)) == 1
+    if attributes.isEmpty {
+      return JS_SetProperty(context.ref, object.ref, atom, JS_DupValue(context.ref, value.ref))
+        == 1
+    }
+    return JS_DefinePropertyValue(
+      context.ref,
+      object.ref,
+      atom,
+      JS_DupValue(context.ref, value.ref),
+      propertyFlags(for: attributes)
+    ) == 1
   }
 
   public static func setIndexPropertyHandle(

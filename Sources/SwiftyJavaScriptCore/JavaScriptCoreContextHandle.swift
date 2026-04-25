@@ -8,14 +8,23 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
   package let ownsContext: Bool
   package let globalObjectClass: JSClassRef?
   package let functionClass: JSClassRef?
+  package let propertyNamesFunction: JSObjectRef?
 
   package init(runtime: JavaScriptCoreRuntimeHandle) {
     var definition = kJSClassDefinitionEmpty
     let globalObjectClass = JSClassCreate(&definition)
-    self.ref = JSGlobalContextCreateInGroup(runtime.ref, globalObjectClass)
+    guard let ref = JSGlobalContextCreateInGroup(runtime.ref, globalObjectClass) else {
+      preconditionFailure("JavaScriptCore could not create a global context")
+    }
+    let propertyNamesFunction = makeJavaScriptCorePropertyNamesFunction(in: ref)
+    if let propertyNamesFunction {
+      JSValueProtect(ref, propertyNamesFunction)
+    }
+    self.ref = ref
     self.ownsContext = true
     self.globalObjectClass = globalObjectClass
     self.functionClass = makeJavaScriptCoreFunctionClass()
+    self.propertyNamesFunction = propertyNamesFunction
   }
 
   package init(borrowing ref: JSGlobalContextRef) {
@@ -23,6 +32,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ownsContext = false
     self.globalObjectClass = nil
     self.functionClass = nil
+    self.propertyNamesFunction = nil
   }
 
   package init(adopting ref: JSGlobalContextRef) {
@@ -30,6 +40,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ownsContext = true
     self.globalObjectClass = nil
     self.functionClass = nil
+    self.propertyNamesFunction = nil
   }
 
   package var globalObjectRef: JSObjectRef {
@@ -42,6 +53,14 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     }
     return SwiftJavaScript.JSContext<JavaScriptCoreEngine>.borrow(ctx: ref)
       .driverContextHandle.functionClassRef
+  }
+
+  package var propertyNamesFunctionRef: JSObjectRef? {
+    if let propertyNamesFunction {
+      return propertyNamesFunction
+    }
+    return SwiftJavaScript.JSContext<JavaScriptCoreEngine>.borrow(ctx: ref)
+      .driverContextHandle.propertyNamesFunctionRef
   }
 
   public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
@@ -64,6 +83,9 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     if let functionClass {
       JSClassRetain(functionClass)
     }
+    if let propertyNamesFunction {
+      JSValueProtect(ref, propertyNamesFunction)
+    }
     JSGlobalContextRetain(ref)
     return true
   }
@@ -79,6 +101,9 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     if let globalObjectClass {
       JSClassRelease(globalObjectClass)
     }
+    if let propertyNamesFunction {
+      JSValueUnprotect(ref, propertyNamesFunction)
+    }
     JSGlobalContextRelease(ref)
     return true
   }
@@ -87,6 +112,28 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
 private func makeJavaScriptCoreFunctionClass() -> JSClassRef {
   var definition = makeJavaScriptCoreFunctionClassDefinition()
   return JSClassCreate(&definition)!
+}
+
+private func makeJavaScriptCorePropertyNamesFunction(in context: JSGlobalContextRef)
+  -> JSObjectRef?
+{
+  let source = """
+    (function(keys) {
+      return function(value) {
+        return keys(value);
+      };
+    })(Object.keys)
+    """
+  return withJavaScriptCoreString(source) { scriptRef in
+    var exception: JSValueRef?
+    guard
+      let value = JSEvaluateScript(context, scriptRef, nil, nil, 1, &exception),
+      exception == nil
+    else {
+      return nil
+    }
+    return JSValueToObject(context, value, nil)
+  }
 }
 
 extension JavaScriptCoreContextHandle: Hashable {

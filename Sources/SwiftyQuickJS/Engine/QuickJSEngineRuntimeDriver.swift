@@ -14,7 +14,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
     supportsSymbol: true,
     supportsExternalArrayBuffer: true,
     supportsHostObjects: false,
-    supportsESModules: true,
+    supportsESModules: false,
     supportsPromiseJobQueueControl: false
   )
 

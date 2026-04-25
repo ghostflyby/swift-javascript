@@ -37,6 +37,13 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
       opaque,
       false
     )
+    if JS_IsException(value) {
+      quickJSClearPendingException(in: context)
+      if let opaque {
+        _ = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
+      }
+      return nil
+    }
     return QuickJSValueHandle(ref: value, contextRef: context.ref)
   }
 
@@ -61,29 +68,40 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
   }
 
   public static func makeTypedArrayHandle(
-    in _: QuickJSContextHandle,
-    kind _: JSTypedArrayKind,
-    length _: Int
+    in context: QuickJSContextHandle,
+    kind: JSTypedArrayKind,
+    length: Int
   ) -> QuickJSValueHandle? {
-    nil
+    var arguments = [JS_NewFloat64(context.ref, Double(length))]
+    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
   }
 
   public static func makeTypedArrayHandle(
-    in _: QuickJSContextHandle,
-    kind _: JSTypedArrayKind,
-    arrayBuffer _: QuickJSValueHandle
+    in context: QuickJSContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: QuickJSValueHandle
   ) -> QuickJSValueHandle? {
-    nil
+    var arguments = [
+      arrayBuffer.ref,
+      JS_NewFloat64(context.ref, 0),
+      quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
+    ]
+    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
   }
 
   public static func makeTypedArrayHandle(
-    in _: QuickJSContextHandle,
-    kind _: JSTypedArrayKind,
-    arrayBuffer _: QuickJSValueHandle,
-    byteOffset _: Int,
-    length _: Int
+    in context: QuickJSContextHandle,
+    kind: JSTypedArrayKind,
+    arrayBuffer: QuickJSValueHandle,
+    byteOffset: Int,
+    length: Int
   ) -> QuickJSValueHandle? {
-    nil
+    var arguments = [
+      arrayBuffer.ref,
+      JS_NewFloat64(context.ref, Double(byteOffset)),
+      JS_NewFloat64(context.ref, Double(length)),
+    ]
+    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
   }
 
   public static func typedArrayLengthForHandle(
@@ -176,10 +194,24 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
     _ value: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    guard let buffer = typedArrayBufferForHandle(value, in: context) else {
+    var byteOffset = 0
+    var byteLength = 0
+    var bytesPerElement = 0
+    let buffer = JS_GetTypedArrayBuffer(
+      context.ref,
+      value.ref,
+      &byteOffset,
+      &byteLength,
+      &bytesPerElement
+    )
+    guard !JS_IsException(buffer) else {
       return (nil, true)
     }
-    return arrayBufferBytesPtrForHandle(buffer, in: context)
+    defer { JS_FreeValue(context.ref, buffer) }
+    return arrayBufferBytesPtrForHandle(
+      QuickJSValueHandle(ref: buffer, contextRef: context.ref),
+      in: context
+    )
   }
 
   public static func isArrayBufferHandle(
@@ -215,6 +247,54 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
     default:
       return nil
     }
+  }
+}
+
+private func quickJSMakeTypedArrayHandle(
+  in context: QuickJSContextHandle,
+  kind: JSTypedArrayKind,
+  arguments: inout [CQuickJSValue]
+) -> QuickJSValueHandle? {
+  let value = arguments.withUnsafeMutableBufferPointer { buffer in
+    JS_NewTypedArray(
+      context.ref,
+      Int32(buffer.count),
+      buffer.baseAddress,
+      quickJSTypedArrayType(for: kind)
+    )
+  }
+  guard !JS_IsException(value) else {
+    quickJSClearPendingException(in: context)
+    return nil
+  }
+  return QuickJSValueHandle(ref: value, contextRef: context.ref)
+}
+
+private func quickJSClearPendingException(in context: QuickJSContextHandle) {
+  let exception = JS_GetException(context.ref)
+  JS_FreeValue(context.ref, exception)
+}
+
+private func quickJSTypedArrayType(for kind: JSTypedArrayKind) -> JSTypedArrayEnum {
+  switch kind {
+  case .int8Array:
+    return JS_TYPED_ARRAY_INT8
+  case .uint8Array:
+    return JS_TYPED_ARRAY_UINT8
+  case .uint8ClampedArray:
+    return JS_TYPED_ARRAY_UINT8C
+  case .int16Array:
+    return JS_TYPED_ARRAY_INT16
+  case .uint16Array:
+    return JS_TYPED_ARRAY_UINT16
+  case .int32Array:
+    return JS_TYPED_ARRAY_INT32
+  case .uint32Array:
+    return JS_TYPED_ARRAY_UINT32
+  case .float32Array:
+    return JS_TYPED_ARRAY_FLOAT32
+  case .float64Array:
+    return JS_TYPED_ARRAY_FLOAT64
   }
 }
 

@@ -123,28 +123,71 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> [String] {
-    switch javaScriptCoreObjectRef(for: object, in: context) {
+    guard let propertyNamesFunction = context.propertyNamesFunctionRef else {
+      return []
+    }
+
+    var exception: JSValueRef?
+    var argument = Optional(object.ref)
+    let namesValue = withUnsafePointer(to: &argument) { arguments in
+      JSObjectCallAsFunction(
+        context.ref,
+        propertyNamesFunction,
+        nil,
+        1,
+        arguments,
+        &exception
+      )
+    }
+    guard let namesValue, exception == nil else {
+      return []
+    }
+
+    switch javaScriptCoreObjectRef(
+      for: JavaScriptCoreValueHandle(ref: namesValue, contextRef: context.ref),
+      in: context
+    ) {
     case .exception:
       return []
-    case .object(let objectRef):
-      let names = JSObjectCopyPropertyNames(context.ref, objectRef)
-      defer { JSPropertyNameArrayRelease(names) }
-
-      let count = JSPropertyNameArrayGetCount(names)
-      var result: [String] = []
-      result.reserveCapacity(Int(count))
-      for index in 0..<count {
-        guard let keyHandle = JSPropertyNameArrayGetNameAtIndex(names, index) else {
-          continue
-        }
-        result.append(
-          String(
-            jsStringHandle: JavaScriptCoreStringHandle(ref: keyHandle),
-            engine: JavaScriptCoreEngine.self
-          ))
-      }
-      return result
+    case .object(let namesArray):
+      return arrayElements(from: namesArray, in: context)
     }
+  }
+
+  private static func arrayElements(
+    from array: JSObjectRef,
+    in context: JavaScriptCoreContextHandle
+  ) -> [String] {
+    let count = withJavaScriptCoreString("length") { lengthKey in
+      var exception: JSValueRef?
+      guard
+        let lengthValue = JSObjectGetProperty(context.ref, array, lengthKey, &exception),
+        exception == nil
+      else {
+        return 0
+      }
+      return Int(JSValueToNumber(context.ref, lengthValue, nil))
+    }
+
+    var result: [String] = []
+    result.reserveCapacity(count)
+    for index in 0..<count {
+      var exception: JSValueRef?
+      guard
+        let value = JSObjectGetPropertyAtIndex(
+          context.ref,
+          array,
+          UInt32(index),
+          &exception
+        ),
+        exception == nil,
+        let string = javaScriptCoreString(value, in: context.ref)
+      else {
+        continue
+      }
+      result.append(string)
+    }
+    return result
   }
 
   private static func getProperty(
