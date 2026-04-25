@@ -29,6 +29,7 @@
 第 6 步收尾约束（context/VM 语义）：
 
 - [ ] 约束A：区分 Home Context 与 Operation Context。Home Context 仅负责值生命周期（protect/unprotect、takeRef retain）；Operation Context 仅负责 API 执行。
+- [x] 修复 JSC callback 返回值 ownership handoff：`callbackRef()` 消费 wrapper 并跳过 `JSValue.deinit -> JSValueUnprotect`，补 core transfer 与跨引擎 callback 回归测试（已完成，`swift test` 通过）
 
 ### 1.3 引擎泛型标记
 

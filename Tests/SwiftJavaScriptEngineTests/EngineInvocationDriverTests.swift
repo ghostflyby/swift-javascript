@@ -29,6 +29,11 @@ struct EngineInvocationDriverTests {
   }
 
   @Test(arguments: ScriptEngine.allCases)
+  func nativeFunctionTransfersReturnedObjectsAndExceptions(_ engine: ScriptEngine) async {
+    await engine.run(NativeFunctionTransfersReturnedObjectsAndExceptions.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
   func arrayDateAndInstanceOfPredicates(_ engine: ScriptEngine) async {
     await engine.run(ArrayDateAndInstanceOfPredicates.self)
   }
@@ -191,6 +196,66 @@ private enum NativeFunctionNamesAndExceptionsAreObservable: ScriptEngineAssertio
       case .exception(let exception):
         let exceptionString = exception.toString(in: context)
         #expect(exceptionString == "boom")
+      }
+    }
+  }
+}
+
+private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    await context.withInstantContext { context in
+      let makeObject = context.makeFunction(named: "makeNativeObject") { context, _, _ in
+        let object = context.makeObject()
+        object.setProperty("native", forKey: "kind", in: context)
+        object.setProperty(7, forKey: "count", in: context)
+        return .value(object)
+      }
+      let throwObject = context.makeFunction(named: "throwNativeObject") { context, _, _ in
+        let error = context.makeObject()
+        error.setProperty("native-error", forKey: "kind", in: context)
+        error.setProperty(13, forKey: "code", in: context)
+        return .exception(error)
+      }
+
+      context.withGlobalObject { global in
+        global.setProperty(makeObject, forKey: "makeNativeObject", in: context)
+        global.setProperty(throwObject, forKey: "throwNativeObject", in: context)
+      }
+
+      let objectResult = context.evaluateScript(
+        """
+        const nativeObject = makeNativeObject();
+        globalThis.savedNativeObject = nativeObject;
+        `${nativeObject.kind}:${nativeObject.count}:${globalThis.savedNativeObject === nativeObject}`;
+        """
+      )
+      switch consume objectResult {
+      case .value(let value):
+        #expect(value.toString(in: context) == "native:7:true")
+      case .exception(let exception):
+        Issue.record(
+          "Expected native object callback result, got \(exception.toString(in: context))")
+      }
+
+      let exceptionResult = context.evaluateScript(
+        """
+        try {
+          throwNativeObject();
+          "missing";
+        } catch (error) {
+          globalThis.savedNativeException = error;
+          `${error.kind}:${error.code}:${globalThis.savedNativeException === error}`;
+        }
+        """
+      )
+      switch consume exceptionResult {
+      case .value(let value):
+        #expect(value.toString(in: context) == "native-error:13:true")
+      case .exception(let exception):
+        Issue.record(
+          "Expected native exception callback result, got \(exception.toString(in: context))")
       }
     }
   }

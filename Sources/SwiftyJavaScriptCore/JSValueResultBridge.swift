@@ -12,10 +12,12 @@ extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> 
 }
 
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
-  /// JavaScriptCore callback returns borrow `JSValueRef`; they do not consume a
-  /// `JSValueProtect` retain. Let `self` deinitialize so Swift-side ownership is
-  /// balanced before handing the raw ref back to JavaScriptCore.
+  /// Hands the raw value reference back to JavaScriptCore callback ABI.
+  ///
+  /// The returned `JSValueRef` remains managed by JavaScriptCore. Consume the
+  /// Swift wrapper so its `deinit` does not unprotect a value that was not
+  /// explicitly protected for long-term Swift ownership.
   consuming func callbackRef() -> JSValueRef {
-    ref
+    takeRef()
   }
 }

@@ -63,9 +63,23 @@ public struct MockValue: Sendable, Equatable {
 
 private final class MockValueHandleStorage: @unchecked Sendable {
   let rawValue: MockValue
+  private let onDeinit: (@Sendable () -> Void)?
 
-  init(rawValue: MockValue) {
+  init(rawValue: MockValue, onDeinit: (@Sendable () -> Void)? = nil) {
     self.rawValue = rawValue
+    self.onDeinit = onDeinit
+  }
+
+  deinit {
+    onDeinit?()
+  }
+}
+
+private final class MockReleaseCounter: @unchecked Sendable {
+  private(set) var count = 0
+
+  func increment() {
+    count += 1
   }
 }
 
@@ -143,9 +157,20 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   }
 
   init(rawValue: MockValue) {
+    self.init(rawValue: rawValue, onRelease: nil)
+  }
+
+  private init(rawValue: MockValue, onRelease: (@Sendable () -> Void)?) {
     self.storagePointer = Unmanaged.passRetained(
-      MockValueHandleStorage(rawValue: rawValue)
+      MockValueHandleStorage(rawValue: rawValue, onDeinit: onRelease)
     ).toOpaque()
+  }
+
+  static func releaseCounting(
+    rawValue: MockValue,
+    onRelease: @escaping @Sendable () -> Void
+  ) -> MockValueHandle {
+    MockValueHandle(rawValue: rawValue, onRelease: onRelease)
   }
 
   public var storageWords: JSValueStorageWords {
@@ -216,6 +241,35 @@ public enum MockEngine: JSEngine {
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
   #expect(MemoryLayout<JSValueStorageWords>.size == 3 * MemoryLayout<UInt64>.size)
   #expect(MemoryLayout<JSValueStorageWords>.stride == 3 * MemoryLayout<UInt64>.stride)
+}
+
+@Test func jsValueTakeHandleTransfersWithoutReleaseReference() {
+  let droppedCounter = MockReleaseCounter()
+
+  do {
+    let value = JSValue<MockEngine>(
+      handleValue: .releaseCounting(
+        rawValue: MockValue(kind: "object", payload: "drop"),
+        onRelease: droppedCounter.increment
+      )
+    )
+    #expect(value.borrowHandle().rawValue.payload == "drop")
+  }
+
+  #expect(droppedCounter.count == 1)
+
+  let transferredCounter = MockReleaseCounter()
+  let value = JSValue<MockEngine>(
+    handleValue: .releaseCounting(
+      rawValue: MockValue(kind: "object", payload: "transfer"),
+      onRelease: transferredCounter.increment
+    )
+  )
+  let transferredHandle = value.takeHandle()
+
+  #expect(transferredCounter.count == 0)
+  #expect(transferredHandle.releaseReference())
+  #expect(transferredCounter.count == 1)
 }
 
 private enum MockDriver: JSEngine {
