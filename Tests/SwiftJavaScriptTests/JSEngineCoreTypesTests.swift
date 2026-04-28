@@ -63,23 +63,23 @@ public struct MockValue: Sendable, Equatable {
 
 private final class MockValueHandleStorage: @unchecked Sendable {
   let rawValue: MockValue
-  private let onDeinit: (@Sendable () -> Void)?
+  private let onReleaseReference: (@Sendable () -> Void)?
 
-  init(rawValue: MockValue, onDeinit: (@Sendable () -> Void)? = nil) {
+  init(rawValue: MockValue, onReleaseReference: (@Sendable () -> Void)? = nil) {
     self.rawValue = rawValue
-    self.onDeinit = onDeinit
+    self.onReleaseReference = onReleaseReference
   }
 
-  deinit {
-    onDeinit?()
+  func recordReleaseReference() {
+    onReleaseReference?()
   }
 }
 
-private final class MockReleaseCounter: @unchecked Sendable {
-  private(set) var count = 0
+private final class MockValueReleaseCounter: @unchecked Sendable {
+  private(set) var releaseReferenceCount = 0
 
   func increment() {
-    count += 1
+    releaseReferenceCount += 1
   }
 }
 
@@ -162,7 +162,7 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
 
   private init(rawValue: MockValue, onRelease: (@Sendable () -> Void)?) {
     self.storagePointer = Unmanaged.passRetained(
-      MockValueHandleStorage(rawValue: rawValue, onDeinit: onRelease)
+      MockValueHandleStorage(rawValue: rawValue, onReleaseReference: onRelease)
     ).toOpaque()
   }
 
@@ -196,6 +196,8 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   }
 
   public func releaseReference() -> Bool {
+    let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
+    storage.recordReleaseReference()
     _ = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeRetainedValue()
     return true
   }
@@ -243,33 +245,60 @@ public enum MockEngine: JSEngine {
   #expect(MemoryLayout<JSValueStorageWords>.stride == 3 * MemoryLayout<UInt64>.stride)
 }
 
-@Test func jsValueTakeHandleTransfersWithoutReleaseReference() {
-  let droppedCounter = MockReleaseCounter()
+@Test func jsValueDeinitReleasesHandleExactlyOnce() {
+  let counter = MockValueReleaseCounter()
 
   do {
     let value = JSValue<MockEngine>(
       handleValue: .releaseCounting(
-        rawValue: MockValue(kind: "object", payload: "drop"),
-        onRelease: droppedCounter.increment
+        rawValue: MockValue(kind: "object", payload: "deinit"),
+        onRelease: counter.increment
       )
     )
-    #expect(value.borrowHandle().rawValue.payload == "drop")
+    #expect(value.borrowHandle().rawValue.payload == "deinit")
+    #expect(counter.releaseReferenceCount == 0)
   }
 
-  #expect(droppedCounter.count == 1)
+  #expect(counter.releaseReferenceCount == 1)
+}
 
-  let transferredCounter = MockReleaseCounter()
+@Test func jsValueRetainedCopyDeinitReleasesEachWrapper() {
+  let counter = MockValueReleaseCounter()
+
+  do {
+    let value = JSValue<MockEngine>(
+      handleValue: .releaseCounting(
+        rawValue: MockValue(kind: "object", payload: "retained"),
+        onRelease: counter.increment
+      )
+    )
+
+    do {
+      let retained = JSValue<MockEngine>(retaining: value)
+      #expect(retained.borrowHandle().rawValue.payload == "retained")
+      #expect(counter.releaseReferenceCount == 0)
+    }
+
+    #expect(counter.releaseReferenceCount == 1)
+  }
+
+  #expect(counter.releaseReferenceCount == 2)
+}
+
+@Test func jsValueTakeHandleSkipsDeinitUntilHandleRelease() {
+  let counter = MockValueReleaseCounter()
+
   let value = JSValue<MockEngine>(
     handleValue: .releaseCounting(
       rawValue: MockValue(kind: "object", payload: "transfer"),
-      onRelease: transferredCounter.increment
+      onRelease: counter.increment
     )
   )
   let transferredHandle = value.takeHandle()
 
-  #expect(transferredCounter.count == 0)
+  #expect(counter.releaseReferenceCount == 0)
   #expect(transferredHandle.releaseReference())
-  #expect(transferredCounter.count == 1)
+  #expect(counter.releaseReferenceCount == 1)
 }
 
 private enum MockDriver: JSEngine {
