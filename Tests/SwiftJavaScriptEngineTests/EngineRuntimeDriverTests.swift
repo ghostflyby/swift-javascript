@@ -66,7 +66,7 @@ struct EngineRuntimeDriverTests {
     #expect(!JavaScriptCoreEngine.capabilities.supportsESModules)
     #expect(!JavaScriptCoreEngine.capabilities.supportsPromiseJobQueueControl)
 
-    #expect(!QuickJSEngine.capabilities.supportsHostObjects)
+    #expect(QuickJSEngine.capabilities.supportsHostObjects)
     #expect(!QuickJSEngine.capabilities.supportsESModules)
     #expect(!QuickJSEngine.capabilities.supportsPromiseJobQueueControl)
   }

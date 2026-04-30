@@ -83,6 +83,7 @@ extension JSClassValueConvertible {
       lookup: lookup
     )
   }
+
 }
 
 public enum JSClassValueConverter<T: JSClassValueConvertible>: JSValueConverter {

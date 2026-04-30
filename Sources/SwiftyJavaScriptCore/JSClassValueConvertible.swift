@@ -4,7 +4,7 @@ import JavaScriptCore
 private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNativeClassBacking<
   SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine,
-    JSClass,
+    JavaScriptCoreClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >,
   JavaScriptCore.JSStaticValue,
@@ -14,12 +14,24 @@ private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNat
 private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectStorage<
   SwiftJavaScript.JSEngineClassDefinition<
     JavaScriptCoreEngine,
-    JSClass,
+    JavaScriptCoreClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >
 >
 
+public typealias JavaScriptCoreClassParentDescriptor = SwiftJavaScript.JSClassParentDescriptor<
+  JavaScriptCoreEngine,
+  JSPropertyNameAccumulatorRef
+>
+
+public typealias JavaScriptCoreAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinition<
+  JavaScriptCoreEngine,
+  JavaScriptCoreClassParentDescriptor,
+  JSPropertyNameAccumulatorRef
+>
+
 private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSClass>()
+private let javaScriptCoreCompatibilityClassRuntime = JavaScriptCoreRuntimeHandle()
 
 private func javaScriptCorePrivateData(
   from value: JSValueHandle<JavaScriptCoreEngine>,
@@ -47,16 +59,66 @@ private func makeJavaScriptCoreObjectResultHandle(
   return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
 }
 
+private func makeJavaScriptCoreAutoJSClass(
+  definition: JavaScriptCoreAutoClassDefinition,
+  in runtime: JavaScriptCoreRuntimeHandle
+) -> JSClass {
+  let backing = JSClassAutoNativeClassBacking(
+    definition: definition,
+    lookup: SwiftJavaScript.JSClassDefinitionLookup {
+      $0.definition()
+    }
+  )
+  let nativeDefinition = autoNativeDefinition(backing: backing, in: runtime)
+  return JSClass(
+    nativeDefinition: nativeDefinition,
+    retainedBacking: backing
+  )
+}
+
+extension JavaScriptCoreEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
+  public typealias ClassPropertyNameAccumulator = JSPropertyNameAccumulatorRef
+
+  public static func makeClass(
+    definition: JavaScriptCoreAutoClassDefinition,
+    in runtime: JavaScriptCoreRuntimeHandle
+  ) -> JSClass {
+    makeJavaScriptCoreAutoJSClass(definition: definition, in: runtime)
+  }
+
+  public static func runtimeHandle(
+    for context: JavaScriptCoreContextHandle
+  ) -> JavaScriptCoreRuntimeHandle? {
+    JavaScriptCoreRuntimeHandle(borrowing: JSContextGetGroup(context.ref))
+  }
+
+  public static func makeClassObjectResultHandle(
+    of jsClass: JSClass,
+    privateData: UnsafeMutableRawPointer,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    makeJavaScriptCoreObjectResultHandle(
+      of: jsClass.ref,
+      privateData: privateData,
+      in: context
+    )
+  }
+
+  public static func classObjectPrivateData(
+    from value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSResult<UnsafeMutableRawPointer?>? {
+    javaScriptCorePrivateData(from: value, in: context)
+  }
+
+}
+
 extension JSClassValueConvertible
 where
   Engine == JavaScriptCoreEngine,
-  ParentClass == JSClass,
+  ParentClass == JavaScriptCoreClassParentDescriptor,
   PropertyNameAccumulator == JSPropertyNameAccumulatorRef,
-  ClassDefinition == SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine,
-    JSClass,
-    JSPropertyNameAccumulatorRef
-  >
+  ClassDefinition == JavaScriptCoreAutoClassDefinition
 {
   public static var jsClass: JSClass {
     let key = ObjectIdentifier(Self.self)
@@ -64,139 +126,19 @@ where
   }
 
   fileprivate static func makeAutoJSClass() -> JSClass {
-    let definition = Self.autoClassDefinition()
     let backing: JSClassAutoNativeClassBacking = Self.autoNativeClassBacking(
-      lookup: javaScriptCoreClassDefinitionLookup()
+      lookup: SwiftJavaScript.JSClassDefinitionLookup {
+        $0.definition()
+      }
     )
-    let nativeDefinition = autoNativeDefinition(backing: backing)
+    let nativeDefinition = autoNativeDefinition(
+      backing: backing,
+      in: javaScriptCoreCompatibilityClassRuntime
+    )
     return JSClass(
       nativeDefinition: nativeDefinition,
-      retainedBacking: backing,
-      rememberedDefinition: definition
+      retainedBacking: backing
     )
-  }
-
-  public static func decode<E: JSEngine>(
-    _ value: borrowing SwiftJavaScript.JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) -> Self {
-    do {
-      return try tryDecode(value, in: context)
-    } catch {
-      fatalError("\(Self.self).decode(_:in:) failed: \(error)")
-    }
-  }
-
-  public static func tryDecode<E: JSEngine>(
-    _ value: borrowing SwiftJavaScript.JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> Self {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let jscValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(
-      handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
-    )
-    let jscContext = JSInstantContext<JavaScriptCoreEngine>(
-      handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-    )
-    return try tryDecode(jscValue, in: jscContext)
-  }
-
-  public static func tryEncode<E: JSEngine>(
-    _ value: Self,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let jscContext = JSInstantContext<JavaScriptCoreEngine>(
-      handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-    )
-    let encoded = try tryEncode(value, in: jscContext)
-    let handle = unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self)
-    return SwiftJavaScript.JSValue<E>(handleValue: handle)
-  }
-
-  public static func tryDecode(
-    _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) throws(JSValueConversionError) -> Self {
-    guard value.isObject(in: context) else {
-      throw .typeMismatch(expected: "object", actual: value.type(in: context))
-    }
-    let privateData: UnsafeMutableRawPointer?
-    switch javaScriptCorePrivateData(
-      from: value.borrowHandle(),
-      in: context.driverContextHandle
-    ) {
-    case .exception:
-      throw .codable("\(Self.self) could not be converted to JSObjectRef")
-    case .value(let data):
-      privateData = data
-    }
-
-    guard let privateData else {
-      throw .codable("\(Self.self) does not have a Swift instance backing")
-    }
-
-    let storage = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(privateData).takeUnretainedValue()
-    guard let instance = storage.typedInstance(as: Self.self) else {
-      throw .codable("JS object backing is not of type \(Self.self)")
-    }
-
-    return instance
-  }
-
-  public static func encode(
-    _ value: Self, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> SwiftJavaScript.JSValue<
-      JavaScriptCoreEngine
-    >
-  {
-    do {
-      return try tryEncode(value, in: context)
-    } catch {
-      return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
-    }
-  }
-
-  public static func tryEncode(
-    _ value: Self,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-    let storage = Self.autoObjectStorage(
-      instance: value,
-      lookup: javaScriptCoreClassDefinitionLookup()
-    )
-    let data = Unmanaged.passRetained(storage).toOpaque()
-
-    switch makeJavaScriptCoreObjectResultHandle(
-      of: Self.jsClass.ref,
-      privateData: data,
-      in: context.driverContextHandle
-    ) {
-    case .exception:
-      _ = Unmanaged<JSClassAutoObjectStorage>.fromOpaque(data).takeRetainedValue()
-      throw .codable("Failed to create JS object for \(Self.self)")
-    case .value(let object):
-      return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(handleValue: object)
-    }
-  }
-
-  public func toJSValue<E: JSEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) -> SwiftJavaScript.JSValue<E> {
-    Self.encode(self, in: context)
-  }
-
-  public func tryEncode<E: JSEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<E> {
-    try Self.tryEncode(self, in: context)
   }
 }
 
@@ -206,7 +148,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     in context: borrowing JSInstantContext<JavaScriptCoreEngine>
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JavaScriptCoreEngine, T.ParentClass == JSClass,
+    T.Engine == JavaScriptCoreEngine, T.ParentClass == JavaScriptCoreClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -218,7 +160,7 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     in context: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine> = #isolation
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JavaScriptCoreEngine, T.ParentClass == JSClass,
+    T.Engine == JavaScriptCoreEngine, T.ParentClass == JavaScriptCoreClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -277,9 +219,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    SwiftJavaScript.JSEngineClassDefinition<
-      JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-    >, borrowing JSInstantContext<JavaScriptCoreEngine>,
+    JavaScriptCoreAutoClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
     borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
   ) -> R
 ) -> R? {
@@ -299,9 +239,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
 }
 
 private func autoDynamicGetPropertyCallbackValue(
-  definition: SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
+  definition: JavaScriptCoreAutoClassDefinition,
   context: borrowing JSInstantContext<JavaScriptCoreEngine>,
   thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
   key: String,
@@ -320,9 +258,7 @@ private func autoDynamicGetPropertyCallbackValue(
 }
 
 private func autoDynamicSetPropertyCallbackResult(
-  definition: SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
-  >,
+  definition: JavaScriptCoreAutoClassDefinition,
   context: borrowing JSInstantContext<JavaScriptCoreEngine>,
   thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
   key: String,
@@ -371,7 +307,7 @@ private func withAutoStaticValueCallbackInput<R>(
   guard
     let valueDefinition = definition.inheritedStaticValue(
       named: name,
-      resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
+      resolvingParentDefinition: { $0.definition() }
     )
   else {
     return nil
@@ -408,7 +344,7 @@ private func withAutoStaticFunctionCallbackInput<R>(
     guard
       let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,
-        resolvingParentDefinition: resolveJavaScriptCoreParentClassDefinition
+        resolvingParentDefinition: { $0.definition() }
       )
     else {
       return nil
@@ -621,7 +557,10 @@ private func installAutoStaticFunctionMembers(
   }
 }
 
-private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
+private func autoNativeDefinition(
+  backing: JSClassAutoNativeClassBacking,
+  in runtime: JavaScriptCoreRuntimeHandle
+)
   -> JavaScriptCore.JSClassDefinition
 {
   let definition = backing.definition.classDefinition
@@ -629,7 +568,7 @@ private func autoNativeDefinition(backing: JSClassAutoNativeClassBacking)
   var cls = JavaScriptCore.kJSClassDefinitionEmpty
   cls.version = definition.version
   cls.attributes = definition.attributes.rawValue
-  cls.parentClass = definition.parentClass?.ref
+  cls.parentClass = definition.parentClass?.jsClass(in: runtime).ref
   cls.initialize = autoClassInitializeCallback
   cls.finalize = autoClassFinalizeCallback
 

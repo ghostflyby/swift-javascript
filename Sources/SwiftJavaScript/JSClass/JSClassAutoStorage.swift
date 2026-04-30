@@ -43,14 +43,14 @@ package final class JSClassAutoNativeClassBacking<
   }
 }
 
-package final class JSClassAutoObjectStorage<
+public final class JSClassAutoObjectStorage<
   Definition: JSClassDefinition
 >: @unchecked Sendable {
-  package let definition: Definition
-  package let instance: AnyObject
-  package let finalizeDepth: Int
+  public let definition: Definition
+  public let instance: AnyObject
+  public let finalizeDepth: Int
 
-  package init(
+  public init(
     definition: Definition,
     instance: AnyObject,
     finalizeDepth: Int
@@ -60,7 +60,7 @@ package final class JSClassAutoObjectStorage<
     self.finalizeDepth = finalizeDepth
   }
 
-  package convenience init(
+  public convenience init(
     definition: Definition,
     instance: AnyObject,
     resolvingParentDefinition:
@@ -87,7 +87,7 @@ package final class JSClassAutoObjectStorage<
     )
   }
 
-  package func typedInstance<T: AnyObject>(as type: T.Type) -> T? {
+  public func typedInstance<T: AnyObject>(as type: T.Type) -> T? {
     instance as? T
   }
 }

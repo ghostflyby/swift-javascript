@@ -13,7 +13,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver {
     supportsBigInt: true,
     supportsSymbol: true,
     supportsExternalArrayBuffer: true,
-    supportsHostObjects: false,
+    supportsHostObjects: true,
     supportsESModules: false,
     supportsPromiseJobQueueControl: false
   )

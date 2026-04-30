@@ -42,6 +42,16 @@ package struct JSClassMapRegistry<Key: Hashable & Sendable, Value: Sendable>:
       $0.removeValue(forKey: key)
     }
   }
+
+  @discardableResult
+  package func removeValues(where shouldRemove: (Key) -> Bool) -> [Value] {
+    map.withLock { storage in
+      let keys = storage.keys.filter(shouldRemove)
+      return keys.compactMap {
+        storage.removeValue(forKey: $0)
+      }
+    }
+  }
 }
 
 package struct JSClassDefinitionDepthRegistry<Key: Hashable & Sendable, Definition: Sendable>:

@@ -152,13 +152,26 @@ class ExportedFunctionNode {
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   let hasParentClass =
-    ExportedChildNode.jsClassDefinition.parentClass?.ref == ExportedBaseNode.jsClass.ref
+    ExportedChildNode.jsClassDefinition.parentClass == .for(ExportedBaseNode.self)
   let hasLeafParentClass =
-    ExportedLeafNode.jsClassDefinition.parentClass?.ref == ExportedChildNode.jsClass.ref
+    ExportedLeafNode.jsClassDefinition.parentClass == .for(ExportedChildNode.self)
   #expect(hasParentClass)
   #expect(hasLeafParentClass)
 
   await context.withIsolatedGlobalObject { context, global in
+    let runtime = JavaScriptCoreEngine.runtimeHandle(for: context.driverContextHandle)
+    #expect(runtime != nil)
+    if let runtime {
+      #expect(
+        ExportedChildNode.jsClassDefinition.parentClass?.jsClass(in: runtime).ref
+          == ExportedBaseNode.jsClass(in: runtime).ref
+      )
+      #expect(
+        ExportedLeafNode.jsClassDefinition.parentClass?.jsClass(in: runtime).ref
+          == ExportedChildNode.jsClass(in: runtime).ref
+      )
+    }
+
     let base = ExportedBaseNode(base: 1)
     let child = ExportedChildNode(base: 2, child: "two")
     global.setProperty(

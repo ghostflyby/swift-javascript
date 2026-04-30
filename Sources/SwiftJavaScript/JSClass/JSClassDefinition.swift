@@ -157,6 +157,75 @@ public struct JSClassDefinitionMetadata<ParentClass: Sendable>: Sendable {
   public init() {}
 }
 
+public struct JSClassParentDescriptor<
+  E: JSEngine,
+  PropertyNameAccumulator
+>: Sendable, Hashable {
+  private let typeID: ObjectIdentifier
+  private let definitionProvider:
+    @Sendable () -> JSEngineClassDefinition<
+      E,
+      JSClassParentDescriptor<E, PropertyNameAccumulator>,
+      PropertyNameAccumulator
+    >
+  private let classProvider: @Sendable (E.RuntimeHandle) -> JSClass<E>
+
+  package init(
+    typeID: ObjectIdentifier,
+    definitionProvider:
+      @escaping @Sendable () -> JSEngineClassDefinition<
+        E,
+        JSClassParentDescriptor<E, PropertyNameAccumulator>,
+        PropertyNameAccumulator
+      >,
+    classProvider: @escaping @Sendable (E.RuntimeHandle) -> JSClass<E>
+  ) {
+    self.typeID = typeID
+    self.definitionProvider = definitionProvider
+    self.classProvider = classProvider
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.typeID == rhs.typeID
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(typeID)
+  }
+
+  public func definition() -> JSEngineClassDefinition<
+    E,
+    JSClassParentDescriptor<E, PropertyNameAccumulator>,
+    PropertyNameAccumulator
+  > {
+    definitionProvider()
+  }
+
+  public func jsClass(in runtime: E.RuntimeHandle) -> JSClass<E> {
+    classProvider(runtime)
+  }
+}
+
+extension JSClassParentDescriptor
+where E: JSEngineClassBridgeDriver, PropertyNameAccumulator == E.ClassPropertyNameAccumulator {
+  public static func `for`<Parent: JSClassValueConvertible>(
+    _ parent: Parent.Type
+  ) -> Self
+  where
+    Parent.Engine == E,
+    Parent.ParentClass == Self,
+    Parent.PropertyNameAccumulator == PropertyNameAccumulator,
+    Parent.ClassDefinition == JSEngineClassDefinition<E, Self, PropertyNameAccumulator>
+  {
+    _ = parent
+    return Self(
+      typeID: ObjectIdentifier(Parent.self),
+      definitionProvider: { Parent.jsClassDefinition },
+      classProvider: { Parent.jsClass(in: $0) }
+    )
+  }
+}
+
 package struct JSClassDefinitionLookup<Definition: JSClassDefinition> {
   package let resolveParentDefinition: (Definition.ParentClass) -> Definition?
 

@@ -1377,7 +1377,7 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
 
     if let inheritedClass {
       parentClassSetup = """
-        definition.parentClass = \(inheritedClass).jsClass
+        definition.parentClass = SwiftJavaScript.JSClassParentDescriptor<JavaScriptCoreEngine, JSPropertyNameAccumulatorRef>.for(\(inheritedClass).self)
         """
       parentHasPropertyFallback = """
               return \(inheritedClass).jsClassDefinition.hasProperty?(context, this, property) ?? false
@@ -1459,8 +1459,8 @@ public struct JSClassAutoConvertibleMacro: MemberMacro, ExtensionMacro {
     }
 
     let propertySource = """
-      \(declarationModifier) var jsClassDefinition: SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef> {
-        var definition = SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef>()
+      \(declarationModifier) var jsClassDefinition: SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, SwiftJavaScript.JSClassParentDescriptor<JavaScriptCoreEngine, JSPropertyNameAccumulatorRef>, JSPropertyNameAccumulatorRef> {
+        var definition = SwiftJavaScript.JSEngineClassDefinition<JavaScriptCoreEngine, SwiftJavaScript.JSClassParentDescriptor<JavaScriptCoreEngine, JSPropertyNameAccumulatorRef>, JSPropertyNameAccumulatorRef>()
         definition.className = \"\(trimmed(classDecl.name.text))\"
         \(parentClassSetup)
         \(staticFunctionsSource)

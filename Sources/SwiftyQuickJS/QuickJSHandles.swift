@@ -1,5 +1,6 @@
 import Foundation
 import SwiftJavaScript
+import Synchronization
 
 #if canImport(CQuickJSStatic)
   import CQuickJSStatic
@@ -9,12 +10,48 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
+private struct QuickJSRuntimeIdentityRegistry: Sendable, ~Copyable {
+  struct State {
+    var nextID: UInt64 = 1
+    var runtimeIDs: [UInt: UInt64] = [:]
+  }
+
+  private let state = Mutex(State())
+
+  func id(for runtime: OpaquePointer, ownsRuntime: Bool) -> UInt64 {
+    let key = UInt(bitPattern: runtime)
+    return state.withLock { state in
+      if let id = state.runtimeIDs[key] {
+        return id
+      }
+      guard ownsRuntime else {
+        return UInt64(key)
+      }
+      let id = state.nextID
+      state.nextID += 1
+      state.runtimeIDs[key] = id
+      return id
+    }
+  }
+
+  func removeID(for runtime: OpaquePointer) {
+    let key = UInt(bitPattern: runtime)
+    _ = state.withLock {
+      $0.runtimeIDs.removeValue(forKey: key)
+    }
+  }
+}
+
+private let quickJSRuntimeIdentityRegistry = QuickJSRuntimeIdentityRegistry()
+
 public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
   private let rawRef: OpaquePointer
+  private let runtimeID: UInt64
   let ownsRuntime: Bool
 
   init(ref: OpaquePointer, ownsRuntime: Bool = true) {
     self.rawRef = ref
+    self.runtimeID = quickJSRuntimeIdentityRegistry.id(for: ref, ownsRuntime: ownsRuntime)
     self.ownsRuntime = ownsRuntime
   }
 
@@ -39,17 +76,21 @@ public struct QuickJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unch
       return false
     }
     JS_FreeRuntime(ref)
+    removeJSClassValueConvertibleClasses(for: QuickJSEngine.self, in: self)
+    removeQuickJSClassRecords(in: self)
+    quickJSRuntimeIdentityRegistry.removeID(for: rawRef)
     return true
   }
 }
 
 extension QuickJSRuntimeHandle: Hashable {
   public static func == (lhs: QuickJSRuntimeHandle, rhs: QuickJSRuntimeHandle) -> Bool {
-    lhs.rawRef == rhs.rawRef
+    lhs.rawRef == rhs.rawRef && lhs.runtimeID == rhs.runtimeID
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(rawRef)
+    hasher.combine(runtimeID)
   }
 }
 
@@ -156,9 +197,11 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
 
 public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable {
   let id: JSClassID
+  let runtime: QuickJSRuntimeHandle?
 
-  public init(id: JSClassID) {
+  public init(id: JSClassID, runtime: QuickJSRuntimeHandle? = nil) {
     self.id = id
+    self.runtime = runtime
   }
 
   @discardableResult
