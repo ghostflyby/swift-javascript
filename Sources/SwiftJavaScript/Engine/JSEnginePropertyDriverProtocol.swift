@@ -1,17 +1,29 @@
 public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
+  associatedtype PropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle
+
+  static func makePropertyKeyHandle(
+    _ value: String,
+    in context: ContextHandle
+  ) -> PropertyKeyHandle?
+
+  static func isPropertyKeyHandleCompatibleWithContext(
+    _ key: PropertyKeyHandle,
+    in context: ContextHandle
+  ) -> Bool
+
   static func propertyNamesForHandle(
     on object: ValueHandle,
     in context: ContextHandle
   ) -> [String]?
 
-  static func getStringPropertyHandle(
-    _ key: String,
+  static func getPropertyKeyHandle(
+    _ key: PropertyKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
-  static func setStringPropertyHandle(
-    _ key: String,
+  static func setPropertyKeyHandle(
+    _ key: PropertyKeyHandle,
     on object: ValueHandle,
     to value: ValueHandle,
     in context: ContextHandle,
@@ -45,8 +57,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool
 
-  static func hasStringPropertyHandle(
-    _ key: String,
+  static func hasPropertyKeyHandle(
+    _ key: PropertyKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool?
@@ -57,8 +69,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool?
 
-  static func deleteStringPropertyHandle(
-    _ key: String,
+  static func deletePropertyKeyHandle(
+    _ key: PropertyKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool

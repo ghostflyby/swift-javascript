@@ -131,7 +131,7 @@ private enum BuiltinCodableRoundtrip: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let key = JSStringManaged<E>("number")
+      let key = "number"
       context.withGlobalObject { global in
         global.setProperty(42.5, forKey: key, in: context)
       }
@@ -164,7 +164,7 @@ private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
         tags: ["swift", "js"],
         address: SharedCodableAddress(city: "shanghai", zip: 200000)
       )
-      let key = JSStringManaged<E>("user")
+      let key = "user"
 
       context.withGlobalObject { global in
         global.setProperty(
@@ -193,7 +193,7 @@ private enum ConverterOverrideForPropertyReadWrite: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let key = JSStringManaged<E>("flag")
+      let key = "flag"
 
       context.withGlobalObject { global in
         global.setProperty(true, forKey: key, using: SharedZeroOneBoolConverter.self, in: context)
@@ -335,7 +335,7 @@ private enum FunctionInitSupportsReturnAndErrorCoder: ScriptEngineAssertion {
         }
       )
 
-      global.setProperty(fn, forKey: JSStringManaged<E>("coded"), in: context)
+      global.setProperty(fn, forKey: ("coded"), in: context)
 
       let success = context.evaluateScript("coded(40)")
       switch consume success {

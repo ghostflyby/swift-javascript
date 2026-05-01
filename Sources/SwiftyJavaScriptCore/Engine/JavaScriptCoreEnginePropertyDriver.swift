@@ -2,6 +2,24 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JavaScriptCoreEngine: JSEnginePropertyDriver {
+  public static func makePropertyKeyHandle(
+    _ value: String,
+    in context: JavaScriptCoreContextHandle
+  ) -> JavaScriptCorePropertyKeyHandle? {
+    _ = context
+    let keyRef = JSStringCreateWithCFString(value as CFString)!
+    return JavaScriptCorePropertyKeyHandle(ref: keyRef)
+  }
+
+  public static func isPropertyKeyHandleCompatibleWithContext(
+    _ key: JavaScriptCorePropertyKeyHandle,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    _ = key
+    _ = context
+    return true
+  }
+
   public static func propertyNamesForHandle(
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
@@ -9,16 +27,16 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     propertyNames(on: object, in: context)
   }
 
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func getPropertyKeyHandle(
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     getProperty(key, on: object, in: context)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setPropertyKeyHandle(
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle,
@@ -77,8 +95,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasPropertyKeyHandle(
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
@@ -93,8 +111,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     hasProperty(key, on: object, in: context)
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deletePropertyKeyHandle(
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
@@ -191,7 +209,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func getProperty(
-    _ key: String,
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JavaScriptCoreValueHandle> {
@@ -199,11 +217,9 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        let valueRef = JSObjectGetProperty(context.ref, objectRef, keyRef, &exception)
-        return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
-      }
+      var exception: JSValueRef?
+      let valueRef = JSObjectGetProperty(context.ref, objectRef, key.ref, &exception)
+      return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
 
@@ -238,7 +254,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func setProperty(
-    _ key: String,
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JavaScriptCoreValueHandle,
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle,
@@ -248,21 +264,19 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return .exception(())
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        JSObjectSetProperty(
-          context.ref,
-          objectRef,
-          keyRef,
-          value.ref,
-          javaScriptCorePropertyAttributes(from: attributes),
-          &exception
-        )
-        if exception != nil {
-          return .exception(())
-        }
-        return .value(())
+      var exception: JSValueRef?
+      JSObjectSetProperty(
+        context.ref,
+        objectRef,
+        key.ref,
+        value.ref,
+        javaScriptCorePropertyAttributes(from: attributes),
+        &exception
+      )
+      if exception != nil {
+        return .exception(())
       }
+      return .value(())
     }
   }
 
@@ -313,7 +327,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func hasProperty(
-    _ key: String,
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
@@ -321,9 +335,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return false
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        JSObjectHasProperty(context.ref, objectRef, keyRef)
-      }
+      return JSObjectHasProperty(context.ref, objectRef, key.ref)
     }
   }
 
@@ -343,7 +355,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func deleteProperty(
-    _ key: String,
+    _ key: JavaScriptCorePropertyKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<Void> {
@@ -351,14 +363,12 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return .exception(())
     case .object(let objectRef):
-      return withJavaScriptCoreString(key) { keyRef in
-        var exception: JSValueRef?
-        JSObjectDeleteProperty(context.ref, objectRef, keyRef, &exception)
-        if exception != nil {
-          return .exception(())
-        }
-        return .value(())
+      var exception: JSValueRef?
+      JSObjectDeleteProperty(context.ref, objectRef, key.ref, &exception)
+      if exception != nil {
+        return .exception(())
       }
+      return .value(())
     }
   }
 

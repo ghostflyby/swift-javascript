@@ -9,6 +9,31 @@ import SwiftJavaScript
 #endif
 
 extension QuickJSEngine: JSEnginePropertyDriver {
+  public static func makePropertyKeyHandle(
+    _ value: String,
+    in context: QuickJSContextHandle
+  ) -> QuickJSPropertyKeyHandle? {
+    let bytes = Array(value.utf8) + [0]
+    let atom = bytes.withUnsafeBufferPointer { buffer in
+      JS_NewAtomLen(
+        context.ref,
+        UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self),
+        bytes.count - 1
+      )
+    }
+    guard atom != 0 else {
+      return nil
+    }
+    return QuickJSPropertyKeyHandle(atom: atom, contextRef: context.ref)
+  }
+
+  public static func isPropertyKeyHandleCompatibleWithContext(
+    _ key: QuickJSPropertyKeyHandle,
+    in context: QuickJSContextHandle
+  ) -> Bool {
+    key.contextRef == context.ref
+  }
+
   public static func propertyNamesForHandle(
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
@@ -38,41 +63,33 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func getPropertyKeyHandle(
+    _ key: QuickJSPropertyKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> JSResult<QuickJSValueHandle>? {
-    let result = key.withCString { JS_GetPropertyStr(context.ref, object.ref, $0) }
+    let result = JS_GetProperty(context.ref, object.ref, key.atom)
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setPropertyKeyHandle(
+    _ key: QuickJSPropertyKeyHandle,
     on object: QuickJSValueHandle,
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    let result = key.withCString { keyPointer in
-      if attributes.isEmpty {
-        JS_SetPropertyStr(
-          context.ref,
-          object.ref,
-          keyPointer,
-          JS_DupValue(context.ref, value.ref)
-        )
-      } else {
-        JS_DefinePropertyValueStr(
-          context.ref,
-          object.ref,
-          keyPointer,
-          JS_DupValue(context.ref, value.ref),
-          propertyFlags(for: attributes)
-        )
-      }
+    if attributes.isEmpty {
+      return JS_SetProperty(context.ref, object.ref, key.atom, JS_DupValue(context.ref, value.ref))
+        == 1
     }
-    return result == 1
+    return JS_DefinePropertyValue(
+      context.ref,
+      object.ref,
+      key.atom,
+      JS_DupValue(context.ref, value.ref),
+      propertyFlags(for: attributes)
+    ) == 1
   }
 
   public static func getValuePropertyHandle(
@@ -134,17 +151,12 @@ extension QuickJSEngine: JSEnginePropertyDriver {
       == 1
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasPropertyKeyHandle(
+    _ key: QuickJSPropertyKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool? {
-    let atom = key.withCString { JS_NewAtom(context.ref, $0) }
-    guard atom != 0 else {
-      return nil
-    }
-    defer { JS_FreeAtom(context.ref, atom) }
-    let result = JS_HasProperty(context.ref, object.ref, atom)
+    let result = JS_HasProperty(context.ref, object.ref, key.atom)
     return result >= 0 ? result == 1 : nil
   }
 
@@ -162,17 +174,12 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deletePropertyKeyHandle(
+    _ key: QuickJSPropertyKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool {
-    let atom = key.withCString { JS_NewAtom(context.ref, $0) }
-    guard atom != 0 else {
-      return false
-    }
-    defer { JS_FreeAtom(context.ref, atom) }
-    return JS_DeleteProperty(context.ref, object.ref, atom, Int32(JS_PROP_THROW)) == 1
+    return JS_DeleteProperty(context.ref, object.ref, key.atom, Int32(JS_PROP_THROW)) == 1
   }
 
   public static func deleteValuePropertyHandle(

@@ -13,7 +13,8 @@ public enum JavaScriptCoreEngine: Sendable, SendableMetatype {
   public typealias Engine = JavaScriptCoreEngine
   public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
   public typealias ContextHandle = JavaScriptCoreContextHandle
-  public typealias StringHandle = JavaScriptCoreStringHandle
+  public typealias PropertyKeyHandle = JavaScriptCorePropertyKeyHandle
+  public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
 }
 
 func javaScriptCoreObjectRef(
@@ -67,10 +68,13 @@ func javaScriptCoreString(_ value: JSValueRef, in context: JSContextRef) -> Stri
     return nil
   }
   defer { JSStringRelease(stringHandle) }
-  return String(
-    jsStringHandle: JavaScriptCoreStringHandle(ref: stringHandle),
-    engine: JavaScriptCoreEngine.self
-  )
+  return javaScriptCoreString(stringHandle)
+}
+
+func javaScriptCoreString(_ string: JSStringRef) -> String {
+  let length = JSStringGetLength(string)
+  let characters = JSStringGetCharactersPtr(string)!
+  return String(decoding: UnsafeBufferPointer(start: characters, count: length), as: UTF16.self)
 }
 
 func withJavaScriptCoreString<R>(_ string: String, _ body: (JSStringRef) -> R) -> R {

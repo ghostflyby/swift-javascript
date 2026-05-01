@@ -344,7 +344,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
     let instance = QuickJSExportedNode(name: "leaf", count: 4)
     global.setProperty(
       instance,
-      forKey: SwiftJavaScript.JSStringManaged<QuickJSEngine>("node"),
+      forKey: ("node"),
       in: context
     )
 
@@ -387,7 +387,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
     let instance = QuickJSStaticMemberNode(count: 3)
     global.setProperty(
       instance,
-      forKey: SwiftJavaScript.JSStringManaged<QuickJSEngine>("node"),
+      forKey: ("node"),
       in: context
     )
 
@@ -445,7 +445,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
       QuickJSLifecycleNode(),
-      forKey: SwiftJavaScript.JSStringManaged<QuickJSEngine>("node"),
+      forKey: ("node"),
       in: context
     )
     #expect(

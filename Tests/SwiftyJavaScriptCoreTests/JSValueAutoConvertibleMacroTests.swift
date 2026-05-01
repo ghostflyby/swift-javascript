@@ -8,11 +8,11 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroDefaultUser(name: "alice", age: 42)
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroDefault"),
+      value, forKey: ("macroDefault"),
       in: context)
 
     let decoded: MacroDefaultUser = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroDefault"),
+      forKey: ("macroDefault"),
       using: JSDefaultConverter<MacroDefaultUser>.self,
       in: context
     )
@@ -27,15 +27,15 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroDelegatedUser(score: 9)
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroDelegated"),
+      value, forKey: ("macroDelegated"),
       in: context)
 
     let raw = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroDelegated"), in: context)
+      forKey: ("macroDelegated"), in: context)
     #expect(raw.toDouble(in: context) == 9)
 
     let decoded: MacroDelegatedUser = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroDelegated"),
+      forKey: ("macroDelegated"),
       using: JSDefaultConverter<MacroDelegatedUser>.self,
       in: context
     )
@@ -49,7 +49,7 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroFieldOverrideUser(name: "bob", active: true)
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroField"),
+      value, forKey: ("macroField"),
       in: context)
 
     let activeRaw = context.evaluateScript("macroField.active")
@@ -62,7 +62,7 @@ import Testing
 
     _ = context.evaluateScript("macroField = { name: 'bob', active: 0 }")
     let decoded: MacroFieldOverrideUser = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroField"),
+      forKey: ("macroField"),
       using: JSDefaultConverter<MacroFieldOverrideUser>.self,
       in: context
     )
@@ -76,7 +76,7 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroSerializedClass(name: "iris", active: true)
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroClass"),
+      value, forKey: ("macroClass"),
       in: context)
 
     let shapeCheck = context.evaluateScript("[macroClass.name, macroClass.active].join(':')")
@@ -88,7 +88,7 @@ import Testing
     }
 
     let decoded: MacroSerializedClass = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroClass"),
+      forKey: ("macroClass"),
       using: JSDefaultConverter<MacroSerializedClass>.self,
       in: context
     )
@@ -97,7 +97,7 @@ import Testing
 
     _ = context.evaluateScript("macroClass = { name: 'rhea', active: 0 }")
     let decodedFromObject: MacroSerializedClass = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroClass"),
+      forKey: ("macroClass"),
       using: JSDefaultConverter<MacroSerializedClass>.self,
       in: context
     )
@@ -111,16 +111,16 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroStringEnum.running
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroEnum"), in: context
+      value, forKey: ("macroEnum"), in: context
     )
 
     let raw = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroEnum"), in: context)
+      forKey: ("macroEnum"), in: context)
     #expect(raw.toString(in: context) == "running")
 
     _ = context.evaluateScript("macroEnum = 'done'")
     let decoded: MacroStringEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroEnum"),
+      forKey: ("macroEnum"),
       using: JSDefaultConverter<MacroStringEnum>.self,
       in: context
     )
@@ -134,16 +134,16 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     let value = MacroRawEnum.alpha
     global.setProperty(
-      value, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroRawEnum"),
+      value, forKey: ("macroRawEnum"),
       in: context)
 
     let raw = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroRawEnum"), in: context)
+      forKey: ("macroRawEnum"), in: context)
     #expect(raw.toString(in: context) == "A")
 
     _ = context.evaluateScript("macroRawEnum = 'B'")
     let decoded: MacroRawEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("macroRawEnum"),
+      forKey: ("macroRawEnum"),
       using: JSDefaultConverter<MacroRawEnum>.self,
       in: context
     )
@@ -157,16 +157,16 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
       MacroAssociatedEnum.idle,
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumIdle"), in: context)
+      forKey: ("enumIdle"), in: context)
     global.setProperty(
       MacroAssociatedEnum.count(7),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumCount"), in: context)
+      forKey: ("enumCount"), in: context)
     global.setProperty(
       MacroAssociatedEnum.range(3, 9),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumRange"), in: context)
+      forKey: ("enumRange"), in: context)
     global.setProperty(
       MacroAssociatedEnum.user(id: 42, name: "neo"),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumUser"),
+      forKey: ("enumUser"),
       in: context
     )
 
@@ -203,22 +203,22 @@ import Testing
       """)
 
     let idle: MacroAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumIdle"),
+      forKey: ("enumIdle"),
       using: JSDefaultConverter<MacroAssociatedEnum>.self,
       in: context
     )
     let count: MacroAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumCount"),
+      forKey: ("enumCount"),
       using: JSDefaultConverter<MacroAssociatedEnum>.self,
       in: context
     )
     let range: MacroAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumRange"),
+      forKey: ("enumRange"),
       using: JSDefaultConverter<MacroAssociatedEnum>.self,
       in: context
     )
     let user: MacroAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumUser"),
+      forKey: ("enumUser"),
       using: JSDefaultConverter<MacroAssociatedEnum>.self,
       in: context
     )
@@ -236,17 +236,17 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
       MacroCustomKeyAssociatedEnum.idle,
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customIdle"),
+      forKey: ("customIdle"),
       in: context
     )
     global.setProperty(
       MacroCustomKeyAssociatedEnum.count(11),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customCount"),
+      forKey: ("customCount"),
       in: context
     )
     global.setProperty(
       MacroCustomKeyAssociatedEnum.user(id: 3, name: "smith"),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customUser"),
+      forKey: ("customUser"),
       in: context
     )
 
@@ -276,17 +276,17 @@ import Testing
       """)
 
     let idle: MacroCustomKeyAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customIdle"),
+      forKey: ("customIdle"),
       using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
       in: context
     )
     let count: MacroCustomKeyAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customCount"),
+      forKey: ("customCount"),
       using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
       in: context
     )
     let user: MacroCustomKeyAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("customUser"),
+      forKey: ("customUser"),
       using: JSDefaultConverter<MacroCustomKeyAssociatedEnum>.self,
       in: context
     )
@@ -303,17 +303,17 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
       MacroFlattenedAssociatedEnum.rgb(r: 1, g: 2, b: 3),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedRgb"),
+      forKey: ("flattenedRgb"),
       in: context
     )
     global.setProperty(
       MacroFlattenedAssociatedEnum.named(name: "cyan"),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedNamed"),
+      forKey: ("flattenedNamed"),
       in: context
     )
     global.setProperty(
       MacroFlattenedAssociatedEnum.idle,
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedIdle"),
+      forKey: ("flattenedIdle"),
       in: context
     )
 
@@ -347,17 +347,17 @@ import Testing
       """)
 
     let rgb: MacroFlattenedAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedRgb"),
+      forKey: ("flattenedRgb"),
       using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
       in: context
     )
     let named: MacroFlattenedAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedNamed"),
+      forKey: ("flattenedNamed"),
       using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
       in: context
     )
     let idle: MacroFlattenedAssociatedEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("flattenedIdle"),
+      forKey: ("flattenedIdle"),
       using: JSDefaultConverter<MacroFlattenedAssociatedEnum>.self,
       in: context
     )
@@ -374,17 +374,17 @@ import Testing
   await context.withIsolatedGlobalObject { context, global in
     global.setProperty(
       MacroAssociatedOverrideEnum.enabled(true),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumEnabled"),
+      forKey: ("enumEnabled"),
       in: context
     )
     global.setProperty(
       MacroAssociatedOverrideEnum.pair(true, false),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumPair"),
+      forKey: ("enumPair"),
       in: context
     )
     global.setProperty(
       MacroAssociatedOverrideEnum.flags(id: 9, enabled: true),
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumFlags"),
+      forKey: ("enumFlags"),
       in: context
     )
 
@@ -414,17 +414,17 @@ import Testing
       """)
 
     let enabled: MacroAssociatedOverrideEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumEnabled"),
+      forKey: ("enumEnabled"),
       using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
       in: context
     )
     let pair: MacroAssociatedOverrideEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumPair"),
+      forKey: ("enumPair"),
       using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
       in: context
     )
     let flags: MacroAssociatedOverrideEnum = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("enumFlags"),
+      forKey: ("enumFlags"),
       using: JSDefaultConverter<MacroAssociatedOverrideEnum>.self,
       in: context
     )

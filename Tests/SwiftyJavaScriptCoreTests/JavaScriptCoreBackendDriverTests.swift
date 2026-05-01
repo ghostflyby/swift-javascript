@@ -16,12 +16,21 @@ private func evaluateBackendScript(
   sourceURL: String? = nil,
   startingLineNumber: Int32 = 1
 ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
-  JavaScriptCoreEngine.evaluateScriptResultHandle(
-    script,
+  let preparedScript = JavaScriptCoreEngine.makePreparedScriptHandle(script, in: context)!
+  defer { _ = preparedScript.releaseReference() }
+  return JavaScriptCoreEngine.evaluatePreparedScriptResultHandle(
+    preparedScript,
     context,
     sourceURL: sourceURL,
     startingLineNumber: startingLineNumber
   )!
+}
+
+private func makeBackendPropertyKey(
+  _ value: String,
+  in context: JavaScriptCoreContextHandle
+) -> JavaScriptCorePropertyKeyHandle {
+  JavaScriptCoreEngine.makePropertyKeyHandle(value, in: context)!
 }
 
 private func makeBackendObject(
@@ -65,9 +74,11 @@ private func makeBackendArray(
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
     let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!
+    let answerKey = makeBackendPropertyKey("answer", in: context)
+    defer { _ = answerKey.releaseReference() }
 
-    if !JavaScriptCoreEngine.setStringPropertyHandle(
-      "answer",
+    if !JavaScriptCoreEngine.setPropertyKeyHandle(
+      answerKey,
       on: object,
       to: answer,
       in: context,
@@ -76,7 +87,7 @@ private func makeBackendArray(
       Issue.record("expected property assignment to succeed")
     }
 
-    switch JavaScriptCoreEngine.getStringPropertyHandle("answer", on: object, in: context) {
+    switch JavaScriptCoreEngine.getPropertyKeyHandle(answerKey, on: object, in: context) {
     case .none, .some(.exception):
       Issue.record("expected property read to succeed")
     case .some(.value(let property)):
@@ -164,8 +175,10 @@ private func makeBackendArray(
       Issue.record("expected receiver object creation to succeed")
     case .value(let thisObject):
       let base = JavaScriptCoreEngine.makeNumberValueHandle(10, context)!
-      _ = JavaScriptCoreEngine.setStringPropertyHandle(
-        "base",
+      let baseKey = makeBackendPropertyKey("base", in: context)
+      defer { _ = baseKey.releaseReference() }
+      _ = JavaScriptCoreEngine.setPropertyKeyHandle(
+        baseKey,
         on: thisObject,
         to: base,
         in: context,
@@ -208,21 +221,23 @@ private func makeBackendArray(
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
     let value = makeBackendString("ok", in: context)
-    _ = JavaScriptCoreEngine.setStringPropertyHandle(
-      "status",
+    let statusKey = makeBackendPropertyKey("status", in: context)
+    defer { _ = statusKey.releaseReference() }
+    _ = JavaScriptCoreEngine.setPropertyKeyHandle(
+      statusKey,
       on: object,
       to: value,
       in: context,
       attributes: .none
     )
 
-    #expect(JavaScriptCoreEngine.hasStringPropertyHandle("status", on: object, in: context) == true)
+    #expect(JavaScriptCoreEngine.hasPropertyKeyHandle(statusKey, on: object, in: context) == true)
 
-    if !JavaScriptCoreEngine.deleteStringPropertyHandle("status", on: object, in: context) {
+    if !JavaScriptCoreEngine.deletePropertyKeyHandle(statusKey, on: object, in: context) {
       Issue.record("expected property deletion to succeed")
     } else {
       #expect(
-        JavaScriptCoreEngine.hasStringPropertyHandle("status", on: object, in: context) == false)
+        JavaScriptCoreEngine.hasPropertyKeyHandle(statusKey, on: object, in: context) == false)
     }
   }
 }

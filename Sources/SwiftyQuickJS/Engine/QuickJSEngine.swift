@@ -16,7 +16,8 @@ public enum QuickJSEngine: Sendable, SendableMetatype {
   public typealias ContextHandle = QuickJSContextHandle
   public typealias ValueHandle = QuickJSValueHandle
   public typealias ClassHandle = QuickJSClassHandle
-  public typealias StringHandle = QuickJSStringHandle
+  public typealias PropertyKeyHandle = QuickJSPropertyKeyHandle
+  public typealias PreparedScriptHandle = QuickJSPreparedScriptHandle
 }
 
 func quickJSResultHandle(

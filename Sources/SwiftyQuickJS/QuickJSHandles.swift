@@ -217,28 +217,50 @@ public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecke
 
 extension QuickJSClassHandle: Hashable {}
 
-public final class QuickJSStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable {
-  private let count: Int
-  private let storage: UnsafeMutablePointer<UInt16>
+public final class QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle,
+  @unchecked Sendable
+{
+  let atom: JSAtom
+  let contextRef: OpaquePointer
 
-  public init(_ value: String) {
-    let units = Array(value.utf16)
-    count = units.count
-    storage = .allocate(capacity: max(1, count))
-    if count > 0 {
-      storage.initialize(from: units, count: count)
-    }
+  init(atom: JSAtom, contextRef: OpaquePointer) {
+    self.atom = atom
+    self.contextRef = contextRef
   }
 
-  deinit {
-    if count > 0 {
-      storage.deinitialize(count: count)
-    }
-    storage.deallocate()
+  @discardableResult
+  public func retainReference() -> Bool {
+    JS_DupAtom(contextRef, atom) != 0
   }
 
-  var length: Int { count }
-  var characters: UnsafePointer<UInt16> { UnsafePointer(storage) }
+  @discardableResult
+  public func releaseReference() -> Bool {
+    JS_FreeAtom(contextRef, atom)
+    return true
+  }
+}
+
+public final class QuickJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
+  @unchecked Sendable
+{
+  private let bytes: [UInt8]
+  let contextRef: OpaquePointer
+
+  init(source: String, contextRef: OpaquePointer) {
+    self.bytes = Array(source.utf8) + [0]
+    self.contextRef = contextRef
+  }
+
+  var byteCount: Int {
+    max(0, bytes.count - 1)
+  }
+
+  func withCString<R>(_ body: (UnsafePointer<CChar>, Int) -> R) -> R {
+    bytes.withUnsafeBufferPointer { buffer in
+      let pointer = UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self)
+      return body(pointer, byteCount)
+    }
+  }
 
   @discardableResult
   public func retainReference() -> Bool {

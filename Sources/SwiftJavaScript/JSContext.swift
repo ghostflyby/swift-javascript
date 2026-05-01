@@ -59,6 +59,18 @@ extension JSContext {
     }
   }
 
+  public func makePropertyKey(_ value: String) -> JSPropertyKey<E> {
+    withInstantContext { instantContext in
+      instantContext.makePropertyKey(value)
+    }
+  }
+
+  public func prepareScript(_ source: String) -> JSPreparedScript<E> {
+    withInstantContext { instantContext in
+      instantContext.prepareScript(source)
+    }
+  }
+
   public func makeNumber(_ value: Double) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.makeNumber(value)
@@ -176,52 +188,9 @@ extension JSContext {
     }
   }
 
-  public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script)
-    }
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(script, startingLineNumber: startingLineNumber)
-    }
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    sourceURL: String,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
-  }
-
-  public func evaluateScript<SourceURL>(
-    _ script: String,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
-  }
-
   public func evaluateScript(
     _ script: String,
-    sourceURL: String,
+    sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> {
     withInstantContext { instantContext in
@@ -233,12 +202,11 @@ extension JSContext {
     }
   }
 
-  public func evaluateScript<Script, SourceURL>(
-    _ script: borrowing Script,
-    sourceURL: borrowing SourceURL,
+  public func evaluateScript(
+    _ script: borrowing JSPreparedScript<E>,
+    sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>>
-  where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
+  ) -> JSResult<JSValue<E>> {
     withInstantContext { instantContext in
       instantContext.evaluateScript(
         script,

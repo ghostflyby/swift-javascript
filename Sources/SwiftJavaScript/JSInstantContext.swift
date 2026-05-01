@@ -52,6 +52,20 @@ extension JSInstantContext {
     )
   }
 
+  public func makePropertyKey(_ value: String) -> JSPropertyKey<E> {
+    guard let handle = E.makePropertyKeyHandle(value, in: driverContextHandle) else {
+      preconditionFailure("JSInstantContext.makePropertyKey could not create handle")
+    }
+    return JSPropertyKey(handle: handle, context: driverContextHandle)
+  }
+
+  public func prepareScript(_ source: String) -> JSPreparedScript<E> {
+    guard let handle = E.makePreparedScriptHandle(source, in: driverContextHandle) else {
+      preconditionFailure("JSInstantContext.prepareScript could not create handle")
+    }
+    return JSPreparedScript(handle: handle, context: driverContextHandle)
+  }
+
   func makeSymbol(_ value: String) -> JSValue<E> {
     valueFromHandle(
       E.makeSymbolValueHandle(value, driverContextHandle),
@@ -187,70 +201,31 @@ extension JSInstantContext {
     }
   }
 
-  public func evaluateScript(_ script: String) -> JSResult<JSValue<E>> {
-    bridgeHandleResult(
-      E.evaluateScriptResultHandle(
-        script,
-        driverContextHandle,
-        sourceURL: nil,
-        startingLineNumber: 1
-      ))
+  public func evaluateScript(
+    _ script: String,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResult<JSValue<E>> {
+    let preparedScript = prepareScript(script)
+    return evaluateScript(
+      preparedScript,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
   }
 
   public func evaluateScript(
-    _ script: String,
-    sourceURL: String,
+    _ script: borrowing JSPreparedScript<E>,
+    sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
-      E.evaluateScriptResultHandle(
-        script,
+      E.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: self),
         driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       ))
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    bridgeHandleResult(
-      E.evaluateScriptResultHandle(
-        script.string,
-        driverContextHandle,
-        sourceURL: nil,
-        startingLineNumber: startingLineNumber
-      ))
-  }
-
-  public func evaluateScript<Script>(
-    _ script: borrowing Script,
-    sourceURL: String,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where Script: JSString, Script: ~Copyable {
-    evaluateScript(script.string, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
-  }
-
-  public func evaluateScript<SourceURL>(
-    _ script: String,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> where SourceURL: JSString, SourceURL: ~Copyable {
-    evaluateScript(script, sourceURL: sourceURL.string, startingLineNumber: startingLineNumber)
-  }
-
-  public func evaluateScript<Script, SourceURL>(
-    _ script: borrowing Script,
-    sourceURL: borrowing SourceURL,
-    startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>>
-  where Script: JSString, Script: ~Copyable, SourceURL: JSString, SourceURL: ~Copyable {
-    evaluateScript(
-      script.string,
-      sourceURL: sourceURL.string,
-      startingLineNumber: startingLineNumber
-    )
   }
 
   public func toBoolean(_ value: borrowing JSValue<E>) -> Bool {

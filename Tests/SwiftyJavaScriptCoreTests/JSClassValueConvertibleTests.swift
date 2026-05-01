@@ -104,10 +104,10 @@ class ExportedFunctionNode {
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedLeafNode(base: 1, child: "leaf", enabled: true)
     global.setProperty(
-      instance, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("node"), in: context)
+      instance, forKey: ("node"), in: context)
 
     let decoded: ExportedLeafNode = global.getProperty(
-      forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("node"),
+      forKey: ("node"),
       using: JSClassValueConverter<ExportedLeafNode>.self,
       in: context
     )
@@ -122,7 +122,7 @@ class ExportedFunctionNode {
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedLeafNode(base: 2, child: "branch", enabled: true)
     global.setProperty(
-      instance, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("node"), in: context)
+      instance, forKey: ("node"), in: context)
 
     let readResult = context.evaluateScript(
       "String(node.base) + ':' + node.child + ':' + String(node.enabled)")
@@ -175,9 +175,9 @@ class ExportedFunctionNode {
     let base = ExportedBaseNode(base: 1)
     let child = ExportedChildNode(base: 2, child: "two")
     global.setProperty(
-      base, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("baseNode"), in: context)
+      base, forKey: ("baseNode"), in: context)
     global.setProperty(
-      child, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("childNode"), in: context
+      child, forKey: ("childNode"), in: context
     )
 
     let prototypeResult = context.evaluateScript(
@@ -200,7 +200,7 @@ class ExportedFunctionNode {
   await context.withIsolatedGlobalObject { context, global in
     let instance = ExportedFunctionNode(name: "leaf", count: 4)
     global.setProperty(
-      instance, forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("node"), in: context)
+      instance, forKey: ("node"), in: context)
 
     let sumResult = context.evaluateScript("node.sum(2, 3)")
     switch consume sumResult {

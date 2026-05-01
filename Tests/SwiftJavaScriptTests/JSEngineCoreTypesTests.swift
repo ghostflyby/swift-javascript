@@ -105,7 +105,9 @@ public struct MockClassHandle: JSClassManualReferenceCountedHandle, @unchecked S
   }
 }
 
-public final class MockStringHandle: JSStringManualReferenceCountedHandle, @unchecked Sendable {
+public final class MockStringHandle: JSPropertyKeyManualReferenceCountedHandle,
+  JSPreparedScriptManualReferenceCountedHandle, @unchecked Sendable
+{
   private let count: Int
   private let storage: UnsafeMutablePointer<UInt16>
 
@@ -208,23 +210,8 @@ public enum MockEngine: JSEngine {
   public typealias ContextHandle = MockContextHandle
   public typealias ValueHandle = MockValueHandle
   public typealias ClassHandle = MockClassHandle
-  public typealias StringHandle = MockStringHandle
-
-  public static func stringLength(_ stringHandle: MockStringHandle) -> Int {
-    stringHandle.length
-  }
-
-  public static func stringCharacters(_ stringHandle: MockStringHandle) -> UnsafePointer<UInt16>? {
-    stringHandle.characters
-  }
-
-  public static func makeJSString(_ value: String) -> MockStringHandle {
-    MockStringHandle(value)
-  }
-
-  public static func stringEquals(_ lhs: MockStringHandle, _ rhs: MockStringHandle) -> Bool {
-    lhs.string == rhs.string
-  }
+  public typealias PropertyKeyHandle = MockStringHandle
+  public typealias PreparedScriptHandle = MockStringHandle
 }
 
 @Test func jsValueHandleStorageWordsRoundTripMockHandlePointerWord() {
@@ -307,7 +294,8 @@ private enum MockDriver: JSEngine {
   typealias Engine = MockEngine
   typealias RuntimeHandle = MockRuntimeHandle
   typealias ContextHandle = MockContextHandle
-  typealias StringHandle = MockStringHandle
+  typealias PropertyKeyHandle = MockStringHandle
+  typealias PreparedScriptHandle = MockStringHandle
 
   static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
 
@@ -492,21 +480,6 @@ private enum MockDriver: JSEngine {
     .value(())
   }
 
-  static func stringLength(_ stringHandle: MockStringHandle) -> Int {
-    stringHandle.length
-  }
-
-  static func stringCharacters(_ stringHandle: MockStringHandle) -> UnsafePointer<UInt16>? {
-    stringHandle.characters
-  }
-
-  static func makeJSString(_ value: String) -> MockStringHandle {
-    MockStringHandle(value)
-  }
-
-  static func stringEquals(_ lhs: MockStringHandle, _ rhs: MockStringHandle) -> Bool {
-    lhs.string == rhs.string
-  }
 }
 
 extension MockDriver {
@@ -600,8 +573,25 @@ extension MockDriver {
     return resultHandle(from: makeArray(in: context.rawContext))
   }
 
-  fileprivate static func evaluateScriptResultHandle(
-    _ script: String,
+  fileprivate static func makePreparedScriptHandle(
+    _ source: String,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    _ = context
+    return MockStringHandle(source)
+  }
+
+  fileprivate static func isPreparedScriptHandleCompatibleWithContext(
+    _ script: MockStringHandle,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = script
+    _ = context
+    return true
+  }
+
+  fileprivate static func evaluatePreparedScriptResultHandle(
+    _ script: MockStringHandle,
     _ context: MockContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
@@ -609,7 +599,7 @@ extension MockDriver {
 
     return resultHandle(
       from: evaluateScript(
-        script,
+        script.string,
         in: context.rawContext,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
@@ -682,17 +672,34 @@ extension MockDriver {
     return propertyNames(on: object.rawValue, in: context.rawContext)
   }
 
-  fileprivate static func getStringPropertyHandle(
-    _ key: String,
+  fileprivate static func makePropertyKeyHandle(
+    _ value: String,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    _ = context
+    return MockStringHandle(value)
+  }
+
+  fileprivate static func isPropertyKeyHandleCompatibleWithContext(
+    _ key: MockStringHandle,
+    in context: MockContextHandle
+  ) -> Bool {
+    _ = key
+    _ = context
+    return true
+  }
+
+  fileprivate static func getPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> JSResult<JSValueHandle<MockEngine>>? {
 
-    return resultHandle(from: getProperty(key, on: object.rawValue, in: context.rawContext))
+    return resultHandle(from: getProperty(key.string, on: object.rawValue, in: context.rawContext))
   }
 
-  fileprivate static func setStringPropertyHandle(
-    _ key: String,
+  fileprivate static func setPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     to value: JSValueHandle<MockEngine>,
     in context: MockContextHandle,
@@ -700,7 +707,7 @@ extension MockDriver {
   ) -> Bool {
 
     switch setProperty(
-      key,
+      key.string,
       on: object.rawValue,
       to: value.rawValue,
       in: context.rawContext,
@@ -769,13 +776,13 @@ extension MockDriver {
     }
   }
 
-  fileprivate static func hasStringPropertyHandle(
-    _ key: String,
+  fileprivate static func hasPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool? {
 
-    return hasProperty(key, on: object.rawValue, in: context.rawContext)
+    return hasProperty(key.string, on: object.rawValue, in: context.rawContext)
   }
 
   fileprivate static func hasValuePropertyHandle(
@@ -787,13 +794,13 @@ extension MockDriver {
     return hasProperty(key.rawValue, on: object.rawValue, in: context.rawContext)
   }
 
-  fileprivate static func deleteStringPropertyHandle(
-    _ key: String,
+  fileprivate static func deletePropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool {
 
-    switch deleteProperty(key, on: object.rawValue, in: context.rawContext) {
+    switch deleteProperty(key.string, on: object.rawValue, in: context.rawContext) {
     case .value:
       return true
     case .exception:
@@ -1059,13 +1066,27 @@ extension MockEngine {
     MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: context)
   }
 
-  public static func evaluateScriptResultHandle(
-    _ script: String,
+  public static func makePreparedScriptHandle(
+    _ source: String,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    MockDriver.makePreparedScriptHandle(source, in: context)
+  }
+
+  public static func isPreparedScriptHandleCompatibleWithContext(
+    _ script: MockStringHandle,
+    in context: MockContextHandle
+  ) -> Bool {
+    MockDriver.isPreparedScriptHandleCompatibleWithContext(script, in: context)
+  }
+
+  public static func evaluatePreparedScriptResultHandle(
+    _ script: MockStringHandle,
     _ context: MockContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValueHandle<MockEngine>>? {
-    MockDriver.evaluateScriptResultHandle(
+    MockDriver.evaluatePreparedScriptResultHandle(
       script,
       context,
       sourceURL: sourceURL,
@@ -1183,22 +1204,36 @@ extension MockEngine {
     MockDriver.propertyNamesForHandle(on: object, in: context)
   }
 
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func makePropertyKeyHandle(
+    _ value: String,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    MockDriver.makePropertyKeyHandle(value, in: context)
+  }
+
+  public static func isPropertyKeyHandleCompatibleWithContext(
+    _ key: MockStringHandle,
+    in context: MockContextHandle
+  ) -> Bool {
+    MockDriver.isPropertyKeyHandleCompatibleWithContext(key, in: context)
+  }
+
+  public static func getPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> JSResult<JSValueHandle<MockEngine>>? {
-    MockDriver.getStringPropertyHandle(key, on: object, in: context)
+    MockDriver.getPropertyKeyHandle(key, on: object, in: context)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     to value: JSValueHandle<MockEngine>,
     in context: MockContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    MockDriver.setStringPropertyHandle(
+    MockDriver.setPropertyKeyHandle(
       key,
       on: object,
       to: value,
@@ -1248,12 +1283,12 @@ extension MockEngine {
     MockDriver.setIndexPropertyHandle(at: index, on: object, to: value, in: context)
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasPropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool? {
-    MockDriver.hasStringPropertyHandle(key, on: object, in: context)
+    MockDriver.hasPropertyKeyHandle(key, on: object, in: context)
   }
 
   public static func hasValuePropertyHandle(
@@ -1264,12 +1299,12 @@ extension MockEngine {
     MockDriver.hasValuePropertyHandle(key, on: object, in: context)
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deletePropertyKeyHandle(
+    _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool {
-    MockDriver.deleteStringPropertyHandle(key, on: object, in: context)
+    MockDriver.deletePropertyKeyHandle(key, on: object, in: context)
   }
 
   public static func deleteValuePropertyHandle(
@@ -1629,19 +1664,36 @@ extension MockEngine {
   let stringValue = MockDriver.makeStringValueHandle("hello", context)
   let symbolValue = MockDriver.makeSymbolValueHandle("token", context)
   let numberValue = MockDriver.makeNumberValueHandle(42, context)
-  let evalValue = MockDriver.evaluateScriptResultHandle("1 + 2", context)
-  let evalException = MockDriver.evaluateScriptResultHandle("throw", context)
+  let script = MockDriver.makePreparedScriptHandle("1 + 2", in: context)
+  let throwingScript = MockDriver.makePreparedScriptHandle("throw", in: context)
+  let evalValue = script.map { MockDriver.evaluatePreparedScriptResultHandle($0, context) } ?? nil
+  let evalException =
+    throwingScript.map { MockDriver.evaluatePreparedScriptResultHandle($0, context) } ?? nil
 
-  guard let stringValue, let symbolValue, let numberValue, let evalValue, let evalException else {
+  guard
+    let stringValue, let symbolValue, let numberValue, let script, let throwingScript,
+    let evalValue,
+    let evalException
+  else {
     Issue.record("Expected driver bridge operations to produce handles")
     return
   }
+  defer {
+    _ = script.releaseReference()
+    _ = throwingScript.releaseReference()
+  }
 
   let names = MockDriver.propertyNamesForHandle(on: stringValue, in: context)
-  let property = MockDriver.getStringPropertyHandle(
-    "message", on: stringValue, in: context)
-  let propertySet = MockDriver.setStringPropertyHandle(
-    "message",
+  let messageKey = MockDriver.makePropertyKeyHandle("message", in: context)
+  guard let messageKey else {
+    Issue.record("Expected property key handle")
+    return
+  }
+  defer { _ = messageKey.releaseReference() }
+  let property = MockDriver.getPropertyKeyHandle(
+    messageKey, on: stringValue, in: context)
+  let propertySet = MockDriver.setPropertyKeyHandle(
+    messageKey,
     on: stringValue,
     to: numberValue,
     in: context,

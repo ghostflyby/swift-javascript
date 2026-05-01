@@ -152,10 +152,7 @@ func classPropertyName(_ propertyName: JSStringRef?) -> String? {
   guard let propertyName else {
     return nil
   }
-  return String(
-    jsStringHandle: JavaScriptCoreStringHandle(ref: propertyName),
-    engine: JavaScriptCoreEngine.self
-  )
+  return javaScriptCoreString(propertyName)
 }
 
 func rememberClassObjectContext(_ ctx: JSContextRef, _ object: JSObjectRef) {
@@ -402,7 +399,7 @@ private func withJavaScriptCoreStaticFunctionCallbackInput<R>(
   let context = makeRememberedClassCallbackContext(ctx, thisObject)
   let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
   let functionName = functionValue.getProperty(
-    forKey: SwiftJavaScript.JSStringManaged<JavaScriptCoreEngine>("name"), in: context
+    forKey: "name", in: context
   )
   .toString(in: context)
   guard

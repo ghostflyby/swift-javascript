@@ -9,21 +9,6 @@ extension JSValue {
     self = context.makeString(value)
   }
 
-  public init(
-    string value: borrowing some JSString, in context: isolated JSContext<E> = #isolation
-  ) {
-    let stringValue = value.string
-    self = context.withInstantContext { callbackContext in
-      callbackContext.makeString(stringValue)
-    }
-  }
-
-  public init(
-    string value: borrowing some JSString, in context: borrowing JSInstantContext<E>
-  ) {
-    self = context.makeString(value.string)
-  }
-
   public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)

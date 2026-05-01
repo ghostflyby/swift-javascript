@@ -18,13 +18,6 @@ public protocol JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> ValueHandle?
 
-  static func evaluateScriptResultHandle(
-    _ script: String,
-    _ context: ContextHandle,
-    sourceURL: String?,
-    startingLineNumber: Int32
-  ) -> JSResult<ValueHandle>?
-
   static func valueTypeForHandle(
     _ value: ValueHandle,
     in context: ContextHandle

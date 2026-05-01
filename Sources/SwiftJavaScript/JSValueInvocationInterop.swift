@@ -122,25 +122,25 @@ extension JSInstantContext {
     return construct(constructor: constructor, arguments: argumentHandles)
   }
 
-  func getStringProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<
-    JSValue<E>
-  > {
+  func getProperty(_ key: borrowing JSPropertyKey<E>, on object: borrowing JSValue<E>)
+    -> JSResult<JSValue<E>>
+  {
     bridgeInvocationResult(
-      E.getStringPropertyHandle(
-        key,
+      E.getPropertyKeyHandle(
+        key.borrowHandle(in: self),
         on: valueHandle(for: object),
         in: driverContextHandle
       ))
   }
 
-  func setStringProperty(
-    _ key: String,
+  func setProperty(
+    _ key: borrowing JSPropertyKey<E>,
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    E.setStringPropertyHandle(
-      key,
+    E.setPropertyKeyHandle(
+      key.borrowHandle(in: self),
       on: valueHandle(for: object),
       to: valueHandle(for: value),
       in: driverContextHandle,
@@ -149,11 +149,11 @@ extension JSInstantContext {
   }
 
   func invokeMethod(
-    _ name: String,
+    _ name: borrowing JSPropertyKey<E>,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
-    switch getStringProperty(name, on: object) {
+    switch getProperty(name, on: object) {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
@@ -166,11 +166,28 @@ extension JSInstantContext {
   }
 
   func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+    let key = makePropertyKey(name)
+    return invokeMethod(key, on: object, arguments: [])
+  }
+
+  func invokeMethod(
+    _ name: borrowing JSPropertyKey<E>,
+    on object: borrowing JSValue<E>
+  ) -> JSResult<JSValue<E>> {
     invokeMethod(name, on: object, arguments: [])
   }
 
   func invokeMethod<each A: JSValueEncodable>(
     _ name: String,
+    on object: borrowing JSValue<E>,
+    arguments: repeat each A
+  ) -> JSResult<JSValue<E>> {
+    let key = makePropertyKey(name)
+    return invokeMethod(key, on: object, arguments: repeat each arguments)
+  }
+
+  func invokeMethod<each A: JSValueEncodable>(
+    _ name: borrowing JSPropertyKey<E>,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
@@ -327,42 +344,72 @@ extension JSValue {
     )
   }
 
-  public func invokeMethod<Name: JSString>(
-    _ name: borrowing Name,
+  public func invokeMethod(
+    _ name: String,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+  ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
     }
   }
 
-  public func invokeMethod<Name: JSString>(
-    _ name: borrowing Name,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
-    context.invokeMethod(name.string, on: self)
+  public func invokeMethod(
+    _ name: borrowing JSPropertyKey<E>,
+    in context: isolated JSContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      invokeMethod(name, in: callbackContext)
+    }
   }
 
-  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
-    _ name: borrowing Name,
+  public func invokeMethod(
+    _ name: String,
+    in context: borrowing JSInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.invokeMethod(name, on: self)
+  }
+
+  public func invokeMethod(
+    _ name: borrowing JSPropertyKey<E>,
+    in context: borrowing JSInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.invokeMethod(name, on: self)
+  }
+
+  public func invokeMethod<each A: JSValueEncodable>(
+    _ name: String,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
+  ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
     }
   }
 
-  public func invokeMethod<each A: JSValueEncodable, Name: JSString>(
-    _ name: borrowing Name,
+  public func invokeMethod<each A: JSValueEncodable>(
+    _ name: borrowing JSPropertyKey<E>,
+    arguments: repeat each A,
+    in context: isolated JSContext<E> = #isolation
+  ) -> JSResult<JSValue<E>> {
+    context.withInstantContext { callbackContext in
+      invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
+    }
+  }
+
+  public func invokeMethod<each A: JSValueEncodable>(
+    _ name: String,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> where Name: ~Copyable {
-    context.invokeMethod(
-      name.string,
-      on: self,
-      arguments: repeat each arguments
-    )
+  ) -> JSResult<JSValue<E>> {
+    context.invokeMethod(name, on: self, arguments: repeat each arguments)
+  }
+
+  public func invokeMethod<each A: JSValueEncodable>(
+    _ name: borrowing JSPropertyKey<E>,
+    arguments: repeat each A,
+    in context: borrowing JSInstantContext<E>
+  ) -> JSResult<JSValue<E>> {
+    context.invokeMethod(name, on: self, arguments: repeat each arguments)
   }
 
   public func toNumber(in context: isolated JSContext<E> = #isolation) -> Double {
@@ -455,28 +502,51 @@ extension JSValue {
     context.strictlyEquals(self, other)
   }
 
-  public func defineProperty<Val, Key>(
+  public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: borrowing Key,
+    forKey key: String,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable {
     context.withInstantContext { callbackContext in
       defineProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
   }
 
-  public func defineProperty<Val, Key>(
+  public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: borrowing Key,
+    forKey key: borrowing JSPropertyKey<E>,
+    with attributes: JSPropertyAttributes = .none,
+    in context: isolated JSContext<E> = #isolation
+  ) -> JSResult<JSValue<E>>
+  where Val: JSValueEncodable, Val: ~Copyable {
+    context.withInstantContext { callbackContext in
+      defineProperty(value, forKey: key, with: attributes, in: callbackContext)
+    }
+  }
+
+  public func defineProperty<Val>(
+    _ value: borrowing Val,
+    forKey key: String,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable, Key: JSString, Key: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable {
+    let propertyKey = context.makePropertyKey(key)
+    return defineProperty(value, forKey: propertyKey, with: attributes, in: context)
+  }
+
+  public func defineProperty<Val>(
+    _ value: borrowing Val,
+    forKey key: borrowing JSPropertyKey<E>,
+    with attributes: JSPropertyAttributes = .none,
+    in context: borrowing JSInstantContext<E>
+  ) -> JSResult<JSValue<E>>
+  where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
-    let didSet = context.setStringProperty(
-      key.string,
+    let didSet = context.setProperty(
+      key,
       on: self,
       to: encoded,
       attributes: attributes.hostMemberAttributes
@@ -485,6 +555,6 @@ extension JSValue {
       return .exception(context.makeUndefined())
     }
 
-    return context.getStringProperty(key.string, on: self)
+    return context.getProperty(key, on: self)
   }
 }

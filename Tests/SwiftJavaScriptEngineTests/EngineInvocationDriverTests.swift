@@ -143,7 +143,7 @@ private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAsser
 
       switch consume objectResult {
       case .value(let object):
-        let invokeResult = object.invokeMethod(JSStringManaged<E>("mul"), arguments: 5, in: context)
+        let invokeResult = object.invokeMethod(("mul"), arguments: 5, in: context)
         switch consume invokeResult {
         case .value(let value):
           let resultValue = value.toDouble(in: context)
@@ -152,7 +152,7 @@ private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAsser
           Issue.record("Expected method invocation to succeed")
         }
 
-        let missingResult = object.invokeMethod(JSStringManaged<E>("missing"), in: context)
+        let missingResult = object.invokeMethod(("missing"), in: context)
         switch consume missingResult {
         case .value:
           Issue.record("Expected missing method invocation to raise exception")

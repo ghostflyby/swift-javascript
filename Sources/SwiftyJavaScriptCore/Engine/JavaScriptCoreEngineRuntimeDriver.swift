@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
+extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
@@ -60,25 +60,41 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver {
     return JavaScriptCoreValueHandle(ref: functionRef, contextRef: context.ref)
   }
 
-  public static func evaluateScriptResultHandle(
-    _ script: String,
+  public static func makePreparedScriptHandle(
+    _ source: String,
+    in context: JavaScriptCoreContextHandle
+  ) -> JavaScriptCorePreparedScriptHandle? {
+    _ = context
+    let scriptRef = JSStringCreateWithCFString(source as CFString)!
+    return JavaScriptCorePreparedScriptHandle(ref: scriptRef)
+  }
+
+  public static func isPreparedScriptHandleCompatibleWithContext(
+    _ script: JavaScriptCorePreparedScriptHandle,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    _ = script
+    _ = context
+    return true
+  }
+
+  public static func evaluatePreparedScriptResultHandle(
+    _ script: JavaScriptCorePreparedScriptHandle,
     _ context: JavaScriptCoreContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    withJavaScriptCoreString(script) { scriptRef in
-      withOptionalJavaScriptCoreString(sourceURL) { sourceURLRef in
-        var exception: JSValueRef?
-        let resultRef = JSEvaluateScript(
-          context.ref,
-          scriptRef,
-          nil,
-          sourceURLRef,
-          startingLineNumber,
-          &exception
-        )
-        return javaScriptCoreResult(value: resultRef, exception: exception, in: context)
-      }
+    withOptionalJavaScriptCoreString(sourceURL) { sourceURLRef in
+      var exception: JSValueRef?
+      let resultRef = JSEvaluateScript(
+        context.ref,
+        script.ref,
+        nil,
+        sourceURLRef,
+        startingLineNumber,
+        &exception
+      )
+      return javaScriptCoreResult(value: resultRef, exception: exception, in: context)
     }
   }
 
