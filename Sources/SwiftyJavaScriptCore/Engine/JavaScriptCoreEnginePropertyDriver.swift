@@ -11,6 +11,17 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     return JavaScriptCorePropertyStringKeyHandle(ref: keyRef)
   }
 
+  public static func makePropertyStringKeyHandle(
+    _ value: StaticString,
+    in context: JavaScriptCoreContextHandle
+  ) -> JavaScriptCorePropertyStringKeyHandle? {
+    _ = context
+    let keyRef = withJavaScriptCoreString(value) { keyRef in
+      JSStringRetain(keyRef)!
+    }
+    return JavaScriptCorePropertyStringKeyHandle(ref: keyRef)
+  }
+
   public static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: JavaScriptCorePropertyStringKeyHandle,
     in context: JavaScriptCoreContextHandle
@@ -37,8 +48,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     propertyNames(on: object, in: context)
   }
 
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func getStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
@@ -55,8 +66,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     getProperty(key.ref, on: object, in: context)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle,
@@ -140,8 +151,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     hasProperty(key.ref, on: object, in: context)
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
@@ -171,8 +182,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deleteStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {

@@ -299,6 +299,12 @@ private enum MockDriver: JSEngine {
 
   static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
 
+  private static func string(from key: StaticString) -> String {
+    key.withUTF8Buffer { buffer in
+      String(decoding: buffer, as: UTF8.self)
+    }
+  }
+
   static func makeRuntime() -> MockRuntime {
     MockRuntime(id: "runtime")
   }
@@ -355,6 +361,12 @@ private enum MockDriver: JSEngine {
     [context.runtimeID, object.kind, object.payload]
   }
 
+  static func getProperty(_ key: StaticString, on object: MockValue, in context: MockContext)
+    -> JSResult<MockValue>
+  {
+    getProperty(string(from: key), on: object, in: context)
+  }
+
   static func getProperty(_ key: String, on object: MockValue, in context: MockContext)
     -> JSResult<MockValue>
   {
@@ -374,12 +386,24 @@ private enum MockDriver: JSEngine {
     .value(MockValue(kind: "index", payload: "\(context.runtimeID):\(object.payload):\(index)"))
   }
 
+  static func hasProperty(_ key: StaticString, on object: MockValue, in context: MockContext)
+    -> Bool
+  {
+    hasProperty(string(from: key), on: object, in: context)
+  }
+
   static func hasProperty(_ key: String, on object: MockValue, in context: MockContext) -> Bool {
     object.payload.contains(key)
   }
 
   static func hasProperty(_ key: MockValue, on object: MockValue, in context: MockContext) -> Bool {
     object.payload.contains(key.payload)
+  }
+
+  static func deleteProperty(_ key: StaticString, on object: MockValue, in context: MockContext)
+    -> JSResult<Void>
+  {
+    deleteProperty(string(from: key), on: object, in: context)
   }
 
   static func deleteProperty(_ key: String, on object: MockValue, in context: MockContext)
@@ -450,6 +474,16 @@ private enum MockDriver: JSEngine {
   ) -> Bool {
     _ = context
     return lhs == rhs
+  }
+
+  static func setProperty(
+    _ key: StaticString,
+    on object: MockValue,
+    to value: MockValue,
+    in context: MockContext,
+    attributes: JSHostMemberAttributes
+  ) -> JSResult<Void> {
+    setProperty(string(from: key), on: object, to: value, in: context, attributes: attributes)
   }
 
   static func setProperty(
@@ -678,6 +712,16 @@ extension MockDriver {
   ) -> MockStringHandle? {
     _ = context
     return MockStringHandle(value)
+  }
+
+  fileprivate static func makePropertyStringKeyHandle(
+    _ value: StaticString,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    _ = context
+    return value.withUTF8Buffer { buffer in
+      MockStringHandle(String(decoding: buffer, as: UTF8.self))
+    }
   }
 
   fileprivate static func makeStringValueHandle(
@@ -1213,6 +1257,13 @@ extension MockEngine {
 
   public static func makePropertyStringKeyHandle(
     _ value: String,
+    in context: MockContextHandle
+  ) -> MockStringHandle? {
+    MockDriver.makePropertyStringKeyHandle(value, in: context)
+  }
+
+  public static func makePropertyStringKeyHandle(
+    _ value: StaticString,
     in context: MockContextHandle
   ) -> MockStringHandle? {
     MockDriver.makePropertyStringKeyHandle(value, in: context)

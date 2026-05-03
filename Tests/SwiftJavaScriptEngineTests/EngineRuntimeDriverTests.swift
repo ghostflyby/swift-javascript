@@ -141,7 +141,7 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let answerKey = "answer"
+      let answerKey: StaticString = "answer"
       context.setGlobalProperty(41, forKey: answerKey)
       let hasAnswer = context.hasGlobalProperty(answerKey)
       let answer = context.getGlobalProperty(forKey: answerKey).toDouble(in: context)
@@ -149,7 +149,7 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
       #expect(answer == 41)
 
       let object = context.makeObject()
-      let flagKey = "flag"
+      let flagKey: StaticString = "flag"
       object.setProperty(context.makeBoolean(true), forKey: flagKey, in: context)
       let flag = object.getProperty(forKey: flagKey, in: context).toBool(in: context)
       #expect(flag)
@@ -180,7 +180,7 @@ private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion 
     let context = JSContext<E>()
 
     await context.withIsolatedGlobalObject { context, _ in
-      let countKey = "count"
+      let countKey: StaticString = "count"
       context.setGlobalProperty(5, forKey: countKey)
       let hasCount = context.hasGlobalProperty(countKey)
       #expect(hasCount)

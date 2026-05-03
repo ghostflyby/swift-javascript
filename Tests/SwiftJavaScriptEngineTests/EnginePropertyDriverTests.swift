@@ -45,7 +45,7 @@ private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
 
     await context.withInstantContext { context in
       let object = context.makeObject()
-      let key = "strKey"
+      let key: StaticString = "strKey"
       object.setProperty(3.5, forKey: key, in: context)
 
       let hasBeforeDelete = object.hasProperty(key, in: context)
@@ -228,7 +228,7 @@ private enum DefinePropertyAppliesAttributes: ScriptEngineAssertion {
 
     await context.withInstantContext { context in
       let object = JSValue(objectIn: context)
-      let key = "locked"
+      let key: StaticString = "locked"
 
       let defineResult = object.defineProperty(7, forKey: key, with: [.readOnly], in: context)
       switch consume defineResult {
@@ -250,8 +250,8 @@ private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion 
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let hiddenKey = "hiddenFlag"
-      let pinnedKey = "pinnedFlag"
+      let hiddenKey: StaticString = "hiddenFlag"
+      let pinnedKey: StaticString = "pinnedFlag"
 
       context.withGlobalObject { global in
         _ = global.defineProperty(true, forKey: hiddenKey, with: [.dontEnum], in: context)

@@ -801,7 +801,7 @@ private func makeEnumDecodeCase(
       let keyName = "__payloadKey_\(enumCase.name)_\(label)"
       let valueName = "__payloadValue_\(enumCase.name)_\(label)"
       lines.append(
-        "  let \(keyName) = (\"\(label)\")")
+        "  let \(keyName): Swift.StaticString = \"\(label)\"")
       lines.append(
         "  let \(valueName) = \(payloadSource).getProperty(forKey: \(keyName), in: context)")
       if let decoder = associatedValue.decoderOverride {
@@ -888,7 +888,7 @@ private func makeEnumEncodeCase(
     let payloadTarget = flattenedLabeledPayload ? "__object" : "__payload"
     for (index, label) in bindings.enumerated() {
       lines.append(
-        "  let __payloadKey_\(label) = (\"\(label)\")"
+        "  let __payloadKey_\(label): Swift.StaticString = \"\(label)\""
       )
       if let encoder = enumCase.associatedValues[index].encoderOverride {
         lines.append("  let __encoded_\(label) = try \(encoder).tryEncode(\(label), in: context)")
@@ -972,7 +972,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         let keyName = "__key_\(property.name)"
         let localName = "__\(property.name)Value"
         decodeLines.append(
-          "let \(keyName) = (\"\(property.name)\")"
+          "let \(keyName): Swift.StaticString = \"\(property.name)\""
         )
         decodeLines.append(
           "let \(localName) = value.getProperty(forKey: \(keyName), in: context)")
@@ -994,7 +994,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         let keyName = "__key_\(property.name)"
         let encodedName = "__encoded_\(property.name)"
         encodeLines.append(
-          "let \(keyName) = (\"\(property.name)\")"
+          "let \(keyName): Swift.StaticString = \"\(property.name)\""
         )
         if let encoder = property.encoderOverride ?? sharedEncoder {
           encodeLines.append(
@@ -1038,7 +1038,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         let keyName = "__key_\(property.name)"
         let localName = "__\(property.name)Value"
         decodeLines.append(
-          "let \(keyName) = (\"\(property.name)\")"
+          "let \(keyName): Swift.StaticString = \"\(property.name)\""
         )
         decodeLines.append(
           "let \(localName) = value.getProperty(forKey: \(keyName), in: context)")
@@ -1074,7 +1074,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         let keyName = "__key_\(property.name)"
         let encodedName = "__encoded_\(property.name)"
         encodeLines.append(
-          "let \(keyName) = (\"\(property.name)\")"
+          "let \(keyName): Swift.StaticString = \"\(property.name)\""
         )
         if let encoder = property.encoderOverride ?? sharedEncoder {
           encodeLines.append(
@@ -1154,14 +1154,14 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           if flattenedLabeledPayload {
             ""
           } else {
-            "let __payloadKey = (\"\(options.payloadKey)\")"
+            "let __payloadKey: Swift.StaticString = \"\(options.payloadKey)\""
           }
 
         decodeBody = """
           guard value.isObject(in: context) else {
             throw .typeMismatch(expected: "object", actual: value.type(in: context))
           }
-          let __tagKey = "\(options.tagKey)"
+          let __tagKey: Swift.StaticString = "\(options.tagKey)"
           \(payloadKeyDeclaration)
           let __tagValue = value.getProperty(forKey: __tagKey, in: context)
           let __caseName = try String.tryDecode(__tagValue, in: context)
@@ -1172,7 +1172,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           }
           """
         encodeBody = """
-          let __tagKey = "\(options.tagKey)"
+          let __tagKey: Swift.StaticString = "\(options.tagKey)"
           \(payloadKeyDeclaration)
           switch self {
           \(encodeCases)

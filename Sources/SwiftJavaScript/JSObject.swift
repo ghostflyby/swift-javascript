@@ -1,11 +1,11 @@
 extension JSValue {
   public func setProperty(
     _ value: borrowing JSValue<E>,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    _ = E.setStringPropertyHandle(
+    _ = E.setStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
       to: value.borrowHandle(),
@@ -59,7 +59,7 @@ extension JSValue {
 
   public func setProperty(
     _ value: borrowing JSValue<E>,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) {
@@ -102,12 +102,12 @@ extension JSValue {
 
   public func setProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) where Val: JSValueEncodable, Val: ~Copyable {
     let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
-    _ = E.setStringPropertyHandle(
+    _ = E.setStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
       to: encoded.borrowHandle(),
@@ -158,7 +158,7 @@ extension JSValue {
 
   public func setProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) where Val: JSValueEncodable, Val: ~Copyable {
@@ -201,13 +201,13 @@ extension JSValue {
 
   public func setProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
     let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
-    _ = E.setStringPropertyHandle(
+    _ = E.setStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
       to: encoded.borrowHandle(),
@@ -261,7 +261,7 @@ extension JSValue {
 
   public func setProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
@@ -307,11 +307,11 @@ extension JSValue {
   }
 
   public func getProperty(
-    forKey key: String,
+    forKey key: StaticString,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      E.getStringPropertyHandle(
+      E.getStaticStringPropertyHandle(
         key,
         on: borrowHandle(),
         in: context.driverContextHandle
@@ -383,7 +383,7 @@ extension JSValue {
   }
 
   public func getProperty(
-    forKey key: String,
+    forKey key: StaticString,
     in context: isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
     context.withInstantContext { callbackContext in
@@ -419,7 +419,7 @@ extension JSValue {
   }
 
   public func getProperty<C: JSValueDecoder>(
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     in context: borrowing JSInstantContext<E>
   ) -> C.SwiftType {
@@ -455,7 +455,7 @@ extension JSValue {
   }
 
   public func getProperty<C: JSValueDecoder>(
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     in context: isolated JSContext<E> = #isolation
   ) -> C.SwiftType {
@@ -491,10 +491,10 @@ extension JSValue {
   }
 
   public func deleteProperty(
-    forKey key: String,
+    forKey key: StaticString,
     in context: borrowing JSInstantContext<E>
   ) {
-    _ = E.deleteStringPropertyHandle(
+    _ = E.deleteStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
       in: context.driverContextHandle
@@ -524,7 +524,7 @@ extension JSValue {
   }
 
   public func deleteProperty(
-    forKey key: String,
+    forKey key: StaticString,
     in context: isolated JSContext<E> = #isolation
   ) {
     context.withInstantContext { callbackContext in
@@ -551,10 +551,10 @@ extension JSValue {
   }
 
   public func hasProperty(
-    _ key: String,
+    _ key: StaticString,
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
-    E.hasStringPropertyHandle(
+    E.hasStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
       in: context.driverContextHandle
@@ -584,7 +584,7 @@ extension JSValue {
   }
 
   public func hasProperty(
-    _ key: String,
+    _ key: StaticString,
     in context: isolated JSContext<E> = #isolation
   ) -> Bool {
     context.withInstantContext { callbackContext in

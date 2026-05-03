@@ -133,9 +133,9 @@ extension JSInstantContext {
       ))
   }
 
-  func getProperty(_ key: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func getProperty(_ key: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     bridgeInvocationResult(
-      E.getStringPropertyHandle(
+      E.getStaticStringPropertyHandle(
         key,
         on: valueHandle(for: object),
         in: driverContextHandle
@@ -158,12 +158,12 @@ extension JSInstantContext {
   }
 
   func setProperty(
-    _ key: String,
+    _ key: StaticString,
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    E.setStringPropertyHandle(
+    E.setStaticStringPropertyHandle(
       key,
       on: valueHandle(for: object),
       to: valueHandle(for: value),
@@ -190,7 +190,7 @@ extension JSInstantContext {
   }
 
   func invokeMethod(
-    _ name: String,
+    _ name: StaticString,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
@@ -206,7 +206,7 @@ extension JSInstantContext {
     }
   }
 
-  func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func invokeMethod(_ name: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     invokeMethod(name, on: object, arguments: [])
   }
 
@@ -218,7 +218,7 @@ extension JSInstantContext {
   }
 
   func invokeMethod<each A: JSValueEncodable>(
-    _ name: String,
+    _ name: StaticString,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
@@ -386,7 +386,7 @@ extension JSValue {
   }
 
   public func invokeMethod(
-    _ name: String,
+    _ name: StaticString,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
@@ -404,7 +404,7 @@ extension JSValue {
   }
 
   public func invokeMethod(
-    _ name: String,
+    _ name: StaticString,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.invokeMethod(name, on: self)
@@ -418,7 +418,7 @@ extension JSValue {
   }
 
   public func invokeMethod<each A: JSValueEncodable>(
-    _ name: String,
+    _ name: StaticString,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
@@ -438,7 +438,7 @@ extension JSValue {
   }
 
   public func invokeMethod<each A: JSValueEncodable>(
-    _ name: String,
+    _ name: StaticString,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
@@ -545,7 +545,7 @@ extension JSValue {
 
   public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
@@ -569,7 +569,7 @@ extension JSValue {
 
   public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>

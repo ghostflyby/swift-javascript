@@ -132,7 +132,7 @@ extension JSInstantContext {
 
   public func setGlobalProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none
   ) where Val: JSValueEncodable, Val: ~Copyable {
     withGlobalObject { globalObject in
@@ -142,7 +142,7 @@ extension JSInstantContext {
 
   public func setGlobalProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none
   ) {
@@ -151,14 +151,14 @@ extension JSInstantContext {
     }
   }
 
-  public func getGlobalProperty(forKey key: String) -> JSValue<E> {
+  public func getGlobalProperty(forKey key: StaticString) -> JSValue<E> {
     withGlobalObject { globalObject in
       globalObject.getProperty(forKey: key, in: self)
     }
   }
 
   public func getGlobalProperty<C: JSValueDecoder>(
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type
   ) -> C.SwiftType {
     withGlobalObject { globalObject in
@@ -166,13 +166,13 @@ extension JSInstantContext {
     }
   }
 
-  public func deleteGlobalProperty(forKey key: String) {
+  public func deleteGlobalProperty(forKey key: StaticString) {
     withGlobalObject { globalObject in
       globalObject.deleteProperty(forKey: key, in: self)
     }
   }
 
-  public func hasGlobalProperty(_ key: String) -> Bool {
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
     withGlobalObject { globalObject in
       globalObject.hasProperty(key, in: self)
     }
@@ -206,8 +206,9 @@ extension JSInstantContext {
     callback: @escaping JSFunctionCallback<E>
   ) where E.Engine == E {
     let function = makeFunction(named: name, callback: callback)
+    let key = makePropertyStringKey(name)
     withGlobalObject { globalObject in
-      globalObject.setProperty(function, forKey: name, with: attributes, in: self)
+      globalObject.setProperty(function, forKey: key, with: attributes, in: self)
     }
   }
 

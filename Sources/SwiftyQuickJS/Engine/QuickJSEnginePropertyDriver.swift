@@ -20,6 +20,17 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return QuickJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
+  public static func makePropertyStringKeyHandle(
+    _ value: StaticString,
+    in context: QuickJSContextHandle
+  ) -> QuickJSPropertyStringKeyHandle? {
+    let atom = makePropertyStringAtom(value, in: context)
+    guard atom != 0 else {
+      return nil
+    }
+    return QuickJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
+  }
+
   public static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: QuickJSPropertyStringKeyHandle,
     in context: QuickJSContextHandle
@@ -64,8 +75,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func getStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> JSResult<QuickJSValueHandle>? {
@@ -83,8 +94,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: QuickJSValueHandle,
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle,
@@ -173,8 +184,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool? {
@@ -213,8 +224,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return JS_DeleteProperty(context.ref, object.ref, key.atom, Int32(JS_PROP_THROW)) == 1
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deleteStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool {
@@ -247,8 +258,33 @@ private func makePropertyStringAtom(_ value: String, in context: QuickJSContextH
   }
 }
 
+private func makePropertyStringAtom(
+  _ value: StaticString,
+  in context: QuickJSContextHandle
+) -> JSAtom {
+  value.withUTF8Buffer { buffer in
+    let pointer = buffer.baseAddress.map {
+      UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
+    }
+    return JS_NewAtomLen(context.ref, pointer, buffer.count)
+  }
+}
+
 private func withPropertyStringAtom<R>(
   _ value: String,
+  in context: QuickJSContextHandle,
+  _ body: (JSAtom) -> R
+) -> R? {
+  let atom = makePropertyStringAtom(value, in: context)
+  guard atom != 0 else {
+    return nil
+  }
+  defer { JS_FreeAtom(context.ref, atom) }
+  return body(atom)
+}
+
+private func withPropertyStringAtom<R>(
+  _ value: StaticString,
   in context: QuickJSContextHandle,
   _ body: (JSAtom) -> R
 ) -> R? {

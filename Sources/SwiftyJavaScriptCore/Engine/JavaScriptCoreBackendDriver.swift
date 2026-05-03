@@ -83,6 +83,19 @@ func withJavaScriptCoreString<R>(_ string: String, _ body: (JSStringRef) -> R) -
   return body(stringHandle)
 }
 
+func withJavaScriptCoreString<R>(_ string: StaticString, _ body: (JSStringRef) -> R) -> R {
+  let stringHandle =
+    if string.hasPointerRepresentation {
+      JSStringCreateWithUTF8CString(
+        UnsafeRawPointer(string.utf8Start).assumingMemoryBound(to: CChar.self)
+      )!
+    } else {
+      JSStringCreateWithCFString(String(describing: string) as CFString)!
+    }
+  defer { JSStringRelease(stringHandle) }
+  return body(stringHandle)
+}
+
 func withOptionalJavaScriptCoreString<R>(_ string: String?, _ body: (JSStringRef?) -> R) -> R {
   guard let string else {
     return body(nil)

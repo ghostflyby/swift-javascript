@@ -6,6 +6,11 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> PropertyStringKeyHandle?
 
+  static func makePropertyStringKeyHandle(
+    _ value: StaticString,
+    in context: ContextHandle
+  ) -> PropertyStringKeyHandle?
+
   static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: PropertyStringKeyHandle,
     in context: ContextHandle
@@ -21,8 +26,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> [String]?
 
-  static func getStringPropertyHandle(
-    _ key: String,
+  static func getStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
@@ -33,8 +38,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
-  static func setStringPropertyHandle(
-    _ key: String,
+  static func setStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     to value: ValueHandle,
     in context: ContextHandle,
@@ -76,8 +81,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool
 
-  static func hasStringPropertyHandle(
-    _ key: String,
+  static func hasStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool?
@@ -94,8 +99,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool?
 
-  static func deleteStringPropertyHandle(
-    _ key: String,
+  static func deleteStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool
@@ -114,8 +119,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
 }
 
 extension JSEnginePropertyDriver {
-  public static func getStringPropertyHandle(
-    _ key: String,
+  public static func getStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>? {
@@ -126,8 +131,8 @@ extension JSEnginePropertyDriver {
     return getPropertyStringKeyHandle(keyHandle, on: object, in: context)
   }
 
-  public static func setStringPropertyHandle(
-    _ key: String,
+  public static func setStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     to value: ValueHandle,
     in context: ContextHandle,
@@ -146,8 +151,8 @@ extension JSEnginePropertyDriver {
     )
   }
 
-  public static func hasStringPropertyHandle(
-    _ key: String,
+  public static func hasStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool? {
@@ -158,8 +163,8 @@ extension JSEnginePropertyDriver {
     return hasPropertyStringKeyHandle(keyHandle, on: object, in: context)
   }
 
-  public static func deleteStringPropertyHandle(
-    _ key: String,
+  public static func deleteStaticStringPropertyHandle(
+    _ key: StaticString,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool {

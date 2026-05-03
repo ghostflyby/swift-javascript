@@ -117,7 +117,7 @@ extension JSContext {
 
   public func setGlobalProperty<Val>(
     _ value: borrowing Val,
-    forKey key: String,
+    forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none
   ) where Val: JSValueEncodable, Val: ~Copyable {
     withInstantContext { instantContext in
@@ -127,7 +127,7 @@ extension JSContext {
 
   public func setGlobalProperty<C: JSValueEncoder>(
     _ value: C.SwiftType,
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none
   ) {
@@ -136,14 +136,14 @@ extension JSContext {
     }
   }
 
-  public func getGlobalProperty(forKey key: String) -> JSValue<E> {
+  public func getGlobalProperty(forKey key: StaticString) -> JSValue<E> {
     withInstantContext { instantContext in
       instantContext.getGlobalProperty(forKey: key)
     }
   }
 
   public func getGlobalProperty<C: JSValueDecoder>(
-    forKey key: String,
+    forKey key: StaticString,
     using converter: C.Type
   ) -> C.SwiftType {
     withInstantContext { instantContext in
@@ -151,13 +151,13 @@ extension JSContext {
     }
   }
 
-  public func deleteGlobalProperty(forKey key: String) {
+  public func deleteGlobalProperty(forKey key: StaticString) {
     withInstantContext { instantContext in
       instantContext.deleteGlobalProperty(forKey: key)
     }
   }
 
-  public func hasGlobalProperty(_ key: String) -> Bool {
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
     withInstantContext { instantContext in
       instantContext.hasGlobalProperty(key)
     }

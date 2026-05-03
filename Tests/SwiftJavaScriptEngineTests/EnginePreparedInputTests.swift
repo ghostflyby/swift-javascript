@@ -57,7 +57,8 @@ private enum PropertyStringKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertio
       object.setProperty("ok", forKey: key, in: context)
 
       #expect(object.getProperty(forKey: key, in: context).toString(in: context) == "ok")
-      #expect(object.getProperty(forKey: keyText, in: context).toString(in: context) == "ok")
+      let sameKey = context.makePropertyStringKey(keyText)
+      #expect(object.getProperty(forKey: sameKey, in: context).toString(in: context) == "ok")
     }
   }
 }
