@@ -217,7 +217,7 @@ public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecke
 
 extension QuickJSClassHandle: Hashable {}
 
-public final class QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle,
+public struct QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
   let atom: JSAtom
@@ -240,7 +240,7 @@ public final class QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCounted
   }
 }
 
-public final class QuickJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
+public struct QuickJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
   @unchecked Sendable
 {
   private let bytes: [UInt8]
