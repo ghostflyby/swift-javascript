@@ -17,6 +17,18 @@ public enum JavaScriptCoreEngine: Sendable, SendableMetatype {
   public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
 }
 
+private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {
+  let ref: JSStringRef
+}
+
+private let javaScriptCoreEmptyString = JavaScriptCoreSharedStringRef(
+  ref: JSStringCreateWithUTF8CString("")!
+)
+
+private var javaScriptCoreEmptyStringRef: JSStringRef {
+  javaScriptCoreEmptyString.ref
+}
+
 func javaScriptCoreObjectRef(
   for value: JavaScriptCoreValueHandle,
   in context: JavaScriptCoreContextHandle
@@ -55,7 +67,14 @@ func javaScriptCoreMakeStringValue(
   _ value: String,
   in context: JavaScriptCoreContextHandle
 ) -> JavaScriptCoreValueHandle {
-  withJavaScriptCoreString(value) { stringHandle in
+  guard !value.isEmpty else {
+    return JavaScriptCoreValueHandle(
+      ref: JSValueMakeString(context.ref, javaScriptCoreEmptyStringRef)!,
+      contextRef: context.ref
+    )
+  }
+
+  return withJavaScriptCoreString(value) { stringHandle in
     JavaScriptCoreValueHandle(
       ref: JSValueMakeString(context.ref, stringHandle)!,
       contextRef: context.ref

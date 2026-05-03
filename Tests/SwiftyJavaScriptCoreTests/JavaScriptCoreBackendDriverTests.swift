@@ -58,11 +58,14 @@ private func makeBackendArray(
 
   let number = JavaScriptCoreEngine.makeNumberValueHandle(42, context)!
   let string = makeBackendString("hello", in: context)
+  let emptyString = makeBackendString("", in: context)
 
   #expect(JavaScriptCoreEngine.valueTypeForHandle(number, in: context) == .number)
   #expect(JavaScriptCoreEngine.toNumberForHandle(number, in: context) == 42)
   #expect(JavaScriptCoreEngine.valueTypeForHandle(string, in: context) == .string)
   #expect(JavaScriptCoreEngine.toStringForHandle(string, in: context) == "hello")
+  #expect(JavaScriptCoreEngine.valueTypeForHandle(emptyString, in: context) == .string)
+  #expect(JavaScriptCoreEngine.toStringForHandle(emptyString, in: context) == "")
   let stringKey = makeBackendPropertyStringKey("key_😀_\u{0}_tail", in: context)
   defer { _ = stringKey.releaseReference() }
   let stringKeyValue = JavaScriptCoreEngine.makeStringValueHandle(
@@ -71,6 +74,21 @@ private func makeBackendArray(
   )!
   #expect(JavaScriptCoreEngine.valueTypeForHandle(stringKeyValue, in: context) == .string)
   #expect(JavaScriptCoreEngine.toStringForHandle(stringKeyValue, in: context) == "key_😀_\u{0}_tail")
+
+  let emptyKey = makeBackendPropertyStringKey("", in: context)
+  defer { _ = emptyKey.releaseReference() }
+  let emptyKeyValue = JavaScriptCoreEngine.makeStringValueHandle(
+    fromPropertyStringKey: emptyKey,
+    in: context
+  )!
+  #expect(JavaScriptCoreEngine.toStringForHandle(emptyKeyValue, in: context) == "")
+
+  switch evaluateBackendScript("", in: context, sourceURL: nil, startingLineNumber: 1) {
+  case .exception:
+    Issue.record("expected empty script evaluation to succeed")
+  case .value(let value):
+    #expect(JavaScriptCoreEngine.valueTypeForHandle(value, in: context) == .undefined)
+  }
 
   switch evaluateBackendScript(
     "({})",
@@ -84,6 +102,7 @@ private func makeBackendArray(
     let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!
     let answerKey = makeBackendPropertyStringKey("answer", in: context)
     defer { _ = answerKey.releaseReference() }
+    let emptyValue = makeBackendString("empty-key", in: context)
 
     if !JavaScriptCoreEngine.setPropertyStringKeyHandle(
       answerKey,
@@ -95,12 +114,29 @@ private func makeBackendArray(
       Issue.record("expected property assignment to succeed")
     }
 
+    if !JavaScriptCoreEngine.setPropertyStringKeyHandle(
+      emptyKey,
+      on: object,
+      to: emptyValue,
+      in: context,
+      attributes: .none
+    ) {
+      Issue.record("expected empty-key property assignment to succeed")
+    }
+
     switch JavaScriptCoreEngine.getPropertyStringKeyHandle(answerKey, on: object, in: context) {
     case .none, .some(.exception):
       Issue.record("expected property read to succeed")
     case .some(.value(let property)):
       #expect(JavaScriptCoreEngine.valueTypeForHandle(property, in: context) == .number)
       #expect(JavaScriptCoreEngine.toNumberForHandle(property, in: context) == 99)
+    }
+
+    switch JavaScriptCoreEngine.getPropertyStringKeyHandle(emptyKey, on: object, in: context) {
+    case .none, .some(.exception):
+      Issue.record("expected empty-key property read to succeed")
+    case .some(.value(let property)):
+      #expect(JavaScriptCoreEngine.toStringForHandle(property, in: context) == "empty-key")
     }
   }
 }
