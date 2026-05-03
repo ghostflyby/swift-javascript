@@ -9,6 +9,22 @@ extension JSValue {
     self = context.makeString(value)
   }
 
+  public init(
+    string key: borrowing JSPropertyStringKey<E>,
+    in context: isolated JSContext<E> = #isolation
+  ) {
+    self = context.withInstantContext { callbackContext in
+      callbackContext.makeString(from: key)
+    }
+  }
+
+  public init(
+    string key: borrowing JSPropertyStringKey<E>,
+    in context: borrowing JSInstantContext<E>
+  ) {
+    self = context.makeString(from: key)
+  }
+
   public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
       callbackContext.makeNumber(value)

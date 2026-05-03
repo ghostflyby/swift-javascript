@@ -52,11 +52,21 @@ extension JSInstantContext {
     )
   }
 
-  public func makePropertyKey(_ value: String) -> JSPropertyKey<E> {
-    guard let handle = E.makePropertyKeyHandle(value, in: driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makePropertyKey could not create handle")
+  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSValue<E> {
+    valueFromHandle(
+      E.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: self),
+        in: driverContextHandle
+      ),
+      "JSInstantContext.makeString(from:) could not create handle"
+    )
+  }
+
+  public func makePropertyStringKey(_ value: String) -> JSPropertyStringKey<E> {
+    guard let handle = E.makePropertyStringKeyHandle(value, in: driverContextHandle) else {
+      preconditionFailure("JSInstantContext.makePropertyStringKey could not create handle")
     }
-    return JSPropertyKey(handle: handle, context: driverContextHandle)
+    return JSPropertyStringKey(handle: handle, context: driverContextHandle)
   }
 
   public func prepareScript(_ source: String) -> JSPreparedScript<E> {

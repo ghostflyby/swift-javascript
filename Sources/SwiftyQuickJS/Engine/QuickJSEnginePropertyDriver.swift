@@ -9,29 +9,36 @@ import SwiftJavaScript
 #endif
 
 extension QuickJSEngine: JSEnginePropertyDriver {
-  public static func makePropertyKeyHandle(
+  public static func makePropertyStringKeyHandle(
     _ value: String,
     in context: QuickJSContextHandle
-  ) -> QuickJSPropertyKeyHandle? {
-    var value = value
-    let atom = value.withUTF8 { pointer in
+  ) -> QuickJSPropertyStringKeyHandle? {
+    let atom = value.withCString { pointer in
       JS_NewAtomLen(
         context.ref,
-        pointer.baseAddress,
-        pointer.count
+        pointer,
+        value.utf8.count
       )
     }
     guard atom != 0 else {
       return nil
     }
-    return QuickJSPropertyKeyHandle(atom: atom, contextRef: context.ref)
+    return QuickJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
-  public static func isPropertyKeyHandleCompatibleWithContext(
-    _ key: QuickJSPropertyKeyHandle,
+  public static func isPropertyStringKeyHandleCompatibleWithContext(
+    _ key: QuickJSPropertyStringKeyHandle,
     in context: QuickJSContextHandle
   ) -> Bool {
     key.contextRef == context.ref
+  }
+
+  public static func makeStringValueHandle(
+    fromPropertyStringKey key: QuickJSPropertyStringKeyHandle,
+    in context: QuickJSContextHandle
+  ) -> QuickJSValueHandle? {
+    let value = JS_AtomToString(context.ref, key.atom)
+    return QuickJSValueHandle(ref: value, contextRef: context.ref)
   }
 
   public static func propertyNamesForHandle(
@@ -63,8 +70,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getPropertyKeyHandle(
-    _ key: QuickJSPropertyKeyHandle,
+  public static func getPropertyStringKeyHandle(
+    _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> JSResult<QuickJSValueHandle>? {
@@ -72,8 +79,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func setPropertyKeyHandle(
-    _ key: QuickJSPropertyKeyHandle,
+  public static func setPropertyStringKeyHandle(
+    _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
     to value: QuickJSValueHandle,
     in context: QuickJSContextHandle,
@@ -151,8 +158,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
       == 1
   }
 
-  public static func hasPropertyKeyHandle(
-    _ key: QuickJSPropertyKeyHandle,
+  public static func hasPropertyStringKeyHandle(
+    _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool? {
@@ -174,8 +181,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func deletePropertyKeyHandle(
-    _ key: QuickJSPropertyKeyHandle,
+  public static func deletePropertyStringKeyHandle(
+    _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
     in context: QuickJSContextHandle
   ) -> Bool {

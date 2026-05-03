@@ -122,11 +122,11 @@ extension JSInstantContext {
     return construct(constructor: constructor, arguments: argumentHandles)
   }
 
-  func getProperty(_ key: borrowing JSPropertyKey<E>, on object: borrowing JSValue<E>)
+  func getProperty(_ key: borrowing JSPropertyStringKey<E>, on object: borrowing JSValue<E>)
     -> JSResult<JSValue<E>>
   {
     bridgeInvocationResult(
-      E.getPropertyKeyHandle(
+      E.getPropertyStringKeyHandle(
         key.borrowHandle(in: self),
         on: valueHandle(for: object),
         in: driverContextHandle
@@ -134,12 +134,12 @@ extension JSInstantContext {
   }
 
   func setProperty(
-    _ key: borrowing JSPropertyKey<E>,
+    _ key: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    E.setPropertyKeyHandle(
+    E.setPropertyStringKeyHandle(
       key.borrowHandle(in: self),
       on: valueHandle(for: object),
       to: valueHandle(for: value),
@@ -149,7 +149,7 @@ extension JSInstantContext {
   }
 
   func invokeMethod(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
@@ -166,12 +166,12 @@ extension JSInstantContext {
   }
 
   func invokeMethod(_ name: String, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
-    let key = makePropertyKey(name)
+    let key = makePropertyStringKey(name)
     return invokeMethod(key, on: object, arguments: [])
   }
 
   func invokeMethod(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>
   ) -> JSResult<JSValue<E>> {
     invokeMethod(name, on: object, arguments: [])
@@ -182,12 +182,12 @@ extension JSInstantContext {
     on object: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
-    let key = makePropertyKey(name)
+    let key = makePropertyStringKey(name)
     return invokeMethod(key, on: object, arguments: repeat each arguments)
   }
 
   func invokeMethod<each A: JSValueEncodable>(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> {
@@ -354,7 +354,7 @@ extension JSValue {
   }
 
   public func invokeMethod(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
     context.withInstantContext { callbackContext in
@@ -370,7 +370,7 @@ extension JSValue {
   }
 
   public func invokeMethod(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
     context.invokeMethod(name, on: self)
@@ -387,7 +387,7 @@ extension JSValue {
   }
 
   public func invokeMethod<each A: JSValueEncodable>(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>> {
@@ -405,7 +405,7 @@ extension JSValue {
   }
 
   public func invokeMethod<each A: JSValueEncodable>(
-    _ name: borrowing JSPropertyKey<E>,
+    _ name: borrowing JSPropertyStringKey<E>,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>> {
@@ -516,7 +516,7 @@ extension JSValue {
 
   public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: borrowing JSPropertyKey<E>,
+    forKey key: borrowing JSPropertyStringKey<E>,
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
@@ -533,13 +533,13 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
   where Val: JSValueEncodable, Val: ~Copyable {
-    let propertyKey = context.makePropertyKey(key)
-    return defineProperty(value, forKey: propertyKey, with: attributes, in: context)
+    let propertyStringKey = context.makePropertyStringKey(key)
+    return defineProperty(value, forKey: propertyStringKey, with: attributes, in: context)
   }
 
   public func defineProperty<Val>(
     _ value: borrowing Val,
-    forKey key: borrowing JSPropertyKey<E>,
+    forKey key: borrowing JSPropertyStringKey<E>,
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>

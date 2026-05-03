@@ -13,7 +13,7 @@ public enum JavaScriptCoreEngine: Sendable, SendableMetatype {
   public typealias Engine = JavaScriptCoreEngine
   public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
   public typealias ContextHandle = JavaScriptCoreContextHandle
-  public typealias PropertyKeyHandle = JavaScriptCorePropertyKeyHandle
+  public typealias PropertyStringKeyHandle = JavaScriptCorePropertyStringKeyHandle
   public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
 }
 

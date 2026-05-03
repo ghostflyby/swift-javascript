@@ -31,6 +31,6 @@ public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHan
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSPropertyKeyManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSPropertyStringKeyManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
 public protocol JSPreparedScriptManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

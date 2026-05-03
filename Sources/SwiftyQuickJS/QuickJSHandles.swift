@@ -217,7 +217,7 @@ public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecke
 
 extension QuickJSClassHandle: Hashable {}
 
-public struct QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle,
+public struct QuickJSPropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
   let atom: JSAtom

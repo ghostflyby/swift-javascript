@@ -1,29 +1,34 @@
 public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
-  associatedtype PropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle
+  associatedtype PropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle
 
-  static func makePropertyKeyHandle(
+  static func makePropertyStringKeyHandle(
     _ value: String,
     in context: ContextHandle
-  ) -> PropertyKeyHandle?
+  ) -> PropertyStringKeyHandle?
 
-  static func isPropertyKeyHandleCompatibleWithContext(
-    _ key: PropertyKeyHandle,
+  static func isPropertyStringKeyHandleCompatibleWithContext(
+    _ key: PropertyStringKeyHandle,
     in context: ContextHandle
   ) -> Bool
+
+  static func makeStringValueHandle(
+    fromPropertyStringKey key: PropertyStringKeyHandle,
+    in context: ContextHandle
+  ) -> ValueHandle?
 
   static func propertyNamesForHandle(
     on object: ValueHandle,
     in context: ContextHandle
   ) -> [String]?
 
-  static func getPropertyKeyHandle(
-    _ key: PropertyKeyHandle,
+  static func getPropertyStringKeyHandle(
+    _ key: PropertyStringKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
-  static func setPropertyKeyHandle(
-    _ key: PropertyKeyHandle,
+  static func setPropertyStringKeyHandle(
+    _ key: PropertyStringKeyHandle,
     on object: ValueHandle,
     to value: ValueHandle,
     in context: ContextHandle,
@@ -57,8 +62,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool
 
-  static func hasPropertyKeyHandle(
-    _ key: PropertyKeyHandle,
+  static func hasPropertyStringKeyHandle(
+    _ key: PropertyStringKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool?
@@ -69,8 +74,8 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool?
 
-  static func deletePropertyKeyHandle(
-    _ key: PropertyKeyHandle,
+  static func deletePropertyStringKeyHandle(
+    _ key: PropertyStringKeyHandle,
     on object: ValueHandle,
     in context: ContextHandle
   ) -> Bool

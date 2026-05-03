@@ -1,17 +1,17 @@
-public struct JSPropertyKey<E: JSEngine>: Sendable, ~Copyable {
-  package let handle: E.PropertyKeyHandle
+public struct JSPropertyStringKey<E: JSEngine>: Sendable, ~Copyable {
+  package let handle: E.PropertyStringKeyHandle
   private let contextHandle: E.ContextHandle
 
-  init(handle: E.PropertyKeyHandle, context: E.ContextHandle) {
+  init(handle: E.PropertyStringKeyHandle, context: E.ContextHandle) {
     self.handle = handle
     self.contextHandle = context
     _ = contextHandle.retainReference()
   }
 
-  func borrowHandle(in context: borrowing JSInstantContext<E>) -> E.PropertyKeyHandle {
+  func borrowHandle(in context: borrowing JSInstantContext<E>) -> E.PropertyStringKeyHandle {
     precondition(
-      E.isPropertyKeyHandleCompatibleWithContext(handle, in: context.driverContextHandle),
-      "JSPropertyKey can only be used with the context that created it"
+      E.isPropertyStringKeyHandleCompatibleWithContext(handle, in: context.driverContextHandle),
+      "JSPropertyStringKey can only be used with the context that created it"
     )
     return handle
   }

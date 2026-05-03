@@ -108,7 +108,7 @@
 - [ ] 后续重排线索：`JSEngineInvocationDriver` 同时承担 call/construct/toObject、Array/Date/instanceof 判定与 equality；可评估将 equality 与对象判型迁到 value/object semantics 协议
 - [ ] 后续重排线索：`JSEngineTypedArrayDriver` 同时承担 ArrayBuffer 外部内存、TypedArray 构造、字节视图与类型判定；QuickJS 目前只有部分构造能力，适合按 capability 拆分 ArrayBuffer 与 TypedArray factory/introspection
 - [ ] 后续重排线索：`JSEnginePropertyDriver` 混合 string/value/index 属性读写、删除、存在性检查与 propertyNames 枚举；可评估拆分 keyed/indexed property 与 enumeration 能力
-- [x] 拆分 `JSString` 语义：移除公开 `JSString` / `JSStringManaged` / `JSStringValue`，改为 context-scoped `JSPropertyKey` 与 `JSPreparedScript`，并让 QuickJS property key 使用 runtime/context 作用域 atom（已补充清理 JSC prepared script/property key handle，按 runtime-free `JSStringRef` 去除 context 存储）
+- [x] 拆分 `JSString` 语义：移除公开 `JSString` / `JSStringManaged` / `JSStringValue`，改为 context-scoped `JSPropertyStringKey` 与 `JSPreparedScript`，并让 QuickJS property string key 使用 runtime/context 作用域 atom（已补充 string-key 命名，并增加 property string key 到 JS string value 的 native factory）
 - [ ] 后续重排线索：`ClassHandle` 目前挂在 `JSEngineRuntimeDriver`，但 class/host object lifecycle 尚未形成独立能力协议；后续迁移 `JSClass`/host object 时需确认是否拆出 class bridge driver
 - [ ] 最后再接 `JSClass` / callback / auto-convertible；到这一步再决定当前剩余 JSC-only 接线哪些真的应继续上收
 

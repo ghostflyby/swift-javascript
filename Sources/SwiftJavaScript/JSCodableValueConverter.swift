@@ -240,10 +240,10 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       let objectValue = context.makeObject()
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
-        let propertyKey = context.makePropertyKey(key)
+        let propertyStringKey = context.makePropertyStringKey(key)
         guard
-          E.setPropertyKeyHandle(
-            propertyKey.borrowHandle(in: context),
+          E.setPropertyStringKeyHandle(
+            propertyStringKey.borrowHandle(in: context),
             on: objectValue.borrowHandle(),
             to: encoded.borrowHandle(),
             in: context.driverContextHandle,
@@ -262,10 +262,10 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     on object: JSValueHandle<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
-    let propertyKey = context.makePropertyKey(key)
+    let propertyStringKey = context.makePropertyStringKey(key)
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      E.getPropertyKeyHandle(
-        propertyKey.borrowHandle(in: context),
+      E.getPropertyStringKeyHandle(
+        propertyStringKey.borrowHandle(in: context),
         on: object,
         in: context.driverContextHandle
       )

@@ -105,7 +105,7 @@ public struct MockClassHandle: JSClassManualReferenceCountedHandle, @unchecked S
   }
 }
 
-public final class MockStringHandle: JSPropertyKeyManualReferenceCountedHandle,
+public final class MockStringHandle: JSPropertyStringKeyManualReferenceCountedHandle,
   JSPreparedScriptManualReferenceCountedHandle, @unchecked Sendable
 {
   private let count: Int
@@ -210,7 +210,7 @@ public enum MockEngine: JSEngine {
   public typealias ContextHandle = MockContextHandle
   public typealias ValueHandle = MockValueHandle
   public typealias ClassHandle = MockClassHandle
-  public typealias PropertyKeyHandle = MockStringHandle
+  public typealias PropertyStringKeyHandle = MockStringHandle
   public typealias PreparedScriptHandle = MockStringHandle
 }
 
@@ -294,7 +294,7 @@ private enum MockDriver: JSEngine {
   typealias Engine = MockEngine
   typealias RuntimeHandle = MockRuntimeHandle
   typealias ContextHandle = MockContextHandle
-  typealias PropertyKeyHandle = MockStringHandle
+  typealias PropertyStringKeyHandle = MockStringHandle
   typealias PreparedScriptHandle = MockStringHandle
 
   static let capabilities = JSEngineCapabilities(supportsHostObjects: true)
@@ -672,7 +672,7 @@ extension MockDriver {
     return propertyNames(on: object.rawValue, in: context.rawContext)
   }
 
-  fileprivate static func makePropertyKeyHandle(
+  fileprivate static func makePropertyStringKeyHandle(
     _ value: String,
     in context: MockContextHandle
   ) -> MockStringHandle? {
@@ -680,7 +680,14 @@ extension MockDriver {
     return MockStringHandle(value)
   }
 
-  fileprivate static func isPropertyKeyHandleCompatibleWithContext(
+  fileprivate static func makeStringValueHandle(
+    fromPropertyStringKey key: MockStringHandle,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    makeStringValueHandle(key.string, context)
+  }
+
+  fileprivate static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: MockStringHandle,
     in context: MockContextHandle
   ) -> Bool {
@@ -689,7 +696,7 @@ extension MockDriver {
     return true
   }
 
-  fileprivate static func getPropertyKeyHandle(
+  fileprivate static func getPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
@@ -698,7 +705,7 @@ extension MockDriver {
     return resultHandle(from: getProperty(key.string, on: object.rawValue, in: context.rawContext))
   }
 
-  fileprivate static func setPropertyKeyHandle(
+  fileprivate static func setPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     to value: JSValueHandle<MockEngine>,
@@ -776,7 +783,7 @@ extension MockDriver {
     }
   }
 
-  fileprivate static func hasPropertyKeyHandle(
+  fileprivate static func hasPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
@@ -794,7 +801,7 @@ extension MockDriver {
     return hasProperty(key.rawValue, on: object.rawValue, in: context.rawContext)
   }
 
-  fileprivate static func deletePropertyKeyHandle(
+  fileprivate static func deletePropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
@@ -1204,36 +1211,43 @@ extension MockEngine {
     MockDriver.propertyNamesForHandle(on: object, in: context)
   }
 
-  public static func makePropertyKeyHandle(
+  public static func makePropertyStringKeyHandle(
     _ value: String,
     in context: MockContextHandle
   ) -> MockStringHandle? {
-    MockDriver.makePropertyKeyHandle(value, in: context)
+    MockDriver.makePropertyStringKeyHandle(value, in: context)
   }
 
-  public static func isPropertyKeyHandleCompatibleWithContext(
+  public static func makeStringValueHandle(
+    fromPropertyStringKey key: MockStringHandle,
+    in context: MockContextHandle
+  ) -> JSValueHandle<MockEngine>? {
+    MockDriver.makeStringValueHandle(fromPropertyStringKey: key, in: context)
+  }
+
+  public static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: MockStringHandle,
     in context: MockContextHandle
   ) -> Bool {
-    MockDriver.isPropertyKeyHandleCompatibleWithContext(key, in: context)
+    MockDriver.isPropertyStringKeyHandleCompatibleWithContext(key, in: context)
   }
 
-  public static func getPropertyKeyHandle(
+  public static func getPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> JSResult<JSValueHandle<MockEngine>>? {
-    MockDriver.getPropertyKeyHandle(key, on: object, in: context)
+    MockDriver.getPropertyStringKeyHandle(key, on: object, in: context)
   }
 
-  public static func setPropertyKeyHandle(
+  public static func setPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     to value: JSValueHandle<MockEngine>,
     in context: MockContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    MockDriver.setPropertyKeyHandle(
+    MockDriver.setPropertyStringKeyHandle(
       key,
       on: object,
       to: value,
@@ -1283,12 +1297,12 @@ extension MockEngine {
     MockDriver.setIndexPropertyHandle(at: index, on: object, to: value, in: context)
   }
 
-  public static func hasPropertyKeyHandle(
+  public static func hasPropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool? {
-    MockDriver.hasPropertyKeyHandle(key, on: object, in: context)
+    MockDriver.hasPropertyStringKeyHandle(key, on: object, in: context)
   }
 
   public static func hasValuePropertyHandle(
@@ -1299,12 +1313,12 @@ extension MockEngine {
     MockDriver.hasValuePropertyHandle(key, on: object, in: context)
   }
 
-  public static func deletePropertyKeyHandle(
+  public static func deletePropertyStringKeyHandle(
     _ key: MockStringHandle,
     on object: JSValueHandle<MockEngine>,
     in context: MockContextHandle
   ) -> Bool {
-    MockDriver.deletePropertyKeyHandle(key, on: object, in: context)
+    MockDriver.deletePropertyStringKeyHandle(key, on: object, in: context)
   }
 
   public static func deleteValuePropertyHandle(
@@ -1684,15 +1698,15 @@ extension MockEngine {
   }
 
   let names = MockDriver.propertyNamesForHandle(on: stringValue, in: context)
-  let messageKey = MockDriver.makePropertyKeyHandle("message", in: context)
+  let messageKey = MockDriver.makePropertyStringKeyHandle("message", in: context)
   guard let messageKey else {
-    Issue.record("Expected property key handle")
+    Issue.record("Expected property string key handle")
     return
   }
   defer { _ = messageKey.releaseReference() }
-  let property = MockDriver.getPropertyKeyHandle(
+  let property = MockDriver.getPropertyStringKeyHandle(
     messageKey, on: stringValue, in: context)
-  let propertySet = MockDriver.setPropertyKeyHandle(
+  let propertySet = MockDriver.setPropertyStringKeyHandle(
     messageKey,
     on: stringValue,
     to: numberValue,

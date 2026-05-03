@@ -2,22 +2,32 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JavaScriptCoreEngine: JSEnginePropertyDriver {
-  public static func makePropertyKeyHandle(
+  public static func makePropertyStringKeyHandle(
     _ value: String,
     in context: JavaScriptCoreContextHandle
-  ) -> JavaScriptCorePropertyKeyHandle? {
+  ) -> JavaScriptCorePropertyStringKeyHandle? {
     _ = context
     let keyRef = JSStringCreateWithCFString(value as CFString)!
-    return JavaScriptCorePropertyKeyHandle(ref: keyRef)
+    return JavaScriptCorePropertyStringKeyHandle(ref: keyRef)
   }
 
-  public static func isPropertyKeyHandleCompatibleWithContext(
-    _ key: JavaScriptCorePropertyKeyHandle,
+  public static func isPropertyStringKeyHandleCompatibleWithContext(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
     _ = key
     _ = context
     return true
+  }
+
+  public static func makeStringValueHandle(
+    fromPropertyStringKey key: JavaScriptCorePropertyStringKeyHandle,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreValueHandle(
+      ref: JSValueMakeString(context.ref, key.ref)!,
+      contextRef: context.ref
+    )
   }
 
   public static func propertyNamesForHandle(
@@ -27,16 +37,16 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     propertyNames(on: object, in: context)
   }
 
-  public static func getPropertyKeyHandle(
-    _ key: JavaScriptCorePropertyKeyHandle,
+  public static func getPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
     getProperty(key, on: object, in: context)
   }
 
-  public static func setPropertyKeyHandle(
-    _ key: JavaScriptCorePropertyKeyHandle,
+  public static func setPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     to value: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle,
@@ -95,8 +105,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func hasPropertyKeyHandle(
-    _ key: JavaScriptCorePropertyKeyHandle,
+  public static func hasPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
@@ -111,8 +121,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     hasProperty(key, on: object, in: context)
   }
 
-  public static func deletePropertyKeyHandle(
-    _ key: JavaScriptCorePropertyKeyHandle,
+  public static func deletePropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
@@ -209,7 +219,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func getProperty(
-    _ key: JavaScriptCorePropertyKeyHandle,
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JavaScriptCoreValueHandle> {
@@ -254,7 +264,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func setProperty(
-    _ key: JavaScriptCorePropertyKeyHandle,
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JavaScriptCoreValueHandle,
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle,
@@ -327,7 +337,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func hasProperty(
-    _ key: JavaScriptCorePropertyKeyHandle,
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
@@ -355,7 +365,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func deleteProperty(
-    _ key: JavaScriptCorePropertyKeyHandle,
+    _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<Void> {

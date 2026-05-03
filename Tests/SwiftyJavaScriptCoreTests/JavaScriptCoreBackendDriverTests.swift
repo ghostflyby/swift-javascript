@@ -26,11 +26,11 @@ private func evaluateBackendScript(
   )!
 }
 
-private func makeBackendPropertyKey(
+private func makeBackendPropertyStringKey(
   _ value: String,
   in context: JavaScriptCoreContextHandle
-) -> JavaScriptCorePropertyKeyHandle {
-  JavaScriptCoreEngine.makePropertyKeyHandle(value, in: context)!
+) -> JavaScriptCorePropertyStringKeyHandle {
+  JavaScriptCoreEngine.makePropertyStringKeyHandle(value, in: context)!
 }
 
 private func makeBackendObject(
@@ -63,6 +63,14 @@ private func makeBackendArray(
   #expect(JavaScriptCoreEngine.toNumberForHandle(number, in: context) == 42)
   #expect(JavaScriptCoreEngine.valueTypeForHandle(string, in: context) == .string)
   #expect(JavaScriptCoreEngine.toStringForHandle(string, in: context) == "hello")
+  let stringKey = makeBackendPropertyStringKey("key_😀_\u{0}_tail", in: context)
+  defer { _ = stringKey.releaseReference() }
+  let stringKeyValue = JavaScriptCoreEngine.makeStringValueHandle(
+    fromPropertyStringKey: stringKey,
+    in: context
+  )!
+  #expect(JavaScriptCoreEngine.valueTypeForHandle(stringKeyValue, in: context) == .string)
+  #expect(JavaScriptCoreEngine.toStringForHandle(stringKeyValue, in: context) == "key_😀_\u{0}_tail")
 
   switch evaluateBackendScript(
     "({})",
@@ -74,10 +82,10 @@ private func makeBackendArray(
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
     let answer = JavaScriptCoreEngine.makeNumberValueHandle(99, context)!
-    let answerKey = makeBackendPropertyKey("answer", in: context)
+    let answerKey = makeBackendPropertyStringKey("answer", in: context)
     defer { _ = answerKey.releaseReference() }
 
-    if !JavaScriptCoreEngine.setPropertyKeyHandle(
+    if !JavaScriptCoreEngine.setPropertyStringKeyHandle(
       answerKey,
       on: object,
       to: answer,
@@ -87,7 +95,7 @@ private func makeBackendArray(
       Issue.record("expected property assignment to succeed")
     }
 
-    switch JavaScriptCoreEngine.getPropertyKeyHandle(answerKey, on: object, in: context) {
+    switch JavaScriptCoreEngine.getPropertyStringKeyHandle(answerKey, on: object, in: context) {
     case .none, .some(.exception):
       Issue.record("expected property read to succeed")
     case .some(.value(let property)):
@@ -175,9 +183,9 @@ private func makeBackendArray(
       Issue.record("expected receiver object creation to succeed")
     case .value(let thisObject):
       let base = JavaScriptCoreEngine.makeNumberValueHandle(10, context)!
-      let baseKey = makeBackendPropertyKey("base", in: context)
+      let baseKey = makeBackendPropertyStringKey("base", in: context)
       defer { _ = baseKey.releaseReference() }
-      _ = JavaScriptCoreEngine.setPropertyKeyHandle(
+      _ = JavaScriptCoreEngine.setPropertyStringKeyHandle(
         baseKey,
         on: thisObject,
         to: base,
@@ -221,9 +229,9 @@ private func makeBackendArray(
     Issue.record("expected object literal evaluation to succeed")
   case .value(let object):
     let value = makeBackendString("ok", in: context)
-    let statusKey = makeBackendPropertyKey("status", in: context)
+    let statusKey = makeBackendPropertyStringKey("status", in: context)
     defer { _ = statusKey.releaseReference() }
-    _ = JavaScriptCoreEngine.setPropertyKeyHandle(
+    _ = JavaScriptCoreEngine.setPropertyStringKeyHandle(
       statusKey,
       on: object,
       to: value,
@@ -231,13 +239,15 @@ private func makeBackendArray(
       attributes: .none
     )
 
-    #expect(JavaScriptCoreEngine.hasPropertyKeyHandle(statusKey, on: object, in: context) == true)
+    #expect(
+      JavaScriptCoreEngine.hasPropertyStringKeyHandle(statusKey, on: object, in: context) == true)
 
-    if !JavaScriptCoreEngine.deletePropertyKeyHandle(statusKey, on: object, in: context) {
+    if !JavaScriptCoreEngine.deletePropertyStringKeyHandle(statusKey, on: object, in: context) {
       Issue.record("expected property deletion to succeed")
     } else {
       #expect(
-        JavaScriptCoreEngine.hasPropertyKeyHandle(statusKey, on: object, in: context) == false)
+        JavaScriptCoreEngine.hasPropertyStringKeyHandle(statusKey, on: object, in: context) == false
+      )
     }
   }
 }

@@ -4,13 +4,18 @@ import Testing
 @Suite
 struct EnginePreparedInputTests {
   @Test(arguments: ScriptEngine.allCases)
-  func propertyKeyCanBeReused(_ engine: ScriptEngine) async {
-    await engine.run(PropertyKeyCanBeReused.self)
+  func propertyStringKeyCanBeReused(_ engine: ScriptEngine) async {
+    await engine.run(PropertyStringKeyCanBeReused.self)
   }
 
   @Test(arguments: ScriptEngine.allCases)
-  func propertyKeyPreservesUTF16AndEmbeddedNUL(_ engine: ScriptEngine) async {
-    await engine.run(PropertyKeyPreservesUTF16AndEmbeddedNUL.self)
+  func propertyStringKeyPreservesUTF16AndEmbeddedNUL(_ engine: ScriptEngine) async {
+    await engine.run(PropertyStringKeyPreservesUTF16AndEmbeddedNUL.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func propertyStringKeyCanCreateStringValue(_ engine: ScriptEngine) async {
+    await engine.run(PropertyStringKeyCanCreateStringValue.self)
   }
 
   @Test(arguments: ScriptEngine.allCases)
@@ -19,13 +24,13 @@ struct EnginePreparedInputTests {
   }
 }
 
-private enum PropertyKeyCanBeReused: ScriptEngineAssertion {
+private enum PropertyStringKeyCanBeReused: ScriptEngineAssertion {
   static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
       let object = context.makeObject()
-      let key = context.makePropertyKey("count")
+      let key = context.makePropertyStringKey("count")
 
       object.setProperty(1, forKey: key, in: context)
       let first = object.getProperty(forKey: key, in: context).toInt32(in: context)
@@ -40,19 +45,35 @@ private enum PropertyKeyCanBeReused: ScriptEngineAssertion {
   }
 }
 
-private enum PropertyKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertion {
+private enum PropertyStringKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertion {
   static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
       let object = context.makeObject()
       let keyText = "emoji_😀_\u{0}_tail"
-      let key = context.makePropertyKey(keyText)
+      let key = context.makePropertyStringKey(keyText)
 
       object.setProperty("ok", forKey: key, in: context)
 
       #expect(object.getProperty(forKey: key, in: context).toString(in: context) == "ok")
       #expect(object.getProperty(forKey: keyText, in: context).toString(in: context) == "ok")
+    }
+  }
+}
+
+private enum PropertyStringKeyCanCreateStringValue: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    await context.withInstantContext { context in
+      let text = "key_😀_\u{0}_tail"
+      let key = context.makePropertyStringKey(text)
+      let value = context.makeString(from: key)
+      let initialized = JSValue(string: key, in: context)
+
+      #expect(value.toString(in: context) == text)
+      #expect(initialized.toString(in: context) == text)
     }
   }
 }

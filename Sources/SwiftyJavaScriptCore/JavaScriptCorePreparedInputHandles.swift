@@ -1,7 +1,8 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCorePropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandle,
+public struct JavaScriptCorePropertyStringKeyHandle:
+  JSPropertyStringKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSStringRef

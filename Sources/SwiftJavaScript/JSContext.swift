@@ -59,9 +59,15 @@ extension JSContext {
     }
   }
 
-  public func makePropertyKey(_ value: String) -> JSPropertyKey<E> {
+  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makePropertyKey(value)
+      instantContext.makeString(from: key)
+    }
+  }
+
+  public func makePropertyStringKey(_ value: String) -> JSPropertyStringKey<E> {
+    withInstantContext { instantContext in
+      instantContext.makePropertyStringKey(value)
     }
   }
 
