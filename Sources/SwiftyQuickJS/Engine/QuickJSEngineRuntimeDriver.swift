@@ -86,7 +86,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
   ) -> JSResult<QuickJSValueHandle>? {
     let fileName = sourceURL ?? "<eval>"
     let result = adjustedPreparedScriptSource(script, startingLineNumber: startingLineNumber)
-      .withCString { sourcePointer, sourceCount in
+      .withCCharPointer { sourcePointer, sourceCount in
         fileName.withCString { filePointer in
           JS_Eval(
             context.ref,
@@ -231,20 +231,15 @@ private enum QuickJSEvaluatedScriptSource {
   case prepared(QuickJSPreparedScriptHandle)
   case adjusted(prefix: String, script: QuickJSPreparedScriptHandle)
 
-  func withCString<R>(_ body: (UnsafePointer<CChar>, Int) -> R) -> R {
+  func withCCharPointer<R>(_ body: (UnsafePointer<CChar>?, Int) -> R) -> R {
     switch self {
     case .prepared(let script):
       return script.withCString(body)
     case .adjusted(let prefix, let script):
-      return script.withCString { scriptPointer, scriptCount in
-        let scriptBytes = UnsafeBufferPointer(
-          start: UnsafeRawPointer(scriptPointer).assumingMemoryBound(to: UInt8.self),
-          count: scriptCount
-        )
-        let source = Array(prefix.utf8) + Array(scriptBytes) + [0]
-        return source.withUnsafeBufferPointer { buffer in
-          let pointer = UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self)
-          return body(pointer, source.count - 1)
+      var source = prefix + script.source
+      return source.withUTF8 { pointer in
+        pointer.withMemoryRebound(to: CChar.self) { pointer in
+          body(pointer.baseAddress, pointer.count)
         }
       }
     }

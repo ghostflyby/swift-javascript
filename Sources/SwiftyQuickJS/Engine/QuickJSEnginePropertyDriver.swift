@@ -13,12 +13,12 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     _ value: String,
     in context: QuickJSContextHandle
   ) -> QuickJSPropertyKeyHandle? {
-    let bytes = Array(value.utf8) + [0]
-    let atom = bytes.withUnsafeBufferPointer { buffer in
+    var value = value
+    let atom = value.withUTF8 { pointer in
       JS_NewAtomLen(
         context.ref,
-        UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self),
-        bytes.count - 1
+        pointer.baseAddress,
+        pointer.count
       )
     }
     guard atom != 0 else {

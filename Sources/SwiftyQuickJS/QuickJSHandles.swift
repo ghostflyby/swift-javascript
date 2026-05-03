@@ -243,22 +243,21 @@ public struct QuickJSPropertyKeyHandle: JSPropertyKeyManualReferenceCountedHandl
 public struct QuickJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
   @unchecked Sendable
 {
-  private let bytes: [UInt8]
+  let source: String
   let contextRef: OpaquePointer
 
   init(source: String, contextRef: OpaquePointer) {
-    self.bytes = Array(source.utf8) + [0]
+    self.source = source
     self.contextRef = contextRef
   }
 
   var byteCount: Int {
-    max(0, bytes.count - 1)
+    source.utf8.count
   }
 
   func withCString<R>(_ body: (UnsafePointer<CChar>, Int) -> R) -> R {
-    bytes.withUnsafeBufferPointer { buffer in
-      let pointer = UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self)
-      return body(pointer, byteCount)
+    source.withCString { pointer in
+      body(pointer, byteCount)
     }
   }
 
