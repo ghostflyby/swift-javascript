@@ -13,13 +13,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     _ value: String,
     in context: QuickJSContextHandle
   ) -> QuickJSPropertyStringKeyHandle? {
-    let atom = value.withCString { pointer in
-      JS_NewAtomLen(
-        context.ref,
-        pointer,
-        value.utf8.count
-      )
-    }
+    let atom = makePropertyStringAtom(value, in: context)
     guard atom != 0 else {
       return nil
     }
@@ -70,6 +64,16 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     }
   }
 
+  public static func getStringPropertyHandle(
+    _ key: String,
+    on object: QuickJSValueHandle,
+    in context: QuickJSContextHandle
+  ) -> JSResult<QuickJSValueHandle>? {
+    withPropertyStringAtom(key, in: context) { atom in
+      quickJSResultHandle(for: JS_GetProperty(context.ref, object.ref, atom), in: context.ref)
+    }
+  }
+
   public static func getPropertyStringKeyHandle(
     _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
@@ -79,6 +83,18 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
+  public static func setStringPropertyHandle(
+    _ key: String,
+    on object: QuickJSValueHandle,
+    to value: QuickJSValueHandle,
+    in context: QuickJSContextHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    withPropertyStringAtom(key, in: context) { atom in
+      setProperty(atom, on: object, to: value, in: context, attributes: attributes)
+    } ?? false
+  }
+
   public static func setPropertyStringKeyHandle(
     _ key: QuickJSPropertyStringKeyHandle,
     on object: QuickJSValueHandle,
@@ -86,17 +102,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     in context: QuickJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    if attributes.isEmpty {
-      return JS_SetProperty(context.ref, object.ref, key.atom, JS_DupValue(context.ref, value.ref))
-        == 1
-    }
-    return JS_DefinePropertyValue(
-      context.ref,
-      object.ref,
-      key.atom,
-      JS_DupValue(context.ref, value.ref),
-      propertyFlags(for: attributes)
-    ) == 1
+    setProperty(key.atom, on: object, to: value, in: context, attributes: attributes)
   }
 
   public static func getValuePropertyHandle(
@@ -167,6 +173,24 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
+  public static func hasStringPropertyHandle(
+    _ key: String,
+    on object: QuickJSValueHandle,
+    in context: QuickJSContextHandle
+  ) -> Bool? {
+    guard
+      let result = withPropertyStringAtom(
+        key, in: context,
+        { atom in
+          let result = JS_HasProperty(context.ref, object.ref, atom)
+          return result >= 0 ? result == 1 : nil
+        })
+    else {
+      return nil
+    }
+    return result
+  }
+
   public static func hasValuePropertyHandle(
     _ key: QuickJSValueHandle,
     on object: QuickJSValueHandle,
@@ -189,6 +213,16 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     return JS_DeleteProperty(context.ref, object.ref, key.atom, Int32(JS_PROP_THROW)) == 1
   }
 
+  public static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: QuickJSValueHandle,
+    in context: QuickJSContextHandle
+  ) -> Bool {
+    withPropertyStringAtom(key, in: context) { atom in
+      JS_DeleteProperty(context.ref, object.ref, atom, Int32(JS_PROP_THROW)) == 1
+    } ?? false
+  }
+
   public static func deleteValuePropertyHandle(
     _ key: QuickJSValueHandle,
     on object: QuickJSValueHandle,
@@ -201,6 +235,48 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     defer { JS_FreeAtom(context.ref, atom) }
     return JS_DeleteProperty(context.ref, object.ref, atom, Int32(JS_PROP_THROW)) == 1
   }
+}
+
+private func makePropertyStringAtom(_ value: String, in context: QuickJSContextHandle) -> JSAtom {
+  value.withCString { pointer in
+    JS_NewAtomLen(
+      context.ref,
+      pointer,
+      value.utf8.count
+    )
+  }
+}
+
+private func withPropertyStringAtom<R>(
+  _ value: String,
+  in context: QuickJSContextHandle,
+  _ body: (JSAtom) -> R
+) -> R? {
+  let atom = makePropertyStringAtom(value, in: context)
+  guard atom != 0 else {
+    return nil
+  }
+  defer { JS_FreeAtom(context.ref, atom) }
+  return body(atom)
+}
+
+private func setProperty(
+  _ atom: JSAtom,
+  on object: QuickJSValueHandle,
+  to value: QuickJSValueHandle,
+  in context: QuickJSContextHandle,
+  attributes: JSHostMemberAttributes
+) -> Bool {
+  if attributes.isEmpty {
+    return JS_SetProperty(context.ref, object.ref, atom, JS_DupValue(context.ref, value.ref)) == 1
+  }
+  return JS_DefinePropertyValue(
+    context.ref,
+    object.ref,
+    atom,
+    JS_DupValue(context.ref, value.ref),
+    propertyFlags(for: attributes)
+  ) == 1
 }
 
 private func atomString(_ atom: JSAtom, in contextRef: OpaquePointer) -> String? {

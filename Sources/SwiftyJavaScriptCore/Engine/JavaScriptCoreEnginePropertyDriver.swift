@@ -37,12 +37,39 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     propertyNames(on: object, in: context)
   }
 
+  public static func getStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    withJavaScriptCoreString(key) { keyRef in
+      getProperty(keyRef, on: object, in: context)
+    }
+  }
+
   public static func getPropertyStringKeyHandle(
     _ key: JavaScriptCorePropertyStringKeyHandle,
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
-    getProperty(key, on: object, in: context)
+    getProperty(key.ref, on: object, in: context)
+  }
+
+  public static func setStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    to value: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle,
+    attributes: JSHostMemberAttributes = .none
+  ) -> Bool {
+    withJavaScriptCoreString(key) { keyRef in
+      switch setProperty(keyRef, on: object, to: value, in: context, attributes: attributes) {
+      case .value:
+        return true
+      case .exception:
+        return false
+      }
+    }
   }
 
   public static func setPropertyStringKeyHandle(
@@ -52,7 +79,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     in context: JavaScriptCoreContextHandle,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    switch setProperty(key, on: object, to: value, in: context, attributes: attributes) {
+    switch setProperty(key.ref, on: object, to: value, in: context, attributes: attributes) {
     case .value:
       return true
     case .exception:
@@ -110,7 +137,17 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool? {
-    hasProperty(key, on: object, in: context)
+    hasProperty(key.ref, on: object, in: context)
+  }
+
+  public static func hasStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool? {
+    withJavaScriptCoreString(key) { keyRef in
+      hasProperty(keyRef, on: object, in: context)
+    }
   }
 
   public static func hasValuePropertyHandle(
@@ -126,11 +163,26 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     on object: JSValueHandle<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
-    switch deleteProperty(key, on: object, in: context) {
+    switch deleteProperty(key.ref, on: object, in: context) {
     case .value:
       return true
     case .exception:
       return false
+    }
+  }
+
+  public static func deleteStringPropertyHandle(
+    _ key: String,
+    on object: JSValueHandle<JavaScriptCoreEngine>,
+    in context: JavaScriptCoreContextHandle
+  ) -> Bool {
+    withJavaScriptCoreString(key) { keyRef in
+      switch deleteProperty(keyRef, on: object, in: context) {
+      case .value:
+        return true
+      case .exception:
+        return false
+      }
     }
   }
 
@@ -219,7 +271,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func getProperty(
-    _ key: JavaScriptCorePropertyStringKeyHandle,
+    _ key: JSStringRef,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<JavaScriptCoreValueHandle> {
@@ -228,7 +280,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
       return .exception(exception)
     case .object(let objectRef):
       var exception: JSValueRef?
-      let valueRef = JSObjectGetProperty(context.ref, objectRef, key.ref, &exception)
+      let valueRef = JSObjectGetProperty(context.ref, objectRef, key, &exception)
       return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
@@ -264,7 +316,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func setProperty(
-    _ key: JavaScriptCorePropertyStringKeyHandle,
+    _ key: JSStringRef,
     on object: JavaScriptCoreValueHandle,
     to value: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle,
@@ -278,7 +330,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
       JSObjectSetProperty(
         context.ref,
         objectRef,
-        key.ref,
+        key,
         value.ref,
         javaScriptCorePropertyAttributes(from: attributes),
         &exception
@@ -337,7 +389,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func hasProperty(
-    _ key: JavaScriptCorePropertyStringKeyHandle,
+    _ key: JSStringRef,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> Bool {
@@ -345,7 +397,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     case .exception:
       return false
     case .object(let objectRef):
-      return JSObjectHasProperty(context.ref, objectRef, key.ref)
+      return JSObjectHasProperty(context.ref, objectRef, key)
     }
   }
 
@@ -365,7 +417,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   }
 
   private static func deleteProperty(
-    _ key: JavaScriptCorePropertyStringKeyHandle,
+    _ key: JSStringRef,
     on object: JavaScriptCoreValueHandle,
     in context: JavaScriptCoreContextHandle
   ) -> JSResult<Void> {
@@ -374,7 +426,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
       return .exception(())
     case .object(let objectRef):
       var exception: JSValueRef?
-      JSObjectDeleteProperty(context.ref, objectRef, key.ref, &exception)
+      JSObjectDeleteProperty(context.ref, objectRef, key, &exception)
       if exception != nil {
         return .exception(())
       }
