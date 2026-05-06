@@ -16,7 +16,14 @@ public actor JSContext<E: JSEngine> {
     }
 
     self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
-    self.driverContextHandle.bindContextOwner(self)
+    let storage =
+      E.contextDataStorageBox(in: driverContextHandle)
+      ?? {
+        let box = JSContextDataStorageBox()
+        E.installContextDataStorageBox(box, in: driverContextHandle)
+        return box
+      }()
+    storage.bindContextOwner(self)
   }
 
   package init(
@@ -29,6 +36,7 @@ public actor JSContext<E: JSEngine> {
   }
 
   deinit {
+    E.installContextDataStorageBox(nil, in: driverContextHandle)
     _ = driverContextHandle.releaseReference()
   }
 }
@@ -46,6 +54,13 @@ extension JSContext {
     }
   }
 
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type = K.self) {
+    E.contextDataStorageBox(in: driverContextHandle)?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type = K.self) -> K.Value? {
+    E.contextDataStorageBox(in: driverContextHandle)?.data(for: key) ?? K.defaultValue
+  }
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
   ) throws(Failure) -> R {

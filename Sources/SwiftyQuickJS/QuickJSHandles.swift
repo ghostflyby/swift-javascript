@@ -111,11 +111,6 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
     JS_UpdateStackTop(JS_GetRuntime(rawRef))
   }
 
-  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
-  where QuickJSContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
-
-  }
-
   @discardableResult
   public func retainReference() -> Bool {
     let duplicated = JS_DupContext(ref)
@@ -126,6 +121,27 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
   public func releaseReference() -> Bool {
     JS_FreeContext(ref)
     return true
+  }
+}
+
+extension QuickJSContextHandle {
+  func contextDataStorage() -> JSContextDataStorageBox? {
+    guard let opaque = JS_GetContextOpaque(ref) else {
+      return nil
+    }
+    return Unmanaged<JSContextDataStorageBox>.fromOpaque(opaque).takeUnretainedValue()
+  }
+
+  func installContextDataStorage(_ storage: JSContextDataStorageBox?) {
+    JS_SetContextOpaque(ref, storage.map { Unmanaged.passRetained($0).toOpaque() })
+  }
+
+  func removeContextDataStorage() {
+    guard let opaque = JS_GetContextOpaque(ref) else {
+      return
+    }
+    JS_SetContextOpaque(ref, nil)
+    _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(opaque).takeRetainedValue()
   }
 }
 

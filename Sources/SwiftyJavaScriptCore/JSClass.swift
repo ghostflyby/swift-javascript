@@ -486,6 +486,17 @@ private func javaScriptCorePrivateData(fromGlobalObjectIn context: JSContextRef)
   JSObjectGetPrivate(JSContextGetGlobalObject(context))
 }
 
+private func javaScriptCoreContextDataStorageBox(from context: JSContextRef)
+  -> SwiftJavaScript.JSContextDataStorageBox?
+{
+  guard let privateData = javaScriptCorePrivateData(fromGlobalObjectIn: context) else {
+    return nil
+  }
+  return Unmanaged<SwiftJavaScript.JSContextDataStorageBox>
+    .fromOpaque(privateData)
+    .takeUnretainedValue()
+}
+
 private let classInitializeCallback: JSObjectInitializeCallback = { ctx, object in
   guard let ctx, let object else {
     return
@@ -971,10 +982,8 @@ extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
   internal static func borrow(ctx: JSContextRef)
     -> SwiftJavaScript.JSContext<JavaScriptCoreEngine>
   {
-    let context = Unmanaged<SwiftJavaScript.JSContext<JavaScriptCoreEngine>>.fromOpaque(
-      javaScriptCorePrivateData(fromGlobalObjectIn: ctx)!
-    ).takeUnretainedValue()
-    return context
+    javaScriptCoreContextDataStorageBox(from: ctx)!
+      .borrowContextOwner(as: JavaScriptCoreEngine.self)!
   }
 }
 

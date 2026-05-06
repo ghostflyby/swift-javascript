@@ -31,6 +31,11 @@ struct EngineRuntimeDriverTests {
   }
 
   @Test(arguments: ScriptEngine.allCases)
+  func contextDataIsSharedWithInstantContextAndCallbacks(_ engine: ScriptEngine) async {
+    await engine.run(ContextDataIsSharedWithInstantContextAndCallbacks.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
   func valueInitializersAndTypePredicates(_ engine: ScriptEngine) async {
     await engine.run(ValueInitializersAndTypePredicates.self)
   }
@@ -70,6 +75,10 @@ struct EngineRuntimeDriverTests {
     #expect(!QuickJSEngine.capabilities.supportsESModules)
     #expect(!QuickJSEngine.capabilities.supportsPromiseJobQueueControl)
   }
+}
+
+private enum EngineContextDataKey: JSContextDataKey {
+  typealias Value = String
 }
 
 private enum EvaluateScriptReturnsValueForValidScript: ScriptEngineAssertion {
@@ -133,6 +142,45 @@ private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssert
         }
       }
     }
+  }
+}
+
+private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    await context.setData("actor", for: EngineContextDataKey.self)
+    let instantValue: String? = await context.withInstantContext {
+      $0.data(for: EngineContextDataKey.self)
+    }
+    #expect(instantValue == "actor")
+
+    let callbackValue = await context.withInstantContext { context in
+      let function = context.makeFunction(named: "readContextData") { context, _, _ in
+        let value = context.data(for: EngineContextDataKey.self) ?? "missing"
+        _ = context.makeFunction(named: "nested") { context, _, _ in
+          .value(context.makeUndefined())
+        }
+        return .value(context.makeString(value))
+      }
+      let result = function.call(in: context)
+      switch consume result {
+      case .value(let value):
+        return value.toString(in: context)
+      case .exception:
+        Issue.record("Expected context data callback to return a value")
+        return "exception"
+      }
+    }
+
+    #expect(callbackValue == "actor")
+
+    await context.withInstantContext {
+      $0.setData("instant", for: EngineContextDataKey.self)
+    }
+    let actorValue: String? = await context.data(for: EngineContextDataKey.self)
+
+    #expect(actorValue == "instant")
   }
 }
 

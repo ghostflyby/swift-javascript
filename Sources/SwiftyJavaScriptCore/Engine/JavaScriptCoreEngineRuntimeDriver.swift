@@ -30,6 +30,23 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     return JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref)
   }
 
+  public static func contextDataStorageBox(in context: JavaScriptCoreContextHandle) -> JSContextDataStorageBox? {
+    context.contextDataStorage()
+  }
+
+  public static func installContextDataStorageBox(
+    _ storage: JSContextDataStorageBox?,
+    in context: JavaScriptCoreContextHandle
+  ) {
+    if let oldData = JSObjectGetPrivate(context.globalObjectRef) {
+      JSObjectSetPrivate(context.globalObjectRef, nil)
+      _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(oldData).takeRetainedValue()
+    }
+    if let storage = storage {
+      JSObjectSetPrivate(context.globalObjectRef, Unmanaged.passRetained(storage).toOpaque())
+    }
+  }
+
   public static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,

@@ -40,6 +40,25 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QuickJSValueHandle(ref: global, contextRef: context.ref)
   }
 
+  public static func contextDataStorageBox(in context: QuickJSContextHandle)
+    -> JSContextDataStorageBox?
+  {
+    context.contextDataStorage()
+  }
+
+  public static func installContextDataStorageBox(
+    _ storage: JSContextDataStorageBox?,
+    in context: QuickJSContextHandle
+  ) {
+    if let oldOpaque = JS_GetContextOpaque(context.ref) {
+      JS_SetContextOpaque(context.ref, nil)
+      _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(oldOpaque).takeRetainedValue()
+    }
+    if let storage = storage {
+      JS_SetContextOpaque(context.ref, Unmanaged.passRetained(storage).toOpaque())
+    }
+  }
+
   public static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<QuickJSEngine>,

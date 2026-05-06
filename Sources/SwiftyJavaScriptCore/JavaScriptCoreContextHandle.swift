@@ -63,11 +63,6 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
       .driverContextHandle.propertyNamesFunctionRef
   }
 
-  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
-  where JavaScriptCoreContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
-    JSObjectSetPrivate(globalObjectRef, Unmanaged.passUnretained(owner).toOpaque())
-  }
-
   public var engineType: JavaScriptCoreEngine.Type {
     JavaScriptCoreEngine.self
   }
@@ -106,6 +101,34 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     }
     JSGlobalContextRelease(ref)
     return true
+  }
+}
+
+extension JavaScriptCoreContextHandle {
+  internal func contextDataStorage() -> JSContextDataStorageBox? {
+    guard let privateData = JSObjectGetPrivate(globalObjectRef) else {
+      return nil
+    }
+    return Unmanaged<JSContextDataStorageBox>.fromOpaque(privateData)
+      .takeUnretainedValue()
+  }
+
+  internal func installContextDataStorage(
+    _ storage: JSContextDataStorageBox?
+  ) {
+    JSObjectSetPrivate(
+      globalObjectRef,
+      storage.map { Unmanaged.passRetained($0).toOpaque() }
+    )
+  }
+
+  internal func removeContextDataStorage() {
+    guard let privateData = JSObjectGetPrivate(globalObjectRef) else {
+      return
+    }
+    JSObjectSetPrivate(globalObjectRef, nil)
+    _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(privateData)
+      .takeRetainedValue()
   }
 }
 

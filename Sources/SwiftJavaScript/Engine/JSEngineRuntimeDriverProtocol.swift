@@ -78,6 +78,15 @@ public protocol JSEngineRuntimeDriver {
     _ value: ValueHandle,
     in context: ContextHandle
   ) -> Bool
+
+  /// Returns the context data storage box for the given context, or nil if none installed.
+  static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox?
+
+  /// Installs or replaces the context data storage box. When `nil`, releases the old box if present.
+  static func installContextDataStorageBox(
+    _ storage: JSContextDataStorageBox?,
+    in context: ContextHandle
+  )
 }
 
 extension JSEngineRuntimeDriver {
@@ -88,5 +97,18 @@ extension JSEngineRuntimeDriver {
     _ = value
     _ = context
     return true
+  }
+
+  public static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox? {
+    _ = context
+    return nil
+  }
+
+  public static func installContextDataStorageBox(
+    _ storage: JSContextDataStorageBox?,
+    in context: ContextHandle
+  ) {
+    _ = storage
+    _ = context
   }
 }

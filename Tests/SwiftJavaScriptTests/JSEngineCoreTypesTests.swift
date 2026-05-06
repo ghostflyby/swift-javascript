@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import SwiftJavaScript
@@ -29,6 +30,12 @@ public struct MockRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @uncheck
 
 public struct MockContext: Sendable, Equatable {
   let runtimeID: String
+  let identity: String
+
+  init(runtimeID: String, identity: String = "") {
+    self.runtimeID = runtimeID
+    self.identity = identity.isEmpty ? runtimeID : identity
+  }
 }
 
 public struct MockContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable {
@@ -36,11 +43,6 @@ public struct MockContextHandle: JSContextManualReferenceCountedHandle, @uncheck
 
   init(rawContext: MockContext) {
     self.rawContext = rawContext
-  }
-
-  public func bindContextOwner<E>(_ owner: SwiftJavaScript.JSContext<E>)
-  where MockContextHandle == E.ContextHandle, E: SwiftJavaScript.JSEngine {
-
   }
 
   var engineType: MockEngine.Type {
@@ -53,6 +55,33 @@ public struct MockContextHandle: JSContextManualReferenceCountedHandle, @uncheck
 
   public func releaseReference() -> Bool {
     true
+  }
+}
+
+private struct MockContextDataRegistryKey: Hashable, Sendable {
+  let identity: String
+}
+
+private let mockContextDataStorageRegistry =
+  Mutex<[MockContextDataRegistryKey: JSContextDataStorageBox]>([:])
+
+private func mockContextDataRegistryKey(
+  for context: MockContextHandle
+) -> MockContextDataRegistryKey {
+  MockContextDataRegistryKey(identity: context.rawContext.identity)
+}
+
+private func mockContextDataStorage(
+  for context: MockContextHandle
+) -> JSContextDataStorageBox {
+  let key = mockContextDataRegistryKey(for: context)
+  return mockContextDataStorageRegistry.withLock {
+    if let existing = $0[key] {
+      return existing
+    }
+    let created = JSContextDataStorageBox()
+    $0[key] = created
+    return created
   }
 }
 
@@ -310,7 +339,7 @@ private enum MockDriver: JSEngine {
   }
 
   static func makeContext(in runtime: MockRuntime) -> MockContext {
-    MockContext(runtimeID: runtime.id)
+    MockContext(runtimeID: runtime.id, identity: UUID().uuidString)
   }
 
   static func evaluateScript(
@@ -1107,6 +1136,23 @@ extension MockEngine {
     _ context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
     MockDriver.globalObjectValueHandle(context)
+  }
+
+  public static func contextDataStorageBox(in context: MockContextHandle)
+    -> JSContextDataStorageBox?
+  {
+    mockContextDataStorageRegistry.withLock {
+      $0[mockContextDataRegistryKey(for: context)]
+    }
+  }
+
+  public static func installContextDataStorageBox(
+    _ storage: JSContextDataStorageBox?,
+    in context: MockContextHandle
+  ) {
+    mockContextDataStorageRegistry.withLock {
+      $0[mockContextDataRegistryKey(for: context)] = storage
+    }
   }
 
   public static func makeFunctionValueHandle(

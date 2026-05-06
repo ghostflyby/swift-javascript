@@ -32,6 +32,14 @@ extension JSInstantContext {
     return JSValue(handleValue: handle)
   }
 
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type = K.self) {
+    E.contextDataStorageBox(in: driverContextHandle)?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type = K.self) -> K.Value? {
+    E.contextDataStorageBox(in: driverContextHandle)?.data(for: key) ?? K.defaultValue
+  }
+
   @inline(__always)
   private func valueFromResultHandle(
     _ handleResult: JSResult<JSValueHandle<E>>?
