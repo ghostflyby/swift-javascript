@@ -104,33 +104,6 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
   }
 }
 
-extension JavaScriptCoreContextHandle {
-  internal func contextDataStorage() -> JSContextDataStorageBox? {
-    guard let privateData = JSObjectGetPrivate(globalObjectRef) else {
-      return nil
-    }
-    return Unmanaged<JSContextDataStorageBox>.fromOpaque(privateData)
-      .takeUnretainedValue()
-  }
-
-  internal func installContextDataStorage(
-    _ storage: JSContextDataStorageBox?
-  ) {
-    JSObjectSetPrivate(
-      globalObjectRef,
-      storage.map { Unmanaged.passRetained($0).toOpaque() }
-    )
-  }
-
-  internal func removeContextDataStorage() {
-    guard let privateData = JSObjectGetPrivate(globalObjectRef) else {
-      return
-    }
-    JSObjectSetPrivate(globalObjectRef, nil)
-    _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(privateData)
-      .takeRetainedValue()
-  }
-}
 
 private func makeJavaScriptCoreFunctionClass() -> JSClassRef {
   var definition = makeJavaScriptCoreFunctionClassDefinition()

@@ -31,7 +31,11 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   }
 
   public static func contextDataStorageBox(in context: JavaScriptCoreContextHandle) -> JSContextDataStorageBox? {
-    context.contextDataStorage()
+    guard let privateData = JSObjectGetPrivate(context.globalObjectRef) else {
+      return nil
+    }
+    return Unmanaged<JSContextDataStorageBox>.fromOpaque(privateData)
+      .takeUnretainedValue()
   }
 
   public static func installContextDataStorageBox(

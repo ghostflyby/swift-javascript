@@ -124,26 +124,6 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
   }
 }
 
-extension QuickJSContextHandle {
-  func contextDataStorage() -> JSContextDataStorageBox? {
-    guard let opaque = JS_GetContextOpaque(ref) else {
-      return nil
-    }
-    return Unmanaged<JSContextDataStorageBox>.fromOpaque(opaque).takeUnretainedValue()
-  }
-
-  func installContextDataStorage(_ storage: JSContextDataStorageBox?) {
-    JS_SetContextOpaque(ref, storage.map { Unmanaged.passRetained($0).toOpaque() })
-  }
-
-  func removeContextDataStorage() {
-    guard let opaque = JS_GetContextOpaque(ref) else {
-      return
-    }
-    JS_SetContextOpaque(ref, nil)
-    _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(opaque).takeRetainedValue()
-  }
-}
 
 extension QuickJSContextHandle: Hashable {
   public static func == (lhs: QuickJSContextHandle, rhs: QuickJSContextHandle) -> Bool {
