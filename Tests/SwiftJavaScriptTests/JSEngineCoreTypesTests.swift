@@ -1951,3 +1951,17 @@ extension MockEngine {
     #expect(strictlyNotEqual)
   }
 }
+
+@Test func propertyAttributesOptionSet() {
+  let value: JSPropertyAttributes = [.dontDelete, .readOnly]
+  #expect(value.contains(.dontDelete))
+  #expect(value.contains(.readOnly))
+  #expect(!value.contains(.dontEnum))
+  #expect(JSPropertyAttributes.none.rawValue == 0)
+}
+
+@Test func classAttributesOptionSet() {
+  let value: JSClassAttributes = [.noAutomaticPrototype]
+  #expect(value.contains(.noAutomaticPrototype))
+  #expect(JSClassAttributes.none.rawValue == 0)
+}

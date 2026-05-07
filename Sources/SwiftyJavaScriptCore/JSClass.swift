@@ -1,6 +1,5 @@
 import Foundation
 import JavaScriptCore
-
 public typealias JSClass = SwiftJavaScript.JSClass<JavaScriptCoreEngine>
 
 public struct JavaScriptCoreClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,
@@ -35,13 +34,6 @@ extension JavaScriptCoreClassHandle: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: ref))
   }
-}
-
-extension SwiftJavaScript.JSClassAttributes {
-  public static let none = SwiftJavaScript.JSClassAttributes(
-    rawValue: UInt32(kJSClassAttributeNone))
-  public static let noAutomaticPrototype = SwiftJavaScript.JSClassAttributes(
-    rawValue: UInt32(kJSClassAttributeNoAutomaticPrototype))
 }
 
 typealias JavaScriptCoreClassDefinitionModel = SwiftJavaScript.JSEngineClassDefinition<
