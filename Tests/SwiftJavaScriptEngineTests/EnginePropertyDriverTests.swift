@@ -37,6 +37,11 @@ struct EnginePropertyDriverTests {
   func definePropertyRespectsDontEnumAndDontDelete(_ engine: ScriptEngine) async {
     await engine.run(DefinePropertyRespectsDontEnumAndDontDelete.self)
   }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func staticStringPropertyEdgeCases(_ engine: ScriptEngine) async {
+    await engine.run(StaticStringPropertyEdgeCases.self)
+  }
 }
 
 private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
@@ -291,6 +296,89 @@ private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion 
       case .exception:
         Issue.record("Expected membership check for pinnedFlag")
       }
+    }
+  }
+}
+
+private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    await context.withInstantContext { context in
+      let object = context.makeObject()
+
+      // --- value type roundtrips ---
+      let numKey: StaticString = "num"
+      object.setProperty(42.5, forKey: numKey, in: context)
+      let numVal = object.getProperty(forKey: numKey, in: context).toDouble(in: context)
+      #expect(numVal == 42.5)
+      let hasNum = object.hasProperty(numKey, in: context)
+      #expect(hasNum)
+
+      let boolKey: StaticString = "flag"
+      object.setProperty(true, forKey: boolKey, in: context)
+      let boolVal = object.getProperty(forKey: boolKey, in: context).toBool(in: context)
+      #expect(boolVal)
+
+      let strKey: StaticString = "greeting"
+      object.setProperty("hello", forKey: strKey, in: context)
+      let strVal = object.getProperty(forKey: strKey, in: context).toString(in: context)
+      #expect(strVal == "hello")
+
+      // --- typed converter read via StaticString ---
+      let typedKey: StaticString = "pi"
+      object.setProperty(3.14, forKey: typedKey, in: context)
+      let decoded: Double = object.getProperty(forKey: typedKey, using: JSDefaultConverter<Double>.self, in: context)
+      #expect(decoded == 3.14)
+
+      let typedBoolKey: StaticString = "yes"
+      object.setProperty(true, forKey: typedBoolKey, in: context)
+      let decodedBool: Bool = object.getProperty(forKey: typedBoolKey, using: JSDefaultConverter<Bool>.self, in: context)
+      #expect(decodedBool)
+
+      // --- delete + hasProperty ---
+      let delKey: StaticString = "temp"
+      object.setProperty(1, forKey: delKey, in: context)
+      let hasDel = object.hasProperty(delKey, in: context)
+      #expect(hasDel)
+      object.deleteProperty(forKey: delKey, in: context)
+      let hasDelAfter = object.hasProperty(delKey, in: context)
+      #expect(!hasDelAfter)
+
+      // --- non-existent key ---
+      let missingKey: StaticString = "nope"
+      let hasMissing = object.hasProperty(missingKey, in: context)
+      #expect(!hasMissing)
+      object.deleteProperty(forKey: missingKey, in: context)
+
+      // --- empty StaticString key ---
+      let emptyKey: StaticString = ""
+      object.setProperty("empty-val", forKey: emptyKey, in: context)
+      let hasEmpty = object.hasProperty(emptyKey, in: context)
+      #expect(hasEmpty)
+      let emptyVal = object.getProperty(forKey: emptyKey, in: context).toString(in: context)
+      #expect(emptyVal == "empty-val")
+      object.deleteProperty(forKey: emptyKey, in: context)
+      let hasEmptyAfter = object.hasProperty(emptyKey, in: context)
+      #expect(!hasEmptyAfter)
+
+      // --- unicode and special char StaticString key ---
+      let uniKey: StaticString = "key_😀"
+      object.setProperty("unicode", forKey: uniKey, in: context)
+      let hasUni = object.hasProperty(uniKey, in: context)
+      #expect(hasUni)
+      let uniVal = object.getProperty(forKey: uniKey, in: context).toString(in: context)
+      #expect(uniVal == "unicode")
+
+      let nullCharKey: StaticString = "a\0b"
+      object.setProperty("null", forKey: nullCharKey, in: context)
+      let hasNullChar = object.hasProperty(nullCharKey, in: context)
+      #expect(hasNullChar)
+      let nullCharVal = object.getProperty(forKey: nullCharKey, in: context).toString(in: context)
+      #expect(nullCharVal == "null")
+      object.deleteProperty(forKey: nullCharKey, in: context)
+      let hasNullCharAfter = object.hasProperty(nullCharKey, in: context)
+      #expect(!hasNullCharAfter)
     }
   }
 }
