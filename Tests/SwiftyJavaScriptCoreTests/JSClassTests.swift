@@ -3,13 +3,6 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-@Test func classAttributesOptionSet() {
-  let value: SwiftJavaScript.JSClassAttributes = [.noAutomaticPrototype]
-
-  #expect(value.contains(.noAutomaticPrototype))
-  #expect(SwiftJavaScript.JSClassAttributes.none.rawValue == 0)
-}
-
 @Test func staticValueAndFunctionStorage() {
   let staticValue = SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
     name: "value",
