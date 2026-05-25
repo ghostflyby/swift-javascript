@@ -1,4 +1,4 @@
-import SwiftJavaScript
+@testable import SwiftJavaScript
 import SwiftyJavaScriptCore
 import SwiftyQuickJS
 

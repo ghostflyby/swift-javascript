@@ -1,4 +1,4 @@
-import SwiftJavaScript
+@testable import SwiftJavaScript
 import SwiftyJavaScriptCore
 import SwiftyQuickJS
 import Testing
@@ -155,18 +155,18 @@ private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAsse
     }
     #expect(instantValue == "actor")
 
-    let callbackValue = await context.withInstantContext { context in
-      let function = context.makeFunction(named: "readContextData") { context, _, _ in
-        let value = context.data(for: EngineContextDataKey.self) ?? "missing"
-        _ = context.makeFunction(named: "nested") { context, _, _ in
-          .value(context.makeUndefined())
+    let callbackValue = await context.withInstantContext { ic in
+      let function = ic.makeFunction(named: "readContextData") { c, _, _ in
+        let value = c.data(for: EngineContextDataKey.self) ?? "missing"
+        _ = c.makeFunction(named: "nested") { c2, _, _ in
+          JSCallbackReturn(temporary: c2.makeUndefined().handle)
         }
-        return .value(context.makeString(value))
+        return JSCallbackReturn(persistent: c.makeString(value))
       }
-      let result = function.call(in: context)
+      let result = function.call(in: ic)
       switch consume result {
       case .value(let value):
-        return value.toString(in: context)
+        return value.toString(in: ic)
       case .exception:
         Issue.record("Expected context data callback to return a value")
         return "exception"
@@ -202,9 +202,9 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
       let flag = object.getProperty(forKey: flagKey, in: context).toBool(in: context)
       #expect(flag)
 
-      context.installGlobalFunction(named: "bump") { context, _, arguments in
-        let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-        return .value(context.makeNumber(value + 1))
+      context.installGlobalFunction(named: "bump") { c, _, arguments in
+        let value: Double = arguments.unpack(types: Double.self, in: c)
+        return JSCallbackReturn(persistent: c.makeNumber(value + 1))
       }
 
       let result = context.evaluateScript("bump(answer)")
@@ -233,9 +233,9 @@ private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion 
       let hasCount = context.hasGlobalProperty(countKey)
       #expect(hasCount)
 
-      context.installGlobalFunction(named: "double") { context, _, arguments in
-        let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-        return .value(context.makeNumber(value * 2))
+      context.installGlobalFunction(named: "double") { c, _, arguments in
+        let value: Double = arguments.unpack(types: Double.self, in: c)
+        return JSCallbackReturn(persistent: c.makeNumber(value * 2))
       }
 
       let result = context.evaluateScript("double(count)")

@@ -1,4 +1,4 @@
-import SwiftJavaScript
+@testable import SwiftJavaScript
 import Testing
 
 @Suite
@@ -59,9 +59,12 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let function = context.makeFunction(named: "bump") { context, _, arguments in
-        let value = arguments.unpack(at: 0, using: JSDefaultConverter<Double>.self, in: context)
-        return .value(context.makeNumber(value + 1))
+      let function = context.makeFunction(named: "bump") { c, _, arguments in
+        let value: Double = arguments.unpack(
+          types: Double.self,
+          in: c
+        )
+        return JSCallbackReturn(persistent: c.makeNumber(value + 1))
       }
 
       let result = function.call(arguments: 41, in: context)
@@ -173,8 +176,8 @@ private enum NativeFunctionNamesAndExceptionsAreObservable: ScriptEngineAssertio
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let function = context.makeFunction(named: "explode") { context, _, _ in
-        .exception(context.makeString("boom"))
+      let function = context.makeFunction(named: "explode") { c, _, _ in
+        return JSCallbackReturn(exception: c.makeString("boom").handle)
       }
       context.withGlobalObject { global in
         global.setProperty(function, forKey: "explode", in: context)
@@ -206,17 +209,17 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let makeObject = context.makeFunction(named: "makeNativeObject") { context, _, _ in
-        let object = context.makeObject()
-        object.setProperty("native", forKey: "kind", in: context)
-        object.setProperty(7, forKey: "count", in: context)
-        return .value(object)
+      let makeObject = context.makeFunction(named: "makeNativeObject") { c, _, _ in
+        let object = c.makeObject()
+        object.setProperty("native", forKey: "kind", in: c)
+        object.setProperty(7, forKey: "count", in: c)
+        return JSCallbackReturn(persistent: object)
       }
-      let throwObject = context.makeFunction(named: "throwNativeObject") { context, _, _ in
-        let error = context.makeObject()
-        error.setProperty("native-error", forKey: "kind", in: context)
-        error.setProperty(13, forKey: "code", in: context)
-        return .exception(error)
+      let throwObject = context.makeFunction(named: "throwNativeObject") { c, _, _ in
+        let error = c.makeObject()
+        error.setProperty("native-error", forKey: "kind", in: c)
+        error.setProperty(13, forKey: "code", in: c)
+        return JSCallbackReturn(exception: error.takeHandle())
       }
 
       context.withGlobalObject { global in

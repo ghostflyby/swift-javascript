@@ -574,12 +574,13 @@ extension MockDriver {
       rawValue: MockValue(kind: "object", payload: "\(context.rawContext.runtimeID):global"))
   }
 
+  @_optimize(none)
   fileprivate static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
-    _ = callback
+    _ = callback; _ = name
 
     return JSValueHandle<MockEngine>(
       rawValue: MockValue(kind: "function", payload: "\(context.rawContext.runtimeID):\(name)"))
@@ -1155,12 +1156,15 @@ extension MockEngine {
     }
   }
 
+  @_optimize(none)
   public static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
-    MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: context)
+    _ = callback
+    return JSValueHandle<MockEngine>(
+      rawValue: MockValue(kind: "function", payload: "\(context.rawContext.runtimeID):\(name)"))
   }
 
   public static func makePreparedScriptHandle(
@@ -1965,3 +1969,5 @@ extension MockEngine {
   #expect(value.contains(.noAutomaticPrototype))
   #expect(JSClassAttributes.none.rawValue == 0)
 }
+
+
