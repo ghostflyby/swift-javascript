@@ -3,6 +3,7 @@ public protocol JSEngineRuntimeDriver {
   associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
+  where ContextHandle == ValueHandle.Context
   associatedtype ClassHandle: JSClassManualReferenceCountedHandle
 
   static var capabilities: JSEngineCapabilities { get }
@@ -74,10 +75,14 @@ public protocol JSEngineRuntimeDriver {
     _ context: ContextHandle
   ) -> JSResult<ValueHandle>?
 
-  static func isValueHandleCompatibleWithContext(
-    _ value: ValueHandle,
-    in context: ContextHandle
+  static func isContextCompatibleWith(
+    _ this: ContextHandle,
+    _ that: ContextHandle
   ) -> Bool
+
+  static func makeStorageWords(value: ValueHandle, in context: ContextHandle) -> JSValueStorageWords
+
+  static func fromStorageWords(_ storageWords: JSValueStorageWords) -> (ValueHandle, ContextHandle)
 
   /// Returns the context data storage box for the given context, or nil if none installed.
   static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox?
@@ -90,14 +95,6 @@ public protocol JSEngineRuntimeDriver {
 }
 
 extension JSEngineRuntimeDriver {
-  public static func isValueHandleCompatibleWithContext(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Bool {
-    _ = value
-    _ = context
-    return true
-  }
 
   public static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox? {
     _ = context

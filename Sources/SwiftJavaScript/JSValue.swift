@@ -4,31 +4,29 @@
 /// It only carries the minimal value identity/representation and relies on
 /// explicit `in context` parameters at operation sites.
 public struct JSValue<E: JSEngine>: ~Copyable {
-  var storage: JSValueStorageWords
+  let storage: JSValueStorageWords
 
-  var handle: JSValueHandle<E> {
-    get {
-      .init(storageWords: storage)
-    }
-    set {
-      storage = newValue.storageWords
-    }
+  package var handle: JSValueHandle<E> {
+    E.fromStorageWords(storage).0
+  }
+  package var contextHandle: E.ContextHandle {
+    return E.fromStorageWords(storage).1
   }
 
   public func borrowHandle() -> JSValueHandle<E> {
     handle
   }
 
-  public init(handleValue: JSValueHandle<E>) {
-    self.storage = handleValue.storageWords
+  package init(handleValue: JSValueHandle<E>, in context: E.ContextHandle) {
+    self.storage = E.makeStorageWords(value: handleValue, in: context)
   }
 
   public init(retaining value: borrowing JSValue<E>) {
-    self.init(handleValue: value.retainHandle())
+    self.init(handleValue: value.retainHandle(), in: value.contextHandle)
   }
 
   deinit {
-    handle.releaseReference()
+    handle.releaseReference(in: contextHandle)
   }
 
   public consuming func discard() {
@@ -43,7 +41,7 @@ public struct JSValue<E: JSEngine>: ~Copyable {
 
   public func retainHandle() -> JSValueHandle<E> {
     let h = handle
-    _ = h.retainReference()
+    h.retainReference(in: contextHandle)
     return h
   }
 }

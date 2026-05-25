@@ -36,7 +36,7 @@ func javaScriptCoreObjectRef(
   var exception: JSValueRef?
   guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
     if let exception {
-      return .exception(JavaScriptCoreValueHandle(ref: exception, contextRef: context.ref))
+      return .exception(JavaScriptCoreValueHandle(ref: exception))
     }
     return .exception(javaScriptCoreMakeUndefined(in: context))
   }
@@ -49,10 +49,10 @@ func javaScriptCoreResult(
   in context: JavaScriptCoreContextHandle
 ) -> JSResult<JavaScriptCoreValueHandle> {
   if let exceptionRef {
-    return .exception(JavaScriptCoreValueHandle(ref: exceptionRef, contextRef: context.ref))
+    return .exception(JavaScriptCoreValueHandle(ref: exceptionRef))
   }
   if let resultRef {
-    return .value(JavaScriptCoreValueHandle(ref: resultRef, contextRef: context.ref))
+    return .value(JavaScriptCoreValueHandle(ref: resultRef))
   }
   return .value(javaScriptCoreMakeUndefined(in: context))
 }
@@ -60,7 +60,7 @@ func javaScriptCoreResult(
 func javaScriptCoreMakeUndefined(in context: JavaScriptCoreContextHandle)
   -> JavaScriptCoreValueHandle
 {
-  JavaScriptCoreValueHandle(ref: JSValueMakeUndefined(context.ref)!, contextRef: context.ref)
+  JavaScriptCoreValueHandle(ref: JSValueMakeUndefined(context.ref)!)
 }
 
 func javaScriptCoreMakeStringValue(
@@ -69,15 +69,13 @@ func javaScriptCoreMakeStringValue(
 ) -> JavaScriptCoreValueHandle {
   guard !value.isEmpty else {
     return JavaScriptCoreValueHandle(
-      ref: JSValueMakeString(context.ref, javaScriptCoreEmptyStringRef)!,
-      contextRef: context.ref
+      ref: JSValueMakeString(context.ref, javaScriptCoreEmptyStringRef)!
     )
   }
 
   return withJavaScriptCoreString(value) { stringHandle in
     JavaScriptCoreValueHandle(
-      ref: JSValueMakeString(context.ref, stringHandle)!,
-      contextRef: context.ref
+      ref: JSValueMakeString(context.ref, stringHandle)!
     )
   }
 }

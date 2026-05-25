@@ -36,8 +36,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     in context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     JavaScriptCoreValueHandle(
-      ref: JSValueMakeString(context.ref, key.ref)!,
-      contextRef: context.ref
+      ref: JSValueMakeString(context.ref, key.ref)!
     )
   }
 
@@ -235,7 +234,7 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
 
     switch javaScriptCoreObjectRef(
-      for: JavaScriptCoreValueHandle(ref: namesValue, contextRef: context.ref),
+      for: JavaScriptCoreValueHandle(ref: namesValue),
       in: context
     ) {
     case .exception:

@@ -3,17 +3,10 @@ extension JSInstantContext {
   func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
     let handle = value.borrowHandle()
     precondition(
-      E.isValueHandleCompatibleWithContext(handle, in: driverContextHandle),
+      E.isContextCompatibleWith(value.contextHandle, driverContextHandle),
       "Cross-VM JSValue operation is not allowed; pass a context from the same JSVirtualMachine"
     )
     return handle
-  }
-
-  @inline(__always)
-  func bridgeInvocationResult(
-    _ handleResult: JSResult<JSValueHandle<E>>?
-  ) -> JSResult<JSValue<E>> {
-    bridgeHandleResult(handleResult)
   }
 
   func encodeArguments<each A: JSValueEncodable>(
@@ -33,7 +26,7 @@ extension JSInstantContext {
 
   func releaseArguments(_ arguments: [JSValueHandle<E>]) {
     for argument in arguments {
-      _ = argument.releaseReference()
+      argument.releaseReference(in: self.driverContextHandle)
     }
   }
 
@@ -42,13 +35,13 @@ extension JSInstantContext {
     this thisValueHandle: JSValueHandle<E>?,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
-    bridgeInvocationResult(
+    bridgeHandleResult(
       E.callFunctionHandle(
         valueHandle(for: function),
         this: thisValueHandle,
         arguments: arguments,
         in: driverContextHandle
-      ))
+      ), in: driverContextHandle)
   }
 
   func call(function: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
@@ -101,12 +94,12 @@ extension JSInstantContext {
     constructor: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
-    bridgeInvocationResult(
+    bridgeHandleResult(
       E.constructHandle(
         valueHandle(for: constructor),
         arguments: arguments,
         in: driverContextHandle
-      ))
+      ), in: driverContextHandle)
   }
 
   func construct(constructor: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
@@ -125,21 +118,21 @@ extension JSInstantContext {
   func getProperty(_ key: borrowing JSPropertyStringKey<E>, on object: borrowing JSValue<E>)
     -> JSResult<JSValue<E>>
   {
-    bridgeInvocationResult(
+    bridgeHandleResult(
       E.getPropertyStringKeyHandle(
         key.borrowHandle(in: self),
         on: valueHandle(for: object),
         in: driverContextHandle
-      ))
+      ), in: driverContextHandle)
   }
 
   func getProperty(_ key: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
-    bridgeInvocationResult(
+    bridgeHandleResult(
       E.getStaticStringPropertyHandle(
         key,
         on: valueHandle(for: object),
         in: driverContextHandle
-      ))
+      ), in: driverContextHandle)
   }
 
   func setProperty(
@@ -238,11 +231,11 @@ extension JSInstantContext {
   }
 
   func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
-    bridgeInvocationResult(
+    bridgeHandleResult(
       E.toObjectHandle(
         valueHandle(for: value),
         in: driverContextHandle
-      ))
+      ), in: driverContextHandle)
   }
 
   func isArray(_ value: borrowing JSValue<E>) -> Bool {

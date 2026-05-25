@@ -2,6 +2,7 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
+
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
@@ -27,10 +28,12 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     guard let objectRef = JSContextGetGlobalObject(context.ref) else {
       return nil
     }
-    return JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref)
+    return JavaScriptCoreValueHandle(ref: objectRef)
   }
 
-  public static func contextDataStorageBox(in context: JavaScriptCoreContextHandle) -> JSContextDataStorageBox? {
+  public static func contextDataStorageBox(in context: JavaScriptCoreContextHandle)
+    -> JSContextDataStorageBox?
+  {
     guard let privateData = JSObjectGetPrivate(context.globalObjectRef) else {
       return nil
     }
@@ -78,7 +81,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
         )
       }
     }
-    return JavaScriptCoreValueHandle(ref: functionRef, contextRef: context.ref)
+    return JavaScriptCoreValueHandle(ref: functionRef)
   }
 
   public static func makePreparedScriptHandle(
@@ -179,8 +182,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     withJavaScriptCoreString(value) { stringHandle in
       JavaScriptCoreValueHandle(
-        ref: JSValueMakeSymbol(context.ref, stringHandle)!,
-        contextRef: context.ref
+        ref: JSValueMakeSymbol(context.ref, stringHandle)!
       )
     }
   }
@@ -190,8 +192,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     JavaScriptCoreValueHandle(
-      ref: JSValueMakeNumber(context.ref, value)!,
-      contextRef: context.ref
+      ref: JSValueMakeNumber(context.ref, value)!
     )
   }
 
@@ -200,17 +201,15 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     _ context: JavaScriptCoreContextHandle
   ) -> JSValueHandle<JavaScriptCoreEngine>? {
     JavaScriptCoreValueHandle(
-      ref: JSValueMakeBoolean(context.ref, value)!,
-      contextRef: context.ref
+      ref: JSValueMakeBoolean(context.ref, value)!
     )
   }
 
-  public static func makeNullValueHandle(
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+  public static func makeNullValueHandle(_ context: JavaScriptCoreContextHandle)
+    -> JavaScriptCoreValueHandle?
+  {
     JavaScriptCoreValueHandle(
-      ref: JSValueMakeNull(context.ref)!,
-      contextRef: context.ref
+      ref: JSValueMakeNull(context.ref)
     )
   }
 
@@ -226,7 +225,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
       return .exception(javaScriptCoreMakeUndefined(in: context))
     }
-    return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
+    return .value(JavaScriptCoreValueHandle(ref: objectRef))
   }
 
   public static func makeArrayResultHandle(
@@ -237,10 +236,30 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     return javaScriptCoreResult(value: objectRef, exception: exception, in: context)
   }
 
-  public static func isValueHandleCompatibleWithContext(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+  public static func isContextCompatibleWith(
+    _ this: JavaScriptCoreContextHandle,
+    _ that: JavaScriptCoreContextHandle
   ) -> Bool {
-    JSContextGetGroup(value.contextRef) == JSContextGetGroup(context.ref)
+    JSContextGetGroup(this.ref) == JSContextGetGroup(that.ref)
   }
+  public static func makeStorageWords(
+    value: JavaScriptCoreValueHandle, in context: JavaScriptCoreContextHandle
+  ) -> SwiftJavaScript.JSValueStorageWords {
+    return (
+      word0: UInt64(UInt(bitPattern: value.ref)),
+      word1: UInt64(UInt(bitPattern: context.ref)),
+      word2: 0
+    )
+  }
+
+  public static func fromStorageWords(_ storageWords: SwiftJavaScript.JSValueStorageWords) -> (
+    JavaScriptCoreValueHandle, JavaScriptCoreContextHandle
+  ) {
+    return (
+      JavaScriptCoreValueHandle(ref: JSValueRef(bitPattern: UInt(storageWords.word0))!),
+      JavaScriptCoreContextHandle(
+        adopting: JSGlobalContextRef(bitPattern: UInt(storageWords.word1))!)
+    )
+  }
+
 }

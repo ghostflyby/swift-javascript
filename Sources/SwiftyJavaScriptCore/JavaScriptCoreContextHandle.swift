@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle,
+public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle, Equatable,
   @unchecked Sendable
 {
   package let ref: JSGlobalContextRef
@@ -103,7 +103,6 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     return true
   }
 }
-
 
 private func makeJavaScriptCoreFunctionClass() -> JSClassRef {
   var definition = makeJavaScriptCoreFunctionClassDefinition()

@@ -26,9 +26,9 @@ func quickJSResultHandle(
 ) -> JSResult<QuickJSValueHandle> {
   if JS_IsException(result) {
     let exception = JS_GetException(contextRef)
-    return .exception(QuickJSValueHandle(ref: exception, contextRef: contextRef))
+    return .exception(QuickJSValueHandle(ref: exception))
   }
-  return .value(QuickJSValueHandle(ref: result, contextRef: contextRef))
+  return .value(QuickJSValueHandle(ref: result))
 }
 
 func quickJSImmediateValue(tag: Int32, payload: Int32 = 0) -> CQuickJSValue {

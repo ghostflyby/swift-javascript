@@ -1,5 +1,6 @@
-@testable import SwiftJavaScript
 import Testing
+
+@testable import SwiftJavaScript
 
 @Suite
 struct EnginePreparedInputTests {

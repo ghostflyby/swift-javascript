@@ -22,7 +22,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
       fatalError("JSArgument handle is unavailable")
     }
 
-    return JSValue(handleValue: handle)
+    return JSValue(handleValue: handle, in: context.driverContextHandle)
   }
 
   @inline(__always)

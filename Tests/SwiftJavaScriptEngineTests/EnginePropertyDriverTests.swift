@@ -1,5 +1,6 @@
-@testable import SwiftJavaScript
 import Testing
+
+@testable import SwiftJavaScript
 
 @Suite
 struct EnginePropertyDriverTests {
@@ -328,12 +329,14 @@ private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
       // --- typed converter read via StaticString ---
       let typedKey: StaticString = "pi"
       object.setProperty(3.14, forKey: typedKey, in: context)
-      let decoded: Double = object.getProperty(forKey: typedKey, using: JSDefaultConverter<Double>.self, in: context)
+      let decoded: Double = object.getProperty(
+        forKey: typedKey, using: JSDefaultConverter<Double>.self, in: context)
       #expect(decoded == 3.14)
 
       let typedBoolKey: StaticString = "yes"
       object.setProperty(true, forKey: typedBoolKey, in: context)
-      let decodedBool: Bool = object.getProperty(forKey: typedBoolKey, using: JSDefaultConverter<Bool>.self, in: context)
+      let decodedBool: Bool = object.getProperty(
+        forKey: typedBoolKey, using: JSDefaultConverter<Bool>.self, in: context)
       #expect(decodedBool)
 
       // --- delete + hasProperty ---

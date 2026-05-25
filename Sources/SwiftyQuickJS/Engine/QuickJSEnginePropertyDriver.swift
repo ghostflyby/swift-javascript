@@ -43,7 +43,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
     in context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let value = JS_AtomToString(context.ref, key.atom)
-    return QuickJSValueHandle(ref: value, contextRef: context.ref)
+    return QuickJSValueHandle(ref: value)
   }
 
   public static func propertyNamesForHandle(

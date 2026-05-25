@@ -1,6 +1,7 @@
-@testable import SwiftJavaScript
 import SwiftyJavaScriptCore
 import SwiftyQuickJS
+
+@testable import SwiftJavaScript
 
 enum ScriptEngine: String, CaseIterable, CustomStringConvertible, Sendable {
   case javaScriptCore = "JavaScriptCore"

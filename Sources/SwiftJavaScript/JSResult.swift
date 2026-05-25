@@ -29,7 +29,8 @@ package func takeExceptionValue<Value: ~Copyable>(
 }
 
 public func bridgeHandleResult<E: JSEngine>(
-  _ handleResult: JSResult<JSValueHandle<E>>?
+  _ handleResult: JSResult<JSValueHandle<E>>?,
+  in context: E.ContextHandle
 ) -> JSResult<JSValue<E>> {
   guard let handleResult else {
     preconditionFailure("JSResult handle bridge unexpectedly returned nil")
@@ -37,8 +38,8 @@ public func bridgeHandleResult<E: JSEngine>(
 
   switch handleResult {
   case .value(let value):
-    return .value(JSValue(handleValue: value))
+    return .value(JSValue(handleValue: value, in: context))
   case .exception(let exception):
-    return .exception(JSValue(handleValue: exception))
+    return .exception(JSValue(handleValue: exception, in: context))
   }
 }

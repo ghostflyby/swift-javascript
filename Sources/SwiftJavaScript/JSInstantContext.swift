@@ -29,7 +29,7 @@ extension JSInstantContext {
     guard let handle else {
       preconditionFailure(String(describing: failureMessage))
     }
-    return JSValue(handleValue: handle)
+    return JSValue(handleValue: handle, in: driverContextHandle)
   }
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type = K.self) {
@@ -42,9 +42,10 @@ extension JSInstantContext {
 
   @inline(__always)
   private func valueFromResultHandle(
-    _ handleResult: JSResult<JSValueHandle<E>>?
+    _ handleResult: JSResult<JSValueHandle<E>>?,
+    in context: E.ContextHandle
   ) -> JSValue<E> {
-    let result: JSResult<JSValue<E>> = bridgeHandleResult(handleResult)
+    let result: JSResult<JSValue<E>> = bridgeHandleResult(handleResult, in: context)
     switch consume result {
     case .value(let value):
       return value
@@ -187,11 +188,11 @@ extension JSInstantContext {
   }
 
   public func makeObject() -> JSValue<E> {
-    valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle))
+    valueFromResultHandle(E.makeObjectResultHandle(driverContextHandle), in: driverContextHandle)
   }
 
   public func makeArray() -> JSValue<E> {
-    valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle))
+    valueFromResultHandle(E.makeArrayResultHandle(driverContextHandle), in: driverContextHandle)
   }
 
   public func makeFunction(
@@ -244,7 +245,8 @@ extension JSInstantContext {
         driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
-      ))
+      ), in: driverContextHandle
+    )
   }
 
   public func toBoolean(_ value: borrowing JSValue<E>) -> Bool {
@@ -259,3 +261,75 @@ extension JSInstantContext {
     E.toStringForHandle(value.borrowHandle(), in: driverContextHandle) ?? ""
   }
 }
+
+// MARK: - Callback scope operations
+
+extension JSInstantContext {
+  /// Upgrade a temporary callback value to a persistent JSValue.
+  public func persist(_ value: borrowing JSCallbackValue<E>) -> JSValue<E> {
+    guard let frame = TLSCallbackStack.top,
+      frame.engineTypeID == ObjectIdentifier(E.self),
+      frame.contextBox is E.ContextHandle
+    else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    value.handle.retainReference(in: self.driverContextHandle)
+    return JSValue(handleValue: value.handle, in: self.driverContextHandle)
+  }
+
+  /// Wrap a temporary value as a callback return value (borrowed handle).
+  public func `return`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
+    guard let frame = TLSCallbackStack.top,
+      frame.engineTypeID == ObjectIdentifier(E.self),
+      frame.contextBox is E.ContextHandle
+    else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(temporary: value.handle)
+  }
+
+  /// Wrap a persistent JSValue as a callback return value (owned).
+  public func `return`(_ value: consuming JSValue<E>) -> JSCallbackReturn<E> {
+    guard TLSCallbackStack.top != nil else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(persistent: value)
+  }
+
+  /// Mark a JS exception return value (borrowed temporary handle).
+  public func `throw`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
+    guard let frame = TLSCallbackStack.top,
+      frame.engineTypeID == ObjectIdentifier(E.self),
+      frame.contextBox is E.ContextHandle
+    else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(exception: value.handle)
+  }
+
+  /// Mark a JS exception return value (owned persistent JSValue).
+  public func `throw`(_ value: consuming JSValue<E>) -> JSCallbackReturn<E> {
+    guard TLSCallbackStack.top != nil else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(exception: value.takeHandle())
+  }
+
+  /// Return an undefined value (convenience).
+  public func returnUndefined() -> JSCallbackReturn<E> {
+    guard TLSCallbackStack.top != nil else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(temporary: makeUndefined().handle)
+  }
+
+  /// Throw an undefined exception (convenience).
+  public func throwUndefined() -> JSCallbackReturn<E> {
+    guard TLSCallbackStack.top != nil else {
+      preconditionFailure("Scope operation called outside an active callback scope")
+    }
+    return JSCallbackReturn(exception: makeUndefined().handle)
+  }
+}
+
+// MARK: - Internal TLS scope lookup

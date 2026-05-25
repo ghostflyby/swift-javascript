@@ -44,7 +44,7 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
       }
       return nil
     }
-    return QuickJSValueHandle(ref: value, contextRef: context.ref)
+    return QuickJSValueHandle(ref: value)
   }
 
   public static func arrayBufferByteLengthForHandle(
@@ -187,7 +187,7 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return nil
     }
-    return QuickJSValueHandle(ref: buffer, contextRef: context.ref)
+    return QuickJSValueHandle(ref: buffer)
   }
 
   public static func typedArrayBytesPtrForHandle(
@@ -209,7 +209,7 @@ extension QuickJSEngine: JSEngineTypedArrayDriver {
     }
     defer { JS_FreeValue(context.ref, buffer) }
     return arrayBufferBytesPtrForHandle(
-      QuickJSValueHandle(ref: buffer, contextRef: context.ref),
+      QuickJSValueHandle(ref: buffer),
       in: context
     )
   }
@@ -267,7 +267,7 @@ private func quickJSMakeTypedArrayHandle(
     quickJSClearPendingException(in: context)
     return nil
   }
-  return QuickJSValueHandle(ref: value, contextRef: context.ref)
+  return QuickJSValueHandle(ref: value)
 }
 
 private func quickJSClearPendingException(in context: QuickJSContextHandle) {

@@ -9,6 +9,29 @@ import SwiftJavaScript
 #endif
 
 extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
+
+  public static func makeStorageWords(value: QuickJSValueHandle, in context: QuickJSContextHandle)
+    -> SwiftJavaScript.JSValueStorageWords
+  {
+    return (
+      word0: UInt64(bitPattern: value.rawRef.tag),
+      word1: unsafeBitCast(value.rawRef.u, to: UInt64.self),
+      word2: UInt64(UInt(bitPattern: context.ref))
+    )
+  }
+
+  public static func fromStorageWords(_ storageWords: SwiftJavaScript.JSValueStorageWords) -> (
+    QuickJSValueHandle, QuickJSContextHandle
+  ) {
+    let tag = Int64(bitPattern: storageWords.word0)
+    let valueUnion = unsafeBitCast(storageWords.word1, to: JSValueUnion.self)
+    let value = CQuickJSValue(u: valueUnion, tag: tag)
+
+    let context = QuickJSContextHandle(ref: OpaquePointer(bitPattern: UInt(storageWords.word2))!)
+
+    return (QuickJSValueHandle(ref: value), context)
+  }
+
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
@@ -37,7 +60,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
   public static func globalObjectValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle?
   {
     let global = JS_GetGlobalObject(context.ref)
-    return QuickJSValueHandle(ref: global, contextRef: context.ref)
+    return QuickJSValueHandle(ref: global)
   }
 
   public static func contextDataStorageBox(in context: QuickJSContextHandle)
@@ -83,7 +106,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
       _ = callbackBox.takeRetainedValue()
       return nil
     }
-    return QuickJSValueHandle(ref: function, contextRef: context.ref)
+    return QuickJSValueHandle(ref: function)
   }
 
   public static func makePreparedScriptHandle(
@@ -176,7 +199,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     _ context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let rawValue = value.withCString { JS_NewString(context.ref, $0) }
-    return QuickJSValueHandle(ref: rawValue, contextRef: context.ref)
+    return QuickJSValueHandle(ref: rawValue)
   }
 
   public static func makeSymbolValueHandle(
@@ -184,14 +207,14 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     _ context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let rawValue = value.withCString { JS_NewSymbol(context.ref, $0, false) }
-    return QuickJSValueHandle(ref: rawValue, contextRef: context.ref)
+    return QuickJSValueHandle(ref: rawValue)
   }
 
   public static func makeNumberValueHandle(
     _ value: Double,
     _ context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
-    QuickJSValueHandle(ref: JS_NewFloat64(context.ref, value), contextRef: context.ref)
+    QuickJSValueHandle(ref: JS_NewFloat64(context.ref, value))
   }
 
   public static func makeBooleanValueHandle(
@@ -199,13 +222,12 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     _ context: QuickJSContextHandle
   ) -> QuickJSValueHandle? {
     let ref = CQuickJSValue(u: .init(int32: Int32(value ? 1 : 0)), tag: Int64(JS_TAG_BOOL))
-    return QuickJSValueHandle(ref: ref, contextRef: context.ref)
+    return QuickJSValueHandle(ref: ref)
   }
 
   public static func makeNullValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle? {
     QuickJSValueHandle(
-      ref: quickJSImmediateValue(tag: Int32(JS_TAG_NULL)),
-      contextRef: context.ref
+      ref: quickJSImmediateValue(tag: Int32(JS_TAG_NULL))
     )
   }
 
@@ -213,8 +235,7 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     -> QuickJSValueHandle?
   {
     QuickJSValueHandle(
-      ref: quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
-      contextRef: context.ref
+      ref: quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
     )
   }
 
@@ -230,11 +251,11 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     quickJSResultHandle(for: JS_NewArray(context.ref), in: context.ref)
   }
 
-  public static func isValueHandleCompatibleWithContext(
-    _ value: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+  public static func isContextCompatibleWith(
+    _ this: QuickJSContextHandle,
+    _ that: QuickJSContextHandle
   ) -> Bool {
-    JS_GetRuntime(value.contextRef) == JS_GetRuntime(context.ref)
+    JS_GetRuntime(this.ref) == JS_GetRuntime(that.ref)
   }
 }
 
@@ -281,28 +302,27 @@ private func quickJSFunctionCallback(
   }
 
   let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
+  let scope = JSCallbackScope<QuickJSEngine>(contextHandle: contextHandle)
+
   let callback = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
     .takeUnretainedValue()
     .value
-  let thisValue = SwiftJavaScript.JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(
-      ref: thisValueRef,
-      contextRef: contextRef
-    )
+
+  let thisValue = JSCallbackValue<QuickJSEngine>(
+    handle: QuickJSValueHandle(ref: thisValueRef)
   )
 
-  let result = withQuickJSArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
-    callback(context, thisValue, $0)
+  let result = withQuickJSArguments(
+    arguments, count: Int(argumentCount),
+    contextRef: contextRef,
+  ) { args in
+    callback(scope.context, thisValue, args)
   }
-  thisValue.discard()
 
-  switch consume result {
-  case .value(let value):
-    return value.takeHandle().ref
-  case .exception(let error):
-    return JS_Throw(contextRef, error.takeHandle().ref)
+  if result.isException {
+    return JS_Throw(contextRef, result.handle.ref)
   }
+  return result.handle.ref
 }
 
 private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?) {
@@ -316,17 +336,16 @@ private func withQuickJSArguments<R: ~Copyable>(
   _ arguments: UnsafeMutablePointer<CQuickJSValue>?,
   count: Int,
   contextRef: OpaquePointer,
-  _ body: (borrowing JSArguments<QuickJSEngine>) -> R
+  _ body: (borrowing JSCallbackArguments<QuickJSEngine>) -> R
 ) -> R {
-  let swiftArguments = JSArguments<QuickJSEngine>(
+  let swiftArguments = JSCallbackArguments<QuickJSEngine>(
     count: count,
-    borrowedValueHandleAt: { index, contextHandle in
+    borrowedValueHandleAt: { index in
       guard index >= 0, index < count, let arguments else {
         return nil
       }
       return QuickJSValueHandle(
-        ref: arguments[index],
-        contextRef: contextHandle.ref
+        ref: arguments[index]
       )
     }
   )

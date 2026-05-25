@@ -181,7 +181,7 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   typealias Engine = MockEngine
   typealias RawValue = MockValue
 
-  private let storagePointer: UnsafeMutableRawPointer
+  let storagePointer: UnsafeMutableRawPointer
 
   var rawValue: MockValue {
     Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue().rawValue
@@ -189,6 +189,10 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
 
   init(rawValue: MockValue) {
     self.init(rawValue: rawValue, onRelease: nil)
+  }
+
+  init(storagePointer: UnsafeMutableRawPointer) {
+    self.storagePointer = storagePointer
   }
 
   private init(rawValue: MockValue, onRelease: (@Sendable () -> Void)?) {
@@ -204,29 +208,17 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
     MockValueHandle(rawValue: rawValue, onRelease: onRelease)
   }
 
-  public var storageWords: JSValueStorageWords {
-    (
-      word0: UInt64(UInt(bitPattern: storagePointer)),
-      word1: 0,
-      word2: 0
-    )
-  }
-
-  public init(storageWords: JSValueStorageWords) {
-    self.storagePointer = UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!
-  }
-
   var engineType: MockEngine.Type {
     MockEngine.self
   }
 
-  public func retainReference() -> Bool {
+  public func retainReference(in: Context) -> Bool {
     let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
     _ = Unmanaged.passRetained(storage)
     return true
   }
 
-  public func releaseReference() -> Bool {
+  public func releaseReference(in: Context) -> Bool {
     let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
     storage.recordReleaseReference()
     _ = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeRetainedValue()
@@ -241,19 +233,6 @@ public enum MockEngine: JSEngine {
   public typealias ClassHandle = MockClassHandle
   public typealias PropertyStringKeyHandle = MockStringHandle
   public typealias PreparedScriptHandle = MockStringHandle
-}
-
-@Test func jsValueHandleStorageWordsRoundTripMockHandlePointerWord() {
-  let handle = MockValueHandle(rawValue: MockValue(kind: "number", payload: "42"))
-  defer { _ = handle.releaseReference() }
-
-  let storageWords = handle.storageWords
-
-  #expect(storageWords.word1 == 0)
-  #expect(storageWords.word2 == 0)
-
-  let restored = MockValueHandle(storageWords: storageWords)
-  #expect(restored.rawValue == handle.rawValue)
 }
 
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
@@ -318,6 +297,30 @@ public enum MockEngine: JSEngine {
 }
 
 private enum MockDriver: JSEngine {
+  static func fromStorageWords(_ storageWords: SwiftJavaScript.JSValueStorageWords) -> (
+    MockValueHandle, MockContextHandle
+  ) {
+    return (
+      .init(storagePointer: UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!),
+      .init(rawContext:)
+    )
+  }
+
+  static func isContextCompatibleWith(_ this: MockContextHandle, _ that: MockContextHandle) -> Bool
+  {
+    return true
+  }
+
+  static func makeStorageWords(value: MockValueHandle, in context: MockContextHandle)
+    -> SwiftJavaScript.JSValueStorageWords
+  {
+    return (
+      word0: UInt64(UInt(bitPattern: value.storagePointer)),
+      word1: 0,
+      word2: 0
+    )
+  }
+
   typealias ValueHandle = MockValueHandle
   typealias ClassHandle = MockClassHandle
   typealias Engine = MockEngine
@@ -574,13 +577,13 @@ extension MockDriver {
       rawValue: MockValue(kind: "object", payload: "\(context.rawContext.runtimeID):global"))
   }
 
-  @_optimize(none)
   fileprivate static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
   ) -> JSValueHandle<MockEngine>? {
-    _ = callback; _ = name
+    _ = callback
+    _ = name
 
     return JSValueHandle<MockEngine>(
       rawValue: MockValue(kind: "function", payload: "\(context.rawContext.runtimeID):\(name)"))
@@ -1969,5 +1972,3 @@ extension MockEngine {
   #expect(value.contains(.noAutomaticPrototype))
   #expect(JSClassAttributes.none.rawValue == 0)
 }
-
-

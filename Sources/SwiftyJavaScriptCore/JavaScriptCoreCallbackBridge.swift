@@ -7,24 +7,30 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
     return JSValueMakeUndefined(ctx)
   }
 
-  let context = JSInstantContext<JavaScriptCoreEngine>(ctx: ctx)
+  let contextHandle = JavaScriptCoreContextHandle(borrowing: ctx)
+  let scope = JSCallbackScope<JavaScriptCoreEngine>(contextHandle: contextHandle)
+
   let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
-  let thisValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: thisObject, ctx: context)
-  let argumentsAddress = arguments.map { UInt(bitPattern: $0) } ?? 0
-  let argumentsPointer = UnsafePointer<JSValueRef?>(bitPattern: argumentsAddress)
-  let result = withJavaScriptCoreArguments(argumentsPointer, count: Int(argumentCount)) { args in
-    callback(context, thisValue, args).toPrivateResult()
+
+  let thisValue = JSCallbackValue<JavaScriptCoreEngine>(
+    handle: JavaScriptCoreValueHandle(ref: thisObject),
+  )
+
+  let result = withJavaScriptCoreCallbackArguments(
+    pointer: arguments,
+    count: Int(argumentCount),
+    contextRef: ctx,
+  ) { args in
+    callback(scope.context, thisValue, args)
   }
 
-  switch result {
-  case .value(let value):
-    return value
-  case .exception(let error):
-    exception?.pointee = error
+  if result.isException {
+    exception?.pointee = result.handle.ref
     return JSValueMakeUndefined(ctx)
   }
+  return result.handle.ref
 }
 
 func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
@@ -41,26 +47,56 @@ func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefini
   return definition
 }
 
+func withJavaScriptCoreCallbackArguments<R: ~Copyable>(
+  pointer: UnsafePointer<JSValueRef?>?,
+  count: Int,
+  contextRef: JSGlobalContextRef,
+  _ body: (borrowing JSCallbackArguments<JavaScriptCoreEngine>) -> R
+) -> R {
+  var ref: JSValueRef? = nil
+  return withUnsafePointer(
+    to: &ref,
+    { empty in
+      let arguments = JSCallbackArguments<JavaScriptCoreEngine>(
+        count: count,
+        borrowedValueHandleAt: { index in
+          guard
+            index >= 0,
+            index < count,
+            let valueRef = (pointer ?? empty)[index]
+          else {
+            return nil
+          }
+          return JavaScriptCoreValueHandle(ref: valueRef)
+        }
+      )
+      return body(arguments)
+    })
+}
+
+// Legacy version for JSClass callbacks (uses old JSArguments pattern)
 func withJavaScriptCoreArguments<R: ~Copyable>(
   _ pointer: UnsafePointer<JSValueRef?>?,
   count: Int,
   _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
 ) -> R {
-  var empty: JSValueRef? = nil
-  return withUnsafePointer(to: &empty) { emptyPointer in
-    let arguments = JSArguments<JavaScriptCoreEngine>(
-      count: count,
-      borrowedValueHandleAt: { index, contextHandle in
-        guard
-          index >= 0,
-          index < count,
-          let valueRef = (pointer ?? emptyPointer)[index]
-        else {
-          return nil
+  var ref: JSValueRef? = nil
+  return withUnsafePointer(
+    to: &ref,
+    { empty in
+      let arguments = JSArguments<JavaScriptCoreEngine>(
+        count: count,
+        borrowedValueHandleAt: { index, contextHandle in
+          guard
+            index >= 0,
+            index < count,
+            let valueRef = (pointer ?? empty)[index]
+          else {
+            return nil
+          }
+          return JavaScriptCoreValueHandle(ref: valueRef)
         }
-        return JavaScriptCoreValueHandle(ref: valueRef, contextRef: contextHandle.ref)
-      }
-    )
-    return body(arguments)
-  }
+      )
+      return body(arguments)
+    })
 }

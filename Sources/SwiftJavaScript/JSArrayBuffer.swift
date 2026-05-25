@@ -38,7 +38,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer")
     }
 
-    self.value = JSValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -78,7 +78,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer from bytes")
     }
 
-    self.value = JSValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -176,7 +176,7 @@ extension JSArrayBuffer: JSValueEncodable {
     )
 
     let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
-    return JSValue(handleValue: handle)
+    return JSValue(handleValue: handle, in: context.driverContextHandle)
   }
 
   public func tryEncode<TargetEngine: JSEngine>(
@@ -218,7 +218,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create TypedArray")
     }
 
-    self.value = JSValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -284,7 +284,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to create TypedArray from ArrayBuffer")
     }
 
-    self.value = JSValue(handleValue: handle)
+    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -347,7 +347,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
       preconditionFailure("Failed to read TypedArray buffer")
     }
     return JSArrayBuffer(
-      storedValue: JSValue(handleValue: bufferHandle),
+      storedValue: JSValue(handleValue: bufferHandle, in: contextHandle),
       contextHandle: contextHandle
     )
   }
@@ -390,7 +390,7 @@ extension JSTypedArray: JSValueEncodable {
     )
 
     let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
-    return JSValue(handleValue: handle)
+    return JSValue(handleValue: handle, in: context.driverContextHandle)
   }
 
   public func tryEncode<TargetEngine: JSEngine>(

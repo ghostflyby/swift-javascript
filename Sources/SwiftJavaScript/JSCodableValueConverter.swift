@@ -268,7 +268,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         propertyStringKey.borrowHandle(in: context),
         on: object,
         in: context.driverContextHandle
-      )
+      ), in: context.driverContextHandle
     )
 
     switch consume result {
@@ -289,7 +289,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         at: index,
         on: object,
         in: context.driverContextHandle
-      )
+      ), in: context.driverContextHandle
     )
 
     switch consume result {

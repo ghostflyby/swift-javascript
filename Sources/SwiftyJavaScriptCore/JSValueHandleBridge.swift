@@ -34,10 +34,9 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     in context: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
   ) {
     let handle = JavaScriptCoreValueHandle(
-      ref: ref,
-      contextRef: context.driverContextHandle.ref
+      ref: ref
     )
-    self.init(handleValue: handle)
+    self.init(handleValue: handle, in: context.driverContextHandle)
   }
 
   var ref: JSValueRef {

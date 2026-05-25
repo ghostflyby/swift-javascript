@@ -1,7 +1,8 @@
-@testable import SwiftJavaScript
 import SwiftyJavaScriptCore
 import SwiftyQuickJS
 import Testing
+
+@testable import SwiftJavaScript
 
 @Suite
 struct EngineRuntimeDriverTests {
@@ -345,12 +346,12 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
       return
     }
     defer {
-      _ = value.releaseReference()
+      value.releaseReference(in: sourceContext)
       _ = targetContext.releaseReference()
       _ = sourceContext.releaseReference()
     }
 
-    let isCompatible = E.isValueHandleCompatibleWithContext(value, in: targetContext)
+    let isCompatible = E.isContextCompatibleWith(sourceContext, targetContext)
     let targetValue = E.toNumberForHandle(value, in: targetContext)
 
     #expect(isCompatible)

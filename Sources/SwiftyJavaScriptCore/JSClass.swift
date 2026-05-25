@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+
 public typealias JSClass = SwiftJavaScript.JSClass<JavaScriptCoreEngine>
 
 public struct JavaScriptCoreClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,

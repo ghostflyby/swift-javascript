@@ -124,7 +124,6 @@ public struct QuickJSContextHandle: JSContextManualReferenceCountedHandle, @unch
   }
 }
 
-
 extension QuickJSContextHandle: Hashable {
   public static func == (lhs: QuickJSContextHandle, rhs: QuickJSContextHandle) -> Bool {
     lhs.rawRef == rhs.rawRef
@@ -136,59 +135,26 @@ extension QuickJSContextHandle: Hashable {
 }
 
 public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+  public typealias Context = QuickJSContextHandle
 
-  private let rawRef: CQuickJSValue
-  private let rawContextRef: OpaquePointer
+  let rawRef: CQuickJSValue
 
-  init(ref: CQuickJSValue, contextRef: OpaquePointer, ownsValue: Bool = true) {
+  init(ref: CQuickJSValue) {
     self.rawRef = ref
-    self.rawContextRef = contextRef
   }
 
   var ref: CQuickJSValue {
-    updateStackTop()
     return rawRef
   }
 
-  var contextRef: OpaquePointer {
-    updateStackTop()
-    return rawContextRef
+  public func retainReference(in context: QuickJSContextHandle) {
+    _ = JS_DupValue(context.ref, rawRef)
   }
 
-  @inline(__always)
-  func updateStackTop() {
-    JS_UpdateStackTop(JS_GetRuntime(rawContextRef))
+  public func releaseReference(in context: QuickJSContextHandle) {
+    JS_FreeValue(context.ref, rawRef)
   }
 
-  @discardableResult
-  public func retainReference() -> Bool {
-    updateStackTop()
-    _ = JS_DupValue(rawContextRef, rawRef)
-    return true
-  }
-
-  @discardableResult
-  public func releaseReference() -> Bool {
-    updateStackTop()
-    JS_FreeValue(rawContextRef, rawRef)
-    return true
-  }
-
-  public var storageWords: JSValueStorageWords {
-    updateStackTop()
-    return (
-      word0: UInt64(bitPattern: rawRef.tag),
-      word1: unsafeBitCast(rawRef.u, to: UInt64.self),
-      word2: UInt64(UInt(bitPattern: rawContextRef))
-    )
-  }
-
-  public init(storageWords: JSValueStorageWords) {
-    let tag = Int64(bitPattern: storageWords.word0)
-    let valueUnion = unsafeBitCast(storageWords.word1, to: JSValueUnion.self)
-    self.rawRef = CQuickJSValue(u: valueUnion, tag: tag)
-    self.rawContextRef = OpaquePointer(bitPattern: UInt(storageWords.word2))!
-  }
 }
 
 public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable {

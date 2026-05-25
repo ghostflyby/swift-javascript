@@ -23,7 +23,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
       return nil
     }
 
-    return JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref)
+    return JavaScriptCoreValueHandle(ref: objectRef)
   }
 
   public static func arrayBufferByteLengthForHandle(
@@ -65,7 +65,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
       return nil
     }
 
-    return JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref)
+    return JavaScriptCoreValueHandle(ref: objectRef)
   }
 
   public static func makeTypedArrayHandle(
@@ -87,7 +87,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: typedArrayRef, contextRef: context.ref)
+      return JavaScriptCoreValueHandle(ref: typedArrayRef)
     }
   }
 
@@ -114,7 +114,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: typedArrayRef, contextRef: context.ref)
+      return JavaScriptCoreValueHandle(ref: typedArrayRef)
     }
   }
 
@@ -166,7 +166,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: bufferRef, contextRef: context.ref)
+      return JavaScriptCoreValueHandle(ref: bufferRef)
     }
   }
 

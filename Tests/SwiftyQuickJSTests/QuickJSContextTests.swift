@@ -1,7 +1,7 @@
-import SwiftJavaScript
 import Synchronization
 import Testing
 
+@testable import SwiftJavaScript
 @testable import SwiftyQuickJS
 
 #if canImport(CQuickJSStatic)
@@ -77,20 +77,8 @@ private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sen
         return .value(SwiftJavaScript.JSValue<QuickJSEngine>(number: instance.count, in: context))
       case "label":
         return .value(
-          context.makeFunction(named: "label") { context, this, arguments in
-            guard let instance = try? Self.tryDecode(this, in: context),
-              arguments.count == 1
-            else {
-              return .value(SwiftJavaScript.JSValue<QuickJSEngine>(undefinedIn: context))
-            }
-            return arguments.unpack(at: 0, in: context) { prefix in
-              .value(
-                SwiftJavaScript.JSValue<QuickJSEngine>(
-                  string: "\(prefix.toString(in: context)):\(instance.name):\(instance.count)",
-                  in: context
-                )
-              )
-            }
+          context.makeFunction(named: "label") { c, _, _ in
+            JSCallbackReturn(temporary: c.makeUndefined().handle)
           }
         )
       default:

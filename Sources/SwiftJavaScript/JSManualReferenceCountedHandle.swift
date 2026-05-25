@@ -15,12 +15,13 @@ public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedH
 /// Use a pointer-based storage if 24 bytes are insufficient.
 public typealias JSValueStorageWords = (word0: UInt64, word1: UInt64, word2: UInt64)
 
-public protocol JSValueManualReferenceCountedHandle: JSManualReferenceCountedHandle {
-  /// The handle's reference encoded as fixed-width storage words.
-  var storageWords: JSValueStorageWords { get }
+public protocol JSValueManualReferenceCountedHandle {
 
-  /// Initializes a handle from fixed-width storage words.
-  init(storageWords: JSValueStorageWords)
+  associatedtype Context: JSContextManualReferenceCountedHandle
+
+  func retainReference(in context: Context)
+
+  func releaseReference(in context: Context)
 }
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

@@ -315,7 +315,7 @@ extension JSValue {
         key,
         on: borrowHandle(),
         in: context.driverContextHandle
-      ))
+      ), in: context.driverContextHandle)
     switch consume result
     {
     case .value(let value):
@@ -334,7 +334,7 @@ extension JSValue {
         key.borrowHandle(in: context),
         on: borrowHandle(),
         in: context.driverContextHandle
-      ))
+      ), in: context.driverContextHandle)
     switch consume result
     {
     case .value(let value):
@@ -353,7 +353,7 @@ extension JSValue {
         key.borrowHandle(),
         on: borrowHandle(),
         in: context.driverContextHandle
-      ))
+      ), in: context.driverContextHandle)
     switch consume result
     {
     case .value(let value):
@@ -372,7 +372,7 @@ extension JSValue {
         at: index,
         on: borrowHandle(),
         in: context.driverContextHandle
-      ))
+      ), in: context.driverContextHandle)
     switch consume result
     {
     case .value(let value):

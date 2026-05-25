@@ -147,13 +147,13 @@ extension QuickJSEngine: JSEngineClassBridgeDriver {
     if JS_SetOpaque(object, privateData) < 0 {
       JS_FreeValue(context.ref, object)
       let exception = JS_GetException(context.ref)
-      return .exception(QuickJSValueHandle(ref: exception, contextRef: context.ref))
+      return .exception(QuickJSValueHandle(ref: exception))
     }
     quickJSClassObjectContextRegistry.record(context.ref, for: privateData)
     initializeClassObject(object, definition: definition, in: context.ref)
     installStaticValueMembers(on: object, definition: definition, in: context.ref)
     installStaticFunctionMembers(on: object, definition: definition, in: context.ref)
-    return .value(QuickJSValueHandle(ref: object, contextRef: context.ref))
+    return .value(QuickJSValueHandle(ref: object))
   }
 
   public static func classObjectPrivateData(
@@ -277,7 +277,7 @@ private func quickJSClassFinalizer(_ runtimeRef: OpaquePointer?, _ value: CQuick
   let contextRef = quickJSClassObjectContextRegistry.removeContext(for: privateData)
   if let finalize = definition.finalize, let contextRef {
     let thisValue = JSValue<QuickJSEngine>(
-      handleValue: QuickJSValueHandle(ref: value, contextRef: contextRef)
+      handleValue: QuickJSValueHandle(ref: value), in: QuickJSContextHandle(ref: contextRef)
     )
     finalize(thisValue)
     _ = thisValue.takeHandle()
@@ -303,7 +303,8 @@ private func quickJSClassGetProperty(
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: object),
+    in: contextHandle
   )
 
   guard definition.getProperty != nil,
@@ -337,10 +338,11 @@ private func quickJSClassSetProperty(
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: object), in: contextHandle
   )
   let newValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: value, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: value),
+    in: contextHandle
   )
 
   let shouldUseDynamicSetter =
@@ -400,7 +402,7 @@ private func quickJSClassHasProperty(
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: object), in: contextHandle
   )
 
   let result: Int32 =
@@ -441,7 +443,8 @@ private func quickJSClassDeleteProperty(
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: object),
+    in: contextHandle
   )
 
   let result: Int32
@@ -468,7 +471,8 @@ private func initializeClassObject(
   let contextHandle = QuickJSContextHandle(ref: contextRef)
   let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: object),
+    in: contextHandle
   )
   initialize(thisValue, context)
   thisValue.discard()
@@ -593,7 +597,8 @@ private func quickJSStaticValueGetterCallback(
     .takeUnretainedValue()
     .value
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: thisValueRef),
+    in: contextHandle
   )
   let result = value.propertyValue(in: context, on: thisValue)
   thisValue.discard()
@@ -618,14 +623,15 @@ private func quickJSStaticValueSetterCallback(
     .takeUnretainedValue()
     .value
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: thisValueRef),
+    in: contextHandle
   )
   let newValue = JSValue<QuickJSEngine>(
     handleValue: QuickJSValueHandle(
       ref: argumentCount > 0 && arguments != nil
         ? arguments![0] : quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
-      contextRef: contextRef
-    )
+    ),
+    in: contextHandle
   )
   let exception = value.setPropertyException(in: context, on: thisValue, to: newValue)
   thisValue.discard()
@@ -692,7 +698,8 @@ private func quickJSStaticFunctionCallback(
     .takeUnretainedValue()
     .function
   let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef, contextRef: contextRef)
+    handleValue: QuickJSValueHandle(ref: thisValueRef),
+    in: contextHandle
   )
 
   let result = quickJSClassArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
@@ -721,7 +728,7 @@ private func quickJSClassArguments<R: ~Copyable>(
       guard index >= 0, index < count, let arguments else {
         return nil
       }
-      return QuickJSValueHandle(ref: arguments[index], contextRef: contextHandle.ref)
+      return QuickJSValueHandle(ref: arguments[index])
     }
   )
   return body(swiftArguments)

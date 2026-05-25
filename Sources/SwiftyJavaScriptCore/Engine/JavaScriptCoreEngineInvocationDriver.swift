@@ -134,7 +134,7 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
-      return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
+      return .value(JavaScriptCoreValueHandle(ref: objectRef))
     }
   }
 

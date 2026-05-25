@@ -130,7 +130,7 @@ where
       in: context.driverContextHandle
     ) {
     case .value(let object):
-      return JSValue<Engine>(handleValue: object)
+      return JSValue<Engine>(handleValue: object, in: context.driverContextHandle)
     case .exception:
       _ = Unmanaged<JSClassAutoObjectStorage<ClassDefinition>>
         .fromOpaque(privateData)
@@ -164,7 +164,8 @@ where
       "This conversion path only supports \(Engine.self)"
     )
     let engineValue = JSValue<Engine>(
-      handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<Engine>.self)
+      handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<Engine>.self),
+      in: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
     )
     let engineContext = JSInstantContext<Engine>(
       handle: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
@@ -185,7 +186,7 @@ where
     )
     let encoded = try Self.tryEncode(value, in: engineContext)
     let handle = unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self)
-    return JSValue<E>(handleValue: handle)
+    return JSValue<E>(handleValue: handle, in: context.driverContextHandle)
   }
 
   public static func encode<E: JSEngine>(

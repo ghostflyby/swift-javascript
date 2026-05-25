@@ -140,7 +140,7 @@ extension JSValue where E.Engine == E {
     let count = countTypePack(repeat (each A).self)
     let callback: JSFunctionCallback<E> = { context, this, arguments in
       guard arguments.count == count else {
-        return .value(JSValue(undefinedIn: context))
+        return context.returnUndefined()
       }
       do {
         let typedArgs: (repeat each A) = try arguments.tryUnpack(
@@ -149,14 +149,15 @@ extension JSValue where E.Engine == E {
         )
         let r: R = try swiftFunction(repeat each typedArgs)
         let encoded = try r.tryEncode(in: context)
-        return .value(encoded)
+        return context.return(encoded)
       } catch let error as Err {
         if let encoded = try? error.tryEncode(in: context) {
-          return .exception(encoded)
+          let cb = JSCallbackValue<E>(handle: encoded.handle)
+          return context.throw(cb)
         }
-        return .exception(JSValue(undefinedIn: context))
+        return context.throwUndefined()
       } catch {
-        return .exception(JSValue(undefinedIn: context))
+        return context.throwUndefined()
       }
     }
     self.init(name: name, callback: callback, in: context)
@@ -180,7 +181,7 @@ extension JSValue where E.Engine == E {
     let callback: JSFunctionCallback<E> = {
       [swiftFunction] context, this, arguments in
       guard arguments.count == count else {
-        return .value(JSValue(undefinedIn: context))
+        return context.returnUndefined()
       }
       do {
         let typedArgs: (repeat (each C).SwiftType) = try arguments.tryUnpack(
@@ -189,14 +190,15 @@ extension JSValue where E.Engine == E {
         )
         let r: RCoder.SwiftType = try swiftFunction(repeat each typedArgs)
         let encoded = try RCoder.tryEncode(r, in: context)
-        return .value(encoded)
+        return context.return(encoded)
       } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
-          return .exception(encoded)
+          let cb = JSCallbackValue<E>(handle: encoded.handle)
+          return context.throw(cb)
         }
-        return .exception(JSValue(undefinedIn: context))
+        return context.throwUndefined()
       } catch {
-        return .exception(JSValue(undefinedIn: context))
+        return context.throwUndefined()
       }
     }
     self.init(name: name, callback: callback, in: context)

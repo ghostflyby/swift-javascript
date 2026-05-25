@@ -51,12 +51,11 @@ private func makeJavaScriptCoreObjectResultHandle(
 ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
   guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
     let exception = JavaScriptCoreValueHandle(
-      ref: JSValueMakeUndefined(context.ref)!,
-      contextRef: context.ref
+      ref: JSValueMakeUndefined(context.ref)!
     )
     return .exception(exception)
   }
-  return .value(JavaScriptCoreValueHandle(ref: objectRef, contextRef: context.ref))
+  return .value(JavaScriptCoreValueHandle(ref: objectRef))
 }
 
 private func makeJavaScriptCoreAutoJSClass(
