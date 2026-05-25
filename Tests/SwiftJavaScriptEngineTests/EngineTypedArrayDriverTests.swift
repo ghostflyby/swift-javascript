@@ -70,7 +70,8 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
         return
       }
 
-      let typedArrayValue = JSValue<E>(handleValue: typedArrayHandle)
+      let typedArrayValue = JSValue<E>(
+        handleValue: typedArrayHandle, in: context.driverContextHandle)
       guard let typedArray = JSTypedArray<E>(value: typedArrayValue, in: context) else {
         Issue.record("Expected created value to wrap as JSTypedArray")
         return
@@ -127,7 +128,8 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
         return
       }
 
-      let lengthConstructedValue = JSValue<E>(handleValue: lengthConstructedHandle)
+      let lengthConstructedValue = JSValue<E>(
+        handleValue: lengthConstructedHandle, in: context.driverContextHandle)
       guard let lengthConstructed = JSTypedArray<E>(value: lengthConstructedValue, in: context)
       else {
         Issue.record("Expected length-created value to wrap as JSTypedArray")

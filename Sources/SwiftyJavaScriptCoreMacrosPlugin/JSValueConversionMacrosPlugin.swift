@@ -758,9 +758,9 @@ private func makeEnumDecodeCase(
       decodeExpression = "try \(associatedValue.typeName).tryDecode(__payload, in: context)"
     }
     return """
-      case "\(enumCase.name)":
-        let __payload = value.getProperty(forKey: __payloadKey, in: context)
-        return .\(enumCase.name)(\(decodeExpression))
+       case "\(enumCase.name)":
+         let __payload = value.getProperty(forKey: __payloadKey, in: context)
+         return .\(enumCase.name)(\(decodeExpression))
       """
   case .multipleUnlabeled:
     var lines: [String] = [
@@ -1224,41 +1224,43 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
     let genericInitSource: String
     if declaration.as(ClassDeclSyntax.self) != nil {
       genericInitSource = """
-        public convenience init<E: JSEngine>(
-          value: borrowing JSValue<E>,
-          in context: borrowing JSInstantContext<E>
-        ) {
-          precondition(
-            E.self == JavaScriptCoreEngine.self,
-            "This conversion path only supports JavaScriptCoreEngine"
-          )
-          self.init(
-            value: JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
-            ),
-            in: JSInstantContext<JavaScriptCoreEngine>(
-              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+          public convenience init<E: JSEngine>(
+            value: borrowing JSValue<E>,
+            in context: borrowing JSInstantContext<E>
+          ) {
+            precondition(
+              E.self == JavaScriptCoreEngine.self,
+              "This conversion path only supports JavaScriptCoreEngine"
             )
+           self.init(
+             value: JSValue<JavaScriptCoreEngine>(
+                handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+                in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+             ),
+             in: JSInstantContext<JavaScriptCoreEngine>(
+               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+             )
           )
         }
         """
     } else {
       genericInitSource = """
         public init<E: JSEngine>(
-          value: borrowing JSValue<E>,
-          in context: borrowing JSInstantContext<E>
-        ) {
-          precondition(
-            E.self == JavaScriptCoreEngine.self,
-            "This conversion path only supports JavaScriptCoreEngine"
-          )
-          self.init(
-            value: JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
-            ),
-            in: JSInstantContext<JavaScriptCoreEngine>(
-              handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-            )
+           value: borrowing JSValue<E>,
+           in context: borrowing JSInstantContext<E>
+         ) {
+           precondition(
+             E.self == JavaScriptCoreEngine.self,
+             "This conversion path only supports JavaScriptCoreEngine"
+           )
+           self.init(
+             value: JSValue<JavaScriptCoreEngine>(
+                handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+                in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+             ),
+             in: JSInstantContext<JavaScriptCoreEngine>(
+               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
+             )
           )
         }
         """
@@ -1278,7 +1280,8 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
           return try Self.tryDecode(
             JSValue<JavaScriptCoreEngine>(
-              handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+               handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+               in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
             ),
             in: JSInstantContext<JavaScriptCoreEngine>(
               handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -1299,7 +1302,8 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             )
           )
           return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
+             handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self),
+             in: context.driverContextHandle
           )
         }
 
@@ -1316,29 +1320,30 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
             )
           )
           return JSValue<E>(
-            handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self)
+             handleValue: unsafeBitCast(__encoded.takeHandle(), to: JSValueHandle<E>.self),
+             in: context.driverContextHandle
           )
         }
 
-        \(initSource)
+         \(initSource)
 
-        public static func tryDecode(
-          _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-          in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-        ) throws(JSValueConversionError) -> Self {
-          \(decodeBody)
-        }
+         public static func tryDecode(
+           _ value: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+           in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+         ) throws(JSValueConversionError) -> Self {
+           \(decodeBody)
+         }
 
-        public func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-          do {
-            return try self.tryEncode(in: context)
-          } catch {
-            return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
-          }
-        }
+         public func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
+           do {
+             return try self.tryEncode(in: context)
+           } catch {
+             return SwiftJavaScript.JSValue<JavaScriptCoreEngine>(undefinedIn: context)
+           }
+         }
 
-        public func tryEncode(
-          in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+         public func tryEncode(
+           in context: borrowing JSInstantContext<JavaScriptCoreEngine>
         ) throws(JSValueConversionError) -> SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
           \(encodeBody)
         }

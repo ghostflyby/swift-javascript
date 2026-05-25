@@ -180,6 +180,7 @@ public final class MockStringHandle: JSPropertyStringKeyManualReferenceCountedHa
 public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
   typealias Engine = MockEngine
   typealias RawValue = MockValue
+  public typealias Context = MockContextHandle
 
   let storagePointer: UnsafeMutableRawPointer
 
@@ -212,17 +213,15 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
     MockEngine.self
   }
 
-  public func retainReference(in: Context) -> Bool {
+  public func retainReference(in: Context) {
     let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
     _ = Unmanaged.passRetained(storage)
-    return true
   }
 
-  public func releaseReference(in: Context) -> Bool {
+  public func releaseReference(in: Context) {
     let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
     storage.recordReleaseReference()
     _ = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeRetainedValue()
-    return true
   }
 }
 
@@ -233,6 +232,31 @@ public enum MockEngine: JSEngine {
   public typealias ClassHandle = MockClassHandle
   public typealias PropertyStringKeyHandle = MockStringHandle
   public typealias PreparedScriptHandle = MockStringHandle
+
+  public static func isContextCompatibleWith(_ this: MockContextHandle, _ that: MockContextHandle)
+    -> Bool
+  {
+    true
+  }
+
+  public static func makeStorageWords(value: MockValueHandle, in context: MockContextHandle)
+    -> JSValueStorageWords
+  {
+    (
+      word0: UInt64(UInt(bitPattern: value.storagePointer)),
+      word1: 0,
+      word2: 0
+    )
+  }
+
+  public static func fromStorageWords(_ storageWords: JSValueStorageWords) -> (
+    MockValueHandle, MockContextHandle
+  ) {
+    (
+      .init(storagePointer: UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!),
+      .init(rawContext: MockContext(runtimeID: ""))
+    )
+  }
 }
 
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
@@ -242,13 +266,15 @@ public enum MockEngine: JSEngine {
 
 @Test func jsValueDeinitReleasesHandleExactlyOnce() {
   let counter = MockValueReleaseCounter()
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
 
   do {
     let value = JSValue<MockEngine>(
       handleValue: .releaseCounting(
         rawValue: MockValue(kind: "object", payload: "deinit"),
         onRelease: counter.increment
-      )
+      ),
+      in: context
     )
     #expect(value.borrowHandle().rawValue.payload == "deinit")
     #expect(counter.releaseReferenceCount == 0)
@@ -259,13 +285,15 @@ public enum MockEngine: JSEngine {
 
 @Test func jsValueRetainedCopyDeinitReleasesEachWrapper() {
   let counter = MockValueReleaseCounter()
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
 
   do {
     let value = JSValue<MockEngine>(
       handleValue: .releaseCounting(
         rawValue: MockValue(kind: "object", payload: "retained"),
         onRelease: counter.increment
-      )
+      ),
+      in: context
     )
 
     do {
@@ -282,17 +310,19 @@ public enum MockEngine: JSEngine {
 
 @Test func jsValueTakeHandleSkipsDeinitUntilHandleRelease() {
   let counter = MockValueReleaseCounter()
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
 
   let value = JSValue<MockEngine>(
     handleValue: .releaseCounting(
       rawValue: MockValue(kind: "object", payload: "transfer"),
       onRelease: counter.increment
-    )
+    ),
+    in: context
   )
   let transferredHandle = value.takeHandle()
 
   #expect(counter.releaseReferenceCount == 0)
-  #expect(transferredHandle.releaseReference())
+  transferredHandle.releaseReference(in: context)
   #expect(counter.releaseReferenceCount == 1)
 }
 
@@ -302,7 +332,7 @@ private enum MockDriver: JSEngine {
   ) {
     return (
       .init(storagePointer: UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!),
-      .init(rawContext:)
+      .init(rawContext: MockContext(runtimeID: ""))
     )
   }
 
@@ -1710,7 +1740,8 @@ extension MockEngine {
 
 @Test func engineValuePreservesHandleAndEngineType() {
   let handle = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "mock-value"))
-  let value = JSValue<MockEngine>(handleValue: handle)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
+  let value = JSValue<MockEngine>(handleValue: handle, in: context)
 
   let storedHandle = value.borrowHandle()
 
@@ -1721,7 +1752,8 @@ extension MockEngine {
 @Test func engineValueKeepsOpaquePayloadIdentity() {
   let payload = MockValue(kind: "number", payload: "runtime:7")
   let handle = JSValueHandle<MockEngine>(rawValue: payload)
-  let value = JSValue<MockEngine>(handleValue: handle)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
+  let value = JSValue<MockEngine>(handleValue: handle, in: context)
 
   let roundtrip = value.borrowHandle().rawValue
 
@@ -1731,7 +1763,8 @@ extension MockEngine {
 @Test func engineValueShellKeepsHandleAndEngineTyping() {
   let handle = JSValueHandle<MockEngine>(
     rawValue: MockValue(kind: "string", payload: "moved-jsvalue"))
-  let value = JSValue<MockEngine>(handleValue: handle)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
+  let value = JSValue<MockEngine>(handleValue: handle, in: context)
 
   let roundtripHandle = value.borrowHandle()
   #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))

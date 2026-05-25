@@ -20,16 +20,13 @@ import Testing
   await context.withInstantContext { context in
     let value = context.makeNumber(42)
     let handle = value.borrowHandle()
-    let storageWords = handle.storageWords
+    let storageWords = QuickJSEngine.makeStorageWords(
+      value: handle, in: context.driverContextHandle)
 
-    #expect(storageWords.word0 == UInt64(bitPattern: handle.ref.tag))
-    #expect(storageWords.word2 == UInt64(UInt(bitPattern: handle.contextRef)))
-
-    let restored = QuickJSValueHandle(storageWords: storageWords)
+    let (restored, restoredContext) = QuickJSEngine.fromStorageWords(storageWords)
     #expect(restored.ref.tag == handle.ref.tag)
-    #expect(restored.contextRef == handle.contextRef)
 
-    let reboundStorageWords = restored.storageWords
+    let reboundStorageWords = QuickJSEngine.makeStorageWords(value: restored, in: restoredContext)
     #expect(reboundStorageWords.word0 == storageWords.word0)
     #expect(reboundStorageWords.word1 == storageWords.word1)
     #expect(reboundStorageWords.word2 == storageWords.word2)

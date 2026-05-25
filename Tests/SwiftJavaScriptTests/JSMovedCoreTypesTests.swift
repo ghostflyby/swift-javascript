@@ -174,8 +174,10 @@ private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendab
 }
 
 private func mockUndefinedValue() -> JSValue<MockEngine> {
-  JSValue<MockEngine>(
-    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test"))
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
+  return JSValue<MockEngine>(
+    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
+    in: context
   )
 }
 

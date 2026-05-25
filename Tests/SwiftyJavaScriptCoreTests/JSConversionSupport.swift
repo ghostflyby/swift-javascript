@@ -105,7 +105,8 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
     return decode(
       JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self)
+          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+        in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
@@ -140,7 +141,9 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
         handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       )
     )
-    return JSValue<E>(handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self))
+    return JSValue<E>(
+      handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self),
+      in: context.driverContextHandle)
   }
 
   static func encode(
