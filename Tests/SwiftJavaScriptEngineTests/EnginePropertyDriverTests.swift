@@ -50,7 +50,7 @@ private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       let key: StaticString = "strKey"
       object.setProperty(3.5, forKey: key, in: context)
 
@@ -71,7 +71,7 @@ private enum SetGetHasDeletePropertyWithValueKey: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       let key = JSValue(string: "valueKey", in: context)
       object.setProperty("abc", forKey: key, in: context)
 
@@ -92,7 +92,7 @@ private enum SetGetPropertyAtIndex: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       object.setProperty(true, at: 2, in: context)
       let readIsBoolean = object.getProperty(at: 2, in: context).isBoolean(in: context)
       #expect(readIsBoolean)
@@ -306,7 +306,7 @@ private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
 
       // --- value type roundtrips ---
       let numKey: StaticString = "num"
@@ -383,5 +383,12 @@ private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
       let hasNullCharAfter = object.hasProperty(nullCharKey, in: context)
       #expect(!hasNullCharAfter)
     }
+  }
+}
+extension JSInstantContext {
+  fileprivate func makePersistentObject() -> JSValue<E> {
+    let result = makeObject()
+    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
+    return persist(cb)
   }
 }

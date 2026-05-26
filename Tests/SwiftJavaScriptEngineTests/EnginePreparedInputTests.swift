@@ -30,7 +30,7 @@ private enum PropertyStringKeyCanBeReused: ScriptEngineAssertion {
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       let key = context.makePropertyStringKey("count")
 
       object.setProperty(1, forKey: key, in: context)
@@ -51,7 +51,7 @@ private enum PropertyStringKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertio
     let context = JSContext<E>()
 
     await context.withInstantContext { context in
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       let keyText = "emoji_😀_\u{0}_tail"
       let key = context.makePropertyStringKey(keyText)
 
@@ -74,7 +74,7 @@ private enum PropertyStringKeyCanCreateStringValue: ScriptEngineAssertion {
       let value = context.makeString(from: key)
       let initialized = JSValue(string: key, in: context)
 
-      #expect(value.toString(in: context) == text)
+      #expect(value.toString() == text)
       #expect(initialized.toString(in: context) == text)
     }
   }
@@ -94,5 +94,12 @@ private enum PreparedScriptCanBeReused: ScriptEngineAssertion {
       let value = context.getGlobalProperty(forKey: "__preparedCount").toInt32(in: context)
       #expect(value == 2)
     }
+  }
+}
+extension JSInstantContext {
+  fileprivate func makePersistentObject() -> JSValue<E> {
+    let result = makeObject()
+    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
+    return persist(cb)
   }
 }

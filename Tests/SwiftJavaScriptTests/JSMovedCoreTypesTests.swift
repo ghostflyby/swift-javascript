@@ -224,13 +224,13 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let staticValue = JSStaticValue<MockEngine>(
     name: "title",
     attributes: [.readOnly],
-    getProperty: { context, _ in .value(context.makeString("title")) },
-    setProperty: { context, _, _ in .value(context.makeString("set")) }
+    getProperty: { context, _ in .value(context.persist(context.makeString("title"))) },
+    setProperty: { context, _, _ in .value(context.persist(context.makeString("set"))) }
   )
   let staticFunction = JSStaticFunction<MockEngine>(
     name: "render",
     attributes: [.dontDelete],
-    callAsFunction: { context, _, arguments in .value(context.makeNumber(arguments.count)) }
+    callAsFunction: { context, _, arguments in .value(context.persist(context.makeNumber(arguments.count))) }
   )
 
   #expect(staticValue.definition.name == "title")
@@ -257,8 +257,8 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let failingStaticValue = JSStaticValue<MockEngine>(
     name: "broken",
     attributes: [.none],
-    getProperty: { context, _ in .value(context.makeString("unused")) },
-    setProperty: { context, _, _ in .exception(context.makeString("error")) }
+    getProperty: { context, _ in .value(context.persist(context.makeString("unused"))) },
+    setProperty: { context, _, _ in .exception(context.persist(context.makeString("error"))) }
   )
 
   if let exception = failingStaticValue.setPropertyException(

@@ -65,7 +65,7 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
           types: Double.self,
           in: c
         )
-        return JSCallbackReturn(persistent: c.makeNumber(value + 1))
+        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value + 1)))
       }
 
       let result = function.call(arguments: 41, in: context)
@@ -211,13 +211,13 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
 
     await context.withInstantContext { context in
       let makeObject = context.makeFunction(named: "makeNativeObject") { c, _, _ in
-        let object = c.makeObject()
+        let object = c.makePersistentObject()
         object.setProperty("native", forKey: "kind", in: c)
         object.setProperty(7, forKey: "count", in: c)
         return JSCallbackReturn(persistent: object)
       }
       let throwObject = context.makeFunction(named: "throwNativeObject") { c, _, _ in
-        let error = c.makeObject()
+        let error = c.makePersistentObject()
         error.setProperty("native-error", forKey: "kind", in: c)
         error.setProperty(13, forKey: "code", in: c)
         return JSCallbackReturn(exception: error.takeHandle())
@@ -359,5 +359,12 @@ private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertio
       #expect(arrayIsObject)
       #expect(arrayIsArray)
     }
+  }
+}
+extension JSInstantContext {
+  fileprivate func makePersistentObject() -> JSValue<E> {
+    let result = makeObject()
+    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
+    return persist(cb)
   }
 }

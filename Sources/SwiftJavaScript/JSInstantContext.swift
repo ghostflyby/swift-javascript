@@ -19,7 +19,9 @@ private final class RuntimeScopeRegistry: NSObject, @unchecked Sendable {
   var activeContext: AnyHashable?
 }
 
-private final class RegistrySentinel: NSObject, @unchecked Sendable {}
+private final class RegistrySentinel: NSObject, NSCopying, @unchecked Sendable {
+  func copy(with zone: NSZone? = nil) -> Any { return self }
+}
 private let registrySentinel = RegistrySentinel()
 
 internal enum TLSCallbackStack {
@@ -37,7 +39,8 @@ internal enum TLSCallbackStack {
     return new
   }
 
-  static func push(_ context: any JSContextManualReferenceCountedHandle, key: AnyHashable) {
+  static func push(_ context: any JSContextManualReferenceCountedHandle) {
+    let key = AnyHashable(context)
     let reg = registry()
     reg.activeContext = key
     let s = reg.stacks[key] ?? ScopeStack()
@@ -46,7 +49,8 @@ internal enum TLSCallbackStack {
   }
 
   @discardableResult
-  static func pop(key: AnyHashable) -> (any JSContextManualReferenceCountedHandle)? {
+  static func pop(_ context: any JSContextManualReferenceCountedHandle) -> (any JSContextManualReferenceCountedHandle)? {
+    let key = AnyHashable(context)
     let reg = registry()
     guard let s = reg.stacks[key] else { return nil }
     let popped = s.pop()
@@ -111,20 +115,18 @@ private final class ScopeArena<Handle: Hashable>: @unchecked Sendable {
 public struct JSInstantContext<E: JSEngine>: ~Copyable {
   public let driverContextHandle: E.ContextHandle
   private let arena: ScopeArena<E.ValueHandle>
-  private let contextKey: AnyHashable
 
   package init(handle: E.ContextHandle) {
     self.driverContextHandle = handle
     self.arena = ScopeArena()
-    self.contextKey = AnyHashable(handle)
-    TLSCallbackStack.push(handle, key: contextKey)
+    TLSCallbackStack.push(handle)
   }
 
   deinit {
     for h in arena.created where !arena.removed.contains(h) {
       E.releaseCreatedHandle(h, in: driverContextHandle)
     }
-    TLSCallbackStack.pop(key: contextKey)
+    TLSCallbackStack.pop(driverContextHandle)
   }
 
   // MARK: - Arena tracking

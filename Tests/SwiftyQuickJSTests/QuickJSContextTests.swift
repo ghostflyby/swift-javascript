@@ -19,7 +19,7 @@ import Testing
 
   await context.withInstantContext { context in
     let value = context.makeNumber(42)
-    let handle = value.borrowHandle()
+    let handle = value.handle
     let storageWords = QuickJSEngine.makeStorageWords(
       value: handle, in: context.driverContextHandle)
 

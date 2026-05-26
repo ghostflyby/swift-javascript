@@ -162,7 +162,7 @@ private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAsse
         _ = c.makeFunction(named: "nested") { c2, _, _ in
           JSCallbackReturn(temporary: c2.makeUndefined().handle)
         }
-        return JSCallbackReturn(persistent: c.makeString(value))
+        return JSCallbackReturn(persistent: c.persist(c.makeString(value)))
       }
       let result = function.call(in: ic)
       switch consume result {
@@ -197,15 +197,15 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
       #expect(hasAnswer)
       #expect(answer == 41)
 
-      let object = context.makeObject()
+      let object = context.makePersistentObject()
       let flagKey: StaticString = "flag"
-      object.setProperty(context.makeBoolean(true), forKey: flagKey, in: context)
+      object.setProperty(context.persist(context.makeBoolean(true)), forKey: flagKey, in: context)
       let flag = object.getProperty(forKey: flagKey, in: context).toBool(in: context)
       #expect(flag)
 
       context.installGlobalFunction(named: "bump") { c, _, arguments in
         let value: Double = arguments.unpack(types: Double.self, in: c)
-        return JSCallbackReturn(persistent: c.makeNumber(value + 1))
+        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value + 1)))
       }
 
       let result = context.evaluateScript("bump(answer)")
@@ -236,7 +236,7 @@ private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion 
 
       context.installGlobalFunction(named: "double") { c, _, arguments in
         let value: Double = arguments.unpack(types: Double.self, in: c)
-        return JSCallbackReturn(persistent: c.makeNumber(value * 2))
+        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value * 2)))
       }
 
       let result = context.evaluateScript("double(count)")
@@ -356,5 +356,12 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
 
     #expect(isCompatible)
     #expect(targetValue == 7)
+  }
+}
+extension JSInstantContext {
+  fileprivate func makePersistentObject() -> JSValue<E> {
+    let result = makeObject()
+    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
+    return persist(cb)
   }
 }
