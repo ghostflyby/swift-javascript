@@ -8,7 +8,7 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
   }
 
   let contextHandle = JavaScriptCoreContextHandle(borrowing: ctx)
-  let scope = JSCallbackScope<JavaScriptCoreEngine>(contextHandle: contextHandle)
+  let scope = JSInstantContext<JavaScriptCoreEngine>(handle: contextHandle)
 
   let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
     JSObjectGetPrivate(function)!
@@ -23,7 +23,7 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
     count: Int(argumentCount),
     contextRef: ctx,
   ) { args in
-    callback(scope.context, thisValue, args)
+    callback(scope, thisValue, args)
   }
 
   if result.isException {

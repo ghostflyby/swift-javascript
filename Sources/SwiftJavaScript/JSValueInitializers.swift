@@ -1,12 +1,12 @@
 extension JSValue {
   public init(string value: String, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeString(value)
+      callbackContext.persist(callbackContext.makeString(value))
     }
   }
 
   public init(string value: String, in context: borrowing JSInstantContext<E>) {
-    self = context.makeString(value)
+    self = context.persist(context.makeString(value))
   }
 
   public init(
@@ -14,7 +14,7 @@ extension JSValue {
     in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeString(from: key)
+      callbackContext.persist(callbackContext.makeString(from: key))
     }
   }
 
@@ -22,89 +22,105 @@ extension JSValue {
     string key: borrowing JSPropertyStringKey<E>,
     in context: borrowing JSInstantContext<E>
   ) {
-    self = context.makeString(from: key)
+    self = context.persist(context.makeString(from: key))
   }
 
   public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeNumber(value)
+      callbackContext.persist(callbackContext.makeNumber(value))
     }
   }
 
   public init(number value: Double, in context: borrowing JSInstantContext<E>) {
-    self = context.makeNumber(value)
+    self = context.persist(context.makeNumber(value))
   }
 
   public init(
     number value: some BinaryInteger, in context: isolated JSContext<E> = #isolation
   ) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeNumber(value)
+      callbackContext.persist(callbackContext.makeNumber(value))
     }
   }
 
   public init(number value: some BinaryInteger, in context: borrowing JSInstantContext<E>) {
-    self = context.makeNumber(value)
+    self = context.persist(context.makeNumber(value))
   }
 
   public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeBoolean(value)
+      callbackContext.persist(callbackContext.makeBoolean(value))
     }
   }
 
   public init(boolean value: Bool, in context: borrowing JSInstantContext<E>) {
-    self = context.makeBoolean(value)
+    self = context.persist(context.makeBoolean(value))
   }
 
   public init(symbol: String, in context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeSymbol(symbol)
+      callbackContext.persist(callbackContext.makeSymbol(symbol))
     }
   }
 
   public init(symbol: String, in context: borrowing JSInstantContext<E>) {
-    self = context.makeSymbol(symbol)
+    self = context.persist(context.makeSymbol(symbol))
   }
 
   public init(nullIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeNull()
+      callbackContext.persist(callbackContext.makeNull())
     }
   }
 
   public init(nullIn context: borrowing JSInstantContext<E>) {
-    self = context.makeNull()
+    self = context.persist(context.makeNull())
   }
 
   public init(undefinedIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeUndefined()
+      callbackContext.persist(callbackContext.makeUndefined())
     }
   }
 
   public init(undefinedIn context: borrowing JSInstantContext<E>) {
-    self = context.makeUndefined()
+    self = context.persist(context.makeUndefined())
   }
 
   public init(objectIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeObject()
+      let result = callbackContext.makeObject()
+      guard case .value(let cb) = result else {
+        preconditionFailure("makeObject failed")
+      }
+      return callbackContext.persist(cb)
     }
   }
 
   public init(objectIn context: borrowing JSInstantContext<E>) {
-    self = context.makeObject()
+    let result = context.makeObject()
+    guard case .value(let cb) = result else {
+      preconditionFailure("makeObject failed")
+    }
+    self = context.persist(cb)
   }
 
   public init(arrayIn context: isolated JSContext<E> = #isolation) {
     self = context.withInstantContext { callbackContext in
-      callbackContext.makeArray()
+      let result = callbackContext.makeArray()
+      guard case .value(let cb) = result else {
+        preconditionFailure("makeArray failed")
+      }
+      return callbackContext.persist(cb)
     }
   }
 
   public init(arrayIn context: borrowing JSInstantContext<E>) {
-    self = context.makeArray()
+    let result = context.makeArray()
+    guard case .value(let cb) = result else {
+      preconditionFailure("makeArray failed")
+    }
+    self = context.persist(cb)
   }
 }
 
@@ -149,7 +165,7 @@ extension JSValue where E.Engine == E {
         )
         let r: R = try swiftFunction(repeat each typedArgs)
         let encoded = try r.tryEncode(in: context)
-        return context.return(encoded)
+        return JSCallbackReturn(persistent: encoded)
       } catch let error as Err {
         if let encoded = try? error.tryEncode(in: context) {
           let cb = JSCallbackValue<E>(handle: encoded.handle)
@@ -190,7 +206,7 @@ extension JSValue where E.Engine == E {
         )
         let r: RCoder.SwiftType = try swiftFunction(repeat each typedArgs)
         let encoded = try RCoder.tryEncode(r, in: context)
-        return context.return(encoded)
+        return JSCallbackReturn(persistent: encoded)
       } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
           let cb = JSCallbackValue<E>(handle: encoded.handle)

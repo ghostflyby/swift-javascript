@@ -92,6 +92,16 @@ public protocol JSEngineRuntimeDriver {
     _ storage: JSContextDataStorageBox?,
     in context: ContextHandle
   )
+
+  /// Release a value handle created by the engine that was not persisted or returned.
+  /// QuickJS: calls JS_FreeValue. JSC: no-op (GC-managed).
+  static func releaseCreatedHandle(_ handle: ValueHandle, in context: ContextHandle)
+}
+
+extension JSEngineRuntimeDriver {
+  public static func releaseCreatedHandle(_ handle: ValueHandle, in context: ContextHandle) {
+    // Default: no-op (JSC — GC manages value lifetimes)
+  }
 }
 
 extension JSEngineRuntimeDriver {

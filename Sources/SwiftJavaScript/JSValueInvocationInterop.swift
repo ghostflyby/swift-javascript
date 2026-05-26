@@ -16,7 +16,7 @@ extension JSInstantContext {
     values.reserveCapacity(countTypePack(repeat (each A).self))
 
     func appendArgument<T: JSValueEncodable>(_ argument: T) {
-      let encoded = (try? argument.tryEncode(in: self)) ?? makeUndefined()
+      let encoded = (try? argument.tryEncode(in: self)) ?? persist(makeUndefined())
       values.append(encoded.retainHandle())
     }
 
@@ -567,7 +567,7 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
   where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     let didSet = context.setProperty(
       key,
       on: self,
@@ -575,7 +575,7 @@ extension JSValue {
       attributes: attributes.hostMemberAttributes
     )
     guard didSet else {
-      return .exception(context.makeUndefined())
+      return .exception(context.persist(context.makeUndefined()))
     }
 
     return context.getProperty(key, on: self)
@@ -588,7 +588,7 @@ extension JSValue {
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
   where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     let didSet = context.setProperty(
       key,
       on: self,
@@ -596,7 +596,7 @@ extension JSValue {
       attributes: attributes.hostMemberAttributes
     )
     guard didSet else {
-      return .exception(context.makeUndefined())
+      return .exception(context.persist(context.makeUndefined()))
     }
 
     return context.getProperty(key, on: self)

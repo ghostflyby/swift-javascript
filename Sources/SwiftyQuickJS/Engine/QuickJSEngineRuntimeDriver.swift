@@ -257,6 +257,10 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
   ) -> Bool {
     JS_GetRuntime(this.ref) == JS_GetRuntime(that.ref)
   }
+
+  public static func releaseCreatedHandle(_ handle: QuickJSValueHandle, in context: QuickJSContextHandle) {
+    handle.releaseReference(in: context)
+  }
 }
 
 private func adjustedPreparedScriptSource(
@@ -302,7 +306,7 @@ private func quickJSFunctionCallback(
   }
 
   let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let scope = JSCallbackScope<QuickJSEngine>(contextHandle: contextHandle)
+  let scope = JSInstantContext<QuickJSEngine>(handle: contextHandle)
 
   let callback = Unmanaged<Box<JSFunctionCallback<QuickJSEngine>>>.fromOpaque(opaque)
     .takeUnretainedValue()
@@ -316,7 +320,7 @@ private func quickJSFunctionCallback(
     arguments, count: Int(argumentCount),
     contextRef: contextRef,
   ) { args in
-    callback(scope.context, thisValue, args)
+    callback(scope, thisValue, args)
   }
 
   if result.isException {

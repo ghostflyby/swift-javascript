@@ -15,7 +15,7 @@ public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedH
 /// Use a pointer-based storage if 24 bytes are insufficient.
 public typealias JSValueStorageWords = (word0: UInt64, word1: UInt64, word2: UInt64)
 
-public protocol JSValueManualReferenceCountedHandle {
+public protocol JSValueManualReferenceCountedHandle: Hashable {
 
   associatedtype Context: JSContextManualReferenceCountedHandle
 

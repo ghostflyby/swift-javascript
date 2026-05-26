@@ -9,7 +9,7 @@ extension Bool: JSValueDecodable, JSValueEncodable {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    context.makeBoolean(self)
+    context.persist(context.makeBoolean(self))
   }
 }
 
@@ -36,7 +36,7 @@ extension Double: JSValueDecodable, JSValueEncodable {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    context.makeNumber(self)
+    context.persist(context.makeNumber(self))
   }
 }
 
@@ -64,7 +64,7 @@ extension Int32: JSValueDecodable, JSValueEncodable {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    context.makeNumber(self)
+    context.persist(context.makeNumber(Double(self)))
   }
 }
 
@@ -96,7 +96,7 @@ extension UInt32: JSValueDecodable, JSValueEncodable {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    context.makeNumber(self)
+    context.persist(context.makeNumber(Double(self)))
   }
 }
 
@@ -127,7 +127,7 @@ extension String: JSValueDecodable, JSValueEncodable {
   public func toJSValue<E: JSEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
-    context.makeString(self)
+    context.persist(context.makeString(self))
   }
 }
 

@@ -106,7 +106,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
@@ -122,7 +122,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     setProperty(encoded, forKey: key, with: attributes, in: context)
   }
 
@@ -132,7 +132,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setValuePropertyHandle(
       key.borrowHandle(),
       on: borrowHandle(),
@@ -147,7 +147,7 @@ extension JSValue {
     at index: UInt32,
     in context: borrowing JSInstantContext<E>
   ) where Val: JSValueEncodable, Val: ~Copyable {
-    let encoded = (try? value.tryEncode(in: context)) ?? context.makeUndefined()
+    let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setIndexPropertyHandle(
       at: index,
       on: borrowHandle(),
@@ -206,7 +206,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setStaticStringPropertyHandle(
       key,
       on: borrowHandle(),
@@ -223,7 +223,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.persist(context.makeUndefined())
     setProperty(encoded, forKey: key, with: attributes, in: context)
   }
 
@@ -234,7 +234,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setValuePropertyHandle(
       key.borrowHandle(),
       on: borrowHandle(),
@@ -250,7 +250,7 @@ extension JSValue {
     using converter: C.Type,
     in context: borrowing JSInstantContext<E>
   ) {
-    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.makeUndefined()
+    let encoded = (try? converter.tryEncode(value, in: context)) ?? context.persist(context.makeUndefined())
     _ = E.setIndexPropertyHandle(
       at: index,
       on: borrowHandle(),
@@ -321,7 +321,7 @@ extension JSValue {
     case .value(let value):
       return value
     case .exception:
-      return context.makeUndefined()
+      return context.persist(context.makeUndefined())
     }
   }
 
@@ -340,7 +340,7 @@ extension JSValue {
     case .value(let value):
       return value
     case .exception:
-      return context.makeUndefined()
+      return context.persist(context.makeUndefined())
     }
   }
 
@@ -359,7 +359,7 @@ extension JSValue {
     case .value(let value):
       return value
     case .exception:
-      return context.makeUndefined()
+      return context.persist(context.makeUndefined())
     }
   }
 
@@ -378,7 +378,7 @@ extension JSValue {
     case .value(let value):
       return value
     case .exception:
-      return context.makeUndefined()
+      return context.persist(context.makeUndefined())
     }
   }
 

@@ -112,7 +112,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     do {
       return try tryEncode(value, in: context)
     } catch {
-      return context.makeUndefined()
+      return context.persist(context.makeUndefined())
     }
   }
 
@@ -208,19 +208,21 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   ) throws(JSValueConversionError) -> JSValue<E> {
     switch node {
     case .null:
-      return context.makeNull()
+      return context.persist(context.makeNull())
 
     case .bool(let value):
-      return context.makeBoolean(value)
+      return context.persist(context.makeBoolean(value))
 
     case .number(let value):
-      return context.makeNumber(value)
+      return context.persist(context.makeNumber(Double(value)))
 
     case .string(let value):
-      return context.makeString(value)
+      return context.persist(context.makeString(value))
 
     case .array(let array):
-      let arrayValue = context.makeArray()
+      let arrayResult = context.makeArray()
+      guard case .value(let arrayCb) = arrayResult else { throw .codable("array creation failed") }
+      let arrayValue = context.persist(arrayCb)
       for (index, item) in array.enumerated() {
         let encoded = try jsValueFromNode(item, in: context)
         guard
@@ -237,7 +239,9 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       return arrayValue
 
     case .object(let object):
-      let objectValue = context.makeObject()
+      let objectResult = context.makeObject()
+      guard case .value(let objectCb) = objectResult else { throw .codable("object creation failed") }
+      let objectValue = context.persist(objectCb)
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
         let propertyStringKey = context.makePropertyStringKey(key)

@@ -70,13 +70,13 @@ extension JSContext {
 
   public func makeString(_ value: String) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeString(value)
+      instantContext.persist(instantContext.makeString(value))
     }
   }
 
   public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeString(from: key)
+      instantContext.persist(instantContext.makeString(from: key))
     }
   }
 
@@ -94,31 +94,31 @@ extension JSContext {
 
   public func makeNumber(_ value: Double) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeNumber(value)
+      instantContext.persist(instantContext.makeNumber(value))
     }
   }
 
   public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeNumber(value)
+      instantContext.persist(instantContext.makeNumber(value))
     }
   }
 
   public func makeBoolean(_ value: Bool) -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeBoolean(value)
+      instantContext.persist(instantContext.makeBoolean(value))
     }
   }
 
   public func makeNull() -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeNull()
+      instantContext.persist(instantContext.makeNull())
     }
   }
 
   public func makeUndefined() -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeUndefined()
+      instantContext.persist(instantContext.makeUndefined())
     }
   }
 
@@ -180,13 +180,21 @@ extension JSContext {
 
   public func makeObject() -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeObject()
+      let result = instantContext.makeObject()
+      guard case .value(let cb) = result else {
+        preconditionFailure("makeObject failed")
+      }
+      return instantContext.persist(cb)
     }
   }
 
   public func makeArray() -> JSValue<E> {
     withInstantContext { instantContext in
-      instantContext.makeArray()
+      let result = instantContext.makeArray()
+      guard case .value(let cb) = result else {
+        preconditionFailure("makeArray failed")
+      }
+      return instantContext.persist(cb)
     }
   }
 

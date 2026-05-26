@@ -134,7 +134,7 @@ extension QuickJSContextHandle: Hashable {
   }
 }
 
-public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable {
+public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable, Hashable {
   public typealias Context = QuickJSContextHandle
 
   let rawRef: CQuickJSValue
@@ -145,6 +145,15 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
 
   var ref: CQuickJSValue {
     return rawRef
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawRef.tag == rhs.rawRef.tag && lhs.rawRef.u.int32 == rhs.rawRef.u.int32
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawRef.tag)
+    hasher.combine(rawRef.u.int32)
   }
 
   public func retainReference(in context: QuickJSContextHandle) {
