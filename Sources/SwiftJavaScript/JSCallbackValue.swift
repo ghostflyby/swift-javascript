@@ -4,7 +4,7 @@
 /// operation (`.toString()`, `.toNumber()`, `.getProperty()`, etc.) looks up
 /// the current callback scope on the thread-local scope stack.
 ///
-public struct JSCallbackValue<E: JSEngine>: ~Copyable {
+public struct JSCallbackValue<E: JSEngine> {
   /// The raw engine value handle, borrowed from the callback arguments frame.
   /// The engine owns the underlying reference; we do NOT retain/release here.
   public let handle: JSValueHandle<E>
@@ -19,9 +19,8 @@ public struct JSCallbackValue<E: JSEngine>: ~Copyable {
 extension JSCallbackValue {
   /// Returns the engine context handle for the current TLS scope,
   internal func resolveContext() -> E.ContextHandle {
-    guard let frame = TLSCallbackStack.top,
-      frame.engineTypeID == ObjectIdentifier(E.self),
-      let handle = frame.contextBox as? E.ContextHandle
+    guard let context = TLSCallbackStack.top,
+      let handle = context as? E.ContextHandle
     else {
       preconditionFailure(
         "JSCallbackValue<\(E.self)> used outside its callback scope"

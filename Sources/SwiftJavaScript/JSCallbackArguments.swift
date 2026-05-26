@@ -24,9 +24,6 @@ public struct JSCallbackArguments<E: JSEngine>: ~Copyable {
     guard let handle = borrowedValueHandleAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    precondition(
-      isInsideCallbackScope(for: E.self),
-      "withValue called outside a callback scope")
     let val = JSCallbackValue<E>(handle: handle)
     return body(val)
   }

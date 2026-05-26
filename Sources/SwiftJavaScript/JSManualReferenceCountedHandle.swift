@@ -8,7 +8,7 @@ public protocol JSManualReferenceCountedHandle: Sendable {
 
 public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle, Hashable {}
 
 /// Fixed-width words used by `JSValue` to store an engine-specific value handle.
 ///

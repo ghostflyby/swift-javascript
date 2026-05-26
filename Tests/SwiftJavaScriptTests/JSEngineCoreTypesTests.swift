@@ -28,7 +28,7 @@ public struct MockRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @uncheck
   }
 }
 
-public struct MockContext: Sendable, Equatable {
+public struct MockContext: Sendable, Hashable {
   let runtimeID: String
   let identity: String
 
@@ -38,7 +38,9 @@ public struct MockContext: Sendable, Equatable {
   }
 }
 
-public struct MockContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable {
+public struct MockContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable,
+  Hashable
+{
   let rawContext: MockContext
 
   init(rawContext: MockContext) {

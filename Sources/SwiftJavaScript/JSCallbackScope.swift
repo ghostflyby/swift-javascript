@@ -1,50 +1,76 @@
-/// A single frame on the per-thread callback scope stack.
 import Foundation
 
-/// Returns whether the current thread is inside an active callback scope for the given engine type.
-internal func isInsideCallbackScope<E: JSEngine>(for _: E.Type) -> Bool {
-  guard let frame = TLSCallbackStack.top,
-    frame.engineTypeID == ObjectIdentifier(E.self)
-  else { return false }
-  return true
-}
-
-internal struct JSCallbackScopeFrame: @unchecked Sendable {
-  let contextBox: any JSContextManualReferenceCountedHandle
-  let engineTypeID: ObjectIdentifier  // ObjectIdentifier(E.self)
-}
-
-/// Per-thread LIFO stack of callback scope frames.
+/// Per-thread LIFO stack of callback context handles.
 internal final class ScopeStack: @unchecked Sendable {
-  private var frames: [JSCallbackScopeFrame] = []
+  private var frames: [any JSContextManualReferenceCountedHandle] = []
 
-  func push(_ frame: JSCallbackScopeFrame) { frames.append(frame) }
-  func pop() { frames.removeLast() }
-  var top: JSCallbackScopeFrame? { frames.last }
+  func push(_ context: any JSContextManualReferenceCountedHandle) { frames.append(context) }
+  @discardableResult
+  func pop() -> (any JSContextManualReferenceCountedHandle)? { frames.popLast() }
+  var top: (any JSContextManualReferenceCountedHandle)? { frames.last }
+  var isEmpty: Bool { frames.isEmpty }
 }
 
-/// Thread-local access to the callback scope stack.
-private let tlsKey = "com.swiftjavascript.scopeStack"
+// MARK: - Runtime scope registry
+
+/// Per-thread registry of per-context scope stacks and the active context.
+/// Stored as a single object in Thread.threadDictionary so mutations happen
+/// in place without copying dictionaries in and out of TLS.
+private final class RuntimeScopeRegistry: NSObject, @unchecked Sendable {
+  var stacks: [AnyHashable: ScopeStack] = [:]
+  var activeContext: AnyHashable?
+}
+
+/// Stable identity-based sentinel key in Thread.threadDictionary.
+private final class RegistrySentinel: NSObject, @unchecked Sendable {}
+private let registrySentinel = RegistrySentinel()
+
+// MARK: - TLS-backed per-context scope stacks
 
 internal enum TLSCallbackStack {
-  static func push(_ frame: JSCallbackScopeFrame) {
-    stack().push(frame)
+
+  private static func tlsDictionary() -> NSMutableDictionary {
+    Thread.current.threadDictionary
   }
 
-  static func pop() {
-    stack().pop()
-  }
-
-  static var top: JSCallbackScopeFrame? {
-    stack().top
-  }
-
-  private static func stack() -> ScopeStack {
-    let dict = Thread.current.threadDictionary
-    if let existing = dict[tlsKey] as? ScopeStack { return existing }
-    let new = ScopeStack()
-    dict[tlsKey] = new
+  private static func registry() -> RuntimeScopeRegistry {
+    if let existing = tlsDictionary()[registrySentinel] as? RuntimeScopeRegistry {
+      return existing
+    }
+    let new = RuntimeScopeRegistry()
+    tlsDictionary()[registrySentinel] = new
     return new
+  }
+
+  // MARK: - Active runtime
+
+  static func push(_ context: any JSContextManualReferenceCountedHandle, key: AnyHashable) {
+    let reg = registry()
+    reg.activeContext = key
+    let s = reg.stacks[key] ?? ScopeStack()
+    s.push(context)
+    reg.stacks[key] = s
+  }
+
+  @discardableResult
+  static func pop(key: AnyHashable) -> (any JSContextManualReferenceCountedHandle)? {
+    let reg = registry()
+    guard let s = reg.stacks[key] else { return nil }
+    let popped = s.pop()
+    if s.isEmpty {
+      reg.stacks.removeValue(forKey: key)
+      reg.activeContext = nil
+    }
+    return popped
+  }
+
+  /// Returns the top context handle for the currently active context, or nil.
+  static var top: (any JSContextManualReferenceCountedHandle)? {
+    let reg = registry()
+    guard let active = reg.activeContext,
+      let s = reg.stacks[active]
+    else { return nil }
+    return s.top
   }
 }
 
@@ -91,21 +117,21 @@ public struct JSCallbackScope<E: JSEngine>: ~Copyable {
   /// The instant context for creating persistent values inside callbacks.
   public let context: JSInstantContext<E>
 
-  /// Unique identifier for this scope instance.
+  private let contextKey: AnyHashable
 
   /// Push a new frame onto the thread-local scope stack.
   package init(contextHandle: E.ContextHandle) {
     self.context = JSInstantContext<E>(handle: contextHandle)
+    self.contextKey = AnyHashable(contextHandle)
     TLSCallbackStack.push(
-      JSCallbackScopeFrame(
-        contextBox: contextHandle,
-        engineTypeID: ObjectIdentifier(E.self)
-      ))
+      contextHandle,
+      key: contextKey
+    )
   }
 
   /// Pop the scope's frame from the TLS stack.
   deinit {
-    TLSCallbackStack.pop()
+    TLSCallbackStack.pop(key: contextKey)
   }
 
   // MARK: - Persist

@@ -267,9 +267,8 @@ extension JSInstantContext {
 extension JSInstantContext {
   /// Upgrade a temporary callback value to a persistent JSValue.
   public func persist(_ value: borrowing JSCallbackValue<E>) -> JSValue<E> {
-    guard let frame = TLSCallbackStack.top,
-      frame.engineTypeID == ObjectIdentifier(E.self),
-      frame.contextBox is E.ContextHandle
+    guard let context = TLSCallbackStack.top,
+      context is E.ContextHandle
     else {
       preconditionFailure("Scope operation called outside an active callback scope")
     }
@@ -279,9 +278,8 @@ extension JSInstantContext {
 
   /// Wrap a temporary value as a callback return value (borrowed handle).
   public func `return`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
-    guard let frame = TLSCallbackStack.top,
-      frame.engineTypeID == ObjectIdentifier(E.self),
-      frame.contextBox is E.ContextHandle
+    guard let context = TLSCallbackStack.top,
+      context is E.ContextHandle
     else {
       preconditionFailure("Scope operation called outside an active callback scope")
     }
@@ -298,9 +296,8 @@ extension JSInstantContext {
 
   /// Mark a JS exception return value (borrowed temporary handle).
   public func `throw`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
-    guard let frame = TLSCallbackStack.top,
-      frame.engineTypeID == ObjectIdentifier(E.self),
-      frame.contextBox is E.ContextHandle
+    guard let context = TLSCallbackStack.top,
+      context is E.ContextHandle
     else {
       preconditionFailure("Scope operation called outside an active callback scope")
     }
