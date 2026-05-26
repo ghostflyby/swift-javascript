@@ -8,6 +8,18 @@ public struct MockRuntime: Sendable, Equatable {
   let id: String
 }
 
+// MARK: - Arena tracking counter for MockEngine
+
+private let mockReleaseCounter = Mutex<[MockValueHandle]>([])
+
+private func takeReleasedHandles() -> [MockValueHandle] {
+  mockReleaseCounter.withLock {
+    let result = Array($0)
+    $0.removeAll()
+    return result
+  }
+}
+
 public struct MockRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
   let rawRuntime: MockRuntime
 
@@ -259,6 +271,76 @@ public enum MockEngine: JSEngine {
       .init(rawContext: MockContext(runtimeID: ""))
     )
   }
+
+  public static func releaseCreatedHandle(_ handle: MockValueHandle, in context: MockContextHandle) {
+    contextReleaseLog.withLock {
+      $0[context.rawContext.identity, default: []].append(handle)
+    }
+  }
+}
+
+// MARK: - Arena lifecycle tests
+
+@Test func scopeArenaReleasesAbandonedValuesOnDeinit() {
+  let id = "scopeArenaReleasesAbandoned"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    _ = scope.makeString("a")
+    _ = scope.makeNumber(42)
+    _ = scope.makeBoolean(true)
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(releaseLog(for: id).count == 3)
+}
+
+@Test func scopeArenaSkipsPersistedValuesOnDeinit() {
+  let id = "scopeArenaSkipsPersisted"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    persisted = scope.persist(scope.makeString("keep"))
+  }
+
+  #expect(releaseLog(for: id).count == 0)
+  _ = persisted
+}
+
+@Test func scopeArenaBorrowingReturnDoesNotRemoveFromArena() {
+  let id = "scopeArenaBorrowingReturn"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    _ = scope.return(scope.makeString("temp"))
+  }
+
+  #expect(releaseLog(for: id).count == 1)
+}
+
+@Test func scopeArenaMixedLifecycle() {
+  let id = "scopeArenaMixed"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    let a = scope.makeString("abandoned")
+    _ = scope.return(scope.makeNumber(1))   // borrowing → stays
+    persisted = scope.persist(a)             // persisted → removed
+    _ = scope.makeBoolean(false)            // abandoned
+  }
+
+  _ = persisted
+  #expect(releaseLog(for: id).count == 2)  // number + boolean
 }
 
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
@@ -2006,4 +2088,15 @@ extension MockEngine {
   let value: JSClassAttributes = [.noAutomaticPrototype]
   #expect(value.contains(.noAutomaticPrototype))
   #expect(JSClassAttributes.none.rawValue == 0)
+}
+// MARK: - Arena tracking for MockEngine
+
+private let contextReleaseLog = Mutex<[String: [MockValueHandle]]>([:])
+
+private func releaseLog(for identity: String) -> [MockValueHandle] {
+  contextReleaseLog.withLock { $0[identity] ?? [] }
+}
+
+private func clearReleaseLog(for identity: String) {
+  contextReleaseLog.withLock { $0[identity] = nil }
 }
