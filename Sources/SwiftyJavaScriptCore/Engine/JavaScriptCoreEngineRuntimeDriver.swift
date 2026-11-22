@@ -58,7 +58,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     named name: String,
     callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
     in context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
     guard let functionRef = JSObjectMake(context.ref, context.functionClassRef, callbackRef) else {
       let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
@@ -66,7 +66,8 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
       )
       .takeRetainedValue()
       _ = callback.value
-      return javaScriptCoreMakeUndefined(in: context)
+      return JavaScriptCoreOwnedValueHandle.adopting(
+        javaScriptCoreMakeUndefined(in: context))
     }
     if !name.isEmpty {
       withJavaScriptCoreString("name") { nameKey in
@@ -81,7 +82,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
         )
       }
     }
-    return JavaScriptCoreValueHandle(ref: functionRef)
+    return JavaScriptCoreOwnedValueHandle(ref: functionRef)
   }
 
   public static func makePreparedScriptHandle(
@@ -172,26 +173,27 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   public static func makeStringValueHandle(
     _ value: String,
     _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    javaScriptCoreMakeStringValue(value, in: context)
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeStringValue(value, in: context))
   }
 
   public static func makeSymbolValueHandle(
     _ value: String,
     _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    withJavaScriptCoreString(value) { stringHandle in
-      JavaScriptCoreValueHandle(
-        ref: JSValueMakeSymbol(context.ref, stringHandle)!
-      )
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    // The string helper's generic result must stay Copyable; build the raw
+    // ref inside and wrap the ownership carrier outside.
+    let symbolRef = withJavaScriptCoreString(value) { stringHandle in
+      JSValueMakeSymbol(context.ref, stringHandle)!
     }
+    return JavaScriptCoreOwnedValueHandle(ref: symbolRef)
   }
 
   public static func makeNumberValueHandle(
     _ value: Double,
     _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreValueHandle(
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreOwnedValueHandle(
       ref: JSValueMakeNumber(context.ref, value)!
     )
   }
@@ -199,41 +201,49 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   public static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreValueHandle(
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreOwnedValueHandle(
       ref: JSValueMakeBoolean(context.ref, value)!
     )
   }
 
   public static func makeNullValueHandle(_ context: JavaScriptCoreContextHandle)
-    -> JavaScriptCoreValueHandle?
+    -> JSOwnedValueHandle<JavaScriptCoreEngine>?
   {
-    JavaScriptCoreValueHandle(
+    JavaScriptCoreOwnedValueHandle(
       ref: JSValueMakeNull(context.ref)
     )
   }
 
   public static func makeUndefinedValueHandle(
     _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    javaScriptCoreMakeUndefined(in: context)
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context))
   }
 
   public static func makeObjectResultHandle(
     _ context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSOwnedValueHandle<JavaScriptCoreEngine>>? {
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
-      return .exception(javaScriptCoreMakeUndefined(in: context))
+      return .exception(
+        JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
     }
-    return .value(JavaScriptCoreValueHandle(ref: objectRef))
+    return .value(JavaScriptCoreOwnedValueHandle(ref: objectRef))
   }
 
   public static func makeArrayResultHandle(
     _ context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSOwnedValueHandle<JavaScriptCoreEngine>>? {
     var exception: JSValueRef?
     let objectRef = JSObjectMakeArray(context.ref, 0, nil, &exception)
-    return javaScriptCoreResult(value: objectRef, exception: exception, in: context)
+    if let exception {
+      return .exception(JavaScriptCoreOwnedValueHandle(ref: exception))
+    }
+    guard let objectRef else {
+      return .value(
+        JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
+    }
+    return .value(JavaScriptCoreOwnedValueHandle(ref: objectRef))
   }
 
   public static func isContextCompatibleWith(
@@ -241,25 +251,6 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     _ that: JavaScriptCoreContextHandle
   ) -> Bool {
     JSContextGetGroup(this.ref) == JSContextGetGroup(that.ref)
-  }
-  public static func makeStorageWords(
-    value: JavaScriptCoreValueHandle, in context: JavaScriptCoreContextHandle
-  ) -> SwiftJavaScript.JSValueStorageWords {
-    return (
-      word0: UInt64(UInt(bitPattern: value.ref)),
-      word1: UInt64(UInt(bitPattern: context.ref)),
-      word2: 0
-    )
-  }
-
-  public static func fromStorageWords(_ storageWords: SwiftJavaScript.JSValueStorageWords) -> (
-    JavaScriptCoreValueHandle, JavaScriptCoreContextHandle
-  ) {
-    return (
-      JavaScriptCoreValueHandle(ref: JSValueRef(bitPattern: UInt(storageWords.word0))!),
-      JavaScriptCoreContextHandle(
-        adopting: JSGlobalContextRef(bitPattern: UInt(storageWords.word1))!)
-    )
   }
 
 }

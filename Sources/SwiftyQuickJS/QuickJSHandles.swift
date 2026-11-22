@@ -134,8 +134,10 @@ extension QuickJSContextHandle: Hashable {
   }
 }
 
-public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable, Hashable {
+public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable, Hashable
+{
   public typealias Context = QuickJSContextHandle
+  public typealias Owned = QuickJSOwnedValueHandle
 
   let rawRef: CQuickJSValue
 
@@ -147,13 +149,22 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
     return rawRef
   }
 
+  /// Full-identity equality: tag plus the complete 8-byte union payload.
+  /// Comparing only `u.int32` truncates heap pointers to their low 32 bits,
+  /// which lets two distinct live objects collide and corrupts identity
+  /// matching (e.g. the scope arena's persist removal).
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.rawRef.tag == rhs.rawRef.tag && lhs.rawRef.u.int32 == rhs.rawRef.u.int32
+    guard lhs.rawRef.tag == rhs.rawRef.tag else { return false }
+    return withUnsafeBytes(of: lhs.rawRef.u) { lhsBytes in
+      withUnsafeBytes(of: rhs.rawRef.u) { rhsBytes in
+        lhsBytes.elementsEqual(rhsBytes)
+      }
+    }
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(rawRef.tag)
-    hasher.combine(rawRef.u.int32)
+    withUnsafeBytes(of: rawRef.u) { hasher.combine($0.load(as: UInt64.self)) }
   }
 
   public func retainReference(in context: QuickJSContextHandle) {
@@ -164,6 +175,43 @@ public struct QuickJSValueHandle: JSValueManualReferenceCountedHandle, @unchecke
     JS_FreeValue(context.ref, rawRef)
   }
 
+}
+
+/// Ownership carrier for a QuickJS value reference (`~Copyable`).
+///
+/// QuickJS is reference-counted: every engine creation or value-operation
+/// call returns a +1 reference. Wrapping exactly those results in this
+/// noncopyable type makes double frees (and lost releases) a compile-time
+/// error — the owned reference can live in only one place (creation
+/// result, scope-arena element, or handoff).
+public struct QuickJSOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
+  Equatable, ~Copyable
+{
+  public typealias Context = QuickJSContextHandle
+  public typealias Borrowed = QuickJSValueHandle
+
+  let rawRef: CQuickJSValue
+
+  init(ref: CQuickJSValue) {
+    self.rawRef = ref
+  }
+
+  public borrowing func borrowed() -> QuickJSValueHandle {
+    QuickJSValueHandle(ref: rawRef)
+  }
+
+  public static func adopting(_ handle: borrowing QuickJSValueHandle) -> Self {
+    Self(ref: handle.rawRef)
+  }
+
+  public static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+    guard lhs.rawRef.tag == rhs.rawRef.tag else { return false }
+    return withUnsafeBytes(of: lhs.rawRef.u) { lhsBytes in
+      withUnsafeBytes(of: rhs.rawRef.u) { rhsBytes in
+        lhsBytes.elementsEqual(rhsBytes)
+      }
+    }
+  }
 }
 
 public struct QuickJSClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable {

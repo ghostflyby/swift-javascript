@@ -321,12 +321,13 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 前置:Stage 1 稳定;确认最低工具链声明(swift-tools-version 提升到 6.4)可接受。
 
-**A. 借用/拥有拆分与直接存储:**
+**A. 借用/拥有拆分与直接存储(已完成):**
 
-- [ ] handle 拆为两个类型(命名待定,§7):`ValueHandle`(Copyable 身份/借用 token,非拥有,复制无副作用)与 `OwnedValueHandle: ~Copyable`(所有权载体)。QuickJS 双 free 防护精确落在所有权点:创建结果(+1)、arena 数组元素、`JSCallbackReturn` handoff、driver 所有权转移签名全部改走 `OwnedValueHandle`(`borrowing`/`consuming` 语义)
-- [ ] `JSValue`/`JSCallbackValue` 直接以存储属性持有 `handle + ContextHandle`(皆 Copyable);`JSValueStorageWords`、`makeStorageWords/fromStorageWords` 与逐访问解码整体删除
-- [ ] JSC/QuickJS backend handle 类型改造:各拆出 owned 变体(经 SE-0499 的 `Hashable` 放宽保持一致性)
-- [ ] QuickJS 双 free 防护测试:构造"曾经可编译、现在应编译失败"的样例进 `SwiftJavaScriptTests`
+- [x] handle 拆为两个类型(占位名,§7):`ValueHandle`(Copyable 借用 token)与 `OwnedValueHandle: ~Copyable`(所有权载体),双协议单向联动(`Owned.Borrowed == Self`——~Copyable 协议不允许指回 Self 的 same-type 约束)。范围边界:创建工厂与 `makeFunctionValueHandle` 返回 owned,值操作签名维持 borrowed(`bridgeCallbackResult` 经 `adopting` 显式升级后 track,全量 owned 化随 B 块重扫);`JSCallbackReturn.handle` 维持 Copyable(§7 问题 2:temporary/exception 是借用、persistent 的 +1 已由 `takeHandle` 交接,随 Stage 3 定案)
+- [x] `JSValue`/`JSCallbackValue` 直接存储 handle+ContextHandle;storage words 三件套删除(Sources/Tests 零残留)。`JSValue` 以 Optional 守卫 + `init(taking:)` 委派式落地(Swift 6.4 禁非平凡可析构泛型的 `discard self`/init 内 `self =`)
+- [x] arena 改分块 `UnsafeMutablePointer` 栈(Array 不支持 ~Copyable 元素,实测);persist 摘除放弃创建引用。**【开放】**该放弃在 QuickJS 上净 +1 泄漏(既有问题):两种结算方案均致并行崩溃(释放从未归零的对象首次触发 quickjs finalizer/GC 路径,根因待查),正确修法为 §3.7 Rooting 分派,排期 Stage 3
+- [x] backend owned 变体落位(`JavaScriptCoreOwnedValueHandle`/`QuickJSOwnedValueHandle`),trampoline 引用交接逐字面核验;QuickJS 句柄判等升级为全位 identity(tag+完整 union 位比较)
+- [x] 双 free 负面样例以文档块+独立探针实测落地(朴素 `let duplicate = owned` 在仅借用使用时被当作重绑定接受,样例须取消耗性使用形态)
 
 **B. driver 协议分解与 context 实例方法化(与 TODO §1.3 合流):**
 
@@ -338,6 +339,7 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 前置:Stage 1 完成(作用域栈迁移与值操作 context 寻址稳定)。这是本重构的中心阶段。
 
+- [ ] **【验收指标】**`JSCallbackReturn` exception/persistent 路径 owned 交接 + persist QuickJS +1 泄漏清零(§2.3 开放项,ASan 已定位机制:借用缺锚):修复落地后**重放结算语义**(先 `retainReference` 后 settle)并以 `swift test --sanitize=address` 全量通过(单测与满载并行各一轮),Mock 释放计数断言恢复结算语义的精确计数——三项全过方可关闭开放项
 - [ ] `ScopeCore` 引入编译期 `Rooting` 策略参数(§3.7):同步 scope 维持 `implicitStackRoots`(JSC 白嫖栈扫描),默认 scope 走 `explicitRoots`
 - [ ] `JSContext` 增加默认 scope(§3.6):context 级长存 `ScopeCore`(`explicitRoots`),deinit 时 drain;actor 值工厂改落默认 scope;**JSC 值入 arena 必须 protect-on-add、drain 时 unprotect**(§3.7 硬约束;QuickJS 策略恒等,`releaseCreatedHandle` 语义不变)
 - [ ] `JSValue` 去 owning 语义:移除 `deinit` 的 `releaseReference(in:)` 与 home-context 释放职责;存储已是直接属性(handle+ctx,Stage 2 完成)

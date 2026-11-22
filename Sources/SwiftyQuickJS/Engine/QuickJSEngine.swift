@@ -15,6 +15,7 @@ public enum QuickJSEngine: Sendable, SendableMetatype {
   public typealias RuntimeHandle = QuickJSRuntimeHandle
   public typealias ContextHandle = QuickJSContextHandle
   public typealias ValueHandle = QuickJSValueHandle
+  public typealias OwnedValueHandle = QuickJSOwnedValueHandle
   public typealias ClassHandle = QuickJSClassHandle
   public typealias PropertyStringKeyHandle = QuickJSPropertyStringKeyHandle
   public typealias PreparedScriptHandle = QuickJSPreparedScriptHandle

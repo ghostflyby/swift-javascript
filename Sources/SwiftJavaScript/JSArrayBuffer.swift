@@ -15,10 +15,21 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     self.contextHandle = contextHandle
   }
 
+  /// Adopt another buffer's wrapped value without an extra retain (inits
+  /// cannot assign `self =` once stored properties are not trivially
+  /// destructible).
+  private init(taking other: consuming JSArrayBuffer<E>) {
+    let context = other.contextHandle
+    let handle = other.value.takeHandle()
+    self.value = JSValue(handleValue: handle, in: context)
+    self.contextHandle = context
+  }
+
   public init(byteLength: Int, in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      JSArrayBuffer(byteLength: byteLength, in: callbackContext)
-    }
+    self.init(
+      taking: context.withInstantContext { callbackContext in
+        JSArrayBuffer(byteLength: byteLength, in: callbackContext)
+      })
   }
 
   public init(byteLength: Int, in context: borrowing JSInstantContext<E>) {
@@ -43,9 +54,10 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
   }
 
   public init(copying bytes: [UInt8], in context: isolated JSContext<E> = #isolation) {
-    self = context.withInstantContext { callbackContext in
-      JSArrayBuffer(copying: bytes, in: callbackContext)
-    }
+    self.init(
+      taking: context.withInstantContext { callbackContext in
+        JSArrayBuffer(copying: bytes, in: callbackContext)
+      })
   }
 
   public init(copying bytes: [UInt8], in context: borrowing JSInstantContext<E>) {
@@ -56,9 +68,10 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     copying bytes: UnsafeRawBufferPointer,
     in context: isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      JSArrayBuffer(copying: bytes, in: callbackContext)
-    }
+    self.init(
+      taking: context.withInstantContext { callbackContext in
+        JSArrayBuffer(copying: bytes, in: callbackContext)
+      })
   }
 
   public init(
@@ -92,7 +105,7 @@ public struct JSArrayBuffer<E: JSEngine>: ~Copyable {
     else {
       return nil
     }
-    self = wrapped
+    self.init(taking: wrapped)
   }
 
   public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {
@@ -195,14 +208,23 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     self.contextHandle = contextHandle
   }
 
+  /// Adopt another array's wrapped value without an extra retain.
+  private init(taking other: consuming JSTypedArray<E>) {
+    let context = other.contextHandle
+    let handle = other.value.takeHandle()
+    self.value = JSValue(handleValue: handle, in: context)
+    self.contextHandle = context
+  }
+
   public init(
     type: JSTypedArrayKind,
     length: Int,
     in context: isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      JSTypedArray(type: type, length: length, in: callbackContext)
-    }
+    self.init(
+      taking: context.withInstantContext { callbackContext in
+        JSTypedArray(type: type, length: length, in: callbackContext)
+      })
   }
 
   public init(type: JSTypedArrayKind, length: Int, in context: borrowing JSInstantContext<E>) {
@@ -229,15 +251,16 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     length: Int? = nil,
     in context: isolated JSContext<E> = #isolation
   ) {
-    self = context.withInstantContext { callbackContext in
-      JSTypedArray(
-        type: type,
-        buffer: buffer,
-        byteOffset: byteOffset,
-        length: length,
-        in: callbackContext
-      )
-    }
+    self.init(
+      taking: context.withInstantContext { callbackContext in
+        JSTypedArray(
+          type: type,
+          buffer: buffer,
+          byteOffset: byteOffset,
+          length: length,
+          in: callbackContext
+        )
+      })
   }
 
   public init(
@@ -298,7 +321,7 @@ public struct JSTypedArray<E: JSEngine>: ~Copyable {
     else {
       return nil
     }
-    self = wrapped
+    self.init(taking: wrapped)
   }
 
   public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {

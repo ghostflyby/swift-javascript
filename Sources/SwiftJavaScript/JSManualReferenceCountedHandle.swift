@@ -10,18 +10,51 @@ public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedH
 
 public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle, Hashable {}
 
-/// Fixed-width words used by `JSValue` to store an engine-specific value handle.
+/// Copyable borrow token for an engine value handle.
 ///
-/// Use a pointer-based storage if 24 bytes are insufficient.
-public typealias JSValueStorageWords = (word0: UInt64, word1: UInt64, word2: UInt64)
-
+/// Copying has no side effect and confers no ownership: the underlying
+/// engine reference (when the engine is reference-counted) is owned
+/// elsewhere — by a scope arena, by `JSValue`'s owning-by-convention
+/// storage, or by the engine itself.
 public protocol JSValueManualReferenceCountedHandle: Hashable {
 
   associatedtype Context: JSContextManualReferenceCountedHandle
 
+  /// The `~Copyable` ownership-carrier counterpart of this borrowed token.
+  associatedtype Owned: JSOwnedValueManualReferenceCountedHandle
+  where Owned: ~Copyable, Owned.Borrowed == Self, Owned.Context == Context
+
   func retainReference(in context: Context)
 
   func releaseReference(in context: Context)
+}
+
+/// The ownership carrier for an engine-created value reference.
+///
+/// `~Copyable` (SE-0503) so an owning reference can exist in exactly one
+/// place: creation results (+1 under reference counting), scope-arena
+/// elements, and ownership handoffs. Conversion to and from the Copyable
+/// borrowed token is always explicit — `borrowed()` downgrades without
+/// releasing, `adopting(_:)` claims an already-owning reference without
+/// changing the reference count. `Equatable` (SE-0499) supports arena
+/// identity checks; `Hashable` is deliberately not required because
+/// noncopyable values cannot be collection elements.
+public protocol JSOwnedValueManualReferenceCountedHandle: Equatable, ~Copyable {
+
+  associatedtype Context: JSContextManualReferenceCountedHandle
+
+  /// The Copyable borrow token sharing this handle's identity.
+  associatedtype Borrowed: JSValueManualReferenceCountedHandle
+  where Borrowed.Context == Context
+
+  /// Explicit downgrade: yield the Copyable borrow token without
+  /// releasing the owned reference.
+  borrowing func borrowed() -> Borrowed
+
+  /// Explicit upgrade: claim an already-owning reference held in borrowed
+  /// form (e.g. an engine value-operation result) as owned. No reference
+  /// counting happens here.
+  static func adopting(_ handle: borrowing Borrowed) -> Self
 }
 
 public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

@@ -41,9 +41,9 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   public static func makeStringValueHandle(
     fromPropertyStringKey key: QuickJSPropertyStringKeyHandle,
     in context: QuickJSContextHandle
-  ) -> QuickJSValueHandle? {
+  ) -> QuickJSOwnedValueHandle? {
     let value = JS_AtomToString(context.ref, key.atom)
-    return QuickJSValueHandle(ref: value)
+    return QuickJSOwnedValueHandle(ref: value)
   }
 
   public static func propertyNamesForHandle(

@@ -4,6 +4,51 @@ import Testing
 
 @testable import SwiftJavaScript
 
+// MARK: - Stage 2A negative compile examples (not automatable in Swift Testing)
+//
+// 「owned handle 被复制/存入集合应编译失败」是编译期契约:Swift Testing 无法
+// 在测试内断言编译期失败(需要独立的负面编译用例),以下样例仅以文档形式
+// 保留,标注「应编译失败」,该验证未自动化:
+//
+//     func sink(_ handle: consuming MockOwnedValueHandle) {}
+//
+//     let owned = MockOwnedValueHandle(
+//       rawValue: MockValue(kind: "string", payload: "owned"))
+//
+//     // ✗ 应编译失败 —— owned handle 是 ~Copyable 所有权载体(SE-0503),
+//     // 同一 owning 引用只能存在于一处:第二处独立(消耗性)使用意味着
+//     // 前面的绑定必须是复制:
+//     let duplicate = owned
+//     sink(duplicate)
+//     sink(owned)
+//
+//     // ✗ 应编译失败(复制的另一形态)——消耗性移交后原绑定继续使用:
+//     sink(owned)
+//     _ = owned.borrowed()
+//
+//     // ✗ 应编译失败 —— ~Copyable 值不能作为集合元素(数组要求元素
+//     // Copyable),存入集合即隐式复制:
+//     var bucket: [MockOwnedValueHandle] = []
+//     bucket.append(owned)
+//
+// 注意:仅当原绑定此后不再使用时,`let duplicate = owned` 才被编译器当作重
+// 绑定接受、不构成复制;原绑定与新绑定同为借用性使用仍会编译失败——复制负
+// 样例必须以独立/消耗性使用呈现。
+//
+// 借用侧 `MockValueHandle` 是 Copyable 身份 token,复制/入集合合法且无副
+// 作用;两侧之间的所有权流转只能经显式转换——`borrowed()` 降级(不释放)、
+// `adopting(_:)` 升级(不改引用计数)。
+//
+// 构建探针实测结论(2026-11-22,Apple Swift 6.4.2 / swiftlang-6.4.2.1.9;
+// 探针文件临时加入 `SwiftJavaScriptTests` target 后 `swift build --build-tests`,
+// 复制/入集合两类样例分别构建,验证后删除探针并重建通过):
+// - 复制样例(`sink(duplicate); sink(owned)`)报
+//   error: 'owned' consumed more than once;
+// - 复制样例(`sink(owned)` 后 `owned.borrowed()`)报
+//   error: 'owned' used after consume;
+// - 入集合样例(`[MockOwnedValueHandle]`)报
+//   error: type 'MockOwnedValueHandle' does not conform to protocol 'Copyable'。
+
 public struct MockRuntime: Sendable, Equatable {
   let id: String
 }
@@ -227,6 +272,8 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
     MockEngine.self
   }
 
+  public typealias Owned = MockOwnedValueHandle
+
   public func retainReference(in: Context) {
     let storage = Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue()
     _ = Unmanaged.passRetained(storage)
@@ -239,10 +286,43 @@ public struct MockValueHandle: JSValueManualReferenceCountedHandle, @unchecked S
   }
 }
 
+/// `~Copyable` ownership carrier mirroring the engine backends' owned
+/// handles: wraps the same `MockValueHandleStorage` identity so
+/// `borrowed()`/`adopting(_:)` round-trip the release-counting hooks.
+public struct MockOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle, Equatable, ~Copyable {
+  public typealias Context = MockContextHandle
+  public typealias Borrowed = MockValueHandle
+
+  let storagePointer: UnsafeMutableRawPointer
+
+  init(rawValue: MockValue) {
+    self.storagePointer = Unmanaged.passRetained(
+      MockValueHandleStorage(rawValue: rawValue, onReleaseReference: nil)
+    ).toOpaque()
+  }
+
+  init(storagePointer: UnsafeMutableRawPointer) {
+    self.storagePointer = storagePointer
+  }
+
+  var rawValue: MockValue {
+    Unmanaged<MockValueHandleStorage>.fromOpaque(storagePointer).takeUnretainedValue().rawValue
+  }
+
+  public borrowing func borrowed() -> MockValueHandle {
+    MockValueHandle(storagePointer: storagePointer)
+  }
+
+  public static func adopting(_ handle: borrowing MockValueHandle) -> MockOwnedValueHandle {
+    MockOwnedValueHandle(storagePointer: handle.storagePointer)
+  }
+}
+
 public enum MockEngine: JSEngine {
   public typealias RuntimeHandle = MockRuntimeHandle
   public typealias ContextHandle = MockContextHandle
   public typealias ValueHandle = MockValueHandle
+  public typealias OwnedValueHandle = MockOwnedValueHandle
   public typealias ClassHandle = MockClassHandle
   public typealias PropertyStringKeyHandle = MockStringHandle
   public typealias PreparedScriptHandle = MockStringHandle
@@ -253,29 +333,11 @@ public enum MockEngine: JSEngine {
     true
   }
 
-  public static func makeStorageWords(value: MockValueHandle, in context: MockContextHandle)
-    -> JSValueStorageWords
-  {
-    (
-      word0: UInt64(UInt(bitPattern: value.storagePointer)),
-      word1: 0,
-      word2: 0
-    )
-  }
-
-  public static func fromStorageWords(_ storageWords: JSValueStorageWords) -> (
-    MockValueHandle, MockContextHandle
+  public static func releaseCreatedHandle(
+    _ handle: consuming MockOwnedValueHandle, in context: MockContextHandle
   ) {
-    (
-      .init(storagePointer: UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!),
-      .init(rawContext: MockContext(runtimeID: ""))
-    )
-  }
-
-  public static func releaseCreatedHandle(_ handle: MockValueHandle, in context: MockContextHandle)
-  {
     contextReleaseLog.withLock {
-      $0[context.rawContext.identity, default: []].append(handle)
+      $0[context.rawContext.identity, default: []].append(handle.borrowed())
     }
   }
 }
@@ -309,6 +371,7 @@ public enum MockEngine: JSEngine {
     persisted = scope.persist(scope.makeString("keep"))
   }
 
+  // persist 摘除创建引用不结算(已知 +1 泄漏,排期 §3.7 Rooting);JSValue 自持引用不在此路径释放。
   #expect(releaseLog(for: id).count == 0)
   _ = persisted
 }
@@ -336,12 +399,143 @@ public enum MockEngine: JSEngine {
     let scope = JSInstantContext<MockEngine>(handle: context)
     let a = scope.makeString("abandoned")
     _ = scope.return(scope.makeNumber(1))  // borrowing → stays
-    persisted = scope.persist(a)  // persisted → removed
+    persisted = scope.persist(a)  // persisted → creation reference removed (unsettled, known leak)
     _ = scope.makeBoolean(false)  // abandoned
   }
 
   _ = persisted
   #expect(releaseLog(for: id).count == 2)  // number + boolean
+}
+
+// MARK: - Stage 2A owned-element arena tests
+
+/// 与实现侧 chunk 容量保持一致(ScopeArena 每 chunk 32 槽,见
+/// JSInstantContext.swift 的 scopeArenaChunkCapacity)。
+private let stage2AArenaChunkCapacity = 32
+
+/// 跨 chunk 边界的 drain:arena 以 32 槽 chunk 链分块持有 owned 元素,
+/// drain 必须把每个 owned 元素恰好释放一次(不泄漏、不重复)。
+@Test func scopeArenaDrainsOwnedElementsAcrossChunkBoundaries() {
+  let id = "scopeArenaDrainsAcrossChunks"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+  let total = stage2AArenaChunkCapacity + 5  // 首块 32 槽 + 次块 5 槽
+
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    for index in 0..<total {
+      _ = scope.makeNumber(Double(index))
+    }
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  let released = releaseLog(for: id)
+  #expect(released.count == total)
+  // 释放条目两两不同(每个 owned 身份恰好一次)且负载与创建集合一致。
+  #expect(Set(released).count == total)
+  #expect(
+    Set(released.map(\.rawValue.payload))
+      == Set((0..<total).map { "\(id):\(Double($0))" }))
+}
+
+/// persist 摘除埋在非头 chunk 的元素:洞由 arena 最后一个元素(跨 chunk)
+/// 回填;被摘除的创建引用在 persist 时结算入账(恰好一次),drain 释放其余全部。
+@Test func scopeArenaPersistRemovesOwnedElementBuriedInOldestChunk() {
+  let id = "scopeArenaPersistBuriedInOldestChunk"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+  let overflow = stage2AArenaChunkCapacity  // "keep" 之后 32 个:恰好溢出到第二 chunk
+
+  let keepHandle: MockValueHandle
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    let keep = scope.makeString("keep")  // 位于最老 chunk 的槽 0
+    keepHandle = keep.handle
+    for index in 0..<overflow {
+      _ = scope.makeNumber(Double(index))
+    }
+    // persist 按身份摘除:removeFirst 匹配到最老 chunk 槽 0,
+    // 用 arena 最后一个元素(位于头 chunk)回填;创建引用摘除不结算(已知泄漏)。
+    persisted = scope.persist(JSCallbackValue(handle: keepHandle, context: context))
+  }
+
+  let released = releaseLog(for: id)
+  #expect(released.count == overflow)
+  #expect(!released.contains(keepHandle))
+  #expect(released.allSatisfy { $0.rawValue.kind == "number" })
+  _ = persisted
+}
+
+/// persist 摘除头 chunk 中间的元素:洞由 arena 最后一个元素(同 chunk)回填,
+/// 排列变化不影响释放账目——其余元素各恰好释放一次。
+@Test func scopeArenaPersistMiddleElementBackfillsArenaLastIntoHole() {
+  let id = "scopeArenaPersistMiddleBackfill"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  let middleHandle: MockValueHandle
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    _ = scope.makeString("first")
+    let middle = scope.makeString("middle")
+    middleHandle = middle.handle
+    _ = scope.makeString("last")
+    persisted = scope.persist(JSCallbackValue(handle: middleHandle, context: context))
+  }
+
+  let released = releaseLog(for: id)
+  #expect(released.count == 2)
+  #expect(!released.contains(middleHandle))
+  #expect(Set(released.map(\.rawValue.payload)) == ["\(id):first", "\(id):last"])
+  _ = persisted
+}
+
+/// 拆分后(Stage 2A)引擎操作结果的落账行为不变:getProperty 返回的 +1 结
+/// 果经 `JSOwnedValueHandle.adopting` 升级后 track 到栈顶 arena,drain 时该
+/// 身份恰好释放一次——既不泄漏(0 次)也不双释放(2 次)。
+@Test func callbackValueOperationResultIsAdoptedAndReleasedExactlyOnce() {
+  let id = "scopeArenaOperationResultAdopted"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  var resultHandle: MockValueHandle? = nil
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    let base = scope.makeString("base")
+    switch base.getProperty("routed") {
+    case .value(let property):
+      resultHandle = property.handle
+    case .exception:
+      Issue.record("Expected getProperty to succeed")
+    }
+    #expect(releaseLog(for: id).isEmpty)  // scope 未关,base 与结果都在账上
+  }
+
+  let released = releaseLog(for: id)
+  #expect(released.count == 2)  // base 值 + getProperty 结果
+  if let resultHandle {
+    #expect(released.filter { $0 == resultHandle }.count == 1)
+  }
+}
+
+/// `makeString(from:)`(property-string-key 工厂,Stage 2A 起返回 Owned 形
+/// 态)的产物入账 arena 并随 drain 释放一次,内容按 key 字符串构造。
+@Test func scopeArenaTracksStringCreatedFromPropertyStringKey() {
+  let id = "scopeArenaPropertyStringKeyString"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let scope = JSInstantContext<MockEngine>(handle: context)
+    let key = scope.makePropertyStringKey("key-text")
+    let made = scope.makeString(from: key)
+    #expect(made.handle.rawValue == MockValue(kind: "string", payload: "\(id):key-text"))
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(releaseLog(for: id).count == 1)
 }
 
 // MARK: - JSScope arena lifecycle tests
@@ -377,6 +571,7 @@ public enum MockEngine: JSEngine {
   }
 
   #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  // persist 摘除创建引用不结算(已知 +1 泄漏,排期 §3.7 Rooting);JSValue 自持引用不在此路径释放。
   #expect(releaseLog(for: id).count == 0)
   _ = persisted
 }
@@ -391,7 +586,7 @@ public enum MockEngine: JSEngine {
     var scope = JSScope<MockEngine>(handle: context)
     scope.open()
     let a = scope.makeString("abandoned")
-    persisted = scope.persist(a)  // persisted → removed from arena
+    persisted = scope.persist(a)  // persisted → creation reference removed (unsettled, known leak)
     _ = scope.makeNumber(1)  // abandoned
     _ = scope.makeBoolean(false)  // abandoned
   }
@@ -570,11 +765,6 @@ public enum MockEngine: JSEngine {
   #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
 }
 
-@Test func jsValueHandleStorageWordsKeepThreeWordLayout() {
-  #expect(MemoryLayout<JSValueStorageWords>.size == 3 * MemoryLayout<UInt64>.size)
-  #expect(MemoryLayout<JSValueStorageWords>.stride == 3 * MemoryLayout<UInt64>.stride)
-}
-
 @Test func jsValueDeinitReleasesHandleExactlyOnce() {
   let counter = MockValueReleaseCounter()
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
@@ -638,31 +828,13 @@ public enum MockEngine: JSEngine {
 }
 
 private enum MockDriver: JSEngine {
-  static func fromStorageWords(_ storageWords: SwiftJavaScript.JSValueStorageWords) -> (
-    MockValueHandle, MockContextHandle
-  ) {
-    return (
-      .init(storagePointer: UnsafeMutableRawPointer(bitPattern: UInt(storageWords.word0))!),
-      .init(rawContext: MockContext(runtimeID: ""))
-    )
-  }
-
   static func isContextCompatibleWith(_ this: MockContextHandle, _ that: MockContextHandle) -> Bool
   {
     return true
   }
 
-  static func makeStorageWords(value: MockValueHandle, in context: MockContextHandle)
-    -> SwiftJavaScript.JSValueStorageWords
-  {
-    return (
-      word0: UInt64(UInt(bitPattern: value.storagePointer)),
-      word1: 0,
-      word2: 0
-    )
-  }
-
   typealias ValueHandle = MockValueHandle
+  typealias OwnedValueHandle = MockOwnedValueHandle
   typealias ClassHandle = MockClassHandle
   typealias Engine = MockEngine
   typealias RuntimeHandle = MockRuntimeHandle
@@ -901,6 +1073,17 @@ extension MockDriver {
     }
   }
 
+  fileprivate static func ownedResultHandle(from result: JSResult<MockValue>)
+    -> JSResult<MockOwnedValueHandle>
+  {
+    switch result {
+    case .value(let value):
+      return .value(MockOwnedValueHandle(rawValue: value))
+    case .exception(let exception):
+      return .exception(MockOwnedValueHandle(rawValue: exception))
+    }
+  }
+
   fileprivate static func makeRuntimeHandle() -> MockRuntimeHandle {
     MockRuntimeHandle(rawRuntime: makeRuntime())
   }
@@ -922,63 +1105,63 @@ extension MockDriver {
     named name: String,
     callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     _ = callback
     _ = name
 
-    return JSValueHandle<MockEngine>(
+    return MockOwnedValueHandle(
       rawValue: MockValue(kind: "function", payload: "\(context.rawContext.runtimeID):\(name)"))
   }
 
   fileprivate static func makeStringValueHandle(
     _ value: String,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(rawValue: makeString(value, in: context.rawContext))
+    return MockOwnedValueHandle(rawValue: makeString(value, in: context.rawContext))
   }
 
   fileprivate static func makeNumberValueHandle(
     _ value: Double,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(rawValue: makeNumber(value, in: context.rawContext))
+    return MockOwnedValueHandle(rawValue: makeNumber(value, in: context.rawContext))
   }
 
   fileprivate static func makeSymbolValueHandle(
     _ value: String,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(rawValue: makeSymbol(value, in: context.rawContext))
+    return MockOwnedValueHandle(rawValue: makeSymbol(value, in: context.rawContext))
   }
 
   fileprivate static func makeNullValueHandle(
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
-    return JSValueHandle<MockEngine>(rawValue: makeNull(in: context.rawContext))
+  ) -> MockOwnedValueHandle? {
+    return MockOwnedValueHandle(rawValue: makeNull(in: context.rawContext))
   }
 
   fileprivate static func makeUndefinedValueHandle(
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(rawValue: makeUndefined(in: context.rawContext))
+    return MockOwnedValueHandle(rawValue: makeUndefined(in: context.rawContext))
   }
 
   fileprivate static func makeObjectResultHandle(
     _ context: MockContextHandle
-  ) -> JSResult<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<MockOwnedValueHandle>? {
 
-    return resultHandle(from: makeObject(in: context.rawContext))
+    return ownedResultHandle(from: makeObject(in: context.rawContext))
   }
 
   fileprivate static func makeArrayResultHandle(
     _ context: MockContextHandle
-  ) -> JSResult<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<MockOwnedValueHandle>? {
 
-    return resultHandle(from: makeArray(in: context.rawContext))
+    return ownedResultHandle(from: makeArray(in: context.rawContext))
   }
 
   fileprivate static func makePreparedScriptHandle(
@@ -1067,9 +1250,9 @@ extension MockDriver {
   fileprivate static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(rawValue: makeBoolean(value, in: context.rawContext))
+    return MockOwnedValueHandle(rawValue: makeBoolean(value, in: context.rawContext))
   }
 
   fileprivate static func propertyNamesForHandle(
@@ -1101,7 +1284,7 @@ extension MockDriver {
   fileprivate static func makeStringValueHandle(
     fromPropertyStringKey key: MockStringHandle,
     in context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     makeStringValueHandle(key.string, context)
   }
 
@@ -1505,9 +1688,9 @@ extension MockEngine {
     named name: String,
     callback: @escaping JSFunctionCallback<MockEngine>,
     in context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     _ = callback
-    return JSValueHandle<MockEngine>(
+    return MockOwnedValueHandle(
       rawValue: MockValue(kind: "function", payload: "\(context.rawContext.runtimeID):\(name)"))
   }
 
@@ -1591,54 +1774,54 @@ extension MockEngine {
   public static func makeStringValueHandle(
     _ value: String,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeStringValueHandle(value, context)
   }
 
   public static func makeSymbolValueHandle(
     _ value: String,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeSymbolValueHandle(value, context)
   }
 
   public static func makeNumberValueHandle(
     _ value: Double,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeNumberValueHandle(value, context)
   }
 
   public static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
 
-    return JSValueHandle<MockEngine>(
+    return MockOwnedValueHandle(
       rawValue: MockDriver.makeBoolean(value, in: context.rawContext))
   }
 
   public static func makeNullValueHandle(
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeNullValueHandle(context)
   }
 
   public static func makeUndefinedValueHandle(
     _ context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeUndefinedValueHandle(context)
   }
 
   public static func makeObjectResultHandle(
     _ context: MockContextHandle
-  ) -> JSResult<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<MockOwnedValueHandle>? {
     MockDriver.makeObjectResultHandle(context)
   }
 
   public static func makeArrayResultHandle(
     _ context: MockContextHandle
-  ) -> JSResult<JSValueHandle<MockEngine>>? {
+  ) -> JSResult<MockOwnedValueHandle>? {
     MockDriver.makeArrayResultHandle(context)
   }
 
@@ -1666,7 +1849,7 @@ extension MockEngine {
   public static func makeStringValueHandle(
     fromPropertyStringKey key: MockStringHandle,
     in context: MockContextHandle
-  ) -> JSValueHandle<MockEngine>? {
+  ) -> MockOwnedValueHandle? {
     MockDriver.makeStringValueHandle(fromPropertyStringKey: key, in: context)
   }
 
@@ -2056,8 +2239,13 @@ extension MockEngine {
 
   let storedHandle = value.borrowHandle()
 
+  // 直接存储等价性:原 storage-words round-trip(word0..word2 +
+  // fromStorageWords 解出 (handle, context) 对)改写后,handle 与 context
+  // 都按原身份往返。
+  #expect(storedHandle == handle)
   #expect(storedHandle.rawValue == MockValue(kind: "string", payload: "mock-value"))
   #expect(storedHandle.engineType == MockEngine.self)
+  #expect(value.contextHandle == context)
 }
 
 @Test func engineValueKeepsOpaquePayloadIdentity() {
@@ -2069,6 +2257,8 @@ extension MockEngine {
   let roundtrip = value.borrowHandle().rawValue
 
   #expect(roundtrip == payload)
+  #expect(value.borrowHandle() == handle)
+  #expect(value.contextHandle == context)
 }
 
 @Test func engineValueShellKeepsHandleAndEngineTyping() {
@@ -2080,6 +2270,8 @@ extension MockEngine {
   let roundtripHandle = value.borrowHandle()
   #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))
   #expect(roundtripHandle.engineType == MockEngine.self)
+  #expect(roundtripHandle == handle)
+  #expect(value.contextHandle == context)
 }
 
 @Test func genericResultHandleWrapsValueAndExceptionStates() {
@@ -2145,7 +2337,7 @@ extension MockEngine {
     _ = throwingScript.releaseReference()
   }
 
-  let names = MockDriver.propertyNamesForHandle(on: stringValue, in: context)
+  let names = MockDriver.propertyNamesForHandle(on: stringValue.borrowed(), in: context)
   let messageKey = MockDriver.makePropertyStringKeyHandle("message", in: context)
   guard let messageKey else {
     Issue.record("Expected property string key handle")
@@ -2153,11 +2345,11 @@ extension MockEngine {
   }
   defer { _ = messageKey.releaseReference() }
   let property = MockDriver.getPropertyStringKeyHandle(
-    messageKey, on: stringValue, in: context)
+    messageKey, on: stringValue.borrowed(), in: context)
   let propertySet = MockDriver.setPropertyStringKeyHandle(
     messageKey,
-    on: stringValue,
-    to: numberValue,
+    on: stringValue.borrowed(),
+    to: numberValue.borrowed(),
     in: context,
     attributes: [.readOnly]
   )
@@ -2224,14 +2416,14 @@ extension MockEngine {
   }
 
   let callResult = MockDriver.callFunctionHandle(
-    function, arguments: [argument], in: context)
+    function.borrowed(), arguments: [argument.borrowed()], in: context)
   let constructResult = MockDriver.constructHandle(
-    function, arguments: [argument], in: context)
-  let boxedResult = MockDriver.toObjectHandle(primitive, in: context)
-  let isArray = MockDriver.isArrayHandle(function, in: context)
-  let isDate = MockDriver.isDateHandle(function, in: context)
+    function.borrowed(), arguments: [argument.borrowed()], in: context)
+  let boxedResult = MockDriver.toObjectHandle(primitive.borrowed(), in: context)
+  let isArray = MockDriver.isArrayHandle(function.borrowed(), in: context)
+  let isDate = MockDriver.isDateHandle(function.borrowed(), in: context)
   let isInstanceOf = MockDriver.isInstanceOfHandle(
-    primitive, constructor: constructor, in: context)
+    primitive.borrowed(), constructor: constructor.borrowed(), in: context)
 
   switch consume object {
   case .value(let value):

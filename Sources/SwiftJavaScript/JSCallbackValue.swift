@@ -34,17 +34,18 @@ package func bridgeCallbackResult<E: JSEngine>(
     preconditionFailure("Unexpected nil JSResult in callback bridge")
   }
   // Engine calls return a new owning reference (QuickJS +1); without a
-  // release path it would leak on every operation. Track it on the
-  // context's topmost open scope so its drain releases it.
+  // release path it would leak on every operation. Adopt the borrowed-form
+  // result into the ownership carrier and track it on the context's
+  // topmost open scope so its drain releases it.
   guard let scope = ScopeStackRegistry<E>.top(of: context) else {
     preconditionFailure("JSCallbackValue operation used outside any open scope")
   }
   switch result {
   case .value(let handle):
-    scope.track(handle)
+    scope.track(E.OwnedValueHandle.adopting(handle))
     return .value(JSCallbackValue(handle: handle, context: context))
   case .exception(let handle):
-    scope.track(handle)
+    scope.track(E.OwnedValueHandle.adopting(handle))
     return .exception(JSCallbackValue(handle: handle, context: context))
   }
 }

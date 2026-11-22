@@ -345,14 +345,17 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
       Issue.record("Expected same-VM driver handles to be creatable")
       return
     }
+    // Downgrade to the borrow token for cross-context reads; the owning
+    // reference is released only after the reads.
+    let borrowed = value.borrowed()
     defer {
-      value.releaseReference(in: sourceContext)
       _ = targetContext.releaseReference()
       _ = sourceContext.releaseReference()
     }
 
     let isCompatible = E.isContextCompatibleWith(sourceContext, targetContext)
-    let targetValue = E.toNumberForHandle(value, in: targetContext)
+    let targetValue = E.toNumberForHandle(borrowed, in: targetContext)
+    E.releaseCreatedHandle(value, in: sourceContext)
 
     #expect(isCompatible)
     #expect(targetValue == 7)

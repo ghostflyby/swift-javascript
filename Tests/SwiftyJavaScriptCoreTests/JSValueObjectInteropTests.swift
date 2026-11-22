@@ -2,22 +2,16 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-@Test func javaScriptCoreValueHandleStorageRoundTripsPointerWords() async {
+@Test func javaScriptCoreValueHandleStoresHandleAndContextDirectly() async {
   let context = JSContext(virtualMachine: JSVirtualMachine<JavaScriptCoreEngine>())
 
   await context.withInstantContext { context in
     let value = JSValue(number: 42, in: context)
     let handle = value.borrowHandle()
-    let storageWords = JavaScriptCoreEngine.makeStorageWords(
-      value: handle, in: context.driverContextHandle)
-
-    let (restored, restoredContext) = JavaScriptCoreEngine.fromStorageWords(storageWords)
-    #expect(restored.ref == handle.ref)
-
-    let reboundStorageWords = JavaScriptCoreEngine.makeStorageWords(
-      value: restored, in: restoredContext)
-    #expect(reboundStorageWords.word0 == storageWords.word0)
-    #expect(reboundStorageWords.word1 == storageWords.word1)
-    #expect(reboundStorageWords.word2 == storageWords.word2)
+    let stored = JSValue<JavaScriptCoreEngine>(handleValue: handle, in: context.driverContextHandle)
+    #expect(stored.borrowHandle().ref == handle.ref)
+    #expect(stored.contextHandle == context.driverContextHandle)
+    // `value` already owns the conventional release for this handle.
+    stored.discard()
   }
 }

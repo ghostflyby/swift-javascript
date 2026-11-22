@@ -98,16 +98,130 @@ public struct JSCallbackReturn<E: JSEngine>: ~Copyable {
 
 // MARK: - Value arena
 
-private final class ScopeArena<Handle: Hashable>: @unchecked Sendable {
-  var created: [Handle] = []
-  var removed: Set<Handle> = []
+/// Slots per arena chunk (file scope: generic types cannot have static
+/// stored properties).
+private let scopeArenaChunkCapacity = 32
+
+/// A chunk of owned value handles stored in raw pointer memory. `Array`
+/// cannot hold `~Copyable` elements and a `~Copyable` stored property of a
+/// class cannot be moved out (consumption would leave the instance's
+/// memory uninitialized), so elements live in `UnsafeMutablePointer`
+/// storage where `move()` is a legal consuming read.
+private final class ScopeArenaChunk<Owned: JSOwnedValueManualReferenceCountedHandle & ~Copyable>:
+  @unchecked Sendable
+{
+  let storage: UnsafeMutablePointer<Owned>
+  var count = 0
+  let capacity: Int
+  let next: ScopeArenaChunk<Owned>?
+
+  init(capacity: Int, next: ScopeArenaChunk<Owned>?) {
+    self.capacity = capacity
+    self.next = next
+    self.storage = UnsafeMutablePointer<Owned>.allocate(capacity: capacity)
+  }
+
+  var isFull: Bool { count == capacity }
+  var isEmpty: Bool { count == 0 }
+
+  func push(_ handle: consuming Owned) {
+    storage.advanced(by: count).initialize(to: handle)
+    count += 1
+  }
+
+  func matches(at index: Int, _ identity: (borrowing Owned) -> Bool) -> Bool {
+    identity(storage.advanced(by: index).pointee)
+  }
+
+  func popLast() -> Owned? {
+    guard count > 0 else { return nil }
+    count -= 1
+    return storage.advanced(by: count).move()
+  }
+
+  /// Vacate slot `index` (consuming its element out) and re-initialize it
+  /// with `last`, keeping the occupied prefix of the chunk contiguous.
+  /// Returns the vacated element; settling its reference is the caller's
+  /// concern.
+  func replaceSlot(at index: Int, with last: consuming Owned) -> Owned {
+    let vacated = storage.advanced(by: index).move()
+    storage.advanced(by: index).initialize(to: last)
+    return vacated
+  }
+
+  deinit {
+    if count > 0 {
+      storage.deinitialize(count: count)
+    }
+    storage.deallocate()
+  }
+}
+
+/// The scope's release ledger. Elements are owned creation results; drain
+/// releases every element still present. Values promoted via `persist` are
+/// removed at promotion time (identity match, first hit), so no separate
+/// "removed" membership structure exists — the chunk stack is the single
+/// source of truth (equivalent structure to the former created+removed
+/// pair, replacing the Set membership check with a linear scan).
+private final class ScopeArena<Owned: JSOwnedValueManualReferenceCountedHandle & ~Copyable>:
+  @unchecked Sendable
+{
+  private var head: ScopeArenaChunk<Owned>? = nil
+
+  func push(_ handle: consuming Owned) {
+    if head?.isFull ?? true {
+      head = ScopeArenaChunk<Owned>(capacity: scopeArenaChunkCapacity, next: head)
+    }
+    head!.push(handle)
+  }
+
+  /// Pop the most recently pushed element (consuming move), or `nil` when
+  /// the arena is empty. Empty head chunks are retired as they drain.
+  func popLast() -> Owned? {
+    while let chunk = head, chunk.isEmpty {
+      head = chunk.next
+    }
+    guard let chunk = head else { return nil }
+    return chunk.popLast()
+  }
+
+  /// Remove the first element matching `identity` and hand its owned
+  /// reference back to the caller, which settles it (release or adopt).
+  /// The hole is filled with the arena's last element so every chunk's
+  /// occupied prefix stays contiguous.
+  func removeFirst(matching identity: (borrowing Owned) -> Bool) -> Owned? {
+    // Retire empty head chunks first: a previous removal may have emptied
+    // the head chunk without retiring it (retirement runs lazily inside
+    // `popLast`). Otherwise a match at a deeper chunk's last element would
+    // wrongly take the else-branch, `popLast` would pop the matched element
+    // itself, and `replaceSlot` would `move()` from the just-vacated
+    // (uninitialized) slot.
+    while let chunk = head, chunk.isEmpty {
+      head = chunk.next
+    }
+    var current = head
+    while let chunk = current {
+      for index in 0..<chunk.count where chunk.matches(at: index, identity) {
+        if chunk === head && index == chunk.count - 1 {
+          // The matched element is the arena's last: popping it alone both
+          // vacates and shrinks.
+          return chunk.popLast()
+        } else {
+          let last = popLast()!
+          return chunk.replaceSlot(at: index, with: last)
+        }
+      }
+      current = chunk.next
+    }
+    return nil
+  }
 }
 
 // MARK: - Shared scope core
 
 struct ScopeCore<E: JSEngine> {
   let driverContextHandle: E.ContextHandle
-  private let arena: ScopeArena<E.ValueHandle>
+  private let arena: ScopeArena<E.OwnedValueHandle>
 
   init(handle: E.ContextHandle) {
     self.driverContextHandle = handle
@@ -115,23 +229,25 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func drain() {
-    for h in arena.created where !arena.removed.contains(h) {
-      E.releaseCreatedHandle(h, in: driverContextHandle)
+    while let handle = arena.popLast() {
+      E.releaseCreatedHandle(handle, in: driverContextHandle)
     }
   }
 
-  /// Track an engine-returned owning handle (a value-operation result) on
-  /// this scope's arena so its drain releases it.
-  func track(_ handle: E.ValueHandle) {
-    arena.created.append(handle)
+  /// Track an engine-returned owning handle (a value-operation result,
+  /// adopted from its borrowed form) on this scope's arena so its drain
+  /// releases it.
+  func track(_ handle: consuming E.OwnedValueHandle) {
+    arena.push(handle)
   }
 
   func makeString(_ value: String) -> JSCallbackValue<E> {
     guard let h = E.makeStringValueHandle(value, driverContextHandle) else {
       preconditionFailure("makeString failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeString(from keyHandle: E.PropertyStringKeyHandle) -> JSCallbackValue<E> {
@@ -143,61 +259,69 @@ struct ScopeCore<E: JSEngine> {
     else {
       preconditionFailure("makeString(from:) failed")
     }
-    arena.created.append(handle)
-    return JSCallbackValue(handle: handle, context: driverContextHandle)
+    let borrowed = handle.borrowed()
+    arena.push(handle)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeNumber(_ value: Double) -> JSCallbackValue<E> {
     guard let h = E.makeNumberValueHandle(value, driverContextHandle) else {
       preconditionFailure("makeNumber failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeBoolean(_ value: Bool) -> JSCallbackValue<E> {
     guard let h = E.makeBooleanValueHandle(value, driverContextHandle) else {
       preconditionFailure("makeBoolean failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeNull() -> JSCallbackValue<E> {
     guard let h = E.makeNullValueHandle(driverContextHandle) else {
       preconditionFailure("makeNull failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeUndefined() -> JSCallbackValue<E> {
     guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
       preconditionFailure("makeUndefined failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeSymbol(_ value: String) -> JSCallbackValue<E> {
     guard let h = E.makeSymbolValueHandle(value, driverContextHandle) else {
       preconditionFailure("makeSymbol failed")
     }
-    arena.created.append(h)
-    return JSCallbackValue(handle: h, context: driverContextHandle)
+    let borrowed = h.borrowed()
+    arena.push(h)
+    return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
   func makeObject() -> JSResult<JSCallbackValue<E>> {
     guard let r = E.makeObjectResultHandle(driverContextHandle) else {
       preconditionFailure("makeObject failed")
     }
-    switch r {
+    switch consume r {
     case .value(let h):
-      arena.created.append(h)
-      return .value(JSCallbackValue(handle: h, context: driverContextHandle))
+      let borrowed = h.borrowed()
+      arena.push(h)
+      return .value(JSCallbackValue(handle: borrowed, context: driverContextHandle))
     case .exception(let h):
-      arena.created.append(h)
-      return .exception(JSCallbackValue(handle: h, context: driverContextHandle))
+      let borrowed = h.borrowed()
+      arena.push(h)
+      return .exception(JSCallbackValue(handle: borrowed, context: driverContextHandle))
     }
   }
 
@@ -205,20 +329,40 @@ struct ScopeCore<E: JSEngine> {
     guard let r = E.makeArrayResultHandle(driverContextHandle) else {
       preconditionFailure("makeArray failed")
     }
-    switch r {
+    switch consume r {
     case .value(let h):
-      arena.created.append(h)
-      return .value(JSCallbackValue(handle: h, context: driverContextHandle))
+      let borrowed = h.borrowed()
+      arena.push(h)
+      return .value(JSCallbackValue(handle: borrowed, context: driverContextHandle))
     case .exception(let h):
-      arena.created.append(h)
-      return .exception(JSCallbackValue(handle: h, context: driverContextHandle))
+      let borrowed = h.borrowed()
+      arena.push(h)
+      return .exception(JSCallbackValue(handle: borrowed, context: driverContextHandle))
     }
   }
 
   func persist(_ value: borrowing JSCallbackValue<E>) -> JSValue<E> {
-    arena.removed.insert(value.handle)
-    value.handle.retainReference(in: driverContextHandle)
-    return JSValue(handleValue: value.handle, in: driverContextHandle)
+    // Retain for `JSValue` (JSC: the required `JSValueProtect`; QuickJS:
+    // JS_DupValue), then unlink the arena's owned element by identity and
+    // abandon it without settling — releasing the creation reference here
+    // (even retain-first, correctly ordered) crashes the engine suites
+    // under parallel load: it frees objects that previously leaked and
+    // never reached refcount zero, running quickjs finalizer/GC paths for
+    // the first time. The abandoned +1 leak is a registered known issue;
+    // the proper fix is the §3.7 rooting-policy split (adopt-without-dup
+    // for refcounted engines) in Stage 3.
+    let handle = value.handle
+    handle.retainReference(in: driverContextHandle)
+    if let creationReference = arena.removeFirst(matching: { $0.borrowed() == handle }) {
+      // Abandoned, not settled: the +1 leak is what anchors
+      // `JSCallbackReturn(exception:)` borrows of persisted values — a
+      // JSValue deinit can run before the trampoline's JS_DupValue, and
+      // settling here frees the value under the borrow (ASan-verified
+      // heap-use-after-free in the error-coder throw path). Fix = owned
+      // exception handoff, with Stage 3's persist/handoff redefinition.
+      _ = creationReference
+    }
+    return JSValue(handleValue: handle, in: driverContextHandle)
   }
 
   func `return`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
@@ -291,14 +435,21 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
   @available(*, noasync)
   public func returnUndefined() -> JSCallbackReturn<E> {
-    let h = E.makeUndefinedValueHandle(driverContextHandle)!
-    return JSCallbackReturn(temporary: h)
+    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+      preconditionFailure("JSInstantContext.returnUndefined could not create handle")
+    }
+    // Undefined carries no reference to balance (engine immediate / GC
+    // singletons), so the owned creation result is unwrapped to its
+    // borrowed token without a release.
+    return JSCallbackReturn(temporary: h.borrowed())
   }
 
   @available(*, noasync)
   public func throwUndefined() -> JSCallbackReturn<E> {
-    let h = E.makeUndefinedValueHandle(driverContextHandle)!
-    return JSCallbackReturn(exception: h)
+    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+      preconditionFailure("JSInstantContext.throwUndefined could not create handle")
+    }
+    return JSCallbackReturn(exception: h.borrowed())
   }
 
   // MARK: - Global object
@@ -439,7 +590,9 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     else {
       preconditionFailure("JSInstantContext.makeFunction could not create handle")
     }
-    return JSValue(handleValue: handle, in: driverContextHandle)
+    // The creation's owning reference transfers into JSValue's
+    // owning-by-convention storage (deinit releases it).
+    return JSValue(handleValue: handle.borrowed(), in: driverContextHandle)
   }
 
   @available(*, noasync)

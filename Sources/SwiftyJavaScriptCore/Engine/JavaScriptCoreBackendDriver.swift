@@ -9,6 +9,7 @@ enum JavaScriptCoreObjectLookup {
 
 public enum JavaScriptCoreEngine: Sendable, SendableMetatype {
   public typealias ValueHandle = JavaScriptCoreValueHandle
+  public typealias OwnedValueHandle = JavaScriptCoreOwnedValueHandle
   public typealias ClassHandle = JavaScriptCoreClassHandle
   public typealias Engine = JavaScriptCoreEngine
   public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle

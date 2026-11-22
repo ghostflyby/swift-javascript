@@ -34,8 +34,8 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
   public static func makeStringValueHandle(
     fromPropertyStringKey key: JavaScriptCorePropertyStringKeyHandle,
     in context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreValueHandle(
+  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    JavaScriptCoreOwnedValueHandle(
       ref: JSValueMakeString(context.ref, key.ref)!
     )
   }

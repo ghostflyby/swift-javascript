@@ -16,10 +16,12 @@ public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
     in context: ContextHandle
   ) -> Bool
 
+  /// Creation factory (owned result): the engine produces a new owning
+  /// reference for the property-string key's value.
   static func makeStringValueHandle(
     fromPropertyStringKey key: PropertyStringKeyHandle,
     in context: ContextHandle
-  ) -> ValueHandle?
+  ) -> OwnedValueHandle?
 
   static func propertyNamesForHandle(
     on object: ValueHandle,
