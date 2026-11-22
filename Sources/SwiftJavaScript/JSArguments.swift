@@ -1,4 +1,4 @@
-public struct JSArguments<E: JSEngine>: ~Copyable {
+public struct JSArguments<E: JSEngineValueTypes>: ~Copyable {
   public let count: Int
   private let borrowedValueHandleAt: (Int, E.ContextHandle) -> JSValueHandle<E>?
 
@@ -12,7 +12,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
 
   @inline(__always)
   private func value(at index: Int, in context: borrowing JSInstantContext<E>)
-    -> JSValue<E>
+    -> JSValue<E> where E: JSEngineRuntimeDriver
   {
     guard index >= 0 && index < count else {
       fatalError("Index out of bounds")
@@ -30,7 +30,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     at index: Int,
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) -> R
-  ) -> R {
+  ) -> R where E: JSEngineRuntimeDriver {
     let value = value(at: index, in: context)
     let result = body(value)
     // Borrowed callback arguments are owned by the engine call frame.
@@ -44,7 +44,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     at index: Int,
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) throws(JSValueConversionError) -> R
-  ) throws(JSValueConversionError) -> R {
+  ) throws(JSValueConversionError) -> R where E: JSEngineRuntimeDriver {
     let value = value(at: index, in: context)
     do {
       let result = try body(value)
@@ -63,7 +63,7 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     at: Int,
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) -> R
-  ) -> R {
+  ) -> R where E: JSEngineRuntimeDriver {
     withValue(at: at, in: context, body)
   }
 
@@ -71,14 +71,14 @@ public struct JSArguments<E: JSEngine>: ~Copyable {
     at: Int,
     in context: isolated JSContext<E> = #isolation,
     _ body: (borrowing JSValue<E>) -> R
-  ) -> R {
+  ) -> R where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       unpack(at: at, in: callbackContext, body)
     }
   }
 }
 
-extension JSArguments {
+extension JSArguments where E: JSValueConversionEngine {
   @inline(__always)
   private func unpackNext<T: JSValueDecodable>(
     _ index: inout Int,

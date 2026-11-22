@@ -1,6 +1,6 @@
-public protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver {
-  static func makeArrayBufferWithBytesNoCopyHandle(
-    in context: ContextHandle,
+/// Context-side TypedArray/ArrayBuffer operations (Stage 2B decomposition).
+public protocol JSContextTypedArrayDriver: JSContextRuntimeDriver {
+  func makeArrayBufferWithBytesNoCopyHandle(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
     bytesDeallocator: (
@@ -9,68 +9,41 @@ public protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver {
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> ValueHandle?
 
-  static func arrayBufferByteLengthForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Int?
+  func arrayBufferByteLengthForHandle(_ value: ValueHandle) -> Int?
 
-  static func arrayBufferBytesPtrForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
+  func arrayBufferBytesPtrForHandle(
+    _ value: ValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool)
 
-  static func makeTypedArrayHandle(
-    in context: ContextHandle,
-    kind: JSTypedArrayKind,
-    length: Int
-  ) -> ValueHandle?
+  func makeTypedArrayHandle(kind: JSTypedArrayKind, length: Int) -> ValueHandle?
 
-  static func makeTypedArrayHandle(
-    in context: ContextHandle,
-    kind: JSTypedArrayKind,
-    arrayBuffer: ValueHandle
-  ) -> ValueHandle?
+  func makeTypedArrayHandle(kind: JSTypedArrayKind, arrayBuffer: ValueHandle) -> ValueHandle?
 
-  static func makeTypedArrayHandle(
-    in context: ContextHandle,
+  func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
     arrayBuffer: ValueHandle,
     byteOffset: Int,
     length: Int
   ) -> ValueHandle?
 
-  static func typedArrayLengthForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Int?
+  func typedArrayLengthForHandle(_ value: ValueHandle) -> Int?
 
-  static func typedArrayByteLengthForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Int?
+  func typedArrayByteLengthForHandle(_ value: ValueHandle) -> Int?
 
-  static func typedArrayByteOffsetForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Int?
+  func typedArrayByteOffsetForHandle(_ value: ValueHandle) -> Int?
 
-  static func typedArrayBufferForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> ValueHandle?
+  func typedArrayBufferForHandle(_ value: ValueHandle) -> ValueHandle?
 
-  static func typedArrayBytesPtrForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
+  func typedArrayBytesPtrForHandle(
+    _ value: ValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool)
 
-  static func isArrayBufferHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Bool
+  func isArrayBufferHandle(_ value: ValueHandle) -> Bool
 
-  static func typedArrayKindForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> JSTypedArrayKind?
+  func typedArrayKindForHandle(_ value: ValueHandle) -> JSTypedArrayKind?
 }
+
+/// Engine-side descriptor. TypedArray requirements now live on
+/// `JSContextTypedArrayDriver`, implemented by `ContextHandle`.
+public protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver
+where ContextHandle: JSContextTypedArrayDriver {}

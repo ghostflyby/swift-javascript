@@ -6,7 +6,7 @@ import Synchronization
 /// cores pushed by scope entry (`JSInstantContext.init`, `JSScope.open`)
 /// and popped on scope exit; a frame's arena is shared with the scope
 /// object that pushed it.
-internal final class ScopeStack<E: JSEngine>: @unchecked Sendable {
+internal final class ScopeStack<E: JSEngineRuntimeDriver>: @unchecked Sendable {
   private var frames: [ScopeCore<E>] = []
 
   func push(_ core: ScopeCore<E>) { frames.append(core) }
@@ -35,7 +35,7 @@ private enum ScopeStackStorage {
 /// own stack is the only notion of current. Context handles of different
 /// engines are distinct `AnyHashable` keys, so the shared storage cannot
 /// mix stacks across engines.
-internal enum ScopeStackRegistry<E: JSEngine> {
+internal enum ScopeStackRegistry<E: JSEngineRuntimeDriver> {
 
   static func push(_ core: ScopeCore<E>, for context: E.ContextHandle) {
     ScopeStackStorage.state.withLock {
@@ -70,7 +70,7 @@ internal enum ScopeStackRegistry<E: JSEngine> {
 
 // MARK: - JSCallbackReturn
 
-public struct JSCallbackReturn<E: JSEngine>: ~Copyable {
+public struct JSCallbackReturn<E: JSEngineValueTypes>: ~Copyable {
   package let handle: JSValueHandle<E>
   package let isPersistent: Bool
   package let isException: Bool
@@ -219,7 +219,7 @@ private final class ScopeArena<Owned: JSOwnedValueManualReferenceCountedHandle &
 
 // MARK: - Shared scope core
 
-struct ScopeCore<E: JSEngine> {
+struct ScopeCore<E: JSEngineRuntimeDriver> {
   let driverContextHandle: E.ContextHandle
   private let arena: ScopeArena<E.OwnedValueHandle>
 
@@ -230,7 +230,7 @@ struct ScopeCore<E: JSEngine> {
 
   func drain() {
     while let handle = arena.popLast() {
-      E.releaseCreatedHandle(handle, in: driverContextHandle)
+      driverContextHandle.releaseCreatedHandle(handle)
     }
   }
 
@@ -242,7 +242,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeString(_ value: String) -> JSCallbackValue<E> {
-    guard let h = E.makeStringValueHandle(value, driverContextHandle) else {
+    guard let h = driverContextHandle.makeStringValueHandle(value) else {
       preconditionFailure("makeString failed")
     }
     let borrowed = h.borrowed()
@@ -250,11 +250,11 @@ struct ScopeCore<E: JSEngine> {
     return JSCallbackValue(handle: borrowed, context: driverContextHandle)
   }
 
-  func makeString(from keyHandle: E.PropertyStringKeyHandle) -> JSCallbackValue<E> {
+  func makeString(from keyHandle: E.PropertyStringKeyHandle) -> JSCallbackValue<E>
+  where E: JSEnginePropertyDriver {
     guard
-      let handle = E.makeStringValueHandle(
-        fromPropertyStringKey: keyHandle,
-        in: driverContextHandle
+      let handle = driverContextHandle.makeStringValueHandle(
+        fromPropertyStringKey: keyHandle
       )
     else {
       preconditionFailure("makeString(from:) failed")
@@ -265,7 +265,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeNumber(_ value: Double) -> JSCallbackValue<E> {
-    guard let h = E.makeNumberValueHandle(value, driverContextHandle) else {
+    guard let h = driverContextHandle.makeNumberValueHandle(value) else {
       preconditionFailure("makeNumber failed")
     }
     let borrowed = h.borrowed()
@@ -274,7 +274,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeBoolean(_ value: Bool) -> JSCallbackValue<E> {
-    guard let h = E.makeBooleanValueHandle(value, driverContextHandle) else {
+    guard let h = driverContextHandle.makeBooleanValueHandle(value) else {
       preconditionFailure("makeBoolean failed")
     }
     let borrowed = h.borrowed()
@@ -283,7 +283,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeNull() -> JSCallbackValue<E> {
-    guard let h = E.makeNullValueHandle(driverContextHandle) else {
+    guard let h = driverContextHandle.makeNullValueHandle() else {
       preconditionFailure("makeNull failed")
     }
     let borrowed = h.borrowed()
@@ -292,7 +292,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeUndefined() -> JSCallbackValue<E> {
-    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+    guard let h = driverContextHandle.makeUndefinedValueHandle() else {
       preconditionFailure("makeUndefined failed")
     }
     let borrowed = h.borrowed()
@@ -301,7 +301,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeSymbol(_ value: String) -> JSCallbackValue<E> {
-    guard let h = E.makeSymbolValueHandle(value, driverContextHandle) else {
+    guard let h = driverContextHandle.makeSymbolValueHandle(value) else {
       preconditionFailure("makeSymbol failed")
     }
     let borrowed = h.borrowed()
@@ -310,7 +310,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeObject() -> JSResult<JSCallbackValue<E>> {
-    guard let r = E.makeObjectResultHandle(driverContextHandle) else {
+    guard let r = driverContextHandle.makeObjectResultHandle() else {
       preconditionFailure("makeObject failed")
     }
     switch consume r {
@@ -326,7 +326,7 @@ struct ScopeCore<E: JSEngine> {
   }
 
   func makeArray() -> JSResult<JSCallbackValue<E>> {
-    guard let r = E.makeArrayResultHandle(driverContextHandle) else {
+    guard let r = driverContextHandle.makeArrayResultHandle() else {
       preconditionFailure("makeArray failed")
     }
     switch consume r {
@@ -374,7 +374,7 @@ struct ScopeCore<E: JSEngine> {
 /// context-addressed registry (`ScopeStackRegistry`), arena-based value
 /// lifecycle, and all value factory methods. Values are released on deinit
 /// unless `persist()`ed or returned.
-public struct JSInstantContext<E: JSEngine>: ~Copyable {
+public struct JSInstantContext<E: JSEngineRuntimeDriver>: ~Copyable {
   private var core: ScopeCore<E>
 
   public var driverContextHandle: E.ContextHandle { core.driverContextHandle }
@@ -412,7 +412,8 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
   package func makeSymbol(_ v: String) -> JSCallbackValue<E> { core.makeSymbol(v) }
 
   @available(*, noasync)
-  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSCallbackValue<E> {
+  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSCallbackValue<E>
+  where E: JSEnginePropertyDriver {
     core.makeString(from: key.borrowHandle(in: self))
   }
 
@@ -435,7 +436,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
   @available(*, noasync)
   public func returnUndefined() -> JSCallbackReturn<E> {
-    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+    guard let h = driverContextHandle.makeUndefinedValueHandle() else {
       preconditionFailure("JSInstantContext.returnUndefined could not create handle")
     }
     // Undefined carries no reference to balance (engine immediate / GC
@@ -446,7 +447,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
   @available(*, noasync)
   public func throwUndefined() -> JSCallbackReturn<E> {
-    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+    guard let h = driverContextHandle.makeUndefinedValueHandle() else {
       preconditionFailure("JSInstantContext.throwUndefined could not create handle")
     }
     return JSCallbackReturn(exception: h.borrowed())
@@ -456,7 +457,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
   @available(*, noasync)
   public func globalObjectValue() -> JSValue<E> {
-    guard let handle = E.globalObjectValueHandle(driverContextHandle) else {
+    guard let handle = driverContextHandle.globalObjectValueHandle() else {
       preconditionFailure("JSInstantContext.globalObjectValue could not create handle")
     }
     return JSValue(handleValue: handle, in: driverContextHandle)
@@ -474,7 +475,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     _ value: borrowing Val,
     forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+  ) where Val: JSValueEncodable, Val: ~Copyable, E: JSValueConversionEngine {
     withGlobalObject { global in
       global.setProperty(value, forKey: key, with: attributes, in: self)
     }
@@ -486,14 +487,15 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none
-  ) {
+  ) where E: JSValueConversionEngine {
     withGlobalObject { global in
       global.setProperty(value, forKey: key, using: converter, with: attributes, in: self)
     }
   }
 
   @available(*, noasync)
-  public func getGlobalProperty(forKey key: StaticString) -> JSValue<E> {
+  public func getGlobalProperty(forKey key: StaticString) -> JSValue<E>
+  where E: JSEnginePropertyDriver {
     withGlobalObject { global in
       global.getProperty(forKey: key, in: self)
     }
@@ -503,21 +505,23 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
   public func getGlobalProperty<C: JSValueDecoder>(
     forKey key: StaticString,
     using converter: C.Type
-  ) -> C.SwiftType {
+  ) -> C.SwiftType where E: JSValueConversionEngine {
     withGlobalObject { global in
       global.getProperty(forKey: key, using: converter, in: self)
     }
   }
 
   @available(*, noasync)
-  public func deleteGlobalProperty(forKey key: StaticString) {
+  public func deleteGlobalProperty(forKey key: StaticString)
+  where E: JSEnginePropertyDriver {
     withGlobalObject { global in
       global.deleteProperty(forKey: key, in: self)
     }
   }
 
   @available(*, noasync)
-  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+  public func hasGlobalProperty(_ key: StaticString) -> Bool
+  where E: JSEnginePropertyDriver {
     withGlobalObject { global in
       global.hasProperty(key, in: self)
     }
@@ -528,7 +532,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     named name: String,
     with attributes: JSPropertyAttributes = .none,
     callback: @escaping JSFunctionCallback<E>
-  ) where E.Engine == E {
+  ) where E.Engine == E, E: JSEnginePropertyDriver {
     let function = makeFunction(named: name, callback: callback)
     let key = makePropertyStringKey(name)
     withGlobalObject { global in
@@ -540,17 +544,17 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
 
   @available(*, noasync)
   public func toBoolean(_ value: borrowing JSValue<E>) -> Bool {
-    E.toBooleanForHandle(value.borrowHandle(), in: driverContextHandle)
+    driverContextHandle.toBooleanForHandle(value.borrowHandle())
   }
 
   @available(*, noasync)
   public func toNumber(_ value: borrowing JSValue<E>) -> Double {
-    E.toNumberForHandle(value.borrowHandle(), in: driverContextHandle)
+    driverContextHandle.toNumberForHandle(value.borrowHandle())
   }
 
   @available(*, noasync)
   public func toString(_ value: borrowing JSValue<E>) -> String {
-    E.toStringForHandle(value.borrowHandle(), in: driverContextHandle) ?? ""
+    driverContextHandle.toStringForHandle(value.borrowHandle()) ?? ""
   }
 
   // setData/data/makePropertyStringKey/prepareScript are deliberately not
@@ -558,22 +562,24 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
   // scope-independent, and property-string-key / prepared-script handles are
   // Sendable and self-owning, valid beyond the scope window.
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type = K.self) {
-    E.contextDataStorageBox(in: driverContextHandle)?.setData(value, for: key)
+    driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type = K.self) -> K.Value? {
-    E.contextDataStorageBox(in: driverContextHandle)?.data(for: key) ?? K.defaultValue
+    driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
   }
 
-  public func makePropertyStringKey(_ value: String) -> JSPropertyStringKey<E> {
-    guard let handle = E.makePropertyStringKeyHandle(value, in: driverContextHandle) else {
+  public func makePropertyStringKey(_ value: String) -> JSPropertyStringKey<E>
+  where E: JSEnginePropertyDriver {
+    guard let handle = driverContextHandle.makePropertyStringKeyHandle(value) else {
       preconditionFailure("JSInstantContext.makePropertyStringKey could not create handle")
     }
     return JSPropertyStringKey(handle: handle, context: driverContextHandle)
   }
 
-  public func prepareScript(_ source: String) -> JSPreparedScript<E> {
-    guard let handle = E.makePreparedScriptHandle(source, in: driverContextHandle) else {
+  public func prepareScript(_ source: String) -> JSPreparedScript<E>
+  where E: JSEnginePreparedScriptDriver {
+    guard let handle = driverContextHandle.makePreparedScriptHandle(source) else {
       preconditionFailure("JSInstantContext.prepareScript could not create handle")
     }
     return JSPreparedScript(handle: handle, context: driverContextHandle)
@@ -585,8 +591,8 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     callback: @escaping JSFunctionCallback<E>
   ) -> JSValue<E> where E.Engine == E {
     guard
-      let handle = E.makeFunctionValueHandle(
-        named: name, callback: callback, in: driverContextHandle)
+      let handle = driverContextHandle.makeFunctionValueHandle(
+        named: name, callback: callback)
     else {
       preconditionFailure("JSInstantContext.makeFunction could not create handle")
     }
@@ -600,11 +606,10 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     _ script: borrowing JSPreparedScript<E>,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSEnginePreparedScriptDriver {
     bridgeHandleResult(
-      E.evaluatePreparedScriptResultHandle(
+      driverContextHandle.evaluatePreparedScriptResultHandle(
         script.borrowHandle(in: self),
-        driverContextHandle,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       ), in: driverContextHandle
@@ -616,7 +621,7 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     _ script: String,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSEnginePreparedScriptDriver {
     let prepared = prepareScript(script)
     return evaluateScript(prepared, sourceURL: sourceURL, startingLineNumber: startingLineNumber)
   }

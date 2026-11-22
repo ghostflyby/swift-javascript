@@ -1,13 +1,22 @@
+/// Driver face required by the shared conversion protocol signatures.
+///
+/// Each protocol declares one generic requirement covering every conformer;
+/// the strongest built-in conformer (`JSCodableValueConverter`) needs property
+/// and invocation operations, so the shared surface is their union. Primitive
+/// conformers use only the runtime subset but must match the same signature.
+public typealias JSValueConversionEngine = JSEnginePropertyDriver & JSEngineInvocationDriver
+
 public protocol JSValueDecodable: ~Copyable {
-  init<E: JSEngine>(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>)
-  static func tryDecode<E: JSEngine>(
+  init<E: JSValueConversionEngine>(
+    value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>)
+  static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self
 }
 
 extension JSValueDecodable {
-  public init<E: JSEngine>(
+  public init<E: JSContextEngine & JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
   ) {
@@ -16,14 +25,14 @@ extension JSValueDecodable {
     }
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self {
     Self(value: value, in: context)
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSContextEngine & JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> Self {
@@ -34,14 +43,16 @@ extension JSValueDecodable {
 }
 
 public protocol JSValueEncodable: ~Copyable {
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E>
-  func tryEncode<E: JSEngine>(
+  func toJSValue<E: JSValueConversionEngine>(
+    in context: borrowing JSInstantContext<E>
+  ) -> JSValue<E>
+  func tryEncode<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
 }
 
 extension JSValueEncodable {
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSContextEngine & JSValueConversionEngine>(
     in context: isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
     context.withInstantContext { callbackContext in
@@ -49,13 +60,13 @@ extension JSValueEncodable {
     }
   }
 
-  public func tryEncode<E: JSEngine>(
+  public func tryEncode<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     toJSValue(in: context)
   }
 
-  public func tryEncode<E: JSEngine>(
+  public func tryEncode<E: JSContextEngine & JSValueConversionEngine>(
     in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> JSValue<E> {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
@@ -69,11 +80,11 @@ public typealias JSValueCodable = JSValueDecodable & JSValueEncodable
 public protocol JSValueDecoder {
   associatedtype SwiftType
 
-  static func decode<E: JSEngine>(
+  static func decode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>
   )
     -> SwiftType
-  static func tryDecode<E: JSEngine>(
+  static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> SwiftType
@@ -82,11 +93,11 @@ public protocol JSValueDecoder {
 public protocol JSValueEncoder {
   associatedtype SwiftType
 
-  static func tryEncode<E: JSEngine>(
+  static func tryEncode<E: JSValueConversionEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E>
-  static func encode<E: JSEngine>(
+  static func encode<E: JSValueConversionEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
   )
@@ -96,7 +107,7 @@ public protocol JSValueEncoder {
 public typealias JSValueConverter = JSValueDecoder & JSValueEncoder
 
 extension JSValueDecoder {
-  public static func decode<E: JSEngine>(
+  public static func decode<E: JSContextEngine & JSValueConversionEngine>(
     _ value: borrowing JSValue<E>, in context: isolated JSContext<E>
   )
     -> SwiftType
@@ -106,14 +117,14 @@ extension JSValueDecoder {
     }
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> SwiftType {
     decode(value, in: context)
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSContextEngine & JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: isolated JSContext<E>
   ) throws(JSValueConversionError) -> SwiftType {
@@ -124,7 +135,7 @@ extension JSValueDecoder {
 }
 
 extension JSValueEncoder {
-  public static func encode<E: JSEngine>(
+  public static func encode<E: JSContextEngine & JSValueConversionEngine>(
     _ value: SwiftType,
     in context: isolated JSContext<E>
   )
@@ -135,14 +146,14 @@ extension JSValueEncoder {
     }
   }
 
-  public static func tryEncode<E: JSEngine>(
+  public static func tryEncode<E: JSValueConversionEngine>(
     _ value: SwiftType,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     encode(value, in: context)
   }
 
-  public static func tryEncode<E: JSEngine>(
+  public static func tryEncode<E: JSContextEngine & JSValueConversionEngine>(
     _ value: SwiftType,
     in context: isolated JSContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
@@ -155,7 +166,7 @@ extension JSValueEncoder {
 public enum JSDefaultConverter<T: JSValueCodable>:
   JSValueConverter
 {
-  public static func decode<E: JSEngine>(
+  public static func decode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>
   )
     -> T
@@ -163,14 +174,14 @@ public enum JSDefaultConverter<T: JSValueCodable>:
     T(value: value, in: context)
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> T {
     try T.tryDecode(value, in: context)
   }
 
-  public static func encode<E: JSEngine>(
+  public static func encode<E: JSValueConversionEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
   )
@@ -179,7 +190,7 @@ public enum JSDefaultConverter<T: JSValueCodable>:
     value.toJSValue(in: context)
   }
 
-  public static func tryEncode<E: JSEngine>(
+  public static func tryEncode<E: JSValueConversionEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {

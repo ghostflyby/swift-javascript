@@ -4,7 +4,7 @@
 /// It stores the value handle and the context handle it was created under
 /// directly as stored properties (both Copyable identity tokens) and relies
 /// on explicit `in context` parameters at operation sites.
-public struct JSValue<E: JSEngine>: ~Copyable {
+public struct JSValue<E: JSEngineValueTypes>: ~Copyable {
   /// The engine value handle. Copying is side-effect free; ownership is
   /// carried by convention until Stage 3 — `deinit` releases the reference.
   /// `nil` marks a taken/discarded value whose reference was handed off,

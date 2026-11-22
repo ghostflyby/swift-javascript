@@ -1,5 +1,6 @@
-extension JSValue {
-  public init(string value: String, in context: isolated JSContext<E> = #isolation) {
+extension JSValue where E: JSEngineRuntimeDriver {
+  public init(string value: String, in context: isolated JSContext<E> = #isolation)
+  where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeString(value))
@@ -13,7 +14,7 @@ extension JSValue {
   public init(
     string key: borrowing JSPropertyStringKey<E>,
     in context: isolated JSContext<E> = #isolation
-  ) {
+  ) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeString(from: key))
@@ -23,11 +24,12 @@ extension JSValue {
   public init(
     string key: borrowing JSPropertyStringKey<E>,
     in context: borrowing JSInstantContext<E>
-  ) {
+  ) where E: JSEnginePropertyDriver {
     self.init(taking: context.persist(context.makeString(from: key)))
   }
 
-  public init(number value: Double, in context: isolated JSContext<E> = #isolation) {
+  public init(number value: Double, in context: isolated JSContext<E> = #isolation)
+  where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNumber(value))
@@ -40,7 +42,7 @@ extension JSValue {
 
   public init(
     number value: some BinaryInteger, in context: isolated JSContext<E> = #isolation
-  ) {
+  ) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNumber(value))
@@ -51,7 +53,8 @@ extension JSValue {
     self.init(taking: context.persist(context.makeNumber(value)))
   }
 
-  public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation) {
+  public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation)
+  where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeBoolean(value))
@@ -62,7 +65,8 @@ extension JSValue {
     self.init(taking: context.persist(context.makeBoolean(value)))
   }
 
-  public init(symbol: String, in context: isolated JSContext<E> = #isolation) {
+  public init(symbol: String, in context: isolated JSContext<E> = #isolation)
+  where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeSymbol(symbol))
@@ -73,7 +77,7 @@ extension JSValue {
     self.init(taking: context.persist(context.makeSymbol(symbol)))
   }
 
-  public init(nullIn context: isolated JSContext<E> = #isolation) {
+  public init(nullIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNull())
@@ -84,7 +88,7 @@ extension JSValue {
     self.init(taking: context.persist(context.makeNull()))
   }
 
-  public init(undefinedIn context: isolated JSContext<E> = #isolation) {
+  public init(undefinedIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeUndefined())
@@ -95,7 +99,7 @@ extension JSValue {
     self.init(taking: context.persist(context.makeUndefined()))
   }
 
-  public init(objectIn context: isolated JSContext<E> = #isolation) {
+  public init(objectIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         let result = callbackContext.makeObject()
@@ -114,7 +118,7 @@ extension JSValue {
     self.init(taking: context.persist(cb))
   }
 
-  public init(arrayIn context: isolated JSContext<E> = #isolation) {
+  public init(arrayIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         let result = callbackContext.makeArray()
@@ -134,12 +138,12 @@ extension JSValue {
   }
 }
 
-extension JSValue where E.Engine == E {
+extension JSValue where E: JSEngineRuntimeDriver, E.Engine == E {
   public init(
     name: String,
     callback: @escaping JSFunctionCallback<E>,
     in context: isolated JSContext<E> = #isolation
-  ) {
+  ) where E: JSContextEngine {
     self.init(
       taking: context.withInstantContext { callbackContext in
         JSValue(name: name, callback: callback, in: callbackContext)
@@ -162,7 +166,7 @@ extension JSValue where E.Engine == E {
     in context: isolated JSContext<E> = #isolation,
     name: String,
     function: @escaping @Sendable (repeat each A) throws(Err) -> R
-  ) {
+  ) where E: JSContextEngine & JSValueConversionEngine {
     let swiftFunction = function
     let count = countTypePack(repeat (each A).self)
     let callback: JSFunctionCallback<E> = { context, this, arguments in
@@ -203,7 +207,7 @@ extension JSValue where E.Engine == E {
     errorCoder: ECoder.Type,
     function:
       @escaping @Sendable (repeat (each C).SwiftType) throws(ECoder.SwiftType) -> RCoder.SwiftType
-  ) {
+  ) where E: JSContextEngine & JSValueConversionEngine {
     let swiftFunction = function
     let count = countTypePack(repeat (each C).self)
     let callback: JSFunctionCallback<E> = {

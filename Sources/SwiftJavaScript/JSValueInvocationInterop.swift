@@ -1,9 +1,9 @@
-extension JSInstantContext {
+extension JSInstantContext where E: JSEngineInvocationDriver {
   @inline(__always)
   func valueHandle(for value: borrowing JSValue<E>) -> JSValueHandle<E> {
     let handle = value.borrowHandle()
     precondition(
-      E.isContextCompatibleWith(value.contextHandle, driverContextHandle),
+      driverContextHandle.isContextCompatibleWith(value.contextHandle),
       "Cross-VM JSValue operation is not allowed; pass a context from the same JSVirtualMachine"
     )
     return handle
@@ -11,7 +11,7 @@ extension JSInstantContext {
 
   func encodeArguments<each A: JSValueEncodable>(
     _ arguments: repeat each A
-  ) -> [JSValueHandle<E>] {
+  ) -> [JSValueHandle<E>] where E: JSValueConversionEngine {
     var values: [JSValueHandle<E>] = []
     values.reserveCapacity(countTypePack(repeat (each A).self))
 
@@ -36,11 +36,10 @@ extension JSInstantContext {
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
-      E.callFunctionHandle(
+      driverContextHandle.callFunctionHandle(
         valueHandle(for: function),
         this: thisValueHandle,
-        arguments: arguments,
-        in: driverContextHandle
+        arguments: arguments
       ), in: driverContextHandle)
   }
 
@@ -70,7 +69,7 @@ extension JSInstantContext {
   func call<each A: JSValueEncodable>(
     function: borrowing JSValue<E>,
     arguments: repeat each A
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
     defer { releaseArguments(argumentHandles) }
     return call(function: function, arguments: argumentHandles)
@@ -80,7 +79,7 @@ extension JSInstantContext {
     function: borrowing JSValue<E>,
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
     defer { releaseArguments(argumentHandles) }
     return call(
@@ -95,10 +94,9 @@ extension JSInstantContext {
     arguments: [JSValueHandle<E>]
   ) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
-      E.constructHandle(
+      driverContextHandle.constructHandle(
         valueHandle(for: constructor),
-        arguments: arguments,
-        in: driverContextHandle
+        arguments: arguments
       ), in: driverContextHandle)
   }
 
@@ -109,7 +107,7 @@ extension JSInstantContext {
   func construct<each A: JSValueEncodable>(
     constructor: borrowing JSValue<E>,
     arguments: repeat each A
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
     defer { releaseArguments(argumentHandles) }
     return construct(constructor: constructor, arguments: argumentHandles)
@@ -117,21 +115,20 @@ extension JSInstantContext {
 
   func getProperty(_ key: borrowing JSPropertyStringKey<E>, on object: borrowing JSValue<E>)
     -> JSResult<JSValue<E>>
-  {
+  where E: JSEnginePropertyDriver {
     bridgeHandleResult(
-      E.getPropertyStringKeyHandle(
+      driverContextHandle.getPropertyStringKeyHandle(
         key.borrowHandle(in: self),
-        on: valueHandle(for: object),
-        in: driverContextHandle
+        on: valueHandle(for: object)
       ), in: driverContextHandle)
   }
 
-  func getProperty(_ key: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func getProperty(_ key: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>>
+  where E: JSEnginePropertyDriver {
     bridgeHandleResult(
-      E.getStaticStringPropertyHandle(
+      driverContextHandle.getStaticStringPropertyHandle(
         key,
-        on: valueHandle(for: object),
-        in: driverContextHandle
+        on: valueHandle(for: object)
       ), in: driverContextHandle)
   }
 
@@ -140,12 +137,11 @@ extension JSInstantContext {
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
     attributes: JSHostMemberAttributes = .none
-  ) -> Bool {
-    E.setPropertyStringKeyHandle(
+  ) -> Bool where E: JSEnginePropertyDriver {
+    driverContextHandle.setPropertyStringKeyHandle(
       key.borrowHandle(in: self),
       on: valueHandle(for: object),
       to: valueHandle(for: value),
-      in: driverContextHandle,
       attributes: attributes
     )
   }
@@ -155,12 +151,11 @@ extension JSInstantContext {
     on object: borrowing JSValue<E>,
     to value: borrowing JSValue<E>,
     attributes: JSHostMemberAttributes = .none
-  ) -> Bool {
-    E.setStaticStringPropertyHandle(
+  ) -> Bool where E: JSEnginePropertyDriver {
+    driverContextHandle.setStaticStringPropertyHandle(
       key,
       on: valueHandle(for: object),
       to: valueHandle(for: value),
-      in: driverContextHandle,
       attributes: attributes
     )
   }
@@ -169,7 +164,7 @@ extension JSInstantContext {
     _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     switch getProperty(name, on: object) {
     case .exception(let exception):
       return .exception(exception)
@@ -186,7 +181,7 @@ extension JSInstantContext {
     _ name: StaticString,
     on object: borrowing JSValue<E>,
     arguments: [JSValueHandle<E>]
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     switch getProperty(name, on: object) {
     case .exception(let exception):
       return .exception(exception)
@@ -199,14 +194,16 @@ extension JSInstantContext {
     }
   }
 
-  func invokeMethod(_ name: StaticString, on object: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
+  func invokeMethod(_ name: StaticString, on object: borrowing JSValue<E>)
+    -> JSResult<JSValue<E>> where E: JSValueConversionEngine
+  {
     invokeMethod(name, on: object, arguments: [])
   }
 
   func invokeMethod(
     _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     invokeMethod(name, on: object, arguments: [])
   }
 
@@ -214,7 +211,7 @@ extension JSInstantContext {
     _ name: StaticString,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
     defer { releaseArguments(argumentHandles) }
     return invokeMethod(name, on: object, arguments: argumentHandles)
@@ -224,7 +221,7 @@ extension JSInstantContext {
     _ name: borrowing JSPropertyStringKey<E>,
     on object: borrowing JSValue<E>,
     arguments: repeat each A
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
     defer { releaseArguments(argumentHandles) }
     return invokeMethod(name, on: object, arguments: argumentHandles)
@@ -232,28 +229,26 @@ extension JSInstantContext {
 
   func toObject(_ value: borrowing JSValue<E>) -> JSResult<JSValue<E>> {
     bridgeHandleResult(
-      E.toObjectHandle(
-        valueHandle(for: value),
-        in: driverContextHandle
+      driverContextHandle.toObjectHandle(
+        valueHandle(for: value)
       ), in: driverContextHandle)
   }
 
   func isArray(_ value: borrowing JSValue<E>) -> Bool {
-    E.isArrayHandle(valueHandle(for: value), in: driverContextHandle) ?? false
+    driverContextHandle.isArrayHandle(valueHandle(for: value)) ?? false
   }
 
   func isDate(_ value: borrowing JSValue<E>) -> Bool {
-    E.isDateHandle(valueHandle(for: value), in: driverContextHandle) ?? false
+    driverContextHandle.isDateHandle(valueHandle(for: value)) ?? false
   }
 
   func isInstanceOf(
     _ value: borrowing JSValue<E>,
     constructor: borrowing JSValue<E>
   ) -> Bool {
-    E.isInstanceOfHandle(
+    driverContextHandle.isInstanceOfHandle(
       valueHandle(for: value),
-      constructor: valueHandle(for: constructor),
-      in: driverContextHandle
+      constructor: valueHandle(for: constructor)
     ) ?? false
   }
 
@@ -261,10 +256,9 @@ extension JSInstantContext {
     _ lhs: borrowing JSValue<E>,
     _ rhs: borrowing JSValue<E>
   ) -> Bool {
-    E.looselyEqualsHandle(
+    driverContextHandle.looselyEqualsHandle(
       valueHandle(for: lhs),
-      valueHandle(for: rhs),
-      in: driverContextHandle
+      valueHandle(for: rhs)
     ) ?? false
   }
 
@@ -272,16 +266,16 @@ extension JSInstantContext {
     _ lhs: borrowing JSValue<E>,
     _ rhs: borrowing JSValue<E>
   ) -> Bool {
-    E.strictlyEqualsHandle(
+    driverContextHandle.strictlyEqualsHandle(
       valueHandle(for: lhs),
-      valueHandle(for: rhs),
-      in: driverContextHandle
+      valueHandle(for: rhs)
     ) ?? false
   }
 }
 
-extension JSValue {
-  public func call(in context: isolated JSContext<E> = #isolation) -> JSResult<JSValue<E>> {
+extension JSValue where E: JSEngineInvocationDriver {
+  public func call(in context: isolated JSContext<E> = #isolation) -> JSResult<JSValue<E>>
+  where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       call(in: callbackContext)
     }
@@ -294,7 +288,7 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       call(arguments: repeat each arguments, in: callbackContext)
     }
@@ -303,14 +297,14 @@ extension JSValue {
   public func call<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.call(function: self, arguments: repeat each arguments)
   }
 
   public func call(
     this thisValue: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       call(this: thisValue, in: callbackContext)
     }
@@ -327,7 +321,7 @@ extension JSValue {
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       call(this: thisValue, arguments: repeat each arguments, in: callbackContext)
     }
@@ -337,7 +331,7 @@ extension JSValue {
     this thisValue: borrowing JSValue<E>,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.call(
       function: self,
       this: thisValue,
@@ -347,7 +341,7 @@ extension JSValue {
 
   public func construct(
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       construct(in: callbackContext)
     }
@@ -362,7 +356,7 @@ extension JSValue {
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       construct(arguments: repeat each arguments, in: callbackContext)
     }
@@ -371,7 +365,7 @@ extension JSValue {
   public func construct<each A: JSValueEncodable>(
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.construct(
       constructor: self,
       arguments: repeat each arguments
@@ -381,7 +375,7 @@ extension JSValue {
   public func invokeMethod(
     _ name: StaticString,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
     }
@@ -390,7 +384,7 @@ extension JSValue {
   public func invokeMethod(
     _ name: borrowing JSPropertyStringKey<E>,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       invokeMethod(name, in: callbackContext)
     }
@@ -399,14 +393,14 @@ extension JSValue {
   public func invokeMethod(
     _ name: StaticString,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.invokeMethod(name, on: self)
   }
 
   public func invokeMethod(
     _ name: borrowing JSPropertyStringKey<E>,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.invokeMethod(name, on: self)
   }
 
@@ -414,7 +408,7 @@ extension JSValue {
     _ name: StaticString,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
     }
@@ -424,7 +418,7 @@ extension JSValue {
     _ name: borrowing JSPropertyStringKey<E>,
     arguments: repeat each A,
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       invokeMethod(name, arguments: repeat each arguments, in: callbackContext)
     }
@@ -434,7 +428,7 @@ extension JSValue {
     _ name: StaticString,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.invokeMethod(name, on: self, arguments: repeat each arguments)
   }
 
@@ -442,21 +436,23 @@ extension JSValue {
     _ name: borrowing JSPropertyStringKey<E>,
     arguments: repeat each A,
     in context: borrowing JSInstantContext<E>
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     context.invokeMethod(name, on: self, arguments: repeat each arguments)
   }
 
-  public func toNumber(in context: isolated JSContext<E> = #isolation) -> Double {
+  public func toNumber(in context: isolated JSContext<E> = #isolation) -> Double
+  where E: JSContextEngine & JSValueConversionEngine {
     toDouble(in: context)
   }
 
-  public func toNumber(in context: borrowing JSInstantContext<E>) -> Double {
+  public func toNumber(in context: borrowing JSInstantContext<E>) -> Double
+  where E: JSValueConversionEngine {
     toDouble(in: context)
   }
 
   public func toObject(
     in context: isolated JSContext<E> = #isolation
-  ) -> JSResult<JSValue<E>> {
+  ) -> JSResult<JSValue<E>> where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       toObject(in: callbackContext)
     }
@@ -468,7 +464,8 @@ extension JSValue {
     context.toObject(self)
   }
 
-  public func isArray(in context: isolated JSContext<E> = #isolation) -> Bool {
+  public func isArray(in context: isolated JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       isArray(in: callbackContext)
     }
@@ -478,7 +475,8 @@ extension JSValue {
     context.isArray(self)
   }
 
-  public func isDate(in context: isolated JSContext<E> = #isolation) -> Bool {
+  public func isDate(in context: isolated JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       isDate(in: callbackContext)
     }
@@ -491,7 +489,7 @@ extension JSValue {
   public func isInstanceOf(
     _ constructor: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
-  ) -> Bool {
+  ) -> Bool where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       isInstanceOf(constructor, in: callbackContext)
     }
@@ -507,7 +505,7 @@ extension JSValue {
   public func looselyEquals(
     _ other: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
-  ) -> Bool {
+  ) -> Bool where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       looselyEquals(other, in: callbackContext)
     }
@@ -523,7 +521,7 @@ extension JSValue {
   public func strictlyEquals(
     _ other: borrowing JSValue<E>,
     in context: isolated JSContext<E> = #isolation
-  ) -> Bool {
+  ) -> Bool where E: JSContextEngine {
     context.withInstantContext { callbackContext in
       strictlyEquals(other, in: callbackContext)
     }
@@ -542,7 +540,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable, E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       defineProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
@@ -554,7 +552,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: isolated JSContext<E> = #isolation
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable, E: JSContextEngine & JSValueConversionEngine {
     context.withInstantContext { callbackContext in
       defineProperty(value, forKey: key, with: attributes, in: callbackContext)
     }
@@ -566,7 +564,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable, E: JSValueConversionEngine {
     let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     let didSet = context.setProperty(
       key,
@@ -587,7 +585,7 @@ extension JSValue {
     with attributes: JSPropertyAttributes = .none,
     in context: borrowing JSInstantContext<E>
   ) -> JSResult<JSValue<E>>
-  where Val: JSValueEncodable, Val: ~Copyable {
+  where Val: JSValueEncodable, Val: ~Copyable, E: JSValueConversionEngine {
     let encoded = (try? value.tryEncode(in: context)) ?? context.persist(context.makeUndefined())
     let didSet = context.setProperty(
       key,

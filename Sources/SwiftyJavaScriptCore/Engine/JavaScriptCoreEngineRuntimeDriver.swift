@@ -254,3 +254,111 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   }
 
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension JavaScriptCoreContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
+  public typealias Engine = JavaScriptCoreEngine
+  public typealias ValueHandle = JavaScriptCoreValueHandle
+  public typealias OwnedValueHandle = JavaScriptCoreOwnedValueHandle
+  public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
+
+  public func globalObjectValueHandle() -> JavaScriptCoreValueHandle? {
+    JavaScriptCoreEngine.globalObjectValueHandle(self)
+  }
+
+  public func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>
+  ) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
+  }
+
+  public func valueTypeForHandle(_ value: JavaScriptCoreValueHandle) -> SwiftJavaScript.JSType? {
+    JavaScriptCoreEngine.valueTypeForHandle(value, in: self)
+  }
+
+  public func toBooleanForHandle(_ value: JavaScriptCoreValueHandle) -> Bool {
+    JavaScriptCoreEngine.toBooleanForHandle(value, in: self)
+  }
+
+  public func toNumberForHandle(_ value: JavaScriptCoreValueHandle) -> Double {
+    JavaScriptCoreEngine.toNumberForHandle(value, in: self)
+  }
+
+  public func toStringForHandle(_ value: JavaScriptCoreValueHandle) -> String? {
+    JavaScriptCoreEngine.toStringForHandle(value, in: self)
+  }
+
+  public func makeStringValueHandle(_ value: String) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeStringValueHandle(value, self)
+  }
+
+  public func makeSymbolValueHandle(_ value: String) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeSymbolValueHandle(value, self)
+  }
+
+  public func makeNumberValueHandle(_ value: Double) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeNumberValueHandle(value, self)
+  }
+
+  public func makeBooleanValueHandle(_ value: Bool) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeBooleanValueHandle(value, self)
+  }
+
+  public func makeNullValueHandle() -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeNullValueHandle(self)
+  }
+
+  public func makeUndefinedValueHandle() -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeUndefinedValueHandle(self)
+  }
+
+  public func makeObjectResultHandle() -> JSResult<JavaScriptCoreOwnedValueHandle>? {
+    JavaScriptCoreEngine.makeObjectResultHandle(self)
+  }
+
+  public func makeArrayResultHandle() -> JSResult<JavaScriptCoreOwnedValueHandle>? {
+    JavaScriptCoreEngine.makeArrayResultHandle(self)
+  }
+
+  public func isContextCompatibleWith(_ other: JavaScriptCoreContextHandle) -> Bool {
+    JavaScriptCoreEngine.isContextCompatibleWith(self, other)
+  }
+
+  public func contextDataStorageBox() -> JSContextDataStorageBox? {
+    JavaScriptCoreEngine.contextDataStorageBox(in: self)
+  }
+
+  public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+    JavaScriptCoreEngine.installContextDataStorageBox(storage, in: self)
+  }
+
+  /// JSC is GC-managed: created handles need no explicit release.
+  public func releaseCreatedHandle(_ handle: consuming JavaScriptCoreOwnedValueHandle) {}
+
+  public func makePreparedScriptHandle(_ source: String)
+    -> JavaScriptCorePreparedScriptHandle?
+  {
+    JavaScriptCoreEngine.makePreparedScriptHandle(source, in: self)
+  }
+
+  public func isPreparedScriptHandleCompatibleWithContext(
+    _ script: JavaScriptCorePreparedScriptHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
+  }
+
+  public func evaluatePreparedScriptResultHandle(
+    _ script: JavaScriptCorePreparedScriptHandle,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.evaluatePreparedScriptResultHandle(
+      script,
+      self,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
+  }
+}

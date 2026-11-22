@@ -1,128 +1,106 @@
-public protocol JSEngineRuntimeDriver {
-  associatedtype Engine: JSEngine = Self
-  associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
+/// The engine's value-handle type surface.
+///
+/// Public value types (`JSValue`, callback values/arguments, prepared inputs)
+/// store only handle tokens and a context handle; they do not need the
+/// engine's operation capabilities. Constraining them on this protocol keeps
+/// each type on the driver face it actually uses — operation extensions add
+/// `JSEngineRuntimeDriver` / `JSEnginePropertyDriver` / … as needed.
+public protocol JSEngineValueTypes {
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ContextHandle == ValueHandle.Context
+  where ValueHandle.Context == ContextHandle
   associatedtype OwnedValueHandle: JSOwnedValueManualReferenceCountedHandle
   where
     OwnedValueHandle: ~Copyable,
     OwnedValueHandle.Context == ContextHandle,
     OwnedValueHandle.Borrowed == ValueHandle
+}
+
+/// Context-side value operations (Stage 2B decomposition).
+///
+/// Requirements live on the context handle itself: operations are addressed
+/// as `context.foo(handle)` instead of the former engine-static
+/// `E.foo(handle, in: context)`. Each engine's `ContextHandle` type conforms;
+/// the engine type keeps only lifecycle/capability requirements.
+public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
+  associatedtype Engine: JSEngineRuntimeDriver
+  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
+  where ValueHandle.Context == Self
+  associatedtype OwnedValueHandle: JSOwnedValueManualReferenceCountedHandle
+  where
+    OwnedValueHandle: ~Copyable,
+    OwnedValueHandle.Context == Self,
+    OwnedValueHandle.Borrowed == ValueHandle
+
+  func globalObjectValueHandle() -> ValueHandle?
+
+  func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSFunctionCallback<Engine>
+  ) -> OwnedValueHandle?
+
+  func valueTypeForHandle(_ value: ValueHandle) -> JSType?
+
+  func toBooleanForHandle(_ value: ValueHandle) -> Bool
+
+  func toNumberForHandle(_ value: ValueHandle) -> Double
+
+  func toStringForHandle(_ value: ValueHandle) -> String?
+
+  // Value-creation factories return the ownership carrier: the engine
+  // produces a new owning reference (+1 under reference counting), which
+  // flows into a scope arena (or an owning-by-convention `JSValue`).
+
+  func makeStringValueHandle(_ value: String) -> OwnedValueHandle?
+
+  func makeSymbolValueHandle(_ value: String) -> OwnedValueHandle?
+
+  func makeNumberValueHandle(_ value: Double) -> OwnedValueHandle?
+
+  func makeBooleanValueHandle(_ value: Bool) -> OwnedValueHandle?
+
+  func makeNullValueHandle() -> OwnedValueHandle?
+
+  func makeUndefinedValueHandle() -> OwnedValueHandle?
+
+  func makeObjectResultHandle() -> JSResult<OwnedValueHandle>?
+
+  func makeArrayResultHandle() -> JSResult<OwnedValueHandle>?
+
+  func isContextCompatibleWith(_ other: Self) -> Bool
+
+  /// Returns the context data storage box, or nil if none installed.
+  func contextDataStorageBox() -> JSContextDataStorageBox?
+
+  /// Installs or replaces the context data storage box. When `nil`, releases the old box if present.
+  func installContextDataStorageBox(_ storage: JSContextDataStorageBox?)
+
+  /// Release a value handle created by the engine that was not persisted or returned.
+  /// QuickJS: calls JS_FreeValue. JSC: no-op (GC-managed).
+  func releaseCreatedHandle(_ handle: consuming OwnedValueHandle)
+}
+
+// No default implementations: every context states its release and storage
+// behavior explicitly. A silent no-op default would let a migrated engine
+// keep compiling while leaking every created handle (a GC-managed engine
+// such as JSC writes its no-op out explicitly instead).
+
+/// Engine-side descriptor: associated types, capabilities, and runtime/context
+/// lifecycle. Value operations moved to `JSContextRuntimeDriver`, implemented
+/// by `ContextHandle`.
+public protocol JSEngineRuntimeDriver: JSEngineValueTypes
+where
+  ContextHandle: JSContextRuntimeDriver,
+  ContextHandle.Engine == Engine,
+  ContextHandle.ValueHandle == ValueHandle,
+  ContextHandle.OwnedValueHandle == OwnedValueHandle
+{
+  associatedtype Engine: JSEngineRuntimeDriver = Self
+  associatedtype RuntimeHandle: JSRuntimeManualReferenceCountedHandle
   associatedtype ClassHandle: JSClassManualReferenceCountedHandle
 
   static var capabilities: JSEngineCapabilities { get }
 
   static func makeRuntimeHandle() -> RuntimeHandle
   static func makeBorrowedContextHandleFromRuntime(in runtime: RuntimeHandle) -> ContextHandle?
-
-  static func globalObjectValueHandle(_ context: ContextHandle) -> ValueHandle?
-
-  static func makeFunctionValueHandle(
-    named name: String,
-    callback: @escaping JSFunctionCallback<Engine>,
-    in context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func valueTypeForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> JSType?
-
-  static func toBooleanForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Bool
-
-  static func toNumberForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> Double
-
-  static func toStringForHandle(
-    _ value: ValueHandle,
-    in context: ContextHandle
-  ) -> String?
-
-  // Value-creation factories return the ownership carrier: the engine
-  // produces a new owning reference (+1 under reference counting), which
-  // flows into a scope arena (or an owning-by-convention `JSValue`).
-
-  static func makeStringValueHandle(
-    _ value: String,
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeSymbolValueHandle(
-    _ value: String,
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeNumberValueHandle(
-    _ value: Double,
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeBooleanValueHandle(
-    _ value: Bool,
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeNullValueHandle(
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeUndefinedValueHandle(
-    _ context: ContextHandle
-  ) -> OwnedValueHandle?
-
-  static func makeObjectResultHandle(
-    _ context: ContextHandle
-  ) -> JSResult<OwnedValueHandle>?
-
-  static func makeArrayResultHandle(
-    _ context: ContextHandle
-  ) -> JSResult<OwnedValueHandle>?
-
-  static func isContextCompatibleWith(
-    _ this: ContextHandle,
-    _ that: ContextHandle
-  ) -> Bool
-
-  /// Returns the context data storage box for the given context, or nil if none installed.
-  static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox?
-
-  /// Installs or replaces the context data storage box. When `nil`, releases the old box if present.
-  static func installContextDataStorageBox(
-    _ storage: JSContextDataStorageBox?,
-    in context: ContextHandle
-  )
-
-  /// Release a value handle created by the engine that was not persisted or returned.
-  /// QuickJS: calls JS_FreeValue. JSC: no-op (GC-managed).
-  static func releaseCreatedHandle(_ handle: consuming OwnedValueHandle, in context: ContextHandle)
-}
-
-extension JSEngineRuntimeDriver {
-  public static func releaseCreatedHandle(
-    _ handle: consuming OwnedValueHandle, in context: ContextHandle
-  ) {
-    // Default: no-op (JSC — GC manages value lifetimes)
-  }
-}
-
-extension JSEngineRuntimeDriver {
-
-  public static func contextDataStorageBox(in context: ContextHandle) -> JSContextDataStorageBox? {
-    _ = context
-    return nil
-  }
-
-  public static func installContextDataStorageBox(
-    _ storage: JSContextDataStorageBox?,
-    in context: ContextHandle
-  ) {
-    _ = storage
-    _ = context
-  }
 }

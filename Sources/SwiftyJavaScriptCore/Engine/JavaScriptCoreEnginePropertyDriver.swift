@@ -462,3 +462,160 @@ extension JavaScriptCoreEngine: JSEnginePropertyDriver {
     }
   }
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension JavaScriptCoreContextHandle: JSContextPropertyDriver {
+  public typealias PropertyStringKeyHandle = JavaScriptCorePropertyStringKeyHandle
+
+  public func makePropertyStringKeyHandle(_ value: String)
+    -> JavaScriptCorePropertyStringKeyHandle?
+  {
+    JavaScriptCoreEngine.makePropertyStringKeyHandle(value, in: self)
+  }
+
+  public func makePropertyStringKeyHandle(_ value: StaticString)
+    -> JavaScriptCorePropertyStringKeyHandle?
+  {
+    JavaScriptCoreEngine.makePropertyStringKeyHandle(value, in: self)
+  }
+
+  public func isPropertyStringKeyHandleCompatibleWithContext(
+    _ key: JavaScriptCorePropertyStringKeyHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
+  }
+
+  public func makeStringValueHandle(
+    fromPropertyStringKey key: JavaScriptCorePropertyStringKeyHandle
+  ) -> JavaScriptCoreOwnedValueHandle? {
+    JavaScriptCoreEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
+  }
+
+  public func propertyNamesForHandle(on object: JavaScriptCoreValueHandle) -> [String]? {
+    JavaScriptCoreEngine.propertyNamesForHandle(on: object, in: self)
+  }
+
+  public func getStaticStringPropertyHandle(
+    _ key: StaticString,
+    on object: JavaScriptCoreValueHandle
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.getStaticStringPropertyHandle(key, on: object, in: self)
+  }
+
+  public func setStaticStringPropertyHandle(
+    _ key: StaticString,
+    on object: JavaScriptCoreValueHandle,
+    to value: JavaScriptCoreValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    JavaScriptCoreEngine.setStaticStringPropertyHandle(
+      key,
+      on: object,
+      to: value,
+      in: self,
+      attributes: attributes
+    )
+  }
+
+  public func getPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.getPropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func setPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
+    on object: JavaScriptCoreValueHandle,
+    to value: JavaScriptCoreValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    JavaScriptCoreEngine.setPropertyStringKeyHandle(
+      key,
+      on: object,
+      to: value,
+      in: self,
+      attributes: attributes
+    )
+  }
+
+  public func getValuePropertyHandle(
+    _ key: JavaScriptCoreValueHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.getValuePropertyHandle(key, on: object, in: self)
+  }
+
+  public func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: JavaScriptCoreValueHandle
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.getIndexPropertyHandle(at: index, on: object, in: self)
+  }
+
+  public func setValuePropertyHandle(
+    _ key: JavaScriptCoreValueHandle,
+    on object: JavaScriptCoreValueHandle,
+    to value: JavaScriptCoreValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    JavaScriptCoreEngine.setValuePropertyHandle(
+      key,
+      on: object,
+      to: value,
+      in: self,
+      attributes: attributes
+    )
+  }
+
+  public func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: JavaScriptCoreValueHandle,
+    to value: JavaScriptCoreValueHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
+  }
+
+  public func hasStaticStringPropertyHandle(
+    _ key: StaticString,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
+  }
+
+  public func hasPropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func hasValuePropertyHandle(
+    _ key: JavaScriptCoreValueHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.hasValuePropertyHandle(key, on: object, in: self)
+  }
+
+  public func deleteStaticStringPropertyHandle(
+    _ key: StaticString,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
+  }
+
+  public func deletePropertyStringKeyHandle(
+    _ key: JavaScriptCorePropertyStringKeyHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func deleteValuePropertyHandle(
+    _ key: JavaScriptCoreValueHandle,
+    on object: JavaScriptCoreValueHandle
+  ) -> Bool {
+    JavaScriptCoreEngine.deleteValuePropertyHandle(key, on: object, in: self)
+  }
+}

@@ -5,7 +5,7 @@
 ///   - this:    The `this` value for the function call (temporary).
 ///   - arguments: The function call arguments (temporary).
 /// - Returns: A `JSCallbackReturn` containing either a temporary or persistent value.
-public typealias JSFunctionCallback<E: JSEngine> = (
+public typealias JSFunctionCallback<E: JSEngineRuntimeDriver> = (
   _ context: borrowing JSInstantContext<E>,
   _ this: borrowing JSCallbackValue<E>,
   _ arguments: borrowing JSCallbackArguments<E>

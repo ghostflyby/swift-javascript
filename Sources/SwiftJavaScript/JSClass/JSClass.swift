@@ -1,6 +1,6 @@
-public typealias JSClassHandle<E: JSEngine> = E.ClassHandle
+public typealias JSClassHandle<E: JSEngineRuntimeDriver> = E.ClassHandle
 
-public final class JSClass<E: JSEngine>: @unchecked Sendable {
+public final class JSClass<E: JSEngineRuntimeDriver>: @unchecked Sendable {
   package let _rawValue: JSClassHandle<E>
   package let retainedOwner: AnyObject?
 

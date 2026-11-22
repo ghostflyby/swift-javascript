@@ -340,7 +340,7 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
         in: virtualMachine.driverRuntimeHandle),
       let targetContext = E.makeBorrowedContextHandleFromRuntime(
         in: virtualMachine.driverRuntimeHandle),
-      let value = E.makeNumberValueHandle(7, sourceContext)
+      let value = sourceContext.makeNumberValueHandle(7)
     else {
       Issue.record("Expected same-VM driver handles to be creatable")
       return
@@ -353,9 +353,9 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
       _ = sourceContext.releaseReference()
     }
 
-    let isCompatible = E.isContextCompatibleWith(sourceContext, targetContext)
-    let targetValue = E.toNumberForHandle(borrowed, in: targetContext)
-    E.releaseCreatedHandle(value, in: sourceContext)
+    let isCompatible = sourceContext.isContextCompatibleWith(targetContext)
+    let targetValue = targetContext.toNumberForHandle(borrowed)
+    sourceContext.releaseCreatedHandle(value)
 
     #expect(isCompatible)
     #expect(targetValue == 7)

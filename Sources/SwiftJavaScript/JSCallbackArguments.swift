@@ -1,5 +1,5 @@
 /// Borrowed JavaScript function call arguments.
-public struct JSCallbackArguments<E: JSEngine>: ~Copyable {
+public struct JSCallbackArguments<E: JSEngineValueTypes>: ~Copyable {
   public let count: Int
   private let borrowedValueHandleAt: (Int) -> JSValueHandle<E>?
 
@@ -17,7 +17,7 @@ public struct JSCallbackArguments<E: JSEngine>: ~Copyable {
     at index: Int,
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSCallbackValue<E>) -> R
-  ) -> R {
+  ) -> R where E: JSEngineRuntimeDriver {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
@@ -31,7 +31,7 @@ public struct JSCallbackArguments<E: JSEngine>: ~Copyable {
 
 // MARK: - Unpacking (via scope.decode)
 
-extension JSCallbackArguments {
+extension JSCallbackArguments where E: JSValueConversionEngine {
   @inline(__always)
   private func unpackNext<T: JSValueDecodable>(
     _ index: inout Int,

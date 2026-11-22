@@ -1,12 +1,12 @@
 extension Bool: JSValueDecodable, JSValueEncodable {
-  public init<E: JSEngine>(
+  public init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
     self = context.toBoolean(value)
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.persist(context.makeBoolean(self))
@@ -14,7 +14,7 @@ extension Bool: JSValueDecodable, JSValueEncodable {
 }
 
 extension Bool {
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Bool {
@@ -26,14 +26,14 @@ extension Bool {
 }
 
 extension Double: JSValueDecodable, JSValueEncodable {
-  public init<E: JSEngine>(
+  public init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
     self = context.toNumber(value)
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.persist(context.makeNumber(self))
@@ -41,7 +41,7 @@ extension Double: JSValueDecodable, JSValueEncodable {
 }
 
 extension Double {
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Double {
@@ -53,7 +53,7 @@ extension Double {
 }
 
 extension Int32: JSValueDecodable, JSValueEncodable {
-  public init<E: JSEngine>(
+  public init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -61,7 +61,7 @@ extension Int32: JSValueDecodable, JSValueEncodable {
     self = Int32(number)
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.persist(context.makeNumber(Double(self)))
@@ -69,7 +69,7 @@ extension Int32: JSValueDecodable, JSValueEncodable {
 }
 
 extension Int32 {
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Int32 {
@@ -85,7 +85,7 @@ extension Int32 {
 }
 
 extension UInt32: JSValueDecodable, JSValueEncodable {
-  public init<E: JSEngine>(
+  public init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -93,7 +93,7 @@ extension UInt32: JSValueDecodable, JSValueEncodable {
     self = UInt32(number)
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.persist(context.makeNumber(Double(self)))
@@ -101,7 +101,7 @@ extension UInt32: JSValueDecodable, JSValueEncodable {
 }
 
 extension UInt32 {
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> UInt32 {
@@ -117,14 +117,14 @@ extension UInt32 {
 }
 
 extension String: JSValueDecodable, JSValueEncodable {
-  public init<E: JSEngine>(
+  public init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
     self = context.toString(value)
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     context.persist(context.makeString(self))
@@ -132,7 +132,7 @@ extension String: JSValueDecodable, JSValueEncodable {
 }
 
 extension String {
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> String {
@@ -144,7 +144,7 @@ extension String {
 }
 
 extension Never: JSValueEncodable {
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     _ = context
@@ -152,32 +152,37 @@ extension Never: JSValueEncodable {
   }
 }
 
-extension JSValue {
+extension JSValue where E: JSValueConversionEngine {
   public func tryDecode<T: JSValueDecodable>(
     as type: T.Type = T.self,
     in context: isolated JSContext<E> = #isolation
-  ) throws(JSValueConversionError) -> T {
+  ) throws(JSValueConversionError) -> T where E: JSContextEngine {
     _ = type
     return try T.tryDecode(self, in: context)
   }
 
-  public func toBool(in context: isolated JSContext<E> = #isolation) -> Bool {
+  public func toBool(in context: isolated JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     Bool(value: self, in: context)
   }
 
-  public func toDouble(in context: isolated JSContext<E> = #isolation) -> Double {
+  public func toDouble(in context: isolated JSContext<E> = #isolation) -> Double
+  where E: JSContextEngine {
     Double(value: self, in: context)
   }
 
-  public func toInt32(in context: isolated JSContext<E> = #isolation) -> Int32 {
+  public func toInt32(in context: isolated JSContext<E> = #isolation) -> Int32
+  where E: JSContextEngine {
     Int32(value: self, in: context)
   }
 
-  public func toUInt32(in context: isolated JSContext<E> = #isolation) -> UInt32 {
+  public func toUInt32(in context: isolated JSContext<E> = #isolation) -> UInt32
+  where E: JSContextEngine {
     UInt32(value: self, in: context)
   }
 
-  public func toString(in context: isolated JSContext<E> = #isolation) -> String {
+  public func toString(in context: isolated JSContext<E> = #isolation) -> String
+  where E: JSContextEngine {
     String(value: self, in: context)
   }
 

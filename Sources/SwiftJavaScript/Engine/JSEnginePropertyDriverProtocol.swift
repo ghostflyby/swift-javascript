@@ -1,146 +1,117 @@
-public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver {
+/// Context-side property operations (Stage 2B decomposition).
+public protocol JSContextPropertyDriver: JSContextRuntimeDriver {
   associatedtype PropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle
 
-  static func makePropertyStringKeyHandle(
-    _ value: String,
-    in context: ContextHandle
-  ) -> PropertyStringKeyHandle?
+  func makePropertyStringKeyHandle(_ value: String) -> PropertyStringKeyHandle?
 
-  static func makePropertyStringKeyHandle(
-    _ value: StaticString,
-    in context: ContextHandle
-  ) -> PropertyStringKeyHandle?
+  func makePropertyStringKeyHandle(_ value: StaticString) -> PropertyStringKeyHandle?
 
-  static func isPropertyStringKeyHandleCompatibleWithContext(
-    _ key: PropertyStringKeyHandle,
-    in context: ContextHandle
-  ) -> Bool
+  func isPropertyStringKeyHandleCompatibleWithContext(_ key: PropertyStringKeyHandle) -> Bool
 
   /// Creation factory (owned result): the engine produces a new owning
   /// reference for the property-string key's value.
-  static func makeStringValueHandle(
-    fromPropertyStringKey key: PropertyStringKeyHandle,
-    in context: ContextHandle
-  ) -> OwnedValueHandle?
+  func makeStringValueHandle(fromPropertyStringKey key: PropertyStringKeyHandle)
+    -> OwnedValueHandle?
 
-  static func propertyNamesForHandle(
-    on object: ValueHandle,
-    in context: ContextHandle
-  ) -> [String]?
+  func propertyNamesForHandle(on object: ValueHandle) -> [String]?
 
-  static func getStaticStringPropertyHandle(
+  func getStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> JSResult<ValueHandle>?
 
-  static func getPropertyStringKeyHandle(
+  func getPropertyStringKeyHandle(
     _ key: PropertyStringKeyHandle,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> JSResult<ValueHandle>?
 
-  static func setStaticStringPropertyHandle(
+  func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle,
     to value: ValueHandle,
-    in context: ContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool
 
-  static func setPropertyStringKeyHandle(
+  func setPropertyStringKeyHandle(
     _ key: PropertyStringKeyHandle,
     on object: ValueHandle,
     to value: ValueHandle,
-    in context: ContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool
 
-  static func getValuePropertyHandle(
+  func getValuePropertyHandle(
+    _ key: ValueHandle,
+    on object: ValueHandle
+  ) -> JSResult<ValueHandle>?
+
+  func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: ValueHandle
+  ) -> JSResult<ValueHandle>?
+
+  func setValuePropertyHandle(
     _ key: ValueHandle,
     on object: ValueHandle,
-    in context: ContextHandle
-  ) -> JSResult<ValueHandle>?
+    to value: ValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool
 
-  static func getIndexPropertyHandle(
+  func setIndexPropertyHandle(
     at index: UInt32,
     on object: ValueHandle,
-    in context: ContextHandle
-  ) -> JSResult<ValueHandle>?
-
-  static func setValuePropertyHandle(
-    _ key: ValueHandle,
-    on object: ValueHandle,
-    to value: ValueHandle,
-    in context: ContextHandle,
-    attributes: JSHostMemberAttributes
+    to value: ValueHandle
   ) -> Bool
 
-  static func setIndexPropertyHandle(
-    at index: UInt32,
-    on object: ValueHandle,
-    to value: ValueHandle,
-    in context: ContextHandle
-  ) -> Bool
-
-  static func hasStaticStringPropertyHandle(
+  func hasStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool?
 
-  static func hasPropertyStringKeyHandle(
+  func hasPropertyStringKeyHandle(
     _ key: PropertyStringKeyHandle,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool?
 
-  static func hasValuePropertyHandle(
+  func hasValuePropertyHandle(
     _ key: ValueHandle,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool?
 
-  static func deleteStaticStringPropertyHandle(
+  func deleteStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool
 
-  static func deletePropertyStringKeyHandle(
+  func deletePropertyStringKeyHandle(
     _ key: PropertyStringKeyHandle,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool
 
-  static func deleteValuePropertyHandle(
+  func deleteValuePropertyHandle(
     _ key: ValueHandle,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool
 }
 
-extension JSEnginePropertyDriver {
-  public static func getStaticStringPropertyHandle(
+extension JSContextPropertyDriver {
+  public func getStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> JSResult<ValueHandle>? {
-    guard let keyHandle = makePropertyStringKeyHandle(key, in: context) else {
+    guard let keyHandle = makePropertyStringKeyHandle(key) else {
       return nil
     }
     defer { _ = keyHandle.releaseReference() }
-    return getPropertyStringKeyHandle(keyHandle, on: object, in: context)
+    return getPropertyStringKeyHandle(keyHandle, on: object)
   }
 
-  public static func setStaticStringPropertyHandle(
+  public func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle,
     to value: ValueHandle,
-    in context: ContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    guard let keyHandle = makePropertyStringKeyHandle(key, in: context) else {
+    guard let keyHandle = makePropertyStringKeyHandle(key) else {
       return false
     }
     defer { _ = keyHandle.releaseReference() }
@@ -148,32 +119,39 @@ extension JSEnginePropertyDriver {
       keyHandle,
       on: object,
       to: value,
-      in: context,
       attributes: attributes
     )
   }
 
-  public static func hasStaticStringPropertyHandle(
+  public func hasStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool? {
-    guard let keyHandle = makePropertyStringKeyHandle(key, in: context) else {
+    guard let keyHandle = makePropertyStringKeyHandle(key) else {
       return nil
     }
     defer { _ = keyHandle.releaseReference() }
-    return hasPropertyStringKeyHandle(keyHandle, on: object, in: context)
+    return hasPropertyStringKeyHandle(keyHandle, on: object)
   }
 
-  public static func deleteStaticStringPropertyHandle(
+  public func deleteStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: ValueHandle,
-    in context: ContextHandle
+    on object: ValueHandle
   ) -> Bool {
-    guard let keyHandle = makePropertyStringKeyHandle(key, in: context) else {
+    guard let keyHandle = makePropertyStringKeyHandle(key) else {
       return false
     }
     defer { _ = keyHandle.releaseReference() }
-    return deletePropertyStringKeyHandle(keyHandle, on: object, in: context)
+    return deletePropertyStringKeyHandle(keyHandle, on: object)
   }
+}
+
+/// Engine-side descriptor. Property requirements now live on
+/// `JSContextPropertyDriver`, implemented by `ContextHandle`.
+public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver
+where
+  ContextHandle: JSContextPropertyDriver,
+  ContextHandle.PropertyStringKeyHandle == PropertyStringKeyHandle
+{
+  associatedtype PropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle
 }

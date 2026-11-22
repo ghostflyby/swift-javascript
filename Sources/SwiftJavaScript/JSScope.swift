@@ -12,7 +12,7 @@ import Foundation
 ///     scope.open()
 ///     let val = scope.persist(scope.makeString("hello"))
 ///     // scope auto-closes on deinit
-public struct JSScope<E: JSEngine>: ~Copyable {
+public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable {
   private var core: ScopeCore<E>
   private var isOpen = false
 

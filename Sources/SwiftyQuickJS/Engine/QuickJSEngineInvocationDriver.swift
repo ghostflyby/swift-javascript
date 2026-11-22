@@ -99,3 +99,60 @@ extension QuickJSEngine: JSEngineInvocationDriver {
     JS_IsStrictEqual(context.ref, lhs.ref, rhs.ref)
   }
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension QuickJSContextHandle: JSContextInvocationDriver {
+  public func callFunctionHandle(
+    _ function: QuickJSValueHandle,
+    this thisValue: QuickJSValueHandle?,
+    arguments: [QuickJSValueHandle]
+  ) -> JSResult<QuickJSValueHandle>? {
+    QuickJSEngine.callFunctionHandle(
+      function,
+      this: thisValue,
+      arguments: arguments,
+      in: self
+    )
+  }
+
+  public func constructHandle(
+    _ constructor: QuickJSValueHandle,
+    arguments: [QuickJSValueHandle]
+  ) -> JSResult<QuickJSValueHandle>? {
+    QuickJSEngine.constructHandle(constructor, arguments: arguments, in: self)
+  }
+
+  public func toObjectHandle(_ value: QuickJSValueHandle) -> JSResult<QuickJSValueHandle>? {
+    QuickJSEngine.toObjectHandle(value, in: self)
+  }
+
+  public func isArrayHandle(_ value: QuickJSValueHandle) -> Bool? {
+    QuickJSEngine.isArrayHandle(value, in: self)
+  }
+
+  public func isDateHandle(_ value: QuickJSValueHandle) -> Bool? {
+    QuickJSEngine.isDateHandle(value, in: self)
+  }
+
+  public func isInstanceOfHandle(
+    _ value: QuickJSValueHandle,
+    constructor: QuickJSValueHandle
+  ) -> Bool? {
+    QuickJSEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
+  }
+
+  public func looselyEqualsHandle(
+    _ lhs: QuickJSValueHandle,
+    _ rhs: QuickJSValueHandle
+  ) -> Bool? {
+    QuickJSEngine.looselyEqualsHandle(lhs, rhs, in: self)
+  }
+
+  public func strictlyEqualsHandle(
+    _ lhs: QuickJSValueHandle,
+    _ rhs: QuickJSValueHandle
+  ) -> Bool? {
+    QuickJSEngine.strictlyEqualsHandle(lhs, rhs, in: self)
+  }
+}

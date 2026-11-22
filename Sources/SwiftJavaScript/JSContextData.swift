@@ -22,13 +22,13 @@ public final class JSContextDataStorageBox: @unchecked Sendable {
 
   package init() {}
 
-  package func bindContextOwner<E: JSEngine>(_ owner: JSContext<E>) {
+  package func bindContextOwner<E: JSContextEngine>(_ owner: JSContext<E>) {
     state.withLock {
       $0.ownerAddress = UInt(bitPattern: Unmanaged.passUnretained(owner).toOpaque())
     }
   }
 
-  package func borrowContextOwner<E: JSEngine>(
+  package func borrowContextOwner<E: JSContextEngine>(
     as engine: E.Type = E.self
   ) -> JSContext<E>? {
     _ = engine

@@ -28,7 +28,7 @@ package func takeExceptionValue<Value: ~Copyable>(
   }
 }
 
-public func bridgeHandleResult<E: JSEngine>(
+public func bridgeHandleResult<E: JSEngineValueTypes>(
   _ handleResult: JSResult<JSValueHandle<E>>?,
   in context: E.ContextHandle
 ) -> JSResult<JSValue<E>> {

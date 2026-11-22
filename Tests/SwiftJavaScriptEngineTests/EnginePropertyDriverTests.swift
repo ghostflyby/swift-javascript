@@ -216,10 +216,7 @@ private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAss
       case .value(let object):
         _ = context.evaluateScript("Object.keys = () => ['patched']")
         let names =
-          E.propertyNamesForHandle(
-            on: object.borrowHandle(),
-            in: context.driverContextHandle
-          ) ?? []
+          context.driverContextHandle.propertyNamesForHandle(on: object.borrowHandle()) ?? []
         #expect(names == ["3", "visible"])
       case .exception:
         Issue.record("Expected propertyNames fixture object")

@@ -37,8 +37,7 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
     await context.withInstantContext { context in
       let buffer = JSArrayBuffer<E>(copying: [10, 20, 30, 40, 50, 60], in: context)
       let invalidTypedArrayHandle = buffer.withJSValue { bufferValue in
-        E.makeTypedArrayHandle(
-          in: context.driverContextHandle,
+        context.driverContextHandle.makeTypedArrayHandle(
           kind: .uint16Array,
           arrayBuffer: bufferValue.borrowHandle(),
           byteOffset: 1,
@@ -57,8 +56,7 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       }
 
       let typedArrayHandle = buffer.withJSValue { bufferValue in
-        E.makeTypedArrayHandle(
-          in: context.driverContextHandle,
+        context.driverContextHandle.makeTypedArrayHandle(
           kind: .uint8Array,
           arrayBuffer: bufferValue.borrowHandle(),
           byteOffset: 2,
@@ -118,8 +116,7 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       #expect(wholeBufferBytes == [10, 20, 30, 40, 50, 60])
 
       guard
-        let lengthConstructedHandle = E.makeTypedArrayHandle(
-          in: context.driverContextHandle,
+        let lengthConstructedHandle = context.driverContextHandle.makeTypedArrayHandle(
           kind: .uint16Array,
           length: 4
         )

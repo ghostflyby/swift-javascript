@@ -145,7 +145,7 @@ private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendab
     return definition
   }
 
-  static func tryDecode<E: JSEngine>(
+  static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> MockExportedJSClassInstance {
@@ -154,7 +154,7 @@ private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendab
     return MockExportedJSClassInstance()
   }
 
-  static func tryEncode<E: JSEngine>(
+  static func tryEncode<E: JSValueConversionEngine>(
     _ value: MockExportedJSClassInstance,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
@@ -162,11 +162,13 @@ private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendab
     return JSValue<E>(undefinedIn: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
+    E
+  > {
     MockExportedJSClassInstance.encode(self, in: context)
   }
 
-  func tryEncode<E: JSEngine>(
+  func tryEncode<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     try MockExportedJSClassInstance.tryEncode(self, in: context)
@@ -230,7 +232,9 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let staticFunction = JSStaticFunction<MockEngine>(
     name: "render",
     attributes: [.dontDelete],
-    callAsFunction: { context, _, arguments in .value(context.persist(context.makeNumber(arguments.count))) }
+    callAsFunction: { context, _, arguments in
+      .value(context.persist(context.makeNumber(arguments.count)))
+    }
   )
 
   #expect(staticValue.definition.name == "title")

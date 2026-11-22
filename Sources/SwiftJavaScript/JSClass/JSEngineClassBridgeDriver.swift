@@ -144,7 +144,7 @@ where
     }
   }
 
-  public static func decode<E: JSEngine>(
+  public static func decode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> Self {
@@ -155,7 +155,7 @@ where
     }
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> Self {
@@ -173,7 +173,7 @@ where
     return try Self.tryDecode(engineValue, in: engineContext)
   }
 
-  public static func tryEncode<E: JSEngine>(
+  public static func tryEncode<E: JSValueConversionEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
@@ -189,7 +189,7 @@ where
     return JSValue<E>(handleValue: handle, in: context.driverContextHandle)
   }
 
-  public static func encode<E: JSEngine>(
+  public static func encode<E: JSValueConversionEngine>(
     _ value: Self,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -200,13 +200,13 @@ where
     }
   }
 
-  public func toJSValue<E: JSEngine>(
+  public func toJSValue<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
     Self.encode(self, in: context)
   }
 
-  public func tryEncode<E: JSEngine>(
+  public func tryEncode<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     try Self.tryEncode(self, in: context)

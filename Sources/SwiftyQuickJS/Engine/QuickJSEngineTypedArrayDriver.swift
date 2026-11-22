@@ -309,3 +309,95 @@ private func quickJSArrayBufferFree(
   let box = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
   box.deallocator(ptr, box.context)
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension QuickJSContextHandle: JSContextTypedArrayDriver {
+  public func makeArrayBufferWithBytesNoCopyHandle(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> QuickJSValueHandle? {
+    QuickJSEngine.makeArrayBufferWithBytesNoCopyHandle(
+      in: self,
+      bytes: bytes,
+      byteLength: byteLength,
+      bytesDeallocator: bytesDeallocator,
+      deallocatorContext: deallocatorContext
+    )
+  }
+
+  public func arrayBufferByteLengthForHandle(_ value: QuickJSValueHandle) -> Int? {
+    QuickJSEngine.arrayBufferByteLengthForHandle(value, in: self)
+  }
+
+  public func arrayBufferBytesPtrForHandle(
+    _ value: QuickJSValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    QuickJSEngine.arrayBufferBytesPtrForHandle(value, in: self)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> QuickJSValueHandle? {
+    QuickJSEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: QuickJSValueHandle
+  ) -> QuickJSValueHandle? {
+    QuickJSEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: QuickJSValueHandle,
+    byteOffset: Int,
+    length: Int
+  ) -> QuickJSValueHandle? {
+    QuickJSEngine.makeTypedArrayHandle(
+      in: self,
+      kind: kind,
+      arrayBuffer: arrayBuffer,
+      byteOffset: byteOffset,
+      length: length
+    )
+  }
+
+  public func typedArrayLengthForHandle(_ value: QuickJSValueHandle) -> Int? {
+    QuickJSEngine.typedArrayLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteLengthForHandle(_ value: QuickJSValueHandle) -> Int? {
+    QuickJSEngine.typedArrayByteLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteOffsetForHandle(_ value: QuickJSValueHandle) -> Int? {
+    QuickJSEngine.typedArrayByteOffsetForHandle(value, in: self)
+  }
+
+  public func typedArrayBufferForHandle(_ value: QuickJSValueHandle)
+    -> QuickJSValueHandle?
+  {
+    QuickJSEngine.typedArrayBufferForHandle(value, in: self)
+  }
+
+  public func typedArrayBytesPtrForHandle(
+    _ value: QuickJSValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    QuickJSEngine.typedArrayBytesPtrForHandle(value, in: self)
+  }
+
+  public func isArrayBufferHandle(_ value: QuickJSValueHandle) -> Bool {
+    QuickJSEngine.isArrayBufferHandle(value, in: self)
+  }
+
+  public func typedArrayKindForHandle(_ value: QuickJSValueHandle) -> JSTypedArrayKind? {
+    QuickJSEngine.typedArrayKindForHandle(value, in: self)
+  }
+}

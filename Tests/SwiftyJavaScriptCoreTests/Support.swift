@@ -9,7 +9,7 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -42,7 +42,9 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     JSValue(number: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
+    E
+  > {
     precondition(
       E.self == JavaScriptCoreEngine.self,
       "This conversion path only supports JavaScriptCoreEngine"
@@ -65,7 +67,7 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -98,7 +100,9 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     JSValue(string: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
+    E
+  > {
     precondition(
       E.self == JavaScriptCoreEngine.self,
       "This conversion path only supports JavaScriptCoreEngine"
@@ -121,7 +125,7 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     self.value = value
   }
 
-  init<E: JSEngine>(
+  init<E: JSValueConversionEngine>(
     value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) {
@@ -154,7 +158,9 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     JSValue(boolean: value, in: context)
   }
 
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
+    E
+  > {
     precondition(
       E.self == JavaScriptCoreEngine.self,
       "This conversion path only supports JavaScriptCoreEngine"

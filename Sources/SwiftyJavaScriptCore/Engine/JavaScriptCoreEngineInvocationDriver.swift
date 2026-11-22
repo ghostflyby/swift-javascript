@@ -158,3 +158,62 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
     }
   }
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension JavaScriptCoreContextHandle: JSContextInvocationDriver {
+  public func callFunctionHandle(
+    _ function: JavaScriptCoreValueHandle,
+    this thisValue: JavaScriptCoreValueHandle?,
+    arguments: [JavaScriptCoreValueHandle]
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.callFunctionHandle(
+      function,
+      this: thisValue,
+      arguments: arguments,
+      in: self
+    )
+  }
+
+  public func constructHandle(
+    _ constructor: JavaScriptCoreValueHandle,
+    arguments: [JavaScriptCoreValueHandle]
+  ) -> JSResult<JavaScriptCoreValueHandle>? {
+    JavaScriptCoreEngine.constructHandle(constructor, arguments: arguments, in: self)
+  }
+
+  public func toObjectHandle(_ value: JavaScriptCoreValueHandle)
+    -> JSResult<JavaScriptCoreValueHandle>?
+  {
+    JavaScriptCoreEngine.toObjectHandle(value, in: self)
+  }
+
+  public func isArrayHandle(_ value: JavaScriptCoreValueHandle) -> Bool? {
+    JavaScriptCoreEngine.isArrayHandle(value, in: self)
+  }
+
+  public func isDateHandle(_ value: JavaScriptCoreValueHandle) -> Bool? {
+    JavaScriptCoreEngine.isDateHandle(value, in: self)
+  }
+
+  public func isInstanceOfHandle(
+    _ value: JavaScriptCoreValueHandle,
+    constructor: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
+  }
+
+  public func looselyEqualsHandle(
+    _ lhs: JavaScriptCoreValueHandle,
+    _ rhs: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.looselyEqualsHandle(lhs, rhs, in: self)
+  }
+
+  public func strictlyEqualsHandle(
+    _ lhs: JavaScriptCoreValueHandle,
+    _ rhs: JavaScriptCoreValueHandle
+  ) -> Bool? {
+    JavaScriptCoreEngine.strictlyEqualsHandle(lhs, rhs, in: self)
+  }
+}

@@ -747,6 +747,7 @@ private let stage2AArenaChunkCapacity = 32
     let outerValue = outer.makeString("outer")
     do {
       let inner = JSInstantContext<MockEngine>(handle: context)
+      #expect(inner.driverContextHandle == context)
       #expect(ScopeStackRegistry<MockEngine>.top(of: context) != nil)
       switch outerValue.getProperty("routed") {
       case .value(let property):
@@ -2518,4 +2519,430 @@ private func releaseLog(for identity: String) -> [MockValueHandle] {
 
 private func clearReleaseLog(for identity: String) {
   contextReleaseLog.withLock { $0[identity] = nil }
+}
+
+// MARK: - Context-side driver conformance (Stage 2B)
+//
+// The engine's operations remain implemented as statics on `MockDriver`; the
+// context handle satisfies the instance protocols by forwarding, mirroring the
+// production backends' Stage 2B shape.
+
+// Forwarding split is deliberate: methods whose engine-facing statics live
+// on MockEngine (release/storage/compatibility requirements) forward there;
+// the rest forward to the MockDriver implementation core. Keep the split
+// aligned when statics move, or the two layers will drift.
+extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
+  JSContextInvocationDriver, JSContextTypedArrayDriver, JSContextPreparedScriptDriver
+{
+  public typealias Engine = MockEngine
+  public typealias ValueHandle = MockValueHandle
+  public typealias OwnedValueHandle = MockOwnedValueHandle
+  public typealias PropertyStringKeyHandle = MockStringHandle
+  public typealias PreparedScriptHandle = MockStringHandle
+
+  public func globalObjectValueHandle() -> MockValueHandle? {
+    MockDriver.globalObjectValueHandle(self)
+  }
+
+  public func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSFunctionCallback<MockEngine>
+  ) -> MockOwnedValueHandle? {
+    MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: self)
+  }
+
+  public func valueTypeForHandle(_ value: MockValueHandle) -> JSType? {
+    MockDriver.valueTypeForHandle(value, in: self)
+  }
+
+  public func toBooleanForHandle(_ value: MockValueHandle) -> Bool {
+    MockDriver.toBooleanForHandle(value, in: self)
+  }
+
+  public func toNumberForHandle(_ value: MockValueHandle) -> Double {
+    MockDriver.toNumberForHandle(value, in: self)
+  }
+
+  public func toStringForHandle(_ value: MockValueHandle) -> String? {
+    MockDriver.toStringForHandle(value, in: self)
+  }
+
+  public func makeStringValueHandle(_ value: String) -> MockOwnedValueHandle? {
+    MockDriver.makeStringValueHandle(value, self)
+  }
+
+  public func makeSymbolValueHandle(_ value: String) -> MockOwnedValueHandle? {
+    MockDriver.makeSymbolValueHandle(value, self)
+  }
+
+  public func makeNumberValueHandle(_ value: Double) -> MockOwnedValueHandle? {
+    MockDriver.makeNumberValueHandle(value, self)
+  }
+
+  public func makeBooleanValueHandle(_ value: Bool) -> MockOwnedValueHandle? {
+    MockDriver.makeBooleanValueHandle(value, self)
+  }
+
+  public func makeNullValueHandle() -> MockOwnedValueHandle? {
+    MockDriver.makeNullValueHandle(self)
+  }
+
+  public func makeUndefinedValueHandle() -> MockOwnedValueHandle? {
+    MockDriver.makeUndefinedValueHandle(self)
+  }
+
+  public func makeObjectResultHandle() -> JSResult<MockOwnedValueHandle>? {
+    MockDriver.makeObjectResultHandle(self)
+  }
+
+  public func makeArrayResultHandle() -> JSResult<MockOwnedValueHandle>? {
+    MockDriver.makeArrayResultHandle(self)
+  }
+
+  public func isContextCompatibleWith(_ other: MockContextHandle) -> Bool {
+    MockEngine.isContextCompatibleWith(self, other)
+  }
+
+  public func contextDataStorageBox() -> JSContextDataStorageBox? {
+    MockEngine.contextDataStorageBox(in: self)
+  }
+
+  public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+    MockEngine.installContextDataStorageBox(storage, in: self)
+  }
+
+  public func releaseCreatedHandle(_ handle: consuming MockOwnedValueHandle) {
+    MockEngine.releaseCreatedHandle(handle, in: self)
+  }
+
+  public func makePreparedScriptHandle(_ source: String) -> MockStringHandle? {
+    MockDriver.makePreparedScriptHandle(source, in: self)
+  }
+
+  public func isPreparedScriptHandleCompatibleWithContext(_ script: MockStringHandle) -> Bool {
+    MockDriver.isPreparedScriptHandleCompatibleWithContext(script, in: self)
+  }
+
+  public func evaluatePreparedScriptResultHandle(
+    _ script: MockStringHandle,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.evaluatePreparedScriptResultHandle(
+      script,
+      self,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
+  }
+
+  public func makePropertyStringKeyHandle(_ value: String) -> MockStringHandle? {
+    MockDriver.makePropertyStringKeyHandle(value, in: self)
+  }
+
+  public func makePropertyStringKeyHandle(_ value: StaticString) -> MockStringHandle? {
+    MockDriver.makePropertyStringKeyHandle(value, in: self)
+  }
+
+  public func isPropertyStringKeyHandleCompatibleWithContext(_ key: MockStringHandle) -> Bool {
+    MockDriver.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
+  }
+
+  public func makeStringValueHandle(
+    fromPropertyStringKey key: MockStringHandle
+  ) -> MockOwnedValueHandle? {
+    MockDriver.makeStringValueHandle(fromPropertyStringKey: key, in: self)
+  }
+
+  public func propertyNamesForHandle(on object: MockValueHandle) -> [String]? {
+    MockDriver.propertyNamesForHandle(on: object, in: self)
+  }
+
+  public func getPropertyStringKeyHandle(
+    _ key: MockStringHandle,
+    on object: MockValueHandle
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.getPropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func setPropertyStringKeyHandle(
+    _ key: MockStringHandle,
+    on object: MockValueHandle,
+    to value: MockValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    MockDriver.setPropertyStringKeyHandle(
+      key,
+      on: object,
+      to: value,
+      in: self,
+      attributes: attributes
+    )
+  }
+
+  public func getValuePropertyHandle(
+    _ key: MockValueHandle,
+    on object: MockValueHandle
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.getValuePropertyHandle(key, on: object, in: self)
+  }
+
+  public func getIndexPropertyHandle(
+    at index: UInt32,
+    on object: MockValueHandle
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.getIndexPropertyHandle(at: index, on: object, in: self)
+  }
+
+  public func setValuePropertyHandle(
+    _ key: MockValueHandle,
+    on object: MockValueHandle,
+    to value: MockValueHandle,
+    attributes: JSHostMemberAttributes
+  ) -> Bool {
+    MockDriver.setValuePropertyHandle(
+      key,
+      on: object,
+      to: value,
+      in: self,
+      attributes: attributes
+    )
+  }
+
+  public func setIndexPropertyHandle(
+    at index: UInt32,
+    on object: MockValueHandle,
+    to value: MockValueHandle
+  ) -> Bool {
+    MockDriver.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
+  }
+
+  public func hasPropertyStringKeyHandle(
+    _ key: MockStringHandle,
+    on object: MockValueHandle
+  ) -> Bool? {
+    MockDriver.hasPropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func hasValuePropertyHandle(
+    _ key: MockValueHandle,
+    on object: MockValueHandle
+  ) -> Bool? {
+    MockDriver.hasValuePropertyHandle(key, on: object, in: self)
+  }
+
+  public func deletePropertyStringKeyHandle(
+    _ key: MockStringHandle,
+    on object: MockValueHandle
+  ) -> Bool {
+    MockDriver.deletePropertyStringKeyHandle(key, on: object, in: self)
+  }
+
+  public func deleteValuePropertyHandle(
+    _ key: MockValueHandle,
+    on object: MockValueHandle
+  ) -> Bool {
+    MockDriver.deleteValuePropertyHandle(key, on: object, in: self)
+  }
+
+  public func callFunctionHandle(
+    _ function: MockValueHandle,
+    this thisValue: MockValueHandle?,
+    arguments: [MockValueHandle]
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.callFunctionHandle(function, this: thisValue, arguments: arguments, in: self)
+  }
+
+  public func constructHandle(
+    _ constructor: MockValueHandle,
+    arguments: [MockValueHandle]
+  ) -> JSResult<MockValueHandle>? {
+    MockDriver.constructHandle(constructor, arguments: arguments, in: self)
+  }
+
+  public func toObjectHandle(_ value: MockValueHandle) -> JSResult<MockValueHandle>? {
+    MockDriver.toObjectHandle(value, in: self)
+  }
+
+  public func isArrayHandle(_ value: MockValueHandle) -> Bool? {
+    MockDriver.isArrayHandle(value, in: self)
+  }
+
+  public func isDateHandle(_ value: MockValueHandle) -> Bool? {
+    MockDriver.isDateHandle(value, in: self)
+  }
+
+  public func isInstanceOfHandle(
+    _ value: MockValueHandle,
+    constructor: MockValueHandle
+  ) -> Bool? {
+    MockDriver.isInstanceOfHandle(value, constructor: constructor, in: self)
+  }
+
+  public func looselyEqualsHandle(
+    _ lhs: MockValueHandle,
+    _ rhs: MockValueHandle
+  ) -> Bool? {
+    MockDriver.looselyEqualsHandle(lhs, rhs, in: self)
+  }
+
+  public func strictlyEqualsHandle(
+    _ lhs: MockValueHandle,
+    _ rhs: MockValueHandle
+  ) -> Bool? {
+    MockDriver.strictlyEqualsHandle(lhs, rhs, in: self)
+  }
+
+  public func makeArrayBufferWithBytesNoCopyHandle(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> MockValueHandle? {
+    MockDriver.makeArrayBufferWithBytesNoCopyHandle(
+      in: self,
+      bytes: bytes,
+      byteLength: byteLength,
+      bytesDeallocator: bytesDeallocator,
+      deallocatorContext: deallocatorContext
+    )
+  }
+
+  public func arrayBufferByteLengthForHandle(_ value: MockValueHandle) -> Int? {
+    MockDriver.arrayBufferByteLengthForHandle(value, in: self)
+  }
+
+  public func arrayBufferBytesPtrForHandle(
+    _ value: MockValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    MockDriver.arrayBufferBytesPtrForHandle(value, in: self)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> MockValueHandle? {
+    MockDriver.makeTypedArrayHandle(in: self, kind: kind, length: length)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: MockValueHandle
+  ) -> MockValueHandle? {
+    MockDriver.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: MockValueHandle,
+    byteOffset: Int,
+    length: Int
+  ) -> MockValueHandle? {
+    MockDriver.makeTypedArrayHandle(
+      in: self,
+      kind: kind,
+      arrayBuffer: arrayBuffer,
+      byteOffset: byteOffset,
+      length: length
+    )
+  }
+
+  public func typedArrayLengthForHandle(_ value: MockValueHandle) -> Int? {
+    MockDriver.typedArrayLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteLengthForHandle(_ value: MockValueHandle) -> Int? {
+    MockDriver.typedArrayByteLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteOffsetForHandle(_ value: MockValueHandle) -> Int? {
+    MockDriver.typedArrayByteOffsetForHandle(value, in: self)
+  }
+
+  public func typedArrayBufferForHandle(_ value: MockValueHandle) -> MockValueHandle? {
+    MockDriver.typedArrayBufferForHandle(value, in: self)
+  }
+
+  public func typedArrayBytesPtrForHandle(
+    _ value: MockValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    MockDriver.typedArrayBytesPtrForHandle(value, in: self)
+  }
+
+  public func isArrayBufferHandle(_ value: MockValueHandle) -> Bool {
+    MockDriver.isArrayBufferHandle(value, in: self)
+  }
+
+  public func typedArrayKindForHandle(_ value: MockValueHandle) -> JSTypedArrayKind? {
+    MockDriver.typedArrayKindForHandle(value, in: self)
+  }
+}
+
+// MARK: - Value-type constraint narrowing (Stage 2B)
+//
+// `JSValue` and its handle typealiases constrain only `JSEngineValueTypes`
+// (the handle-type surface), not the full `JSEngine` capability composition.
+// This engine deliberately conforms to nothing else: if `JSValue` regains a
+// broader constraint, this section stops compiling.
+
+private enum ValueOnlyEngine: JSEngineValueTypes {
+  typealias ContextHandle = MockContextHandle
+  typealias ValueHandle = MockValueHandle
+  typealias OwnedValueHandle = MockOwnedValueHandle
+}
+
+@Test func valueOnlyTypesCompileOnHandleSurface() {
+  // One witness per public value type narrowed to `JSEngineValueTypes`;
+  // broadening any of them back to `JSEngine` breaks this test's build.
+  _ = JSValue<ValueOnlyEngine>.self
+  _ = JSValueHandle<ValueOnlyEngine>.self
+  _ = JSOwnedValueHandle<ValueOnlyEngine>.self
+  _ = JSCallbackValue<ValueOnlyEngine>.self
+  _ = JSCallbackArguments<ValueOnlyEngine>.self
+  _ = JSCallbackReturn<ValueOnlyEngine>.self
+  _ = JSArguments<ValueOnlyEngine>.self
+}
+
+@Test func jsValueRequiresOnlyValueHandleTypes() {
+  let counter = MockValueReleaseCounter()
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "value-only"))
+
+  do {
+    let value = JSValue<ValueOnlyEngine>(
+      handleValue: .releaseCounting(
+        rawValue: MockValue(kind: "object", payload: "narrow"),
+        onRelease: counter.increment
+      ),
+      in: context
+    )
+    let borrowed: JSValueHandle<ValueOnlyEngine> = value.borrowHandle()
+    #expect(borrowed.rawValue.payload == "narrow")
+
+    let owned: JSOwnedValueHandle<ValueOnlyEngine> = MockOwnedValueHandle.adopting(borrowed)
+    #expect(owned.borrowed() == borrowed)
+  }
+
+  #expect(counter.releaseReferenceCount == 1)
+}
+
+@Test func bridgeHandleResultRequiresOnlyValueHandleTypes() {
+  let counter = MockValueReleaseCounter()
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: "value-only-bridge"))
+  let handle = MockValueHandle.releaseCounting(
+    rawValue: MockValue(kind: "object", payload: "bridged"),
+    onRelease: counter.increment
+  )
+
+  let bridged: JSResult<JSValue<ValueOnlyEngine>> = bridgeHandleResult(
+    JSResult<JSValueHandle<ValueOnlyEngine>>.value(handle), in: context)
+  switch consume bridged {
+  case .value(let value):
+    #expect(value.borrowHandle() == handle)
+  case .exception:
+    Issue.record("unexpected exception result")
+  }
+
+  #expect(counter.releaseReferenceCount == 1)
 }

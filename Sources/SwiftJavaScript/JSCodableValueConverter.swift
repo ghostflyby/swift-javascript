@@ -70,7 +70,7 @@ private indirect enum JSCodableNode {
 public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
   public typealias SwiftType = T
 
-  public static func decode<E: JSEngine>(
+  public static func decode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> T {
@@ -81,7 +81,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  public static func tryDecode<E: JSEngine>(
+  public static func tryDecode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> T {
@@ -105,7 +105,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  public static func encode<E: JSEngine>(
+  public static func encode<E: JSValueConversionEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -116,7 +116,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  public static func tryEncode<E: JSEngine>(
+  public static func tryEncode<E: JSValueConversionEngine>(
     _ value: T,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
@@ -141,7 +141,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     return try jsValueFromNode(node, in: context)
   }
 
-  fileprivate static func nodeFromJSValue<E: JSEngine>(
+  fileprivate static func nodeFromJSValue<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSCodableNode {
@@ -164,7 +164,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     if value.isObject(in: context) {
       let valueHandle = value.borrowHandle()
 
-      if E.isArrayHandle(valueHandle, in: context.driverContextHandle) == true {
+      if context.driverContextHandle.isArrayHandle(valueHandle) == true {
         let lengthValue = try readStringProperty("length", on: valueHandle, in: context)
         if lengthValue.isUndefined(in: context) {
           throw .codable("array length missing")
@@ -187,7 +187,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
         return .array(nodes)
       }
 
-      let names = E.propertyNamesForHandle(on: valueHandle, in: context.driverContextHandle) ?? []
+      let names = context.driverContextHandle.propertyNamesForHandle(on: valueHandle) ?? []
       var object: [String: JSCodableNode] = [:]
       object.reserveCapacity(names.count)
 
@@ -202,7 +202,7 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     throw .typeMismatch(expected: "codable compatible JSValue", actual: value.type(in: context))
   }
 
-  fileprivate static func jsValueFromNode<E: JSEngine>(
+  fileprivate static func jsValueFromNode<E: JSValueConversionEngine>(
     _ node: JSCodableNode,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
@@ -226,11 +226,10 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
       for (index, item) in array.enumerated() {
         let encoded = try jsValueFromNode(item, in: context)
         guard
-          E.setIndexPropertyHandle(
+          context.driverContextHandle.setIndexPropertyHandle(
             at: UInt32(index),
             on: arrayValue.borrowHandle(),
-            to: encoded.borrowHandle(),
-            in: context.driverContextHandle
+            to: encoded.borrowHandle()
           )
         else {
           throw .codable("array element write failed at index \(index)")
@@ -240,17 +239,18 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
 
     case .object(let object):
       let objectResult = context.makeObject()
-      guard case .value(let objectCb) = objectResult else { throw .codable("object creation failed") }
+      guard case .value(let objectCb) = objectResult else {
+        throw .codable("object creation failed")
+      }
       let objectValue = context.persist(objectCb)
       for (key, value) in object {
         let encoded = try jsValueFromNode(value, in: context)
         let propertyStringKey = context.makePropertyStringKey(key)
         guard
-          E.setPropertyStringKeyHandle(
+          context.driverContextHandle.setPropertyStringKeyHandle(
             propertyStringKey.borrowHandle(in: context),
             on: objectValue.borrowHandle(),
             to: encoded.borrowHandle(),
-            in: context.driverContextHandle,
             attributes: .none
           )
         else {
@@ -261,17 +261,16 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  private static func readStringProperty<E: JSEngine>(
+  private static func readStringProperty<E: JSValueConversionEngine>(
     _ key: String,
     on object: JSValueHandle<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     let propertyStringKey = context.makePropertyStringKey(key)
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      E.getPropertyStringKeyHandle(
+      context.driverContextHandle.getPropertyStringKeyHandle(
         propertyStringKey.borrowHandle(in: context),
-        on: object,
-        in: context.driverContextHandle
+        on: object
       ), in: context.driverContextHandle
     )
 
@@ -283,16 +282,15 @@ public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
     }
   }
 
-  private static func readIndexProperty<E: JSEngine>(
+  private static func readIndexProperty<E: JSValueConversionEngine>(
     _ index: UInt32,
     on object: JSValueHandle<E>,
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      E.getIndexPropertyHandle(
+      context.driverContextHandle.getIndexPropertyHandle(
         at: index,
-        on: object,
-        in: context.driverContextHandle
+        on: object
       ), in: context.driverContextHandle
     )
 

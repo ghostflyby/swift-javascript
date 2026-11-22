@@ -9,21 +9,23 @@ public enum JSType: Sendable {
   case bigInt
 }
 
-extension JSValue {
-  public func type(in context: borrowing JSContext<E> = #isolation) -> JSType {
+extension JSValue where E: JSEngineRuntimeDriver {
+  public func type(in context: borrowing JSContext<E> = #isolation) -> JSType
+  where E: JSContextEngine {
     let instantContext = JSInstantContext<E>(handle: context.driverContextHandle)
     return type(in: instantContext)
   }
 
   public func type(in context: borrowing JSInstantContext<E>) -> JSType {
-    guard let valueType = E.valueTypeForHandle(borrowHandle(), in: context.driverContextHandle)
+    guard let valueType = context.driverContextHandle.valueTypeForHandle(borrowHandle())
     else {
       preconditionFailure("JSValue.type(in:) could not query value type")
     }
     return valueType
   }
 
-  public func isUndefined(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isUndefined(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .undefined
   }
 
@@ -31,7 +33,8 @@ extension JSValue {
     type(in: context) == .undefined
   }
 
-  public func isNull(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isNull(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .null
   }
 
@@ -39,7 +42,8 @@ extension JSValue {
     type(in: context) == .null
   }
 
-  public func isBoolean(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isBoolean(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .boolean
   }
 
@@ -47,7 +51,8 @@ extension JSValue {
     type(in: context) == .boolean
   }
 
-  public func isNumber(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isNumber(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .number
   }
 
@@ -55,7 +60,8 @@ extension JSValue {
     type(in: context) == .number
   }
 
-  public func isString(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isString(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .string
   }
 
@@ -63,7 +69,8 @@ extension JSValue {
     type(in: context) == .string
   }
 
-  public func isSymbol(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isSymbol(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .symbol
   }
 
@@ -71,7 +78,8 @@ extension JSValue {
     type(in: context) == .symbol
   }
 
-  public func isObject(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isObject(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .object
   }
 
@@ -79,7 +87,8 @@ extension JSValue {
     type(in: context) == .object
   }
 
-  public func isBigInt(in context: borrowing JSContext<E> = #isolation) -> Bool {
+  public func isBigInt(in context: borrowing JSContext<E> = #isolation) -> Bool
+  where E: JSContextEngine {
     type(in: context) == .bigInt
   }
 

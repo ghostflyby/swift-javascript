@@ -53,14 +53,14 @@ struct EngineValueConversionTests {
 private enum SharedZeroOneBoolConverter: JSValueConverter {
   typealias SwiftType = Bool
 
-  static func decode<E: JSEngine>(
+  static func decode<E: JSValueConversionEngine>(
     _ value: borrowing JSValue<E>,
     in context: borrowing JSInstantContext<E>
   ) -> Bool {
     value.toDouble(in: context) != 0
   }
 
-  static func encode<E: JSEngine>(
+  static func encode<E: JSValueConversionEngine>(
     _ value: Bool,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -69,11 +69,13 @@ private enum SharedZeroOneBoolConverter: JSValueConverter {
 }
 
 private struct SharedFailingEncodeValue: JSValueEncodable {
-  func toJSValue<E: JSEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<E> {
+  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
+    E
+  > {
     JSValue(undefinedIn: context)
   }
 
-  func tryEncode<E: JSEngine>(
+  func tryEncode<E: JSValueConversionEngine>(
     in context: borrowing JSInstantContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     _ = context
@@ -88,7 +90,7 @@ private struct SharedReturnPayload {
 private enum SharedReturnPayloadEncoder: JSValueEncoder {
   typealias SwiftType = SharedReturnPayload
 
-  static func encode<E: JSEngine>(
+  static func encode<E: JSValueConversionEngine>(
     _ value: SharedReturnPayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {
@@ -103,7 +105,7 @@ private enum SharedFailurePayload: Error {
 private enum SharedFailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = SharedFailurePayload
 
-  static func encode<E: JSEngine>(
+  static func encode<E: JSValueConversionEngine>(
     _ value: SharedFailurePayload,
     in context: borrowing JSInstantContext<E>
   ) -> JSValue<E> {

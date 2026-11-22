@@ -1,4 +1,4 @@
-public actor JSContext<E: JSEngine> {
+public actor JSContext<E: JSContextEngine> {
   nonisolated package let driverContextHandle: E.ContextHandle
   public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
@@ -17,10 +17,10 @@ public actor JSContext<E: JSEngine> {
 
     self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
     let storage =
-      E.contextDataStorageBox(in: driverContextHandle)
+      driverContextHandle.contextDataStorageBox()
       ?? {
         let box = JSContextDataStorageBox()
-        E.installContextDataStorageBox(box, in: driverContextHandle)
+        driverContextHandle.installContextDataStorageBox(box)
         return box
       }()
     storage.bindContextOwner(self)
@@ -36,7 +36,7 @@ public actor JSContext<E: JSEngine> {
   }
 
   deinit {
-    E.installContextDataStorageBox(nil, in: driverContextHandle)
+    driverContextHandle.installContextDataStorageBox(nil)
     _ = driverContextHandle.releaseReference()
   }
 }
@@ -55,11 +55,11 @@ extension JSContext {
   }
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type = K.self) {
-    E.contextDataStorageBox(in: driverContextHandle)?.setData(value, for: key)
+    driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type = K.self) -> K.Value? {
-    E.contextDataStorageBox(in: driverContextHandle)?.data(for: key) ?? K.defaultValue
+    driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
   }
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSInstantContext<E>) throws(Failure) -> R
@@ -134,7 +134,7 @@ extension JSContext {
     _ value: borrowing Val,
     forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none
-  ) where Val: JSValueEncodable, Val: ~Copyable {
+  ) where Val: JSValueEncodable, Val: ~Copyable, E: JSValueConversionEngine {
     withInstantContext { instantContext in
       instantContext.setGlobalProperty(value, forKey: key, with: attributes)
     }
@@ -145,7 +145,7 @@ extension JSContext {
     forKey key: StaticString,
     using converter: C.Type,
     with attributes: JSPropertyAttributes = .none
-  ) {
+  ) where E: JSValueConversionEngine {
     withInstantContext { instantContext in
       instantContext.setGlobalProperty(value, forKey: key, using: converter, with: attributes)
     }
@@ -160,7 +160,7 @@ extension JSContext {
   public func getGlobalProperty<C: JSValueDecoder>(
     forKey key: StaticString,
     using converter: C.Type
-  ) -> C.SwiftType {
+  ) -> C.SwiftType where E: JSValueConversionEngine {
     withInstantContext { instantContext in
       instantContext.getGlobalProperty(forKey: key, using: converter)
     }

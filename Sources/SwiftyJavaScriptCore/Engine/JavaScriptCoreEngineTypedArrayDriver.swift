@@ -208,3 +208,97 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
     return JSTypedArrayKind(javaScriptCoreTypedArrayType: type)
   }
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension JavaScriptCoreContextHandle: JSContextTypedArrayDriver {
+  public func makeArrayBufferWithBytesNoCopyHandle(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator: (
+      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    )?,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> JavaScriptCoreValueHandle? {
+    JavaScriptCoreEngine.makeArrayBufferWithBytesNoCopyHandle(
+      in: self,
+      bytes: bytes,
+      byteLength: byteLength,
+      bytesDeallocator: bytesDeallocator,
+      deallocatorContext: deallocatorContext
+    )
+  }
+
+  public func arrayBufferByteLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
+    JavaScriptCoreEngine.arrayBufferByteLengthForHandle(value, in: self)
+  }
+
+  public func arrayBufferBytesPtrForHandle(
+    _ value: JavaScriptCoreValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    JavaScriptCoreEngine.arrayBufferBytesPtrForHandle(value, in: self)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    length: Int
+  ) -> JavaScriptCoreValueHandle? {
+    JavaScriptCoreEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: JavaScriptCoreValueHandle
+  ) -> JavaScriptCoreValueHandle? {
+    JavaScriptCoreEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
+  }
+
+  public func makeTypedArrayHandle(
+    kind: JSTypedArrayKind,
+    arrayBuffer: JavaScriptCoreValueHandle,
+    byteOffset: Int,
+    length: Int
+  ) -> JavaScriptCoreValueHandle? {
+    JavaScriptCoreEngine.makeTypedArrayHandle(
+      in: self,
+      kind: kind,
+      arrayBuffer: arrayBuffer,
+      byteOffset: byteOffset,
+      length: length
+    )
+  }
+
+  public func typedArrayLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
+    JavaScriptCoreEngine.typedArrayLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
+    JavaScriptCoreEngine.typedArrayByteLengthForHandle(value, in: self)
+  }
+
+  public func typedArrayByteOffsetForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
+    JavaScriptCoreEngine.typedArrayByteOffsetForHandle(value, in: self)
+  }
+
+  public func typedArrayBufferForHandle(_ value: JavaScriptCoreValueHandle)
+    -> JavaScriptCoreValueHandle?
+  {
+    JavaScriptCoreEngine.typedArrayBufferForHandle(value, in: self)
+  }
+
+  public func typedArrayBytesPtrForHandle(
+    _ value: JavaScriptCoreValueHandle
+  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    JavaScriptCoreEngine.typedArrayBytesPtrForHandle(value, in: self)
+  }
+
+  public func isArrayBufferHandle(_ value: JavaScriptCoreValueHandle) -> Bool {
+    JavaScriptCoreEngine.isArrayBufferHandle(value, in: self)
+  }
+
+  public func typedArrayKindForHandle(
+    _ value: JavaScriptCoreValueHandle
+  ) -> JSTypedArrayKind? {
+    JavaScriptCoreEngine.typedArrayKindForHandle(value, in: self)
+  }
+}

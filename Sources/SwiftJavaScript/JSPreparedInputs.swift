@@ -3,11 +3,11 @@
 /// type; `JSInstantContext` and `JSScope` both conform. Fabricating a
 /// temporary scope just to satisfy such a signature is unnecessary by design.
 internal protocol JSScopeWitness<Engine>: ~Copyable {
-  associatedtype Engine: JSEngine
+  associatedtype Engine: JSEngineRuntimeDriver
   var driverContextHandle: Engine.ContextHandle { get }
 }
 
-public struct JSPropertyStringKey<E: JSEngine>: Sendable, ~Copyable {
+public struct JSPropertyStringKey<E: JSEnginePropertyDriver>: Sendable, ~Copyable {
   package let handle: E.PropertyStringKeyHandle
   private let contextHandle: E.ContextHandle
 
@@ -27,7 +27,7 @@ public struct JSPropertyStringKey<E: JSEngine>: Sendable, ~Copyable {
   /// validate against the context handle they carry themselves.
   func borrowHandle(in contextHandle: E.ContextHandle) -> E.PropertyStringKeyHandle {
     precondition(
-      E.isPropertyStringKeyHandleCompatibleWithContext(handle, in: contextHandle),
+      contextHandle.isPropertyStringKeyHandleCompatibleWithContext(handle),
       "JSPropertyStringKey can only be used with the context that created it"
     )
     return handle
@@ -39,7 +39,7 @@ public struct JSPropertyStringKey<E: JSEngine>: Sendable, ~Copyable {
   }
 }
 
-public struct JSPreparedScript<E: JSEngine>: Sendable, ~Copyable {
+public struct JSPreparedScript<E: JSEnginePreparedScriptDriver>: Sendable, ~Copyable {
   package let handle: E.PreparedScriptHandle
   private let contextHandle: E.ContextHandle
 
@@ -59,7 +59,7 @@ public struct JSPreparedScript<E: JSEngine>: Sendable, ~Copyable {
   /// validate against the context handle they carry themselves.
   func borrowHandle(in contextHandle: E.ContextHandle) -> E.PreparedScriptHandle {
     precondition(
-      E.isPreparedScriptHandleCompatibleWithContext(handle, in: contextHandle),
+      contextHandle.isPreparedScriptHandleCompatibleWithContext(handle),
       "JSPreparedScript can only be used with the context that created it"
     )
     return handle

@@ -36,7 +36,7 @@
   enum UppercaseStringDecoder: JSValueDecoder {
     typealias SwiftType = String
 
-    static func decode<E: JSEngine>(
+    static func decode<E: JSValueConversionEngine>(
       _ value: borrowing SwiftJavaScript.JSValue<E>,
       in context: borrowing JSInstantContext<E>
     ) -> String {

@@ -373,3 +373,110 @@ extension JSVirtualMachine where E == QuickJSEngine {
     JS_RunGC(self.driverRuntimeHandle.ref)
   }
 }
+
+// MARK: - Context-side driver conformance (Stage 2B)
+
+extension QuickJSContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
+  public typealias Engine = QuickJSEngine
+  public typealias ValueHandle = QuickJSValueHandle
+  public typealias OwnedValueHandle = QuickJSOwnedValueHandle
+  public typealias PreparedScriptHandle = QuickJSPreparedScriptHandle
+
+  public func globalObjectValueHandle() -> QuickJSValueHandle? {
+    QuickJSEngine.globalObjectValueHandle(self)
+  }
+
+  public func makeFunctionValueHandle(
+    named name: String,
+    callback: @escaping JSFunctionCallback<QuickJSEngine>
+  ) -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
+  }
+
+  public func valueTypeForHandle(_ value: QuickJSValueHandle) -> JSType? {
+    QuickJSEngine.valueTypeForHandle(value, in: self)
+  }
+
+  public func toBooleanForHandle(_ value: QuickJSValueHandle) -> Bool {
+    QuickJSEngine.toBooleanForHandle(value, in: self)
+  }
+
+  public func toNumberForHandle(_ value: QuickJSValueHandle) -> Double {
+    QuickJSEngine.toNumberForHandle(value, in: self)
+  }
+
+  public func toStringForHandle(_ value: QuickJSValueHandle) -> String? {
+    QuickJSEngine.toStringForHandle(value, in: self)
+  }
+
+  public func makeStringValueHandle(_ value: String) -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeStringValueHandle(value, self)
+  }
+
+  public func makeSymbolValueHandle(_ value: String) -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeSymbolValueHandle(value, self)
+  }
+
+  public func makeNumberValueHandle(_ value: Double) -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeNumberValueHandle(value, self)
+  }
+
+  public func makeBooleanValueHandle(_ value: Bool) -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeBooleanValueHandle(value, self)
+  }
+
+  public func makeNullValueHandle() -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeNullValueHandle(self)
+  }
+
+  public func makeUndefinedValueHandle() -> QuickJSOwnedValueHandle? {
+    QuickJSEngine.makeUndefinedValueHandle(self)
+  }
+
+  public func makeObjectResultHandle() -> JSResult<QuickJSOwnedValueHandle>? {
+    QuickJSEngine.makeObjectResultHandle(self)
+  }
+
+  public func makeArrayResultHandle() -> JSResult<QuickJSOwnedValueHandle>? {
+    QuickJSEngine.makeArrayResultHandle(self)
+  }
+
+  public func isContextCompatibleWith(_ other: QuickJSContextHandle) -> Bool {
+    QuickJSEngine.isContextCompatibleWith(self, other)
+  }
+
+  public func contextDataStorageBox() -> JSContextDataStorageBox? {
+    QuickJSEngine.contextDataStorageBox(in: self)
+  }
+
+  public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+    QuickJSEngine.installContextDataStorageBox(storage, in: self)
+  }
+
+  public func releaseCreatedHandle(_ handle: consuming QuickJSOwnedValueHandle) {
+    QuickJSEngine.releaseCreatedHandle(handle, in: self)
+  }
+
+  public func makePreparedScriptHandle(_ source: String) -> QuickJSPreparedScriptHandle? {
+    QuickJSEngine.makePreparedScriptHandle(source, in: self)
+  }
+
+  public func isPreparedScriptHandleCompatibleWithContext(
+    _ script: QuickJSPreparedScriptHandle
+  ) -> Bool {
+    QuickJSEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
+  }
+
+  public func evaluatePreparedScriptResultHandle(
+    _ script: QuickJSPreparedScriptHandle,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<QuickJSValueHandle>? {
+    QuickJSEngine.evaluatePreparedScriptResultHandle(
+      script,
+      self,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
+  }
+}

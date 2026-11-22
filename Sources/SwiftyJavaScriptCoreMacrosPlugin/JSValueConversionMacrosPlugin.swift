@@ -1224,7 +1224,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
     let genericInitSource: String
     if declaration.as(ClassDeclSyntax.self) != nil {
       genericInitSource = """
-          public convenience init<E: JSEngine>(
+          public convenience init<E: JSValueConversionEngine>(
             value: borrowing JSValue<E>,
             in context: borrowing JSInstantContext<E>
           ) {
@@ -1245,7 +1245,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
         """
     } else {
       genericInitSource = """
-        public init<E: JSEngine>(
+        public init<E: JSValueConversionEngine>(
            value: borrowing JSValue<E>,
            in context: borrowing JSInstantContext<E>
          ) {
@@ -1270,7 +1270,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
       extension \(typeName): JSValueCodable {
         \(genericInitSource)
 
-        public static func tryDecode<E: JSEngine>(
+        public static func tryDecode<E: JSValueConversionEngine>(
           _ value: borrowing JSValue<E>,
           in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> Self {
@@ -1289,7 +1289,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
         }
 
-        public func toJSValue<E: JSEngine>(
+        public func toJSValue<E: JSValueConversionEngine>(
           in context: borrowing JSInstantContext<E>
         ) -> JSValue<E> {
           precondition(
@@ -1307,7 +1307,7 @@ public struct JSValueAutoSerializationMacro: ExtensionMacro {
           )
         }
 
-        public func tryEncode<E: JSEngine>(
+        public func tryEncode<E: JSValueConversionEngine>(
           in context: borrowing JSInstantContext<E>
         ) throws(JSValueConversionError) -> JSValue<E> {
           precondition(

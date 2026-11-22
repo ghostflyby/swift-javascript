@@ -9,7 +9,7 @@
 /// The value is noncopyable: callback values must not be duplicated or
 /// stored beyond the scope whose arena (or the engine's argument frame)
 /// backs the underlying handle.
-public struct JSCallbackValue<E: JSEngine>: ~Copyable {
+public struct JSCallbackValue<E: JSEngineValueTypes>: ~Copyable {
   /// The raw engine value handle, borrowed from the callback arguments frame
   /// or tracked by the scope arena that created it. The engine owns the
   /// underlying reference; we do NOT retain/release here.
@@ -26,7 +26,7 @@ public struct JSCallbackValue<E: JSEngine>: ~Copyable {
 
 // MARK: - Callback result bridging helper
 
-package func bridgeCallbackResult<E: JSEngine>(
+package func bridgeCallbackResult<E: JSEngineRuntimeDriver>(
   _ result: JSResult<JSValueHandle<E>>?,
   context: E.ContextHandle,
 ) -> JSResult<JSCallbackValue<E>> {
@@ -60,8 +60,8 @@ extension JSCallbackValue {
   // ---- type query ----
 
   @available(*, noasync)
-  public func type() -> JSType {
-    guard let t = E.valueTypeForHandle(handle, in: contextHandle) else {
+  public func type() -> JSType where E: JSEngineRuntimeDriver {
+    guard let t = contextHandle.valueTypeForHandle(handle) else {
       preconditionFailure("Could not determine JS type")
     }
     return t
@@ -70,18 +70,18 @@ extension JSCallbackValue {
   // ---- conversions ----
 
   @available(*, noasync)
-  public func toString() -> String {
-    E.toStringForHandle(handle, in: contextHandle) ?? ""
+  public func toString() -> String where E: JSEngineRuntimeDriver {
+    contextHandle.toStringForHandle(handle) ?? ""
   }
 
   @available(*, noasync)
-  public func toNumber() -> Double {
-    E.toNumberForHandle(handle, in: contextHandle)
+  public func toNumber() -> Double where E: JSEngineRuntimeDriver {
+    contextHandle.toNumberForHandle(handle)
   }
 
   @available(*, noasync)
-  public func toBoolean() -> Bool {
-    E.toBooleanForHandle(handle, in: contextHandle)
+  public func toBoolean() -> Bool where E: JSEngineRuntimeDriver {
+    contextHandle.toBooleanForHandle(handle)
   }
 
   // ---- decode (temporary wrapper around JSValueDecodable) ----
@@ -92,7 +92,8 @@ extension JSCallbackValue {
   /// layer (TODO §1.1 non-sinking boundary) and is rescheduled with the
   /// `JSValue` local-value unification in Stage 3.
   @available(*, noasync)
-  public func decode<T: JSValueDecodable>(as type: T.Type = T.self) -> T {
+  public func decode<T: JSValueDecodable>(as type: T.Type = T.self) -> T
+  where E: JSValueConversionEngine {
     let tempValue = JSValue<E>(handleValue: handle, in: contextHandle)
     let result = T(value: tempValue, in: JSInstantContext<E>(handle: contextHandle))
     tempValue.discard()
@@ -102,17 +103,18 @@ extension JSCallbackValue {
   // ---- property access ----
 
   @available(*, noasync)
-  public func getProperty(_ key: StaticString) -> JSResult<JSCallbackValue<E>> {
-    let r = E.getStaticStringPropertyHandle(key, on: handle, in: contextHandle)
+  public func getProperty(_ key: StaticString) -> JSResult<JSCallbackValue<E>>
+  where E: JSEnginePropertyDriver {
+    let r = contextHandle.getStaticStringPropertyHandle(key, on: handle)
     return bridgeCallbackResult(r, context: contextHandle)
   }
 
   @available(*, noasync)
-  public func getProperty(_ key: borrowing JSPropertyStringKey<E>) -> JSResult<JSCallbackValue<E>> {
-    let r = E.getPropertyStringKeyHandle(
+  public func getProperty(_ key: borrowing JSPropertyStringKey<E>) -> JSResult<JSCallbackValue<E>>
+  where E: JSEnginePropertyDriver {
+    let r = contextHandle.getPropertyStringKeyHandle(
       key.borrowHandle(in: contextHandle),
-      on: handle,
-      in: contextHandle
+      on: handle
     )
     return bridgeCallbackResult(r, context: contextHandle)
   }
@@ -122,12 +124,11 @@ extension JSCallbackValue {
     _ value: borrowing JSCallbackValue<E>,
     forKey key: StaticString,
     with attributes: JSPropertyAttributes = .none
-  ) {
-    _ = E.setStaticStringPropertyHandle(
+  ) where E: JSEnginePropertyDriver {
+    _ = contextHandle.setStaticStringPropertyHandle(
       key,
       on: handle,
       to: value.handle,
-      in: contextHandle,
       attributes: attributes.hostMemberAttributes
     )
   }
@@ -137,12 +138,11 @@ extension JSCallbackValue {
     _ value: borrowing JSCallbackValue<E>,
     forKey key: borrowing JSPropertyStringKey<E>,
     with attributes: JSPropertyAttributes = .none
-  ) {
-    _ = E.setPropertyStringKeyHandle(
+  ) where E: JSEnginePropertyDriver {
+    _ = contextHandle.setPropertyStringKeyHandle(
       key.borrowHandle(in: contextHandle),
       on: handle,
       to: value.handle,
-      in: contextHandle,
       attributes: attributes.hostMemberAttributes
     )
   }
@@ -153,12 +153,11 @@ extension JSCallbackValue {
   public func call(
     this: borrowing JSCallbackValue<E>,
     argumentHandles: [JSValueHandle<E>]
-  ) -> JSResult<JSCallbackValue<E>> {
-    let r = E.callFunctionHandle(
+  ) -> JSResult<JSCallbackValue<E>> where E: JSEngineInvocationDriver {
+    let r = contextHandle.callFunctionHandle(
       handle,
       this: this.handle,
-      arguments: argumentHandles,
-      in: contextHandle
+      arguments: argumentHandles
     )
     return bridgeCallbackResult(r, context: contextHandle)
   }
@@ -166,22 +165,24 @@ extension JSCallbackValue {
   // ---- type checks ----
 
   @available(*, noasync)
-  public func isArray() -> Bool {
-    E.isArrayHandle(handle, in: contextHandle) ?? false
+  public func isArray() -> Bool where E: JSEngineInvocationDriver {
+    contextHandle.isArrayHandle(handle) ?? false
   }
 
   @available(*, noasync)
-  public func isDate() -> Bool {
-    E.isDateHandle(handle, in: contextHandle) ?? false
+  public func isDate() -> Bool where E: JSEngineInvocationDriver {
+    contextHandle.isDateHandle(handle) ?? false
   }
 
   @available(*, noasync)
-  public func looselyEquals(_ other: borrowing JSCallbackValue<E>) -> Bool {
-    E.looselyEqualsHandle(handle, other.handle, in: contextHandle) ?? false
+  public func looselyEquals(_ other: borrowing JSCallbackValue<E>) -> Bool
+  where E: JSEngineInvocationDriver {
+    contextHandle.looselyEqualsHandle(handle, other.handle) ?? false
   }
 
   @available(*, noasync)
-  public func strictlyEquals(_ other: borrowing JSCallbackValue<E>) -> Bool {
-    E.strictlyEqualsHandle(handle, other.handle, in: contextHandle) ?? false
+  public func strictlyEquals(_ other: borrowing JSCallbackValue<E>) -> Bool
+  where E: JSEngineInvocationDriver {
+    contextHandle.strictlyEqualsHandle(handle, other.handle) ?? false
   }
 }

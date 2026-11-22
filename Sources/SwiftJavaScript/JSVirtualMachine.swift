@@ -2,7 +2,7 @@ import Dispatch
 import Foundation
 import Synchronization
 
-public final class JSVirtualMachine<E: JSEngine>: Sendable {
+public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
   package let driverRuntimeHandle: E.RuntimeHandle
   private let owner: DedicatedThreadSerialExecutor.Owner
   public let unownedExecutor: UnownedSerialExecutor

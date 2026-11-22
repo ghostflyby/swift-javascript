@@ -329,11 +329,12 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 - [x] backend owned 变体落位(`JavaScriptCoreOwnedValueHandle`/`QuickJSOwnedValueHandle`),trampoline 引用交接逐字面核验;QuickJS 句柄判等升级为全位 identity(tag+完整 union 位比较)
 - [x] 双 free 负面样例以文档块+独立探针实测落地(朴素 `let duplicate = owned` 在仅借用使用时被当作重绑定接受,样例须取消耗性使用形态)
 
-**B. driver 协议分解与 context 实例方法化(与 TODO §1.3 合流):**
+**B. driver 协议分解与 context 实例方法化(已完成,与 TODO §1.3 合流):**
 
-- [ ] driver 要求从静态挂 `E` 迁到关联类型自身:`ContextHandle` 遵循各 driver 协议,操作从 `E.foo(handle, in: ctx)` 变为 `ctx.foo(handle)` 实例方法——`JSInstantContext.toBoolean(_:)` 等已有实例方法为先例,与 §3.4 的 context 寻址会合
-- [ ] 各公共类型只约束自己用到的 driver 面(`JSEngine` 组合别名保留为便利,不再是唯一入口);`SendableMetatype` 与"E 穿透所有类型"逐步退役
-- [ ] 按 TODO §1.3 Slice 2/3/4 顺序逐片收口——原方案假设 god-protocol 不动,SE-0503 解除了该假设,合并推进避免同一批协议文件改两轮
+- [x] driver 要求实例化到 `ContextHandle`:新增五个 `JSContext*Driver` 协议由各引擎 ContextHandle 遵循,引擎协议保留为描述符(associated types + 生命周期静态),where 同型链接;核心调用点全量迁移,`releaseCreatedHandle`/storage 三方法为**硬 requirement(无默认)**——静默 no-op 默认会让迁移引擎无声泄漏;引擎静态面保留为转发目标(双入口,方法体物理搬移排后续片)
+- [x] 值操作签名 owned 化重扫完成(逐签名表见 TODO §2.4):创建工厂 owned、双路径消费 borrowed、单 JSValue 路径(construct/toObject/evaluate 等)裁决维持 borrowed——唯一消费点即约定包装,owned 化零防护增益
+- [x] 约束收窄与退役(本轮份额):`SendableMetatype` 全删;`JSValueConversionEngine` 并集别名落位;`JSCallbackValue`/`JSArguments` 本体只约束 handle 面;类系统(JSClass*/ClassBridgeDriver)仍挂完整 `E: JSEngine`,独立 class driver 面与 `JSFunctionCallback` 去引擎参数化排后续。**Source-breaks 四项已登记(TODO §2.4)**
+- [x] 按 TODO §1.3 合流推进:Slice 2(基础判型/转换)已随本块完成,Slice 3/4(属性访问/回调链路)随后续片
 
 ### Stage 3:`JSValue` 本地值化(核心反转)
 
