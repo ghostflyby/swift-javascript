@@ -107,7 +107,7 @@ enum MacroDelegatedUserDecoder: JSValueDecoder {
     return decode(
       JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
         in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
@@ -144,7 +144,7 @@ enum MacroDelegatedUserEncoder: JSValueEncoder {
       )
     )
     return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self),
+      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
       in: context.driverContextHandle)
   }
 

@@ -130,8 +130,21 @@ where
       in: context.driverContextHandle
     ) {
     case .value(let object):
+      // The host object belongs to the encoding scope's synchronous window:
+      // its creation reference is settled when that scope drains. Anchoring
+      // on the context default scope instead would keep the object alive (and
+      // its finalizer unfired) until the context dies, even after JavaScript
+      // drops every reference to it.
+      context.scopeFrame.track(Engine.OwnedValueHandle.adopting(object))
       return JSValue<Engine>(handleValue: object, in: context.driverContextHandle)
-    case .exception:
+    case .exception(let exception):
+      // The creation result carries an owned reference on the failure path
+      // too (QuickJS: `JS_GetException` returns +1). The conversion error
+      // does not expose the JS value, so settle the reference before
+      // throwing instead of dropping the handle.
+      context.driverContextHandle.releaseCreatedHandle(
+        Engine.OwnedValueHandle.adopting(exception)
+      )
       _ = Unmanaged<JSClassAutoObjectStorage<ClassDefinition>>
         .fromOpaque(privateData)
         .takeRetainedValue()
@@ -164,7 +177,7 @@ where
       "This conversion path only supports \(Engine.self)"
     )
     let engineValue = JSValue<Engine>(
-      handleValue: unsafeBitCast(value.retainHandle(), to: JSValueHandle<Engine>.self),
+      handleValue: unsafeBitCast(value.borrowHandle(), to: JSValueHandle<Engine>.self),
       in: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
     )
     let engineContext = JSInstantContext<Engine>(
@@ -185,7 +198,14 @@ where
       handle: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
     )
     let encoded = try Self.tryEncode(value, in: engineContext)
-    let handle = unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self)
+    // `engineContext` is a temporary witness over the same driver context;
+    // its frame drains when this function returns. Claim an owned reference
+    // into the caller's frame so the returned view stays valid for the
+    // caller's scope window instead of dying with the temporary.
+    let handle = unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self)
+    context.scopeFrame.track(
+      context.driverContextHandle.claimOwnedValueHandle(handle)
+    )
     return JSValue<E>(handleValue: handle, in: context.driverContextHandle)
   }
 

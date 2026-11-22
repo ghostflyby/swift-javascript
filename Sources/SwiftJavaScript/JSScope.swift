@@ -13,14 +13,18 @@ import Foundation
 ///     let val = scope.persist(scope.makeString("hello"))
 ///     // scope auto-closes on deinit
 public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable {
-  private var core: ScopeCore<E>
+  private var core: ScopeCore<E, JSImplicitStackRoots>
   private var isOpen = false
 
   public var driverContextHandle: E.ContextHandle { core.driverContextHandle }
 
+  /// This scope's arena frame: the source of `persist` transfers and an
+  /// explicit `persist(_:into:)` target.
+  var scopeFrame: ScopeFrame<E> { core.frame }
+
   @available(*, noasync)
   public init(handle: E.ContextHandle) {
-    self.core = ScopeCore(handle: handle)
+    self.core = ScopeCore<E, JSImplicitStackRoots>(handle: handle)
   }
 
   /// Push the context scope stack and begin arena tracking. Idempotent.
@@ -66,8 +70,30 @@ public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable {
 
   /// Explicit promotion out of the arena: the only exit semantic this scope
   /// provides. Callback-exit semantics live on `JSInstantContext`.
+  ///
+  /// The value's owned reference is transferred into the context default
+  /// scope (stack bottom); without a hosted `JSContext` the bottom
+  /// (outermost open) frame is the fallback target — in nested bare scopes
+  /// that is not necessarily the receiver.
   @available(*, noasync)
   public func persist(_ v: borrowing JSCallbackValue<E>) -> JSValue<E> { core.persist(v) }
+
+  /// Transfer a value into an explicitly chosen scope arena.
+  @available(*, noasync)
+  public func persist(
+    _ v: borrowing JSCallbackValue<E>,
+    into target: borrowing JSInstantContext<E>
+  ) -> JSValue<E> {
+    core.persist(v, into: target.scopeFrame)
+  }
+
+  @available(*, noasync)
+  public func persist(
+    _ v: borrowing JSCallbackValue<E>,
+    into target: borrowing JSScope<E>
+  ) -> JSValue<E> {
+    core.persist(v, into: target.scopeFrame)
+  }
 }
 
 extension JSScope: JSScopeWitness {

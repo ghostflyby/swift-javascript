@@ -11,7 +11,7 @@ import Testing
     let stored = JSValue<JavaScriptCoreEngine>(handleValue: handle, in: context.driverContextHandle)
     #expect(stored.borrowHandle().ref == handle.ref)
     #expect(stored.contextHandle == context.driverContextHandle)
-    // `value` already owns the conventional release for this handle.
-    stored.discard()
+    // `value` and `stored` are non-owning views over the same
+    // arena-owned reference.
   }
 }

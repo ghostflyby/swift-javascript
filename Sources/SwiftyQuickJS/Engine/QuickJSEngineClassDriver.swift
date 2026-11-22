@@ -280,7 +280,6 @@ private func quickJSClassFinalizer(_ runtimeRef: OpaquePointer?, _ value: CQuick
       handleValue: QuickJSValueHandle(ref: value), in: QuickJSContextHandle(ref: contextRef)
     )
     finalize(thisValue)
-    _ = thisValue.takeHandle()
   }
   _ = Unmanaged<JSClassAutoObjectStorage<QuickJSClassDefinition>>
     .fromOpaque(privateData)
@@ -311,12 +310,10 @@ private func quickJSClassGetProperty(
     definition.hasProperty == nil
       || definition.hasDynamicProperty(in: context, on: thisValue, forKey: key)
   else {
-    thisValue.discard()
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
   let result = definition.dynamicPropertyValue(in: context, on: thisValue, forKey: key)
-  thisValue.discard()
   return quickJSClassCallbackReturnValue(result, in: contextRef)
 }
 
@@ -358,18 +355,12 @@ private func quickJSClassSetProperty(
         to: newValue
       )
     else {
-      thisValue.discard()
-      newValue.discard()
       return 1
     }
-    thisValue.discard()
-    newValue.discard()
-    _ = JS_Throw(contextRef, exception.takeHandle().ref)
+    _ = JS_Throw(contextRef, JS_DupValue(contextRef, exception.borrowHandle().ref))
     return -1
   }
 
-  thisValue.discard()
-  newValue.discard()
   if flags & Int32(JS_PROP_NO_ADD) != 0 {
     return 0
   }
@@ -408,7 +399,6 @@ private func quickJSClassHasProperty(
   let result: Int32 =
     definition.hasDynamicProperty(in: context, on: thisValue, forKey: key)
     ? 1 : 0
-  thisValue.discard()
   return result
 }
 
@@ -456,7 +446,6 @@ private func quickJSClassDeleteProperty(
   } else {
     result = 1
   }
-  thisValue.discard()
   return result
 }
 
@@ -475,7 +464,6 @@ private func initializeClassObject(
     in: contextHandle
   )
   initialize(thisValue, context)
-  thisValue.discard()
 }
 
 private func installStaticValueMembers(
@@ -601,7 +589,6 @@ private func quickJSStaticValueGetterCallback(
     in: contextHandle
   )
   let result = value.propertyValue(in: context, on: thisValue)
-  thisValue.discard()
   return quickJSClassCallbackReturnValue(result, in: contextRef)
 }
 
@@ -634,12 +621,10 @@ private func quickJSStaticValueSetterCallback(
     in: contextHandle
   )
   let exception = value.setPropertyException(in: context, on: thisValue, to: newValue)
-  thisValue.discard()
-  newValue.discard()
   guard let exception else {
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
-  return JS_Throw(contextRef, exception.takeHandle().ref)
+  return JS_Throw(contextRef, JS_DupValue(contextRef, exception.borrowHandle().ref))
 }
 
 private func quickJSStaticValueFinalizer(_ opaque: UnsafeMutableRawPointer?) {
@@ -705,7 +690,6 @@ private func quickJSStaticFunctionCallback(
   let result = quickJSClassArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
     function.callResult(in: context, on: thisValue, with: $0)
   }
-  thisValue.discard()
   return quickJSClassCallbackReturnValue(result, in: contextRef)
 }
 
@@ -738,11 +722,14 @@ private func quickJSClassCallbackReturnValue(
   _ result: consuming JSResult<SwiftJavaScript.JSValue<QuickJSEngine>>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
+  // QuickJS takes ownership of callback return values and of values passed
+  // to JS_Throw. The `JSValue` is a non-owning local view whose backing
+  // reference stays with its arena, so hand the engine a duplicate.
   switch consume result {
   case .value(let value):
-    return value.takeHandle().ref
+    return JS_DupValue(contextRef, value.borrowHandle().ref)
   case .exception(let error):
-    return JS_Throw(contextRef, error.takeHandle().ref)
+    return JS_Throw(contextRef, JS_DupValue(contextRef, error.borrowHandle().ref))
   }
 }
 

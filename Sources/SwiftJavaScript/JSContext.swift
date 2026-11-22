@@ -3,6 +3,13 @@ public actor JSContext<E: JSContextEngine> {
   public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
 
+  /// Context-lifetime default scope (design §3.6): the bottom frame of this
+  /// context's scope stack. Its arena is heap-resident, so it uses the
+  /// explicit-rooting policy (§3.7): JSC values are protected on add and
+  /// unprotected on drain; reference-counted engines rely on the creation
+  /// reference the arena owns.
+  private let defaultScope: ScopeCore<E, JSExplicitRoots>
+
   public init() {
     self.init(virtualMachine: JSVirtualMachine<E>())
   }
@@ -33,9 +40,16 @@ public actor JSContext<E: JSContextEngine> {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
     self.driverContextHandle = driverContextHandle
+    let defaultScope = ScopeCore<E, JSExplicitRoots>(handle: driverContextHandle)
+    self.defaultScope = defaultScope
+    ScopeStackRegistry.push(defaultScope, for: driverContextHandle)
   }
 
   deinit {
+    // The default scope is the stack bottom: drain it last, after every
+    // temporally nested scope has closed, then pop its frame.
+    defaultScope.drain()
+    ScopeStackRegistry<E>.pop(for: driverContextHandle)
     driverContextHandle.installContextDataStorageBox(nil)
     _ = driverContextHandle.releaseReference()
   }
@@ -69,15 +83,13 @@ extension JSContext {
   }
 
   public func makeString(_ value: String) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeString(value))
-    }
+    defaultScope.makeJSValue(defaultScope.makeString(value))
   }
 
   public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeString(from: key))
-    }
+    defaultScope.makeJSValue(
+      defaultScope.makeString(from: key.borrowHandle(in: driverContextHandle))
+    )
   }
 
   public func makePropertyStringKey(_ value: String) -> JSPropertyStringKey<E> {
@@ -93,41 +105,29 @@ extension JSContext {
   }
 
   public func makeNumber(_ value: Double) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeNumber(value))
-    }
+    defaultScope.makeJSValue(defaultScope.makeNumber(value))
   }
 
   public func makeNumber(_ value: some BinaryInteger) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeNumber(value))
-    }
+    makeNumber(Double(value))
   }
 
   public func makeBoolean(_ value: Bool) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeBoolean(value))
-    }
+    defaultScope.makeJSValue(defaultScope.makeBoolean(value))
   }
 
   public func makeNull() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeNull())
-    }
+    defaultScope.makeJSValue(defaultScope.makeNull())
   }
 
   public func makeUndefined() -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.persist(instantContext.makeUndefined())
-    }
+    defaultScope.makeJSValue(defaultScope.makeUndefined())
   }
 
   public func withGlobalObject<R: ~Copyable>(
     _ body: (borrowing JSValue<E>) -> R
   ) -> R {
-    withInstantContext { instantContext in
-      instantContext.withGlobalObject(body)
-    }
+    body(defaultScope.globalObjectValue())
   }
 
   public func setGlobalProperty<Val>(
@@ -152,9 +152,7 @@ extension JSContext {
   }
 
   public func getGlobalProperty(forKey key: StaticString) -> JSValue<E> {
-    withInstantContext { instantContext in
-      instantContext.getGlobalProperty(forKey: key)
-    }
+    defaultScope.getGlobalPropertyValue(forKey: key)
   }
 
   public func getGlobalProperty<C: JSValueDecoder>(
@@ -179,22 +177,20 @@ extension JSContext {
   }
 
   public func makeObject() -> JSValue<E> {
-    withInstantContext { instantContext in
-      let result = instantContext.makeObject()
-      guard case .value(let cb) = result else {
-        preconditionFailure("makeObject failed")
-      }
-      return instantContext.persist(cb)
+    switch defaultScope.makeObject() {
+    case .value(let callbackValue):
+      return defaultScope.makeJSValue(callbackValue)
+    case .exception:
+      preconditionFailure("makeObject failed")
     }
   }
 
   public func makeArray() -> JSValue<E> {
-    withInstantContext { instantContext in
-      let result = instantContext.makeArray()
-      guard case .value(let cb) = result else {
-        preconditionFailure("makeArray failed")
-      }
-      return instantContext.persist(cb)
+    switch defaultScope.makeArray() {
+    case .value(let callbackValue):
+      return defaultScope.makeJSValue(callbackValue)
+    case .exception:
+      preconditionFailure("makeArray failed")
     }
   }
 
@@ -202,9 +198,7 @@ extension JSContext {
     named name: String,
     callback: @escaping JSFunctionCallback<E>
   ) -> JSValue<E> where E.Engine == E {
-    withInstantContext { instantContext in
-      instantContext.makeFunction(named: name, callback: callback)
-    }
+    defaultScope.makeFunctionValue(named: name, callback: callback)
   }
 
   public func installGlobalFunction(
@@ -222,13 +216,15 @@ extension JSContext {
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
+    guard let preparedHandle = driverContextHandle.makePreparedScriptHandle(script) else {
+      preconditionFailure("JSContext.evaluateScript could not prepare script")
     }
+    let prepared = JSPreparedScript<E>(handle: preparedHandle, context: driverContextHandle)
+    return defaultScope.evaluateScriptValue(
+      prepared,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
   }
 
   public func evaluateScript(
@@ -236,13 +232,11 @@ extension JSContext {
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
   ) -> JSResult<JSValue<E>> {
-    withInstantContext { instantContext in
-      instantContext.evaluateScript(
-        script,
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    }
+    defaultScope.evaluateScriptValue(
+      script,
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
   }
 }
 

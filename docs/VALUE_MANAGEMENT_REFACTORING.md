@@ -229,7 +229,7 @@ protocol JSScopeWitness<E: JSEngine>: ~Copyable {
 
 - `JSContext` 持有一个 context 级默认 scope(一个长存 `ScopeCore`,走 `explicitRoots` 策略 §3.7),**即 context 作用域栈的栈底**(§3.4):context 建立时压入、deinit 时最后弹出 drain,QuickJS 释放配平与 JSC unprotect-on-drain 由它兜底;
 - actor 方法中的值工厂(`makeString` 等)落入默认 scope:产物在 context 存续期内有效(经显式根化,§3.7)、可在同一 actor 的后续调用与 `await` 之间使用,但不可离开 actor(非 `Sendable`)——保持现有 `JSContext` 公共 API 的工效不变;
-- 显式 scope(回调 `JSInstantContext`、手动 `JSScope`)是更短的嵌套窗口,用于回调与临时批量创建;默认 scope 是便利层,不是纪律的替代——需要精确释放时仍应使用显式 scope;
+- 显式 scope(回调 `JSInstantContext`、手动 `JSScope`)是更短的嵌套窗口,用于回调与临时批量创建;默认 scope 是便利层,不是纪律的替代——**提前回收的边界(Stage 3 修正)**:显式 scope 只能提前回收其工厂产物与 persist 进它的值;经公共签名逃逸的 `JSValue` 结果(getProperty/call/evaluateScript/host object 等)一律锚默认 scope,到 context deinit 才回收,长寿命 context 会累积(JSC protect/QuickJS 引用)——默认 scope 的提前回收/compact API 为登记在案的后续项(TODO §2.5);
 - 两类 scope 共享同一 `ScopeCore` 内核与 arena 记账,无第二套生命周期规则。
 
 ### 3.7 根化策略:同步 scope 与异步 scope
@@ -340,14 +340,14 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 前置:Stage 1 完成(作用域栈迁移与值操作 context 寻址稳定)。这是本重构的中心阶段。
 
-- [ ] **【验收指标】**`JSCallbackReturn` exception/persistent 路径 owned 交接 + persist QuickJS +1 泄漏清零(§2.3 开放项,ASan 已定位机制:借用缺锚):修复落地后**重放结算语义**(先 `retainReference` 后 settle)并以 `swift test --sanitize=address` 全量通过(单测与满载并行各一轮),Mock 释放计数断言恢复结算语义的精确计数——三项全过方可关闭开放项
-- [ ] `ScopeCore` 引入编译期 `Rooting` 策略参数(§3.7):同步 scope 维持 `implicitStackRoots`(JSC 白嫖栈扫描),默认 scope 走 `explicitRoots`
-- [ ] `JSContext` 增加默认 scope(§3.6):context 级长存 `ScopeCore`(`explicitRoots`),deinit 时 drain;actor 值工厂改落默认 scope;**JSC 值入 arena 必须 protect-on-add、drain 时 unprotect**(§3.7 硬约束;QuickJS 策略恒等,`releaseCreatedHandle` 语义不变)
-- [ ] `JSValue` 去 owning 语义:移除 `deinit` 的 `releaseReference(in:)` 与 home-context 释放职责;存储已是直接属性(handle+ctx,Stage 2 完成)
-- [ ] `persist` 重定义:从"提升为 owning 值"改为"移入指定 scope 的 arena"(回调 scope → 默认 scope 或手动指定);`JSCallbackReturn` 的 temporary/persistent handoff 语义不变(出口交给引擎)
-- [ ] `JSValue`/`JSCallbackValue` 统一评估:合并为单一本地值类型或保留两型共享 `ScopeCore`(§7),连同命名一并定案
-- [ ] `JSObject`/converter/宏生成模板对 `JSValue` owning 语义的依赖面清点与迁移
-- [ ] 测试:context 先于值消亡不再是悬垂 deinit(QuickJS 下默认 scope drain 配平);值跨 `await`(同 actor)可用、跨隔离域编译失败
+- [x] **【验收指标·已按 §7.2 定案变更形态】**persist QuickJS +1 泄漏清零 + exception/persistent 借用锚消解(§2.3 开放项):**原定形态**(owned 交接 + 先 retain 后 settle)在实现中被更优方案取代——`JSValue` 非持有化后 arena 即借用锚点,`JSCallbackReturn` 三态一律借用 + 引擎侧 Duplicate(§7.2 定案),`persist` 改创建引用转移。**三项验收全过**:转移语义(重放等价)、ASan 单测轮、ASan 满载并行轮;Mock 释放计数断言恢复结算语义
+- [x] `ScopeCore` 引入编译期 `Rooting` 策略参数(§3.7):`ScopeCore<E, Rooting>` 编译期参数 + 非泛型 `ScopeFrame` 持有 arena 共享同一 context 栈(运行时 bool 投影,单分支);同步 scope 行为零变化
+- [x] `JSContext` 默认 scope:`defaultScope: ScopeCore<E, JSExplicitRoots>` 压栈底、deinit 最后 drain;`rootOwnedValueHandle`/`unrootOwnedValueHandle` 硬 requirement(JSC `JSValueProtect`/`JSValueUnprotect`,QuickJS 显式恒等);actor 值工厂与**所有逃逸 JSValue 的引擎结果**统一落默认 scope(落当前同步帧会悬垂,代价是到 context deinit 才回收——见 §3.6 修正与 TODO §2.5 开放项)
+- [x] `JSValue` 去 owning 语义:`deinit`/`takeHandle`/`retainHandle`/`discard`/`init(taking:)` 删除,handle 为非 Optional 纯身份 token(`init(copying:)` 无副作用视图);根化片曾加的过渡引用已随值反转删除
+- [x] `persist` 重定义:创建引用转移(源 `takeFirst` 显式根随摘除解除 → 目标 `track` 重新根化),arena-owned 零 retain/release;borrowed fallback 经 `claimOwnedValueHandle` 认领恰好一次(QuickJS dup/JSC identity);默认目标为栈底帧
+- [x] `JSValue`/`JSCallbackValue` 统一评估:**暂不合并**(§7.4 定案)——构造面与 `noasync` 同步窗口契约不同,合并排期 Stage 5 随 `~Escapable`/`@lifetime`
+- [x] `JSObject`/converter/宏依赖面迁移完成:converter 经 `anchorEscapingValue` 锚进默认 scope;宏模板改 `borrowHandle`;`releaseArguments` 删除;owning 残留 rg 零命中
+- [x] 契约测试:context 先亡 drain 配平(Mock)、跨 `await` 同 actor(两引擎)、嵌套同步 scope、跨隔离域编译失败负面样例(文档块 + 探针实测)
 
 ### Stage 4:持久 handle 层(目标能力,设计先行)
 
@@ -382,9 +382,9 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 ## 7. 未决问题
 
 1. **Stage 1 方案 B 的操作归属粒度**:`call/getProperty` 等全部上收到 scope 后,`JSCallbackValue` 是否还应保留 `handle` 访问给宏插件生成的代码?宏生成模板的改造成本需在 Stage 1 启动前评估。
-2. **`JSCallbackReturn.persistent` 与 `JSValue` deinit 的交接**已有测试覆盖;Stage 2 拆分后 `JSCallbackReturn` 改存 `OwnedValueHandle`(`~Copyable`),其按值存储与 `borrowing`/`consuming` 语义随签名审计定论。
+2. **`JSCallbackReturn.persistent` 与 `JSValue` deinit 的交接**已有测试覆盖;Stage 2 拆分后 `JSCallbackReturn` 改存 `OwnedValueHandle`(`~Copyable`),其按值存储与 `borrowing`/`consuming` 语义随签名审计定论。**Stage 3 定案:不存 owned,维持借用。** 理由:owned 交接原本是为补偿 `JSValue.deinit` 先释放引用、trampoline 后借用的时序缺陷(ASan 已定位);`JSValue` 反转为非持有本地值后,借用锚点由 arena 承担——`persistent` 的锚点是 context 默认 scope,天然长于回调——跨帧所有权转移不再必要。temporary/persistent/exception 三态一律借用,trampoline 给出引擎自有的引用(QuickJS `JS_DupValue`;JSC 无引用会计,不做 protect/unprotect),arena 的引用仍由 drain 结清。锚点取决于值的归属 arena 而非标记本身:context 工厂产物锚默认 scope(天然长于回调),类桥值锚其回调 scope——回调存续期间同样成立。`isPersistent` 因此仅为语义标记,trampoline 不读取它。实现注解见 `JSInstantContext.swift` 的 `JSCallbackReturn` 与两侧 trampoline。
 3. **handle 层的所有权与绑定粒度**:引用计数 + 自动清理 vs 显式 invalidate(V8 文档 §12.1 同款问题,初步倾向前者,见 §3.5);`RuntimeLocal` vs `ContextLocal` 的公开面——两引擎堆边界在 runtime 层,但全局对象/构造函数是 context 级差异,绑定粒度随第一版公开哪些待定。
-4. **`JSValue`/`JSCallbackValue` 统一与命名**:本地值化后两型角色重合,终态合并为单一类型;"JSValue" 名称保留给本地值(用户语义面不变),"JSCallbackValue" 退役或内部化——Stage 3 定案。
+4. **`JSValue`/`JSCallbackValue` 统一与命名**:本地值化后两型角色重合,终态合并为单一类型;"JSValue" 名称保留给本地值(用户语义面不变),"JSCallbackValue" 退役或内部化——Stage 3 定案。**Stage 3 定案:暂不合并,记明理由与后续。** 两型此时都是 `handle + ContextHandle` 的非持有视图,但构造面(`JSCallbackValue` 仅 scope 工厂可建 vs `JSValue` 公开初始化器)与操作面(`noasync` 同步窗口 vs 显式 scope/默认 scope 可跨 `await`)不同;此刻合并会放宽回调值构造面并抹掉同步窗口这一契约。合并排期 Stage 5,与 `~Escapable`/`@lifetime` 一同把两种生命周期收进单一类型。现状说明见 `JSCallbackValue` 类型文档。
 5. **借用/拥有 handle 的命名与边界**:`ValueHandle`/`OwnedValueHandle` 为占位名;拆分边界(哪些 driver 签名属于所有权转移)随 Stage 2A 签名审计定案。
 
 ---

@@ -20,11 +20,73 @@ import Testing
 /// 值经 JS 流转(作为实参穿过引擎调用)或 `persist` 成 `JSValue` 是仅有的
 /// 合法出口;`nestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay`
 /// 恰好验证第一条通道。
+// MARK: - Stage 3 negative compile examples (not automatable in Swift Testing)
+//
+// 「`JSValue` 是非 Sendable 本地值,跨隔离域应编译失败」是编译期契约;
+// Swift Testing 无法在测试内断言编译期失败,以下样例仅以文档形式保留,
+// 标注「应编译失败」,该验证未自动化:
+//
+//     // ✗ 应编译失败 —— actor 隔离域把非 Sendable 本地值返回给 nonisolated
+//     // 上下文:
+//     func leak(_ context: JSContext<JavaScriptCoreEngine>) async {
+//       let value = await context.makeString("leak")
+//       _ = value
+//     }
+//
+//     // ✗ 应编译失败 —— 捕获进 @Sendable 任务(handle/context token 的
+//     // Sendable 不使本地值本身可跨域):
+//     func send(_ value: borrowing JSValue<JavaScriptCoreEngine>) {
+//       Task.detached { _ = value }
+//     }
+//
+//     // ✗ 应编译失败 —— 作为 actor 间实例方法实参:
+//     actor Sink {
+//       func take(_ value: borrowing JSValue<JavaScriptCoreEngine>) {}
+//     }
+//     func send(
+//       _ value: borrowing JSValue<JavaScriptCoreEngine>,
+//       to sink: Sink
+//     ) async {
+//       await sink.take(value)
+//     }
+//
+// 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 /
+// swiftlang-6.4.2.1.9;探针文件临时加入 `SwiftJavaScriptEngineTests` target
+// 后 `swift build --build-tests`,确认三类诊断后删除探针并重建通过):
+// - actor 返回样例报 `error: non-Sendable 'JSValue<JavaScriptCoreEngine>'
+//   -typed result can not be returned from actor-isolated instance method
+//   'makeString' to nonisolated context`,并附
+//   `note: generic struct 'JSValue' does not conform to the 'Sendable'
+//   protocol`;
+// - @Sendable 捕获样例报 `error: passing closure as a 'sending' parameter
+//   risks causing data races between code in the current isolation context
+//   and concurrent execution of the closure`(附
+//   `note: closure captures 'value' which is accessible to code in the
+//   current isolation context`),以及参数声明处的
+//   `error: 'value' cannot be captured by an escaping closure since it is a
+//   borrowed parameter`;
+// - actor 间实参样例报 `error: sending 'value' risks causing data races`
+//   (附 `note: sending 'value' to actor-isolated instance method 'take'
+//   risks causing data races between actor-isolated code and code in the
+//   current isolation context`)。
+//
+// 三个样例均因 `JSValue` 只能留在原隔离域而失败;`Sendable` 的
+// handle/context token 不改变该结论。
 @Suite
 struct EngineScopeContractTests {
   @Test(arguments: ScriptEngine.allCases)
   func nestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay(_ engine: ScriptEngine) async {
     await engine.run(NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func defaultScopeValueSurvivesNestedInstantScope(_ engine: ScriptEngine) async {
+    await engine.run(DefaultScopeValueSurvivesNestedInstantScope.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func localValueSurvivesAwaitWithinActor(_ engine: ScriptEngine) async {
+    await engine.run(ValueSurvivesAwaitWithinActor.self)
   }
 }
 
@@ -100,5 +162,125 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
     #expect(observations.receivedType == .string)
     #expect(observations.receivedContent == "payload-from-A")
     #expect(observations.strictlyMatchesTwin == true)
+  }
+}
+
+/// Stage 3 §3.6:actor 值工厂产物落在 context 默认 scope。显式(同步)scope
+/// 在默认帧之上打开又关闭,默认 arena 的值仍可用;由 `evaluateScript`
+/// 产生的值同样由默认 scope 承接(而非临时 scope 的 drain)。
+private enum DefaultScopeValueSurvivesNestedInstantScope: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    await context.withIsolatedGlobalObject { context, _ in
+      let durable = context.makeString("durable")
+
+      // 同步 scope 在默认帧之上压入/弹出,不触碰默认 arena。
+      context.withInstantContext { instantContext in
+        _ = instantContext.makeString("temporary")
+      }
+
+      #expect(durable.toString(in: context) == "durable")
+
+      let result = context.evaluateScript("1 + 1")
+      switch consume result {
+      case .value(let value):
+        #expect(value.toDouble(in: context) == 2)
+      case .exception:
+        Issue.record("Expected default-scope evaluation to produce a value")
+      }
+    }
+  }
+}
+
+/// Stage 3 §§3.2/3.6: a default-scope `JSValue` stays usable when the
+/// context actor suspends and resumes. The value never leaves its isolation
+/// domain; the default arena keeps the engine reference alive across the
+/// suspension (JSC: explicit `JSValueProtect`; QuickJS: the creation
+/// reference), so the resumed read must observe the original string.
+///
+/// 未自动化契约(编译期,Swift Testing 无法在测试内断言):`JSValue` 是非
+/// `Sendable` 本地值,把同一视图送进另一个隔离域必须编译失败。文档样例与
+/// 构建探针实测记录见本文件顶部的 Stage 3 负面样例说明。
+private enum ValueSurvivesAwaitWithinActor: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    let observations = await context.stage3ProbeValueAcrossAwait()
+
+    #expect(observations.valueBeforeSuspension == "across-await")
+    #expect(observations.valueAfterSuspension == "across-await")
+    #expect(observations.valueAfterSiblingJobAndGC == "across-await")
+    #expect(observations.numberAfterSuspension == 42)
+  }
+}
+
+/// Observations are `Sendable`; the non-`Sendable` `JSValue` never leaves
+/// the context actor's isolation domain (the probe is an actor-isolated
+/// method, not a nonisolated helper receiving the value).
+private struct Stage3AwaitObservations: Sendable {
+  let valueBeforeSuspension: String
+  let valueAfterSuspension: String
+  let valueAfterSiblingJobAndGC: String
+  let numberAfterSuspension: Double
+}
+
+extension JSContext where E: JSEngine {
+  /// Runs entirely on this actor: the durable value is created, the actor
+  /// suspends, other default-scope allocations and another job run on the
+  /// same actor, then the value is read again. `JSValue` is never returned
+  /// or captured by a nonisolated context, so this does not cross an
+  /// isolation domain.
+  fileprivate func stage3ProbeValueAcrossAwait() async -> Stage3AwaitObservations {
+    let durable = makeString("across-await")
+    let before = durable.toString(in: self)
+
+    // First suspension: the value's frame is no longer on the synchronous
+    // stack while it is outstanding.
+    await Task.yield()
+    let afterFirstSuspension = durable.toString(in: self)
+
+    // Heap pressure on the default arena between suspension and use.
+    for index in 0..<32 {
+      _ = makeString("default-scope-pressure-\(index)")
+    }
+    withInstantContext { scoped in
+      _ = scoped.makeString("nested-scope-temporary")
+    }
+
+    // A sibling job on the same actor runs while `durable` is outstanding;
+    // it also forces a JSC collection so an unprotected value would be
+    // observable as corruption here rather than waiting for incidental GC.
+    let number = makeNumber(42)
+    let sibling = Task { @Sendable [self] in
+      await self.stage3SiblingJobAndCollection()
+    }
+    await sibling.value
+
+    let numberAfter = number.toDouble(in: self)
+    let afterSibling = durable.toString(in: self)
+
+    return Stage3AwaitObservations(
+      valueBeforeSuspension: before,
+      valueAfterSuspension: afterFirstSuspension,
+      valueAfterSiblingJobAndGC: afterSibling,
+      numberAfterSuspension: numberAfter
+    )
+  }
+
+  /// Same-actor sibling work: default-scope allocation plus an explicit
+  /// collection on GC engines (JSC). Reference-counted engines ignore the
+  /// collection hook because their creation reference is already the root.
+  fileprivate func stage3SiblingJobAndCollection() async {
+    for index in 0..<16 {
+      _ = makeString("sibling-\(index)")
+    }
+    await Task.yield()
+    // JSC's conservative stack scan does not see heap-resident default-scope
+    // arenas, so an explicit collection in the middle of the suspension is
+    // the strongest check that the explicit root is doing its job. QuickJS
+    // is refcounted and needs no collection.
+    stage3CollectGarbageIfSupported(driverContextHandle)
+    _ = evaluateScript("({ mark: 'stage3-gc-pressure' })")
   }
 }

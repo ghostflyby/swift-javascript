@@ -49,7 +49,8 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 
   // Value-creation factories return the ownership carrier: the engine
   // produces a new owning reference (+1 under reference counting), which
-  // flows into a scope arena (or an owning-by-convention `JSValue`).
+  // flows into a scope arena (the current synchronous frame or the context
+  // default scope; `JSValue` itself owns nothing).
 
   func makeStringValueHandle(_ value: String) -> OwnedValueHandle?
 
@@ -78,12 +79,30 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   /// Release a value handle created by the engine that was not persisted or returned.
   /// QuickJS: calls JS_FreeValue. JSC: no-op (GC-managed).
   func releaseCreatedHandle(_ handle: consuming OwnedValueHandle)
+
+  /// Claim an owned reference for a borrowed handle that no arena owns yet
+  /// (e.g. a callback argument) so it can enter a scope arena (persist
+  /// fallback, §3.6).
+  /// JSC: identity — the target arena's explicit root is the anchor.
+  /// QuickJS: duplicate (`JS_DupValue`), because the engine call frame only
+  /// lends the original reference.
+  func claimOwnedValueHandle(_ handle: ValueHandle) -> OwnedValueHandle
+
+  /// Enter this context's explicit root for an arena-owned value (§3.7).
+  /// JSC: `JSValueProtect`. Reference-counted engines: identity — the
+  /// creation reference already keeps the value alive.
+  func rootOwnedValueHandle(_ handle: borrowing OwnedValueHandle)
+
+  /// Leave the explicit root taken by `rootOwnedValueHandle` (§3.7).
+  /// JSC: `JSValueUnprotect`. Reference-counted engines: identity.
+  func unrootOwnedValueHandle(_ handle: borrowing OwnedValueHandle)
 }
 
-// No default implementations: every context states its release and storage
-// behavior explicitly. A silent no-op default would let a migrated engine
-// keep compiling while leaking every created handle (a GC-managed engine
-// such as JSC writes its no-op out explicitly instead).
+// No default implementations: every context states its release, rooting,
+// claim, and storage behavior explicitly. A silent no-op default would let a
+// migrated engine keep compiling while leaking every created handle or
+// dropping a required explicit root (GC-managed and reference-counted engines
+// write their identity semantics out explicitly instead).
 
 /// Engine-side descriptor: associated types, capabilities, and runtime/context
 /// lifecycle. Value operations moved to `JSContextRuntimeDriver`, implemented

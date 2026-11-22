@@ -31,12 +31,11 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
     exception?.pointee = result.handle.ref
     return JSValueMakeUndefined(ctx)
   }
-  // JSC roots the callback's return value itself; a persistent return
-  // carries the JSValueProtect taken by `persist`, and nothing else will
-  // release it — drop it here, mirroring QuickJS's reference handoff.
-  if result.isPersistent {
-    result.handle.releaseReference(in: contextHandle)
-  }
+  // §7.2 decision: the handoff carries a borrowed handle whose reference is
+  // owned by a scope arena (persistent values by the context default scope,
+  // which outlives the callback). JSC is GC-managed: the returned ref needs
+  // no reference accounting, and the arena's explicit root stays in place
+  // until its own drain unprotects it.
   return result.handle.ref
 }
 

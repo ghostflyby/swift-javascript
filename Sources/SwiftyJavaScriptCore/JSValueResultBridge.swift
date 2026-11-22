@@ -1,12 +1,12 @@
 import JavaScriptCore
 
 extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> {
-  consuming func toPrivateResult() -> JSResult<JSValueRef> {
-    switch consume self {
+  borrowing func toPrivateResult() -> JSResult<JSValueRef> {
+    switch self {
     case .value(let v):
-      return .value(v.callbackRef())
+      return .value(v.borrowedRef())
     case .exception(let e):
-      return .exception(e.callbackRef())
+      return .exception(e.borrowedRef())
     }
   }
 }
@@ -14,10 +14,10 @@ extension JSResult where Value == SwiftJavaScript.JSValue<JavaScriptCoreEngine> 
 extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
   /// Hands the raw value reference back to JavaScriptCore callback ABI.
   ///
-  /// The returned `JSValueRef` remains managed by JavaScriptCore. Consume the
-  /// Swift wrapper so its `deinit` does not unprotect a value that was not
-  /// explicitly protected for long-term Swift ownership.
-  consuming func callbackRef() -> JSValueRef {
-    takeRef()
+  /// `JSValue` is a non-owning local view: the returned `JSValueRef` stays
+  /// owned by the arena (or engine callback frame) that backs the handle, so
+  /// there is no protection to drop and nothing to consume.
+  borrowing func callbackRef() -> JSValueRef {
+    borrowedRef()
   }
 }

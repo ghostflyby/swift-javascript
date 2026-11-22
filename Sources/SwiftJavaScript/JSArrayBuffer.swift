@@ -15,20 +15,17 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
     self.contextHandle = contextHandle
   }
 
-  /// Adopt another buffer's wrapped value without an extra retain (inits
-  /// cannot assign `self =` once stored properties are not trivially
-  /// destructible).
-  private init(taking other: consuming JSArrayBuffer<E>) {
-    let context = other.contextHandle
-    let handle = other.value.takeHandle()
-    self.value = JSValue(handleValue: handle, in: context)
-    self.contextHandle = context
+  /// Copy another buffer's wrapped local-value view. `JSValue` owns nothing,
+  /// so this transfers no ownership; the arena of origin remains the owner.
+  private init(copying other: borrowing JSArrayBuffer<E>) {
+    self.value = JSValue(copying: other.value)
+    self.contextHandle = other.contextHandle
   }
 
   public init(byteLength: Int, in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSArrayBuffer(byteLength: byteLength, in: callbackContext)
       })
   }
@@ -49,14 +46,14 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer")
     }
 
-    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
+    self.value = adoptCreatedValueHandle(handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
   public init(copying bytes: [UInt8], in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSArrayBuffer(copying: bytes, in: callbackContext)
       })
   }
@@ -70,7 +67,7 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
     in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSArrayBuffer(copying: bytes, in: callbackContext)
       })
   }
@@ -91,7 +88,7 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
       preconditionFailure("Failed to create ArrayBuffer from bytes")
     }
 
-    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
+    self.value = adoptCreatedValueHandle(handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -105,7 +102,7 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
     else {
       return nil
     }
-    self.init(taking: wrapped)
+    self.init(copying: wrapped)
   }
 
   public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {
@@ -113,7 +110,7 @@ public struct JSArrayBuffer<E: JSEngineTypedArrayDriver>: ~Copyable {
       return nil
     }
 
-    self.value = JSValue(retaining: value)
+    self.value = anchorBorrowedValueHandle(value.borrowHandle(), in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -188,7 +185,7 @@ extension JSArrayBuffer: JSValueEncodable {
       "Cannot encode JSArrayBuffer across different JavaScript engine types"
     )
 
-    let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
+    let handle = unsafeBitCast(value.borrowHandle(), to: JSValueHandle<TargetEngine>.self)
     return JSValue(handleValue: handle, in: context.driverContextHandle)
   }
 
@@ -208,12 +205,10 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
     self.contextHandle = contextHandle
   }
 
-  /// Adopt another array's wrapped value without an extra retain.
-  private init(taking other: consuming JSTypedArray<E>) {
-    let context = other.contextHandle
-    let handle = other.value.takeHandle()
-    self.value = JSValue(handleValue: handle, in: context)
-    self.contextHandle = context
+  /// Copy another array's wrapped local-value view (no ownership transfer).
+  private init(copying other: borrowing JSTypedArray<E>) {
+    self.value = JSValue(copying: other.value)
+    self.contextHandle = other.contextHandle
   }
 
   public init(
@@ -222,7 +217,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
     in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSTypedArray(type: type, length: length, in: callbackContext)
       })
   }
@@ -239,7 +234,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
       preconditionFailure("Failed to create TypedArray")
     }
 
-    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
+    self.value = adoptCreatedValueHandle(handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -251,7 +246,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
     in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSTypedArray(
           type: type,
           buffer: buffer,
@@ -303,7 +298,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
       preconditionFailure("Failed to create TypedArray from ArrayBuffer")
     }
 
-    self.value = JSValue(handleValue: handle, in: context.driverContextHandle)
+    self.value = adoptCreatedValueHandle(handle, in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -317,7 +312,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
     else {
       return nil
     }
-    self.init(taking: wrapped)
+    self.init(copying: wrapped)
   }
 
   public init?(value: borrowing JSValue<E>, in context: borrowing JSInstantContext<E>) {
@@ -325,7 +320,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
       return nil
     }
 
-    self.value = JSValue(retaining: value)
+    self.value = anchorBorrowedValueHandle(value.borrowHandle(), in: context.driverContextHandle)
     self.contextHandle = context.driverContextHandle
   }
 
@@ -366,7 +361,7 @@ public struct JSTypedArray<E: JSEngineTypedArrayDriver>: ~Copyable {
       preconditionFailure("Failed to read TypedArray buffer")
     }
     return JSArrayBuffer(
-      storedValue: JSValue(handleValue: bufferHandle, in: contextHandle),
+      storedValue: adoptCreatedValueHandle(bufferHandle, in: contextHandle),
       contextHandle: contextHandle
     )
   }
@@ -408,7 +403,7 @@ extension JSTypedArray: JSValueEncodable {
       "Cannot encode JSTypedArray across different JavaScript engine types"
     )
 
-    let handle = unsafeBitCast(value.retainHandle(), to: JSValueHandle<TargetEngine>.self)
+    let handle = unsafeBitCast(value.borrowHandle(), to: JSValueHandle<TargetEngine>.self)
     return JSValue(handleValue: handle, in: context.driverContextHandle)
   }
 

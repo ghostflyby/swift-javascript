@@ -24,14 +24,64 @@ import Testing
     #expect(stored.borrowHandle().ref.tag == handle.ref.tag)
     #expect(stored.borrowHandle().ref.u.int32 == handle.ref.u.int32)
     #expect(stored.contextHandle == context.driverContextHandle)
-    // The handle stays arena-owned; drop the conventional release.
-    stored.discard()
+    // Both views are non-owning; the arena created by makeNumber owns the
+    // reference and settles it at drain.
   }
 }
 
 @Test func quickJSHandleStorageWordsLayout() {
   #expect(MemoryLayout<CQuickJSValue>.stride == 2 * MemoryLayout<UInt64>.stride)
   #expect(MemoryLayout<CQuickJSValueUnion>.size == MemoryLayout<UInt64>.size)
+}
+
+/// Stage 3 §2.3: `persist` is a creation-reference **transfer**, not a
+/// retain-and-abandon. QuickJS is reference-counted, so the accounting is
+/// observable through the runtime allocator: while the target arena holds
+/// the value the runtime has one more live allocation than the baseline,
+/// and after the target drains the runtime returns exactly to baseline.
+/// A leaked creation reference (the old +1) would keep the string and its
+/// allocation alive here; a double settlement would corrupt/free it twice.
+@Test func quickJSPersistTransferSettlesCreationReferenceExactlyOnce() async {
+  let virtualMachine = JSVirtualMachine<QuickJSEngine>()
+  var context: JSContext<QuickJSEngine>? = JSContext(virtualMachine: virtualMachine)
+  let runtime = virtualMachine.driverRuntimeHandle
+
+  var baseline = JSMemoryUsage()
+  JS_ComputeMemoryUsage(runtime.ref, &baseline)
+
+  await context!.withInstantContext { outer in
+    var target = JSScope<QuickJSEngine>(handle: outer.driverContextHandle)
+    target.open()
+
+    do {
+      let source = JSInstantContext<QuickJSEngine>(handle: outer.driverContextHandle)
+      let created = source.makeString("stage3-persist-transfer")
+      let transferred = source.persist(created, into: target)
+
+      #expect(transferred.borrowHandle() == created.handle)
+      #expect(transferred.toString(in: outer) == "stage3-persist-transfer")
+    }
+
+    // The source arena is gone. Because persist removed the element, its
+    // drain released nothing: the value is still exactly one live allocation
+    // in the target arena.
+    var whileTargetHolds = JSMemoryUsage()
+    JS_ComputeMemoryUsage(runtime.ref, &whileTargetHolds)
+    #expect(whileTargetHolds.malloc_count == baseline.malloc_count + 1)
+    #expect(whileTargetHolds.malloc_size > baseline.malloc_size)
+
+    // `target` closes here.
+  }
+
+  // The single creation reference was settled by the target drain. Zero
+  // leak (the old retain-and-abandon left +1) and zero double free (the
+  // source had nothing left to settle).
+  var afterDrain = JSMemoryUsage()
+  JS_ComputeMemoryUsage(runtime.ref, &afterDrain)
+  #expect(afterDrain.malloc_count == baseline.malloc_count)
+  #expect(afterDrain.malloc_size == baseline.malloc_size)
+
+  context = nil
 }
 
 private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sendable {
@@ -78,10 +128,8 @@ private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sen
               let instance = try? QuickJSExportedNode.tryDecode(thisValue, in: c),
               arguments.count == 1
             else {
-              thisValue.discard()
               return JSCallbackReturn(temporary: c.makeUndefined().handle)
             }
-            thisValue.discard()
             let prefix: String = arguments.unpack(
               types: String.self,
               in: c

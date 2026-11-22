@@ -337,6 +337,26 @@ extension JavaScriptCoreContextHandle: JSContextRuntimeDriver, JSContextPrepared
   /// JSC is GC-managed: created handles need no explicit release.
   public func releaseCreatedHandle(_ handle: consuming JavaScriptCoreOwnedValueHandle) {}
 
+  /// Claiming a borrowed JSC reference is an identity operation: JSC has no
+  /// reference count, and the target arena's explicit root (if any) is what
+  /// keeps the value alive.
+  public func claimOwnedValueHandle(
+    _ handle: JavaScriptCoreValueHandle
+  ) -> JavaScriptCoreOwnedValueHandle {
+    JavaScriptCoreOwnedValueHandle.adopting(handle)
+  }
+
+  /// Explicit root for heap-resident scopes (context default scope): JSC's
+  /// conservative stack scan cannot see arena storage, so protect on add.
+  public func rootOwnedValueHandle(_ handle: borrowing JavaScriptCoreOwnedValueHandle) {
+    JSValueProtect(ref, handle.ref)
+  }
+
+  /// Leave the explicit root taken by `rootOwnedValueHandle` (drain/unlink).
+  public func unrootOwnedValueHandle(_ handle: borrowing JavaScriptCoreOwnedValueHandle) {
+    JSValueUnprotect(ref, handle.ref)
+  }
+
   public func makePreparedScriptHandle(_ source: String)
     -> JavaScriptCorePreparedScriptHandle?
   {

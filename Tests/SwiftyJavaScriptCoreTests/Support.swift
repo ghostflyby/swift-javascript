@@ -20,7 +20,7 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
     self.init(
       value: JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
         in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
@@ -55,7 +55,7 @@ struct TestNumberMarshal: Sendable, JSValueCodable {
       )
     )
     return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self),
+      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
       in: context.driverContextHandle)
   }
 }
@@ -78,7 +78,7 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
     self.init(
       value: JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
         in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
@@ -113,7 +113,7 @@ struct TestStringMarshal: Sendable, JSValueCodable, Error {
       )
     )
     return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self),
+      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
       in: context.driverContextHandle)
   }
 }
@@ -136,7 +136,7 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
     self.init(
       value: JSValue<JavaScriptCoreEngine>(
         handleValue: unsafeBitCast(
-          value.retainHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
+          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
         in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
       ),
       in: JSInstantContext<JavaScriptCoreEngine>(
@@ -171,7 +171,7 @@ struct TestBoolMarshal: Sendable, JSValueCodable {
       )
     )
     return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.takeHandle(), to: JSValueHandle<E>.self),
+      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
       in: context.driverContextHandle)
   }
 }

@@ -14,8 +14,8 @@ public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedH
 ///
 /// Copying has no side effect and confers no ownership: the underlying
 /// engine reference (when the engine is reference-counted) is owned
-/// elsewhere — by a scope arena, by `JSValue`'s owning-by-convention
-/// storage, or by the engine itself.
+/// elsewhere — by a scope arena, by the context default scope, or by the
+/// engine itself.
 public protocol JSValueManualReferenceCountedHandle: Hashable {
 
   associatedtype Context: JSContextManualReferenceCountedHandle

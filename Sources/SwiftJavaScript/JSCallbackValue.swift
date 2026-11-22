@@ -9,6 +9,19 @@
 /// The value is noncopyable: callback values must not be duplicated or
 /// stored beyond the scope whose arena (or the engine's argument frame)
 /// backs the underlying handle.
+///
+/// **Why this type and `JSValue` remain distinct after Stage 3 (§7.4):**
+/// both are now structurally identical non-owning `handle + ContextHandle`
+/// views, but their contracts differ in two load-bearing ways. (1) The
+/// construction surface: `JSCallbackValue` can only be built by a scope
+/// factory (`package init`), whereas `JSValue` has public initializers and
+/// is also produced by value-returning operations. (2) The operation
+/// surface: callback operations are `@available(*, noasync)` and imply the
+/// synchronous window, while `JSValue` operations take an explicit scope
+/// and may span `await` within the same actor (default-scope values).
+/// Merging into one type now would widen the callback construction surface
+/// and erase that distinction. The merge is scheduled for Stage 5, when
+/// `~Escapable`/`@lifetime` can express the two lifetimes in one type.
 public struct JSCallbackValue<E: JSEngineValueTypes>: ~Copyable {
   /// The raw engine value handle, borrowed from the callback arguments frame
   /// or tracked by the scope arena that created it. The engine owns the
@@ -95,9 +108,7 @@ extension JSCallbackValue {
   public func decode<T: JSValueDecodable>(as type: T.Type = T.self) -> T
   where E: JSValueConversionEngine {
     let tempValue = JSValue<E>(handleValue: handle, in: contextHandle)
-    let result = T(value: tempValue, in: JSInstantContext<E>(handle: contextHandle))
-    tempValue.discard()
-    return result
+    return T(value: tempValue, in: JSInstantContext<E>(handle: contextHandle))
   }
 
   // ---- property access ----

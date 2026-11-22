@@ -17,17 +17,13 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
 
     func appendArgument<T: JSValueEncodable>(_ argument: T) {
       let encoded = (try? argument.tryEncode(in: self)) ?? persist(makeUndefined())
-      values.append(encoded.retainHandle())
+      // Encoded values are anchored in the scope arena (default scope for
+      // promoted values); the engine call only borrows their identities.
+      values.append(encoded.borrowHandle())
     }
 
     repeat appendArgument(each arguments)
     return values
-  }
-
-  func releaseArguments(_ arguments: [JSValueHandle<E>]) {
-    for argument in arguments {
-      argument.releaseReference(in: self.driverContextHandle)
-    }
   }
 
   func call(
@@ -71,7 +67,6 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
-    defer { releaseArguments(argumentHandles) }
     return call(function: function, arguments: argumentHandles)
   }
 
@@ -81,7 +76,6 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
-    defer { releaseArguments(argumentHandles) }
     return call(
       function: function,
       this: thisValue,
@@ -109,7 +103,6 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
-    defer { releaseArguments(argumentHandles) }
     return construct(constructor: constructor, arguments: argumentHandles)
   }
 
@@ -213,7 +206,6 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
-    defer { releaseArguments(argumentHandles) }
     return invokeMethod(name, on: object, arguments: argumentHandles)
   }
 
@@ -223,7 +215,6 @@ extension JSInstantContext where E: JSEngineInvocationDriver {
     arguments: repeat each A
   ) -> JSResult<JSValue<E>> where E: JSValueConversionEngine {
     let argumentHandles = encodeArguments(repeat each arguments)
-    defer { releaseArguments(argumentHandles) }
     return invokeMethod(name, on: object, arguments: argumentHandles)
   }
 

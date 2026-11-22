@@ -31,12 +31,9 @@ public struct JSArguments<E: JSEngineValueTypes>: ~Copyable {
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) -> R
   ) -> R where E: JSEngineRuntimeDriver {
-    let value = value(at: index, in: context)
-    let result = body(value)
-    // Borrowed callback arguments are owned by the engine call frame.
-    // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
-    value.discard()
-    return result
+    // Borrowed callback arguments are owned by the engine call frame; the
+    // `JSValue` is a non-owning view, so dropping it is a no-op.
+    body(value(at: index, in: context))
   }
 
   @inline(__always)
@@ -45,18 +42,7 @@ public struct JSArguments<E: JSEngineValueTypes>: ~Copyable {
     in context: borrowing JSInstantContext<E>,
     _ body: (borrowing JSValue<E>) throws(JSValueConversionError) -> R
   ) throws(JSValueConversionError) -> R where E: JSEngineRuntimeDriver {
-    let value = value(at: index, in: context)
-    do {
-      let result = try body(value)
-      // Borrowed callback arguments are owned by the engine call frame.
-      // Discard the Swift wrapper without running JSValue.deinit/releaseReference.
-      value.discard()
-      return result
-    } catch {
-      // Keep the borrow balanced even when decoding throws.
-      value.discard()
-      throw error
-    }
+    try body(value(at: index, in: context))
   }
 
   public func unpack<R: ~Copyable>(

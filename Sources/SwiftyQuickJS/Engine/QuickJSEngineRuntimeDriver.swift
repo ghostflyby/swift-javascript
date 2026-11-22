@@ -37,7 +37,12 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
 
   public static func globalObjectValueHandle(_ context: QuickJSContextHandle) -> QuickJSValueHandle?
   {
+    // `JS_GetGlobalObject` returns a new reference; the context owns its
+    // global object for its lifetime, so return a borrowed identity and
+    // settle the duplicate immediately. Callers wrap it in a non-owning
+    // local view, which no longer has a deinit to free it.
     let global = JS_GetGlobalObject(context.ref)
+    defer { JS_FreeValue(context.ref, global) }
     return QuickJSValueHandle(ref: global)
   }
 
@@ -317,15 +322,13 @@ private func quickJSFunctionCallback(
   }
 
   // QuickJS takes ownership of a C callback's return value and of the value
-  // passed to JS_Throw. A persistent return carries the engine's reference
-  // already, while temporary and exception returns borrow an arena-tracked
-  // reference that the scope drain will release — in the borrowing case give
-  // the engine its own reference.
+  // passed to JS_Throw. §7.2 decision: the handoff carries a borrowed handle
+  // whose reference is owned by a scope arena (persistent values by the
+  // context default scope), so the trampoline duplicates for every form —
+  // temporary, persistent, and exception alike. The arena settles its own
+  // reference at drain; the engine settles the duplicated one.
   if result.isException {
     return JS_Throw(contextRef, JS_DupValue(contextRef, result.handle.ref))
-  }
-  if result.isPersistent {
-    return result.handle.ref
   }
   return JS_DupValue(contextRef, result.handle.ref)
 }
@@ -456,6 +459,25 @@ extension QuickJSContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptD
   public func releaseCreatedHandle(_ handle: consuming QuickJSOwnedValueHandle) {
     QuickJSEngine.releaseCreatedHandle(handle, in: self)
   }
+
+  /// QuickJS is reference-counted: a borrowed identity from an engine call
+  /// frame carries no reference of its own, so claiming duplicates it before
+  /// the arena adopts the result.
+  public func claimOwnedValueHandle(
+    _ handle: QuickJSValueHandle
+  ) -> QuickJSOwnedValueHandle {
+    QuickJSOwnedValueHandle.adopting(
+      QuickJSValueHandle(ref: JS_DupValue(ref, handle.rawRef)))
+  }
+
+  /// QuickJS is reference-counted: the creation reference itself is the
+  /// root, so entering an explicit root is an identity operation (design
+  /// §3.7). Drain still frees the creation reference via
+  /// `releaseCreatedHandle`.
+  public func rootOwnedValueHandle(_ handle: borrowing QuickJSOwnedValueHandle) {}
+
+  /// Identity counterpart of `rootOwnedValueHandle` (§3.7).
+  public func unrootOwnedValueHandle(_ handle: borrowing QuickJSOwnedValueHandle) {}
 
   public func makePreparedScriptHandle(_ source: String) -> QuickJSPreparedScriptHandle? {
     QuickJSEngine.makePreparedScriptHandle(source, in: self)

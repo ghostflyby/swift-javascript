@@ -2,13 +2,13 @@ extension JSValue where E: JSEngineRuntimeDriver {
   public init(string value: String, in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeString(value))
       })
   }
 
   public init(string value: String, in context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeString(value)))
+    self.init(copying: context.persist(context.makeString(value)))
   }
 
   public init(
@@ -16,7 +16,7 @@ extension JSValue where E: JSEngineRuntimeDriver {
     in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeString(from: key))
       })
   }
@@ -25,83 +25,83 @@ extension JSValue where E: JSEngineRuntimeDriver {
     string key: borrowing JSPropertyStringKey<E>,
     in context: borrowing JSInstantContext<E>
   ) where E: JSEnginePropertyDriver {
-    self.init(taking: context.persist(context.makeString(from: key)))
+    self.init(copying: context.persist(context.makeString(from: key)))
   }
 
   public init(number value: Double, in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNumber(value))
       })
   }
 
   public init(number value: Double, in context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeNumber(value)))
+    self.init(copying: context.persist(context.makeNumber(value)))
   }
 
   public init(
     number value: some BinaryInteger, in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNumber(value))
       })
   }
 
   public init(number value: some BinaryInteger, in context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeNumber(value)))
+    self.init(copying: context.persist(context.makeNumber(value)))
   }
 
   public init(boolean value: Bool, in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeBoolean(value))
       })
   }
 
   public init(boolean value: Bool, in context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeBoolean(value)))
+    self.init(copying: context.persist(context.makeBoolean(value)))
   }
 
   public init(symbol: String, in context: isolated JSContext<E> = #isolation)
   where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeSymbol(symbol))
       })
   }
 
   public init(symbol: String, in context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeSymbol(symbol)))
+    self.init(copying: context.persist(context.makeSymbol(symbol)))
   }
 
   public init(nullIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeNull())
       })
   }
 
   public init(nullIn context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeNull()))
+    self.init(copying: context.persist(context.makeNull()))
   }
 
   public init(undefinedIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         callbackContext.persist(callbackContext.makeUndefined())
       })
   }
 
   public init(undefinedIn context: borrowing JSInstantContext<E>) {
-    self.init(taking: context.persist(context.makeUndefined()))
+    self.init(copying: context.persist(context.makeUndefined()))
   }
 
   public init(objectIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         let result = callbackContext.makeObject()
         guard case .value(let cb) = result else {
           preconditionFailure("makeObject failed")
@@ -115,12 +115,12 @@ extension JSValue where E: JSEngineRuntimeDriver {
     guard case .value(let cb) = result else {
       preconditionFailure("makeObject failed")
     }
-    self.init(taking: context.persist(cb))
+    self.init(copying: context.persist(cb))
   }
 
   public init(arrayIn context: isolated JSContext<E> = #isolation) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         let result = callbackContext.makeArray()
         guard case .value(let cb) = result else {
           preconditionFailure("makeArray failed")
@@ -134,7 +134,7 @@ extension JSValue where E: JSEngineRuntimeDriver {
     guard case .value(let cb) = result else {
       preconditionFailure("makeArray failed")
     }
-    self.init(taking: context.persist(cb))
+    self.init(copying: context.persist(cb))
   }
 }
 
@@ -145,7 +145,7 @@ extension JSValue where E: JSEngineRuntimeDriver, E.Engine == E {
     in context: isolated JSContext<E> = #isolation
   ) where E: JSContextEngine {
     self.init(
-      taking: context.withInstantContext { callbackContext in
+      copying: context.withInstantContext { callbackContext in
         JSValue(name: name, callback: callback, in: callbackContext)
       })
   }
@@ -155,7 +155,7 @@ extension JSValue where E: JSEngineRuntimeDriver, E.Engine == E {
     callback: @escaping JSFunctionCallback<E>,
     in context: borrowing JSInstantContext<E>
   ) {
-    self.init(taking: context.makeFunction(named: name, callback: callback))
+    self.init(copying: context.makeFunction(named: name, callback: callback))
   }
 
   public init<

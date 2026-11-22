@@ -22,9 +22,13 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
     self.init(ref: ref, in: ctx)
   }
 
-  /// tansfer ownership of the underlying JSValueRef out of this value, consuming self in the process.
-  consuming func takeRef() -> JSValueRef {
-    return takeHandle().ref
+  /// Borrow the underlying raw reference for a JavaScriptCore callback ABI.
+  ///
+  /// `JSValue` is a non-owning local view, so no ownership is transferred;
+  /// the arena (or the engine's callback frame) that backs the handle keeps
+  /// the reference alive.
+  borrowing func borrowedRef() -> JSValueRef {
+    borrowHandle().ref
   }
 }
 

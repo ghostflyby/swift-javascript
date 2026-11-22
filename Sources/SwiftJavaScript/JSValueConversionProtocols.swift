@@ -56,7 +56,11 @@ extension JSValueEncodable {
     in context: isolated JSContext<E> = #isolation
   ) -> JSValue<E> {
     context.withInstantContext { callbackContext in
-      self.toJSValue(in: callbackContext)
+      let value = self.toJSValue(in: callbackContext)
+      // The witness scope closes before the caller receives the value: any
+      // reference it still owns must move to the context default scope so the
+      // returned view stays valid beyond this synchronous window.
+      return callbackContext.anchorEscapingValue(value)
     }
   }
 
@@ -70,7 +74,8 @@ extension JSValueEncodable {
     in context: isolated JSContext<E> = #isolation
   ) throws(JSValueConversionError) -> JSValue<E> {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try self.tryEncode(in: callbackContext)
+      let value = try self.tryEncode(in: callbackContext)
+      return callbackContext.anchorEscapingValue(value)
     }
   }
 }
@@ -142,7 +147,10 @@ extension JSValueEncoder {
     -> JSValue<E>
   {
     context.withInstantContext { callbackContext in
-      Self.encode(value, in: callbackContext)
+      let encoded = Self.encode(value, in: callbackContext)
+      // Same escape boundary as `JSValueEncodable.toJSValue(in:)`: anchor the
+      // returned view in the context default scope before the witness drains.
+      return callbackContext.anchorEscapingValue(encoded)
     }
   }
 
@@ -158,7 +166,8 @@ extension JSValueEncoder {
     in context: isolated JSContext<E>
   ) throws(JSValueConversionError) -> JSValue<E> {
     try context.withInstantContext { callbackContext throws(JSValueConversionError) in
-      try Self.tryEncode(value, in: callbackContext)
+      let encoded = try Self.tryEncode(value, in: callbackContext)
+      return callbackContext.anchorEscapingValue(encoded)
     }
   }
 }
