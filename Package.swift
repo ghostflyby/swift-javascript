@@ -7,7 +7,8 @@ import PackageDescription
 let package = Package(
   name: "SwiftyJavaScriptCore",
   platforms: [
-    .macOS(.v15)
+    // 15.4 floor: `isolated deinit` (SE-0371) requires macOS 15.4 runtime.
+    .macOS("15.4")
   ],
   products: [
     // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -29,7 +30,14 @@ let package = Package(
     // Targets are the basic building blocks of a package, defining a module or a test suite.
     // Targets can depend on other targets in this package and products from dependencies.
     .target(
-      name: "SwiftJavaScript"
+      name: "SwiftJavaScript",
+      swiftSettings: [
+        // `isolated deinit` (SE-0371) runs JSContext's destructor on the
+        // actor's dedicated VM thread, so the default-scope drain
+        // (JSValueUnprotect / JS_FreeValue) never touches the engine from
+        // a foreign thread. Tracked in TODO 2.5 until the feature ships.
+        .enableExperimentalFeature("IsolatedDeinit")
+      ]
     ),
     .target(
       name: "SwiftyJavaScriptCore",

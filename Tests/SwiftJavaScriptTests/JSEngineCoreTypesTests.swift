@@ -810,6 +810,7 @@ private let stage2AArenaChunkCapacity = 32
 @Test func defaultScopeLivesAtStackBottomAndRootsActorFactoryValues() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -843,6 +844,7 @@ private let stage2AArenaChunkCapacity = 32
   #expect(ScopeStackRegistry<MockEngine>.top(of: contextHandle) === bottom)
 
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   // drain:先 unroot 再结清 creation 引用(顺序见 MockRootingEvent 序列)。
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
   #expect(rootingLog(for: id).last?.handle == valueHandle)
@@ -855,6 +857,7 @@ private let stage2AArenaChunkCapacity = 32
 @Test func defaultScopeCarriesValueProducingActorOperations() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -897,6 +900,7 @@ private let stage2AArenaChunkCapacity = 32
   #expect(rootingLog(for: id).filter { !$0.isRoot }.isEmpty)
 
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   #expect(rootingLog(for: id).filter(\.isRoot).count == 5)
   #expect(rootingLog(for: id).filter { !$0.isRoot }.count == 5)
   #expect(releaseLog(for: id).count == 5)  // 5 个 arena creation 随默认 scope drain
@@ -909,6 +913,7 @@ private let stage2AArenaChunkCapacity = 32
 @Test func persistTransfersOwnedReferenceIntoDefaultScope() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -931,6 +936,7 @@ private let stage2AArenaChunkCapacity = 32
   #expect(rootingLog(for: id).last?.handle == persistedHandle)
 
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
   #expect(rootingLog(for: id).last?.handle == persistedHandle)
   #expect(releaseLog(for: id).count == 1)
@@ -1006,6 +1012,7 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
 @Test func conversionValueEscapingWitnessScopeIsAnchoredInDefaultScope() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -1026,6 +1033,7 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   #expect(rootingLog(for: id).filter(\.isRoot).count == 1)
 
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
   #expect(rootingLog(for: id).last?.handle.rawValue.payload == "runtime:escaped")
   #expect(releaseLog(for: id).count == 2)
@@ -1038,6 +1046,7 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
 @Test func failedGlobalPropertyReadSettlesExceptionReference() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -1055,6 +1064,7 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   #expect(kind == "undefined")
 
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   // Exception + the arena-tracked undefined each settle exactly once.
   #expect(releaseLog(for: id).count == 2)
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
@@ -1130,9 +1140,10 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
 /// the default scope and settles the arena's creation reference exactly
 /// once; destroying the now-context-less view afterwards performs no engine
 /// call at all (the former `JSValue.deinit` release path is gone).
-@Test func contextDeathBeforeValueDoesNotDangleDefaultScopeReference() {
+@Test func contextDeathBeforeValueDoesNotDangleDefaultScopeReference() async {
   var context: JSContext<MockEngine>? = JSContext()
   let contextHandle = context!.driverContextHandle
+  let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
@@ -1153,6 +1164,7 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   // Context dies first: the default-scope drain unroots and settles the
   // creation reference once.
   context = nil
+  await awaitContextTeardown(on: virtualMachine)
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
   #expect(releaseLog(for: id) == [handle])
 
@@ -2858,6 +2870,24 @@ private func releaseLog(for identity: String) -> [MockValueHandle] {
 
 private func clearReleaseLog(for identity: String) {
   contextReleaseLog.withLock { $0[identity] = nil }
+}
+
+/// Isolated deinit (SE-0371) is scheduled onto the actor's executor as a
+/// job. The VM executor is serial FIFO, so pinging a sentinel actor bound
+/// to it after the context's last release runs strictly after the deinit
+/// job — deterministic post-drain assertions without sleeps.
+private actor IsolatedDeinitBarrier {
+  nonisolated let unownedExecutor: UnownedSerialExecutor
+
+  init<E: JSEngine>(virtualMachine: JSVirtualMachine<E>) {
+    self.unownedExecutor = virtualMachine.unownedExecutor
+  }
+
+  func ping() {}
+}
+
+private func awaitContextTeardown<E: JSEngine>(on virtualMachine: JSVirtualMachine<E>) async {
+  await IsolatedDeinitBarrier(virtualMachine: virtualMachine).ping()
 }
 
 // MARK: - Explicit rooting log for MockEngine (Stage 3 §3.7)

@@ -1,6 +1,9 @@
 public actor JSContext<E: JSContextEngine> {
   nonisolated package let driverContextHandle: E.ContextHandle
-  public let virtualMachine: JSVirtualMachine<E>
+  /// Nonisolated: an immutable, Sendable identity of the owning VM — needed
+  /// by callers right after dropping the context (e.g. the FIFO sentinel
+  /// pattern for the asynchronously scheduled isolated deinit).
+  nonisolated public let virtualMachine: JSVirtualMachine<E>
   nonisolated public let unownedExecutor: UnownedSerialExecutor
 
   /// Context-lifetime default scope (design §3.6): the bottom frame of this
@@ -45,7 +48,15 @@ public actor JSContext<E: JSContextEngine> {
     ScopeStackRegistry.push(defaultScope, for: driverContextHandle)
   }
 
-  deinit {
+  /// Isolated deinit (SE-0371, experimental `IsolatedDeinit`): runs on the
+  /// actor's dedicated VM thread, so the engine-touching teardown below —
+  /// default-scope drain (`JSValueUnprotect` / `JS_FreeValue`), stack pop,
+  /// storage box release, context handle release — never executes on a
+  /// foreign thread (the registered cross-thread risk when a VM is shared
+  /// by multiple contexts). The executor fallback (dispatching teardown to
+  /// the VM executor from a nonisolated deinit) was evaluated and not
+  /// needed.
+  isolated deinit {
     // The default scope is the stack bottom: drain it last, after every
     // temporally nested scope has closed, then pop its frame.
     defaultScope.drain()
