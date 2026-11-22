@@ -30,6 +30,12 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
     exception?.pointee = result.handle.ref
     return JSValueMakeUndefined(ctx)
   }
+  // JSC roots the callback's return value itself; a persistent return
+  // carries the JSValueProtect taken by `persist`, and nothing else will
+  // release it — drop it here, mirroring QuickJS's reference handoff.
+  if result.isPersistent {
+    result.handle.releaseReference(in: contextHandle)
+  }
   return result.handle.ref
 }
 

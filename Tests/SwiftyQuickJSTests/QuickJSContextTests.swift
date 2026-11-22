@@ -74,8 +74,24 @@ private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sen
         return .value(SwiftJavaScript.JSValue<QuickJSEngine>(number: instance.count, in: context))
       case "label":
         return .value(
-          context.makeFunction(named: "label") { c, _, _ in
-            JSCallbackReturn(temporary: c.makeUndefined().handle)
+          context.makeFunction(named: "label") { c, this, arguments in
+            let thisValue = JSValue<QuickJSEngine>(
+              handleValue: this.handle, in: c.driverContextHandle
+            )
+            guard
+              let instance = try? QuickJSExportedNode.tryDecode(thisValue, in: c),
+              arguments.count == 1
+            else {
+              thisValue.discard()
+              return JSCallbackReturn(temporary: c.makeUndefined().handle)
+            }
+            thisValue.discard()
+            let prefix: String = arguments.unpack(
+              types: String.self,
+              in: c
+            )
+            return JSCallbackReturn(
+              persistent: c.persist(c.makeString("\(prefix):\(instance.name):\(instance.count)")))
           }
         )
       default:

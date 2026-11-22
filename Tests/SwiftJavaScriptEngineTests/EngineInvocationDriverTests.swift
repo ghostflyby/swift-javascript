@@ -217,10 +217,12 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
         return JSCallbackReturn(persistent: object)
       }
       let throwObject = context.makeFunction(named: "throwNativeObject") { c, _, _ in
-        let error = c.makePersistentObject()
-        error.setProperty("native-error", forKey: "kind", in: c)
-        error.setProperty(13, forKey: "code", in: c)
-        return JSCallbackReturn(exception: error.takeHandle())
+        guard case .value(let error) = c.makeObject() else {
+          return JSCallbackReturn(temporary: c.makeUndefined().handle)
+        }
+        error.setProperty(c.makeString("native-error"), forKey: "kind")
+        error.setProperty(c.makeNumber(13), forKey: "code")
+        return c.throw(error)
       }
 
       context.withGlobalObject { global in

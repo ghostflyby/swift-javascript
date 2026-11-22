@@ -272,7 +272,8 @@ public enum MockEngine: JSEngine {
     )
   }
 
-  public static func releaseCreatedHandle(_ handle: MockValueHandle, in context: MockContextHandle) {
+  public static func releaseCreatedHandle(_ handle: MockValueHandle, in context: MockContextHandle)
+  {
     contextReleaseLog.withLock {
       $0[context.rawContext.identity, default: []].append(handle)
     }
@@ -334,13 +335,112 @@ public enum MockEngine: JSEngine {
   do {
     let scope = JSInstantContext<MockEngine>(handle: context)
     let a = scope.makeString("abandoned")
-    _ = scope.return(scope.makeNumber(1))   // borrowing → stays
-    persisted = scope.persist(a)             // persisted → removed
-    _ = scope.makeBoolean(false)            // abandoned
+    _ = scope.return(scope.makeNumber(1))  // borrowing → stays
+    persisted = scope.persist(a)  // persisted → removed
+    _ = scope.makeBoolean(false)  // abandoned
   }
 
   _ = persisted
   #expect(releaseLog(for: id).count == 2)  // number + boolean
+}
+
+// MARK: - JSScope arena lifecycle tests
+
+@Test func jsScopeArenaReleasesAbandonedValuesOnDeinit() {
+  let id = "jsScopeArenaReleasesAbandoned"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    var scope = JSScope<MockEngine>(handle: context)
+    scope.open()
+    _ = scope.makeString("a")
+    _ = scope.makeNumber(42)
+    _ = scope.makeBoolean(true)
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(TLSCallbackStack.top == nil)
+  #expect(releaseLog(for: id).count == 3)
+}
+
+@Test func jsScopeArenaSkipsPersistedValuesOnDeinit() {
+  let id = "jsScopeArenaSkipsPersisted"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    var scope = JSScope<MockEngine>(handle: context)
+    scope.open()
+    persisted = scope.persist(scope.makeString("keep"))
+  }
+
+  #expect(TLSCallbackStack.top == nil)
+  #expect(releaseLog(for: id).count == 0)
+  _ = persisted
+}
+
+@Test func jsScopeArenaMixedLifecycle() {
+  let id = "jsScopeArenaMixed"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  var persisted: JSValue<MockEngine>? = nil
+  do {
+    var scope = JSScope<MockEngine>(handle: context)
+    scope.open()
+    let a = scope.makeString("abandoned")
+    persisted = scope.persist(a)  // persisted → removed from arena
+    _ = scope.makeNumber(1)  // abandoned
+    _ = scope.makeBoolean(false)  // abandoned
+  }
+
+  _ = persisted
+  #expect(releaseLog(for: id).count == 2)  // number + boolean
+}
+
+@Test func jsScopeWithoutOpenDoesNotPushTLS() {
+  let id = "jsScopeWithoutOpen"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  #expect(TLSCallbackStack.top == nil)
+  do {
+    let scope = JSScope<MockEngine>(handle: context)
+    #expect(scope.driverContextHandle == context)
+    #expect(TLSCallbackStack.top == nil)
+  }
+
+  #expect(TLSCallbackStack.top == nil)
+  #expect(releaseLog(for: id).isEmpty)
+}
+
+@Test func jsScopeFactoriesWorkAfterOpen() {
+  let id = "jsScopeFactoriesWork"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    var scope = JSScope<MockEngine>(handle: context)
+    scope.open()
+    #expect((TLSCallbackStack.top as? MockContextHandle) == context)
+
+    let string = scope.makeString("hello")
+    #expect(string.handle.rawValue == MockValue(kind: "string", payload: "\(id):hello"))
+
+    switch scope.makeObject() {
+    case .value(let object):
+      #expect(object.handle.rawValue == MockValue(kind: "object", payload: id))
+    case .exception:
+      Issue.record("Expected makeObject to succeed")
+    }
+
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(TLSCallbackStack.top == nil)
+  #expect(releaseLog(for: id).count == 2)  // string + object drained
 }
 
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {

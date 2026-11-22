@@ -258,7 +258,9 @@ extension QuickJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     JS_GetRuntime(this.ref) == JS_GetRuntime(that.ref)
   }
 
-  public static func releaseCreatedHandle(_ handle: QuickJSValueHandle, in context: QuickJSContextHandle) {
+  public static func releaseCreatedHandle(
+    _ handle: QuickJSValueHandle, in context: QuickJSContextHandle
+  ) {
     handle.releaseReference(in: context)
   }
 }
@@ -323,10 +325,18 @@ private func quickJSFunctionCallback(
     callback(scope, thisValue, args)
   }
 
+  // QuickJS takes ownership of a C callback's return value and of the value
+  // passed to JS_Throw. A persistent return carries the engine's reference
+  // already, while temporary and exception returns borrow an arena-tracked
+  // reference that the scope drain will release — in the borrowing case give
+  // the engine its own reference.
   if result.isException {
-    return JS_Throw(contextRef, result.handle.ref)
+    return JS_Throw(contextRef, JS_DupValue(contextRef, result.handle.ref))
   }
-  return result.handle.ref
+  if result.isPersistent {
+    return result.handle.ref
+  }
+  return JS_DupValue(contextRef, result.handle.ref)
 }
 
 private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?) {

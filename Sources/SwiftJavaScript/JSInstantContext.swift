@@ -49,7 +49,9 @@ internal enum TLSCallbackStack {
   }
 
   @discardableResult
-  static func pop(_ context: any JSContextManualReferenceCountedHandle) -> (any JSContextManualReferenceCountedHandle)? {
+  static func pop(_ context: any JSContextManualReferenceCountedHandle) -> (
+    any JSContextManualReferenceCountedHandle
+  )? {
     let key = AnyHashable(context)
     let reg = registry()
     guard let s = reg.stacks[key] else { return nil }
@@ -81,19 +83,19 @@ public struct JSCallbackReturn<E: JSEngine>: ~Copyable {
   package let isPersistent: Bool
   package let isException: Bool
 
-  package init(temporary handle: JSValueHandle<E>) {
+  init(temporary handle: JSValueHandle<E>) {
     self.handle = handle
     self.isPersistent = false
     self.isException = false
   }
 
-  package init(persistent value: consuming JSValue<E>) {
+  init(persistent value: consuming JSValue<E>) {
     self.handle = value.takeHandle()
     self.isPersistent = true
     self.isException = false
   }
 
-  package init(exception handle: JSValueHandle<E>) {
+  init(exception handle: JSValueHandle<E>) {
     self.handle = handle
     self.isPersistent = false
     self.isException = true
@@ -109,134 +111,164 @@ private final class ScopeArena<Handle: Hashable>: @unchecked Sendable {
   var removed: Set<Handle> = []
 }
 
-/// A callback scope context. Manages TLS push/pop, arena-based value lifecycle,
-/// and all value factory methods. Values are released on deinit unless
-/// `persist()`ed or returned.
-public struct JSInstantContext<E: JSEngine>: ~Copyable {
-  public let driverContextHandle: E.ContextHandle
+// MARK: - Shared scope core
+
+struct ScopeCore<E: JSEngine> {
+  let driverContextHandle: E.ContextHandle
   private let arena: ScopeArena<E.ValueHandle>
 
-  package init(handle: E.ContextHandle) {
+  init(handle: E.ContextHandle) {
     self.driverContextHandle = handle
     self.arena = ScopeArena()
-    TLSCallbackStack.push(handle)
   }
 
-  deinit {
+  func drain() {
     for h in arena.created where !arena.removed.contains(h) {
       E.releaseCreatedHandle(h, in: driverContextHandle)
     }
-    TLSCallbackStack.pop(driverContextHandle)
   }
 
-  // MARK: - Arena tracking
-
-  // MARK: - Value factories
-
-  private func callbackValue(from handle: E.ValueHandle) -> JSCallbackValue<E> {
-    JSCallbackValue(handle: handle)
+  func makeString(_ value: String) -> JSCallbackValue<E> {
+    guard let h = E.makeStringValueHandle(value, driverContextHandle) else {
+      preconditionFailure("makeString failed")
+    }
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeString(_ value: String) -> JSCallbackValue<E> {
-    guard let handle = E.makeStringValueHandle(value, driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeString could not create handle")
+  func makeString(from keyHandle: E.PropertyStringKeyHandle) -> JSCallbackValue<E> {
+    guard
+      let handle = E.makeStringValueHandle(
+        fromPropertyStringKey: keyHandle,
+        in: driverContextHandle
+      )
+    else {
+      preconditionFailure("makeString(from:) failed")
     }
     arena.created.append(handle)
-    return callbackValue(from: handle)
+    return JSCallbackValue(handle: handle)
   }
 
-  public func makeNumber(_ value: Double) -> JSCallbackValue<E> {
-    guard let handle = E.makeNumberValueHandle(value, driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeNumber could not create handle")
+  func makeNumber(_ value: Double) -> JSCallbackValue<E> {
+    guard let h = E.makeNumberValueHandle(value, driverContextHandle) else {
+      preconditionFailure("makeNumber failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeBoolean(_ value: Bool) -> JSCallbackValue<E> {
-    guard let handle = E.makeBooleanValueHandle(value, driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeBoolean could not create handle")
+  func makeBoolean(_ value: Bool) -> JSCallbackValue<E> {
+    guard let h = E.makeBooleanValueHandle(value, driverContextHandle) else {
+      preconditionFailure("makeBoolean failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeNull() -> JSCallbackValue<E> {
-    guard let handle = E.makeNullValueHandle(driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeNull could not create handle")
+  func makeNull() -> JSCallbackValue<E> {
+    guard let h = E.makeNullValueHandle(driverContextHandle) else {
+      preconditionFailure("makeNull failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeUndefined() -> JSCallbackValue<E> {
-    guard let handle = E.makeUndefinedValueHandle(driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeUndefined could not create handle")
+  func makeUndefined() -> JSCallbackValue<E> {
+    guard let h = E.makeUndefinedValueHandle(driverContextHandle) else {
+      preconditionFailure("makeUndefined failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeNumber(_ value: some BinaryInteger) -> JSCallbackValue<E> {
-    makeNumber(Double(value))
-  }
-
-  package func makeSymbol(_ value: String) -> JSCallbackValue<E> {
-    guard let handle = E.makeSymbolValueHandle(value, driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeSymbol could not create handle")
+  func makeSymbol(_ value: String) -> JSCallbackValue<E> {
+    guard let h = E.makeSymbolValueHandle(value, driverContextHandle) else {
+      preconditionFailure("makeSymbol failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
+    arena.created.append(h)
+    return JSCallbackValue(handle: h)
   }
 
-  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSCallbackValue<E> {
-    guard let handle = E.makeStringValueHandle(
-      fromPropertyStringKey: key.borrowHandle(in: self),
-      in: driverContextHandle
-    ) else {
-      preconditionFailure("JSInstantContext.makeString(from:) could not create handle")
+  func makeObject() -> JSResult<JSCallbackValue<E>> {
+    guard let r = E.makeObjectResultHandle(driverContextHandle) else {
+      preconditionFailure("makeObject failed")
     }
-    arena.created.append(handle)
-    return callbackValue(from: handle)
-  }
-
-  public func makeObject() -> JSResult<JSCallbackValue<E>> {
-    guard let result = E.makeObjectResultHandle(driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeObject could not create handle")
-    }
-    switch result {
-    case .value(let handle):
-      arena.created.append(handle)
-      return .value(callbackValue(from: handle))
-    case .exception(let handle):
-      return .exception(callbackValue(from: handle))
+    switch r {
+    case .value(let h):
+      arena.created.append(h)
+      return .value(JSCallbackValue(handle: h))
+    case .exception(let h):
+      return .exception(JSCallbackValue(handle: h))
     }
   }
 
-  public func makeArray() -> JSResult<JSCallbackValue<E>> {
-    guard let result = E.makeArrayResultHandle(driverContextHandle) else {
-      preconditionFailure("JSInstantContext.makeArray could not create handle")
+  func makeArray() -> JSResult<JSCallbackValue<E>> {
+    guard let r = E.makeArrayResultHandle(driverContextHandle) else {
+      preconditionFailure("makeArray failed")
     }
-    switch result {
-    case .value(let handle):
-      arena.created.append(handle)
-      return .value(callbackValue(from: handle))
-    case .exception(let handle):
-      return .exception(callbackValue(from: handle))
+    switch r {
+    case .value(let h):
+      arena.created.append(h)
+      return .value(JSCallbackValue(handle: h))
+    case .exception(let h):
+      return .exception(JSCallbackValue(handle: h))
     }
   }
 
-  // MARK: - Scope operations
-
-  public func persist(_ value: borrowing JSCallbackValue<E>) -> JSValue<E> {
+  func persist(_ value: borrowing JSCallbackValue<E>) -> JSValue<E> {
     arena.removed.insert(value.handle)
     value.handle.retainReference(in: driverContextHandle)
     return JSValue(handleValue: value.handle, in: driverContextHandle)
   }
 
-  public func `return`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
+  func `return`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
     JSCallbackReturn(temporary: value.handle)
   }
+}
+
+/// A callback scope context. Manages TLS push/pop, arena-based value lifecycle,
+/// and all value factory methods. Values are released on deinit unless
+/// `persist()`ed or returned.
+public struct JSInstantContext<E: JSEngine>: ~Copyable {
+  private var core: ScopeCore<E>
+
+  public var driverContextHandle: E.ContextHandle { core.driverContextHandle }
+
+  package init(handle: E.ContextHandle) {
+    self.core = ScopeCore(handle: handle)
+    TLSCallbackStack.push(handle)
+  }
+
+  deinit {
+    core.drain()
+    TLSCallbackStack.pop(driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ v: String) -> JSCallbackValue<E> { core.makeString(v) }
+  public func makeNumber(_ v: Double) -> JSCallbackValue<E> { core.makeNumber(v) }
+  public func makeBoolean(_ v: Bool) -> JSCallbackValue<E> { core.makeBoolean(v) }
+  public func makeNull() -> JSCallbackValue<E> { core.makeNull() }
+  public func makeUndefined() -> JSCallbackValue<E> { core.makeUndefined() }
+
+  public func makeNumber(_ value: some BinaryInteger) -> JSCallbackValue<E> {
+    makeNumber(Double(value))
+  }
+
+  package func makeSymbol(_ v: String) -> JSCallbackValue<E> { core.makeSymbol(v) }
+
+  public func makeString(from key: borrowing JSPropertyStringKey<E>) -> JSCallbackValue<E> {
+    core.makeString(from: key.borrowHandle(in: self))
+  }
+
+  public func makeObject() -> JSResult<JSCallbackValue<E>> { core.makeObject() }
+  public func makeArray() -> JSResult<JSCallbackValue<E>> { core.makeArray() }
+
+  // MARK: - Scope operations
+
+  public func persist(_ v: borrowing JSCallbackValue<E>) -> JSValue<E> { core.persist(v) }
+  public func `return`(_ v: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> { core.return(v) }
 
   public func `throw`(_ value: borrowing JSCallbackValue<E>) -> JSCallbackReturn<E> {
     JSCallbackReturn(exception: value.handle)
@@ -367,7 +399,10 @@ public struct JSInstantContext<E: JSEngine>: ~Copyable {
     named name: String,
     callback: @escaping JSFunctionCallback<E>
   ) -> JSValue<E> where E.Engine == E {
-    guard let handle = E.makeFunctionValueHandle(named: name, callback: callback, in: driverContextHandle) else {
+    guard
+      let handle = E.makeFunctionValueHandle(
+        named: name, callback: callback, in: driverContextHandle)
+    else {
       preconditionFailure("JSInstantContext.makeFunction could not create handle")
     }
     return JSValue(handleValue: handle, in: driverContextHandle)
