@@ -24,7 +24,7 @@ public struct JSCallbackArguments<E: JSEngine>: ~Copyable {
     guard let handle = borrowedValueHandleAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    let val = JSCallbackValue<E>(handle: handle)
+    let val = JSCallbackValue<E>(handle: handle, context: context.driverContextHandle)
     return body(val)
   }
 }
@@ -69,7 +69,7 @@ extension JSCallbackArguments {
     guard let handle = borrowedValueHandleAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    let val = JSCallbackValue<E>(handle: handle)
+    let val = JSCallbackValue<E>(handle: handle, context: context.driverContextHandle)
     return try body(val)
   }
 

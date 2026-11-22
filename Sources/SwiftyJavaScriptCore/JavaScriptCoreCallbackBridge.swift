@@ -16,6 +16,7 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
 
   let thisValue = JSCallbackValue<JavaScriptCoreEngine>(
     handle: JavaScriptCoreValueHandle(ref: thisObject),
+    context: contextHandle
   )
 
   let result = withJavaScriptCoreCallbackArguments(

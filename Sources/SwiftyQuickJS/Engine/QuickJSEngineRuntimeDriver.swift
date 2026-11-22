@@ -315,7 +315,8 @@ private func quickJSFunctionCallback(
     .value
 
   let thisValue = JSCallbackValue<QuickJSEngine>(
-    handle: QuickJSValueHandle(ref: thisValueRef)
+    handle: QuickJSValueHandle(ref: thisValueRef),
+    context: contextHandle
   )
 
   let result = withQuickJSArguments(

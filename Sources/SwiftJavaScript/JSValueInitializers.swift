@@ -168,7 +168,7 @@ extension JSValue where E.Engine == E {
         return JSCallbackReturn(persistent: encoded)
       } catch let error as Err {
         if let encoded = try? error.tryEncode(in: context) {
-          let cb = JSCallbackValue<E>(handle: encoded.handle)
+          let cb = JSCallbackValue<E>(handle: encoded.handle, context: context.driverContextHandle)
           return context.throw(cb)
         }
         return context.throwUndefined()
@@ -209,7 +209,7 @@ extension JSValue where E.Engine == E {
         return JSCallbackReturn(persistent: encoded)
       } catch let error as ECoder.SwiftType {
         if let encoded = try? ECoder.tryEncode(error, in: context) {
-          let cb = JSCallbackValue<E>(handle: encoded.handle)
+          let cb = JSCallbackValue<E>(handle: encoded.handle, context: context.driverContextHandle)
           return context.throw(cb)
         }
         return context.throwUndefined()

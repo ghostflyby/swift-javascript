@@ -360,7 +360,7 @@ public enum MockEngine: JSEngine {
     #expect(releaseLog(for: id).isEmpty)
   }
 
-  #expect(TLSCallbackStack.top == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 3)
 }
 
@@ -376,7 +376,7 @@ public enum MockEngine: JSEngine {
     persisted = scope.persist(scope.makeString("keep"))
   }
 
-  #expect(TLSCallbackStack.top == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 0)
   _ = persisted
 }
@@ -400,19 +400,19 @@ public enum MockEngine: JSEngine {
   #expect(releaseLog(for: id).count == 2)  // number + boolean
 }
 
-@Test func jsScopeWithoutOpenDoesNotPushTLS() {
+@Test func jsScopeWithoutOpenDoesNotPushScopeStack() {
   let id = "jsScopeWithoutOpen"
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  #expect(TLSCallbackStack.top == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   do {
     let scope = JSScope<MockEngine>(handle: context)
     #expect(scope.driverContextHandle == context)
-    #expect(TLSCallbackStack.top == nil)
+    #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   }
 
-  #expect(TLSCallbackStack.top == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   #expect(releaseLog(for: id).isEmpty)
 }
 
@@ -424,7 +424,7 @@ public enum MockEngine: JSEngine {
   do {
     var scope = JSScope<MockEngine>(handle: context)
     scope.open()
-    #expect((TLSCallbackStack.top as? MockContextHandle) == context)
+    #expect(ScopeStackRegistry<MockEngine>.top(of: context) != nil)
 
     let string = scope.makeString("hello")
     #expect(string.handle.rawValue == MockValue(kind: "string", payload: "\(id):hello"))
@@ -439,8 +439,135 @@ public enum MockEngine: JSEngine {
     #expect(releaseLog(for: id).isEmpty)
   }
 
-  #expect(TLSCallbackStack.top == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 2)  // string + object drained
+}
+
+// MARK: - Context-addressed scope stack tests (Stage 1, §3.4)
+
+/// 同线程先后使用两个不同 context 的 scope,互不串扰(取代旧 TLS 语义的回归):
+/// 作用域栈按 context 挂载,值的释放与操作路由都落在各自 context 上。
+@Test func sameThreadScopesOnDistinctContextsDoNotCrossTalk() {
+  let idA = "scopeStackSequentialA"
+  let idB = "scopeStackSequentialB"
+  clearReleaseLog(for: idA)
+  clearReleaseLog(for: idB)
+  let contextA = MockContextHandle(rawContext: MockContext(runtimeID: idA))
+  let contextB = MockContextHandle(rawContext: MockContext(runtimeID: idB))
+
+  do {
+    let scopeA = JSInstantContext<MockEngine>(handle: contextA)
+    #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) != nil)
+    let valueFromA = scopeA.makeString("made-in-A")
+    // MockDriver 的操作路由在 payload 中带上操作时寻址的 context:
+    // getProperty 必须经 valueFromA 自带的 contextHandle 寻址到 A。
+    switch valueFromA.getProperty("routed") {
+    case .value(let property):
+      #expect(property.toString() == "\(idA):\(idA):made-in-A:routed")
+    case .exception:
+      Issue.record("Expected getProperty to succeed in scope A")
+    }
+    _ = scopeA.makeNumber(1)
+  }
+  #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) == nil)
+  #expect(releaseLog(for: idA).count == 3)  // string + getProperty result + number
+  #expect(releaseLog(for: idB).isEmpty)
+
+  do {
+    let scopeB = JSInstantContext<MockEngine>(handle: contextB)
+    #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) != nil)
+    let valueFromB = scopeB.makeString("made-in-B")
+    switch valueFromB.getProperty("routed") {
+    case .value(let property):
+      #expect(property.toString() == "\(idB):\(idB):made-in-B:routed")
+    case .exception:
+      Issue.record("Expected getProperty to succeed in scope B")
+    }
+  }
+  #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) == nil)
+  #expect(releaseLog(for: idA).count == 3)  // A 的账目不受 B 的影响
+  #expect(releaseLog(for: idB).count == 2)  // string + getProperty result
+}
+
+/// 同线程上重叠开启两个不同 context 的 scope:B 的 scope 关闭时不得消费 A 的
+/// 栈帧或释放 A 的值;A 创建的值在 B 的 scope 打开期间仍可用,且其操作仍
+/// 经自带的 contextHandle 寻址到 A(旧 TLS 实现下线程栈顶是 B,会错误地
+/// 把 A 的值解析到 B)。
+@Test func overlappingSameThreadScopesOnDistinctContextsReleaseToTheirOwnContexts() {
+  let idA = "scopeStackOverlapA"
+  let idB = "scopeStackOverlapB"
+  clearReleaseLog(for: idA)
+  clearReleaseLog(for: idB)
+  let contextA = MockContextHandle(rawContext: MockContext(runtimeID: idA))
+  let contextB = MockContextHandle(rawContext: MockContext(runtimeID: idB))
+
+  do {
+    let scopeA = JSInstantContext<MockEngine>(handle: contextA)
+    let valueFromA = scopeA.makeString("still-alive")
+
+    do {
+      let scopeB = JSInstantContext<MockEngine>(handle: contextB)
+      let valueFromB = scopeB.makeString("made-in-B")
+
+      // B 的 scope 是同线程上最新开启的,A 的值仍存活、可用,
+      // 且 getProperty 经值自带的 contextHandle 寻址到 A 而非栈顶的 B。
+      switch valueFromA.getProperty("routed") {
+      case .value(let property):
+        #expect(property.toString() == "\(idA):\(idA):still-alive:routed")
+      case .exception:
+        Issue.record("Expected A's value to stay addressable while B's scope is open")
+      }
+      switch valueFromB.getProperty("routed") {
+      case .value(let property):
+        #expect(property.toString() == "\(idB):\(idB):made-in-B:routed")
+      case .exception:
+        Issue.record("Expected getProperty to succeed in scope B")
+      }
+      #expect(releaseLog(for: idA).isEmpty)
+      #expect(releaseLog(for: idB).isEmpty)
+    }
+
+    // B 关闭:只释放 B 的值与 B 的操作结果,不动 A 的账目。
+    #expect(releaseLog(for: idA).isEmpty)
+    #expect(releaseLog(for: idB).count == 2)  // B value + B-routed result
+    #expect(valueFromA.toString() == "\(idA):still-alive")
+  }
+
+  #expect(releaseLog(for: idA).count == 2)  // A value + A-routed result
+  #expect(releaseLog(for: idB).count == 2)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) == nil)
+  #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) == nil)
+}
+
+/// 同 context 嵌套契约(§3.4):外层 scope 创建的值在内层 scope 打开期间
+/// 保持可用;操作结果按该 context 的栈顶(内层)落账,内层 drain 只释放
+/// 落账在内层 arena 的结果,不动外层创建的值。
+@Test func nestedSameContextScopesKeepOuterValuesAlive() {
+  let id = "scopeStackNestedSameContext"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let outer = JSInstantContext<MockEngine>(handle: context)
+    let outerValue = outer.makeString("outer")
+    do {
+      let inner = JSInstantContext<MockEngine>(handle: context)
+      #expect(ScopeStackRegistry<MockEngine>.top(of: context) != nil)
+      switch outerValue.getProperty("routed") {
+      case .value(let property):
+        #expect(property.toString() == "\(id):\(id):outer:routed")
+      case .exception:
+        Issue.record("Expected outer value to stay usable while inner scope is open")
+      }
+      #expect(releaseLog(for: id).isEmpty)  // 内层未关,外层值与结果都在账上
+    }
+    // 内层关闭:释放落账在内层的 getProperty 结果,不动外层创建的值。
+    #expect(releaseLog(for: id).count == 1)
+    #expect(outerValue.toString() == "\(id):outer")  // 外层值仍可用
+  }
+
+  #expect(releaseLog(for: id).count == 2)  // 外层值随外层 drain 释放
+  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
 }
 
 @Test func jsValueHandleStorageWordsKeepThreeWordLayout() {

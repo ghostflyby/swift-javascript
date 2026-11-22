@@ -303,21 +303,19 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 - [x] TODO.md 立项登记
 - [x] 收尾:JSC 桥 persistent 回调返回补 `JSValueUnprotect` 配平(与 QuickJS 的 isPersistent 引用交接对称,修复既有 protect 泄漏);`JSScope` 文档示例 `let`→`var`;`JSInstantContext.makeSymbol` 维持 `package`(`JSScope.makeSymbol` 属新类型公共设计面,保留 `public`)
 
-### Stage 1:作用域栈迁至 context + 值操作 context 寻址
+### Stage 1:作用域栈迁至 context + 值操作 context 寻址(已完成)
 
 前置:Stage 0 合并。
 
-- [ ] per-context 作用域栈落进 context 侧挂存储(`JSContextDataStorageBox` 同机制,§3.4):`JSInstantContext` init/deinit、`JSScope.open`/deinit、引擎回调 trampoline 的 push/pop 全部改操作该栈;`TLSCallbackStack` 与 `Thread.threadDictionary` 依赖整体删除
-- [ ] `JSCallbackValue` 内嵌 `ContextHandle`(工厂与回调包装时注入),`resolveContext()` 改读自带 handle,不再查任何 ambient——"值在别的 context 的 scope 里解析到错误 context"从可能变为不可能
-- [ ] 值操作面保持"方法在值上"(以自带 ctx 寻址),不迁移到 scope;引擎结果 handle 按 context 栈顶落账
-- [ ] 引入 `JSScopeWitness` 协议(§3.3),`JSPropertyStringKey`/`JSPreparedScript` 的 `borrowHandle(in:)` 改收协议;删除 `decode`/`getProperty` 内部的临时 `JSInstantContext` 构造
-- [ ] `JSCallbackValue` `~Copyable` 化 + handle 收敛为 `package`(§3.2)
-- [ ] 同步 scope(`JSInstantContext`/`JSScope`)的构造与值操作标注 `noasync`(SE-0340,5.7 起可用)——把"同步 scope 仅存在于同步窗口"升格为编译期门禁(§3.7)
-- [ ] 嵌套契约测试(§3.4):回调 A 创建的值在回调 B(同 context 内层 scope)中可用;A 的 arena 未关时值存活
-- [ ] 迁移测试:scope 外使用回调值应**编译失败**(不可拷贝)而非运行时崩溃——这是本阶段的核心验收标准
-- [ ] 同步更新 MockEngine 测试见证
-
-风险:trampoline 与栈结构的对接是引擎桥接层改动,JSC/QuickJS 两侧都要过 arena 生命周期回归;`JSCallbackValue` 内嵌 ctx 可参照 `JSValueStorageWords` 的打包方式(该擦除本身在 Stage 2 删除)。
+- [x] per-context 作用域栈:静态 `Mutex` 保护 per-ContextHandle 注册表 `ScopeStackRegistry<E>`(方案偏差:未用 storage box——裸 MockContext 测试无 box;帧为 `ScopeCore` 本体,非泛型 `ScopeStackStorage` 持锁 + 泛型注册表做类型恢复,Swift 泛型类型不支持 static 存储属性);**无进程级 current 概念**——`top(of:)` 为 per-context 查询,`activeContext` 单槽在收尾删除(并行互踩根因);`TLSCallbackStack`/`threadDictionary` 零残留
+- [x] `JSCallbackValue` 内嵌 `ContextHandle`,全部操作经自带 handle 寻址,ambient 查询零残留
+- [x] 值操作面保持"方法在值上";引擎结果 handle 按 context 栈顶落账——`bridgeCallbackResult` 双路径 `track` 到 `top(of:)` 的 arena(含 makeObject/makeArray 异常分支),无打开 scope 时 preconditionFailure;修复 QuickJS 值操作结果 +1 无释放路径的既有泄漏,`return` 路径 trampoline 的 `JS_DupValue` 假设自此成立
+- [x] `JSScopeWitness` 协议落位,`borrowHandle(in:)` 收协议,`getProperty`/`setProperty` 临时构造删除;`decode` 临时构造经裁决排期 Stage 3(`JSValueDecodable` requirement 属转换用户语义面,临时 scope arena 全程为空、正确性无虞)
+- [x] `JSCallbackValue` `~Copyable` 化 + handle 收敛 `package`
+- [x] 同步 scope 构造与值操作标注 `noasync`;`JSCallbackValue` 全部值操作一并标注,`setData`/`data`/`makePropertyStringKey`/`prepareScript` 以豁免注释明示(非 scope 绑定值操作)
+- [x] 嵌套契约测试:引擎级(经 JS 流转,两引擎参数化)+ Mock 级直接用例(同 context 内层 scope 用外层值、结果落内层账)
+- [x] "scope 外使用回调值应编译失败":编译期失败无法在 Swift Testing 内断言,负面样例以文档形式保留于 `EngineScopeContractTests.swift`;`~Copyable` 拷贝门禁实测确认
+- [x] MockEngine 测试见证同步
 
 ### Stage 2:handle 借用/拥有拆分与 driver 协议分解(SE-0503 落地)
 
