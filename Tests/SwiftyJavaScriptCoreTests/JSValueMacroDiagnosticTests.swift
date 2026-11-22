@@ -115,6 +115,9 @@ private func macroTestImplementations() -> [String: Macro.Type] {
           "value"
         }
       }
+
+      extension InvalidStaticExport: JSClassValueConvertible {
+      }
       """,
     diagnostics: [
       DiagnosticSpec(
@@ -145,6 +148,9 @@ private func macroTestImplementations() -> [String: Macro.Type] {
           lhs + rhs
         }
       }
+
+      extension InvalidArgumentConverters: JSClassValueConvertible {
+      }
       """,
     diagnostics: [
       DiagnosticSpec(
@@ -174,6 +180,9 @@ private func macroTestImplementations() -> [String: Macro.Type] {
         func render() -> String {
           "value"
         }
+      }
+
+      extension InvalidErrorEncoder: JSClassValueConvertible {
       }
       """,
     diagnostics: [
