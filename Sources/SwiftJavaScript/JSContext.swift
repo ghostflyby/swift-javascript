@@ -22,33 +22,38 @@ public actor JSContext<E: JSContextEngine> {
     self.init(virtualMachine: JSVirtualMachine<E>())
   }
 
+  /// Engine access only on the VM thread (design §0.2.3): the context — and
+  /// the context data box it installs — is created there. `init` is
+  /// synchronous: a caller on another thread waits for it, a caller already
+  /// on the VM thread (inside another context's window) runs inline.
   public init(virtualMachine: JSVirtualMachine<E>) {
-    guard
-      let driverContextHandle = E.makeBorrowedContextHandleFromRuntime(
-        in: virtualMachine.driverRuntimeHandle)
-    else {
+    guard let driverContextHandle = virtualMachine.makeContextHandle() else {
       preconditionFailure("JSContext could not create context handle from runtime")
     }
 
     self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
-    let storage =
-      driverContextHandle.contextDataStorageBox()
-      ?? {
-        let box = JSContextDataStorageBox()
-        driverContextHandle.installContextDataStorageBox(box)
-        return box
-      }()
+
+    // The context data box: an engine-side read, and an install when the
+    // engine context came without one. Addressed through the protocol, so
+    // the posted closure captures a value rather than `E.Type`.
+    let storageHandle = driverContextHandle as any JSContextRuntimeDriver
+    let storage = virtualMachine.vmThread.runAndWait { () -> JSContextDataStorageBox in
+      if let existing = storageHandle.contextDataStorageBox() {
+        return existing
+      }
+      let box = JSContextDataStorageBox()
+      storageHandle.installContextDataStorageBox(box)
+      return box
+    }
     storage.bindContextOwner(self)
     // Publish the same registry object into the box: callbacks and `JSScope`
     // can only reach it synchronously through the box (design §3.1). The
     // context keeps the authoritative strong reference, so an external box
     // clear only removes this access path.
     storage.setData(persistentRegistry, for: JSPersistentHandleRegistryKey<E>.self)
-    // Bind after the install above. A context's `init` runs entirely on its
-    // caller's thread (the documented bootstrap exception: it issues
-    // `JS_NewContext` there too), so the first box install stays inline and
-    // synchronous with `init`. From here on, storage-box swaps are routed to
-    // the VM thread (`swapContextDataStorageBox`).
+    // Bind after the install above: that first install runs inline because
+    // the context has no VM-thread binding yet. From here on, storage-box
+    // swaps route themselves (`swapContextDataStorageBox`).
     ScopeStackRegistry<E>.bind(virtualMachine.vmThread, for: driverContextHandle)
   }
 
@@ -83,15 +88,16 @@ public actor JSContext<E: JSContextEngine> {
     // never reference each other (§7.4).
     persistentRegistry.close()
     // The default scope is the stack bottom: drain it last, after every
-    // temporally nested scope has closed, then pop its frame.
+    // temporally nested scope has closed.
     defaultScope.drain()
-    ScopeStackRegistry<E>.pop(for: driverContextHandle)
-    // The pop above dropped this context's VM-thread binding with its last
-    // frame, so the box clear below is inline — it must be: a routed
-    // (deferred) clear could only run after this body, i.e. after
-    // `releaseReference()`.
+    // The box clear routes itself (`swapContextDataStorageBox`): this body is
+    // on the VM thread, so it runs inline. It must not be deferred — a posted
+    // clear could only run after this body, i.e. after `releaseReference()`.
     driverContextHandle.installContextDataStorageBox(nil)
     _ = driverContextHandle.releaseReference()
+    // Last: the pop drops this context's VM-thread binding with its last
+    // frame, after everything that needed it.
+    ScopeStackRegistry<E>.pop(for: driverContextHandle)
   }
 
   /// The default-scope arena frame: the anchor for actor-side persistent
@@ -278,7 +284,11 @@ extension JSContext {
     guard let preparedHandle = driverContextHandle.makePreparedScriptHandle(script) else {
       preconditionFailure("JSContext.evaluateScript could not prepare script")
     }
-    let prepared = JSPreparedScript<E>(handle: preparedHandle, context: driverContextHandle)
+    let prepared = JSPreparedScript<E>(
+      handle: preparedHandle,
+      context: driverContextHandle,
+      vmThread: ScopeStackRegistry<E>.vmThread(for: driverContextHandle)
+    )
     return defaultScope.evaluateScriptValue(
       prepared,
       sourceURL: sourceURL,

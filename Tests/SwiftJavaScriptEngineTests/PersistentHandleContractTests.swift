@@ -111,6 +111,23 @@ struct PersistentHandleContractTests {
   func persistentHandleCrossesActorIsolationDomains(_ engine: ScriptEngine) async {
     await engine.run(PersistentHandleCrossesIsolation.self)
   }
+
+  /// Contexts are created on the VM thread even when `JSContext.init` runs
+  /// from another thread while that thread is busy with the VM's other
+  /// contexts (design §0.2.3). QuickJS used to crash intermittently in
+  /// `JS_FreeContext` / `JS_RunGC` when a context was created off the VM
+  /// thread while another one was settling.
+  @Test(arguments: ScriptEngine.allCases)
+  func contextsOnABusySharedVMCanBeCreatedFromAnyThread(_ engine: ScriptEngine) async {
+    await engine.run(ContextsOnABusySharedVM.self)
+  }
+
+  /// Prepared scripts and property keys retain the engine context and can
+  /// die on any thread; their release is routed to the VM thread.
+  @Test(arguments: ScriptEngine.allCases)
+  func selfOwningInputsDroppedOffTheVMThreadReleaseCleanly(_ engine: ScriptEngine) async {
+    await engine.run(SelfOwningInputsDroppedOffTheVMThread.self)
+  }
 }
 
 /// FIFO sentinel on the context's executor: pinging after the context's last
@@ -144,21 +161,6 @@ private func awaitPersistentHandleSettlement<E: JSEngine>(
   let barrier = PersistentHandleBarrier(virtualMachine: virtualMachine)
   await barrier.ping()
   _ = await barrier.pingCount()
-}
-
-/// Create a context on the VM's serial executor, through a live context's
-/// actor window. `JSContext.init` issues `JS_NewContext` /
-/// `JSContextGroupCreate` on the caller's thread (JSContext.swift init), so
-/// creating a second context on a VM that already hosts live (or settling)
-/// engine state from a cooperative thread violates the "VM executor only"
-/// engine-access invariant (design §0.2.3) — the benchmark harness observed
-/// intermittent QuickJS corruption (`JS_FreeContext` / `JS_RunGC`) with
-/// exactly this pattern. The first context on a fresh VM has no concurrent
-/// engine activity and may be created directly.
-private func makeContext<E: JSEngine>(on existing: JSContext<E>) async -> JSContext<E> {
-  await existing.withIsolatedGlobalObject { _, _ in
-    JSContext<E>(virtualMachine: existing.virtualMachine)
-  }
 }
 
 private enum PersistentHandleRoundTripsAcrossWindows: ScriptEngineAssertion {
@@ -215,10 +217,7 @@ private enum PersistentHandleIsContextLocal: ScriptEngineAssertion {
     let handle = await first.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("local"))
     }
-    // Created on the VM executor via a live context's window: `JSContext.init`
-    // issues `JS_NewContext`/`JSContextGroupCreate` on the caller's thread,
-    // and the engine-access invariant is "VM executor only" (design §0.2.3).
-    let second = await makeContext(on: first)
+    let second = JSContext(virtualMachine: first.virtualMachine)
     let foreignResolved = await second.withInstantContext { scope in
       scope.resolve(handle) == nil
     }
@@ -259,9 +258,8 @@ private enum PersistentHandlesDoNotCrossContext: ScriptEngineAssertion {
     let first = JSContext<E>()
     // Same runtime, second context: registry IDs differ, so identities are
     // context-local even though the engines would accept cross-context values
-    // inside one group/runtime (design §5.4/§6.2). Created on the VM executor
-    // via the live first context's window (engine-access invariant, §0.2.3).
-    let second = await makeContext(on: first)
+    // inside one group/runtime (design §5.4/§6.2).
+    let second = JSContext(virtualMachine: first.virtualMachine)
 
     let firstHandle = await first.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("first"))
@@ -404,6 +402,65 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
       scope.resolve(handle) != nil
     }
     #expect(scopeRestored)
+  }
+}
+
+private enum ContextsOnABusySharedVM: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let virtualMachine = JSVirtualMachine<E>()
+    let resident = JSContext<E>(virtualMachine: virtualMachine)
+
+    // The VM thread keeps working for the resident context in small jobs…
+    async let churn: Void = keepBusy(resident, rounds: 200)
+    // …while contexts are created and dropped from the test's thread.
+    for _ in 0..<100 {
+      let shortLived = JSContext<E>(virtualMachine: virtualMachine)
+      _ = shortLived
+    }
+    await churn
+
+    let residentStillWorks = await resident.withInstantContext { scope -> Bool in
+      let result = scope.evaluateScript("1 + 1")
+      switch consume result {
+      case .value(let value):
+        return value.toNumber(in: scope) == 2
+      case .exception:
+        return false
+      }
+    }
+    #expect(residentStillWorks)
+  }
+
+  static func keepBusy<E: JSEngine>(_ context: JSContext<E>, rounds: Int) async {
+    for _ in 0..<rounds {
+      await context.withInstantContext { scope in
+        _ = scope.evaluateScript("1 + 1")
+      }
+    }
+  }
+}
+
+private enum SelfOwningInputsDroppedOffTheVMThread: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+    let virtualMachine = context.virtualMachine
+
+    // Created on the VM thread, dropped here on the test's thread: each
+    // release may be the engine context's last reference.
+    _ = await context.prepareScript("6 * 7")
+    _ = await context.makePropertyStringKey("answer")
+    await awaitPersistentHandleSettlement(on: virtualMachine)
+
+    let stillWorks = await context.withInstantContext { scope -> Bool in
+      let result = scope.evaluateScript("6 * 7")
+      switch consume result {
+      case .value(let value):
+        return value.toNumber(in: scope) == 42
+      case .exception:
+        return false
+      }
+    }
+    #expect(stillWorks)
   }
 }
 

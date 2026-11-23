@@ -139,8 +139,8 @@
 
 - [ ] 默认 scope 逃逸值累积：无提前回收 / compact API
 - [ ] Stage 5（`@lifetime` 转正后）：本地值改 `Copyable + ~Escapable`；`JSValue`/`JSCallbackValue` 合并；`JSCallbackValue.decode` 去临时 scope；arena 降为释放记账
-- [ ] `JSVirtualMachine` / `JSPreparedScript` / `JSPropertyStringKey` 的 deinit 线程归属（非 isolated）
-- [ ] `JSContext.init` 在调用线程执行 `JS_NewContext`：共享 VM 的多 context 宿主需自行串行化创建
 - [ ] `IsolatedDeinit` 实验特性转正后移除 `enableExperimentalFeature`
 - [ ] 测试缺口：Mock `claimOwnedValueHandle` 为 identity，无法建模 QuickJS dup；缺 `persist(this/arguments)` borrowed fallback 用例
 - [ ] 引擎静态操作面退役（方法体搬进 context 扩展）、类系统约束收窄、`JSFunctionCallback` 去引擎参数化
+- [ ] `JSClass.deinit` 的 `JSClassRelease`（仅 JSC；QuickJS 侧为 no-op）仍在任意线程执行，未路由到 VM 线程
+- [ ] 自保活输入（`JSPreparedScript` / `JSPropertyStringKey`）retain 引擎 context 但不 retain `JSVirtualMachine`：VM 先亡时 QuickJS 的 `JS_FreeRuntime` 与存活 context 引用的关系未验证

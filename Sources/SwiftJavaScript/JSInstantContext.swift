@@ -968,7 +968,11 @@ public struct JSInstantContext<E: JSEngineRuntimeDriver>: ~Copyable {
     guard let handle = driverContextHandle.makePropertyStringKeyHandle(value) else {
       preconditionFailure("JSInstantContext.makePropertyStringKey could not create handle")
     }
-    return JSPropertyStringKey(handle: handle, context: driverContextHandle)
+    return JSPropertyStringKey(
+      handle: handle,
+      context: driverContextHandle,
+      vmThread: ScopeStackRegistry<E>.vmThread(for: driverContextHandle)
+    )
   }
 
   public func prepareScript(_ source: String) -> JSPreparedScript<E>
@@ -976,7 +980,11 @@ public struct JSInstantContext<E: JSEngineRuntimeDriver>: ~Copyable {
     guard let handle = driverContextHandle.makePreparedScriptHandle(source) else {
       preconditionFailure("JSInstantContext.prepareScript could not create handle")
     }
-    return JSPreparedScript(handle: handle, context: driverContextHandle)
+    return JSPreparedScript(
+      handle: handle,
+      context: driverContextHandle,
+      vmThread: ScopeStackRegistry<E>.vmThread(for: driverContextHandle)
+    )
   }
 
   @available(*, noasync)

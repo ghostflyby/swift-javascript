@@ -356,8 +356,9 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 - [x] 设计子文档:`docs/PERSISTENT_HANDLE_DESIGN.md` 定稿并经独立评审修订(§4.3 替换 = invalidate + mint、§4.4 **v1 强绑定**(JSC/QuickJS 均无宿主侧弱引用 API,据此重写"弱引用不阻 GC"验收条——root 跨强制 GC 保活 + QuickJS JS `WeakRef` 释放后不阻 GC,JSC 不测释放后可回收性)、§6.1 `ContextLocal`、槽位 + generation registry、`schedulePersistentCleanup` 经 VM executor)
 - [x] core 层实现:`JSPersistentHandle`(identity 化 Sendable,零 JS 操作面)+ `JSPersistentHandleRegistry`(context 数据箱挂载、分块 slab + free list、generation 防误命中);`resolve` 经 scope 见证 claim 进接收帧 arena;零后端改动
 - [x] 基准测试:`Benchmarks/PersistentHandleBenchmarks` 独立 target,JSC/QuickJS 真实数据 + synthetic 槽位 vs Dictionary(复核员独立复现命中)。选型:维持 slab+free list(chunk 32);`pending` 队列建议 head cursor(尾风险登记);witness 优先 typed `package` 字段(box 查找占 resolve 40-45%)
-- [x] 跨引擎测试:契约测试双引擎参数化 + QuickJS 单引擎 WeakRef 用例;Mock 侧精确计数全套;哨兵全部状态化(空 ping 实测被优化为非跳转调用);VM 上第二 context 创建经存活 context 窗口(引擎访问不变量);双 close 幂等、close 后 resolve nil、bare-context 负面样例补齐。遗留测试缺口(§8.1-10 settling 计数器、§8.2-4 QuickJS 内存基线、§8.3 线程直断言/迟到泵)与 `pending` 队列尾风险已于 2026-11-23 闭环(head cursor 化后基准复跑双引擎斜率不变);此前待定的两项(外部清箱线程归属、`JSScope` 公共面收紧)按裁决随后闭环,见下条
+- [x] 跨引擎测试:契约测试双引擎参数化 + QuickJS 单引擎 WeakRef 用例;Mock 侧精确计数全套;哨兵全部状态化(空 ping 实测被优化为非跳转调用);VM 上第二 context 创建当时经存活 context 窗口规避线程问题(线程收口后不再需要);双 close 幂等、close 后 resolve nil、bare-context 负面样例补齐。遗留测试缺口(§8.1-10 settling 计数器、§8.2-4 QuickJS 内存基线、§8.3 隔离断言/迟到泵)与 `pending` 队列尾风险已于 2026-11-23 闭环(head cursor 化后基准复跑双引擎斜率不变);此前待定的两项(外部清箱线程归属、`JSScope` 公共面收紧)按裁决随后闭环,见下条
 - [x] 执行器重构与清箱路由(2026-11-23):执行器换为 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`,闭包投递为 `Task.detached(executorPreference:)`;`installContextDataStorageBox` 对托管 context 路由到 VM 线程;`JSScope` 构造面收敛为 `JSContext.makeScope()`。依据与实现落点见 `docs/PERSISTENT_HANDLE_DESIGN.md` §2.4 末与 §3.5;完成项归档于 `docs/finished/value-management.md`
+- [x] 线程归属收口(2026-11-23):`JSContext.init`、`JSVirtualMachine` 的 runtime 建/释、`JSPreparedScript`/`JSPropertyStringKey` 的析构全部路由到 VM 线程;"引擎调用只在 VM 线程"(§0.2.3)至此覆盖生命周期两端,仅 `JSClass.deinit` 的 JSC `JSClassRelease` 未路由(登记于 `TODO.md` §2.2)。路由规则见 `docs/PERSISTENT_HANDLE_DESIGN.md` §3.5
 
 ### Stage 5:lifetime 依赖转正后的迁移(远期,特性门槛)
 

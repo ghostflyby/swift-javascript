@@ -115,11 +115,9 @@ private enum EngineBenchmarks {
     let virtualMachine = JSVirtualMachine<E>()
     let barrier = ExecutorBarrier(virtualMachine)
 
-    // Bootstrap context: created before any other context on this VM, so its
-    // `JS_NewContext` cannot race another context's teardown. Every sample
-    // context is then created **on the VM executor** through this bootstrap
-    // (`JSContext.init` is itself an engine call and must not run on an
-    // arbitrary cooperative thread when another context may be settling).
+    // A resident context, so every sample context is a second context on a VM
+    // that already hosts engine state — the shape hosts create, and the one
+    // the §11 numbers were taken with.
     var bootstrapBox: JSContext<E>? = JSContext<E>(
       virtualMachine: virtualMachine)
 
@@ -162,19 +160,15 @@ private enum EngineBenchmarks {
     await barrier.ping()
   }
 
-  /// Create a fresh context on the VM's serial executor. `JSContext.init`
-  /// issues `JS_NewContext`/`JSContextGroupCreate`; running it on a
-  /// cooperative thread while another context is settling was observed to
-  /// corrupt QuickJS's runtime (crash in `JS_FreeContext`/`JS_RunGC`). The
-  /// library's engine-access invariant is "VM executor only", so the
-  /// harness creates its contexts there too.
+  /// Create a fresh context. `JSContext.init` routes the engine-side creation
+  /// to the VM thread itself and waits for it, so the call is safe from this
+  /// cooperative thread; `bootstrap` only keeps the resident context alive.
   private static func makeContext<E: JSContextEngine>(
     _ virtualMachine: JSVirtualMachine<E>,
     via bootstrap: JSContext<E>
   ) async -> JSContext<E> {
-    await bootstrap.withIsolatedGlobalObject { _, _ in
-      JSContext<E>(virtualMachine: virtualMachine)
-    }
+    _ = bootstrap
+    return JSContext<E>(virtualMachine: virtualMachine)
   }
 
   // MARK: Allocation

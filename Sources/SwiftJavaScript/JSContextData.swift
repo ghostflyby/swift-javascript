@@ -83,10 +83,8 @@ extension JSEngineRuntimeDriver {
       raw(context, storage)
       return
     }
-    if vmThread.isIsolatingCurrentContext() {
+    vmThread.perform {
       raw(context, storage)
-    } else {
-      vmThread.scheduleOnVMThread { raw(context, storage) }
     }
   }
 }

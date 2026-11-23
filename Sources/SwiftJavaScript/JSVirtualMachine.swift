@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+import Synchronization
 import ThreadAffinityExecutor
 
 public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
@@ -14,11 +15,30 @@ public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
     self.init(thread: VMThread())
   }
 
+  /// Engine access only on the VM thread (design §0.2.3). The runtime is
+  /// created there too, so no engine call of this library ever runs on
+  /// whichever thread happens to construct a VM or a context.
   private init(thread: VMThread) {
-    self.driverRuntimeHandle = E.makeRuntimeHandle()
+    let factory: any EngineLifecycle = EngineFactory<E>()
+    let runtime = thread.runAndWait {
+      factory.makeRuntime()
+    }
+    self.driverRuntimeHandle = runtime as! E.RuntimeHandle
     self.unownedExecutor = thread.unownedExecutor
     self.owner = thread.owner
     self.thread = thread
+  }
+
+  /// The engine context for a new `JSContext` on this VM, created on the VM
+  /// thread: creating a context mutates the shared runtime, which that
+  /// thread may be using for the VM's other contexts.
+  func makeContextHandle() -> E.ContextHandle? {
+    let factory: any EngineLifecycle = EngineFactory<E>()
+    let runtime: any Sendable = driverRuntimeHandle
+    let context = thread.runAndWait {
+      factory.makeContext(in: runtime)
+    }
+    return context as? E.ContextHandle
   }
 
   /// Scheduling handle for persistent-binding settlement (design §2.4
@@ -35,7 +55,13 @@ public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
   }
 
   deinit {
-    _ = driverRuntimeHandle.releaseReference()
+    // An engine call, so it belongs on the VM thread (design §0.2.3). Every
+    // context retained the VM, so by now they are all gone and the thread is
+    // idle; the release completes before `Owner` stops the thread.
+    let runtimeHandle = driverRuntimeHandle
+    thread.runAndWait {
+      _ = runtimeHandle.releaseReference()
+    }
   }
 }
 
@@ -88,8 +114,9 @@ final class VMThread: JSPersistentCleanupScheduler {
   /// the documented ways a task leaves its preferred executor (resumption
   /// after a suspension point) can apply. After `shutdown` was requested the
   /// job is dropped: every binding was settled inline by `close()` before
-  /// shutdown, so dropping cannot leak an engine reference (design §2.4); a
-  /// dropped storage-box swap only releases the box it carried.
+  /// shutdown, so dropping cannot leak a binding (design §2.4). What a
+  /// dropped job can still cost is the release of a self-owning input that
+  /// outlived its VM — a leak, where running it would touch a freed runtime.
   func scheduleOnVMThread(_ body: @escaping @Sendable () -> Void) {
     // Detached, so the task inherits nothing from the caller — in particular
     // not the isolation of a foreign actor the caller may be running on.
@@ -100,6 +127,39 @@ final class VMThread: JSPersistentCleanupScheduler {
 
   func schedulePersistentCleanup(_ body: @escaping @Sendable () -> Void) {
     scheduleOnVMThread(body)
+  }
+
+  /// Run `body` on the VM thread: inline when the caller already is that
+  /// thread, otherwise posted — the call returns before the body runs.
+  func perform(_ body: @escaping @Sendable () -> Void) {
+    if isIsolatingCurrentContext() {
+      body()
+    } else {
+      scheduleOnVMThread(body)
+    }
+  }
+
+  /// Run `body` on the VM thread and return its result: inline when the
+  /// caller already is that thread, otherwise posted and waited for.
+  ///
+  /// For the engine calls that must be complete when a synchronous
+  /// constructor or destructor returns — context and runtime creation,
+  /// runtime teardown. The VM thread never waits on its callers, so the wait
+  /// cannot deadlock; the one thing an embedding must not do is block the
+  /// engine on a thread that is itself waiting here.
+  @available(*, noasync)
+  func runAndWait<R: Sendable>(_ body: @escaping @Sendable () -> R) -> R {
+    if isIsolatingCurrentContext() {
+      return body()
+    }
+    let result = Mutex<R?>(nil)
+    let done = DispatchSemaphore(value: 0)
+    Task.detached(executorPreference: executor) {
+      result.withLock { $0 = body() }
+      done.signal()
+    }
+    done.wait()
+    return result.withLock { $0! }
   }
 
   /// Stop the VM thread once nothing can submit further work: the VM is
@@ -130,5 +190,24 @@ final class VMThread: JSPersistentCleanupScheduler {
 
   var owner: Owner {
     Owner(thread: self)
+  }
+}
+
+/// The engine's lifecycle statics behind a `Sendable` existential, so they
+/// can be posted to the VM thread by a closure that captures a value instead
+/// of `E.Type` (same shape as the registry's pump target). Results are erased
+/// and cast back outside the posted closure.
+private protocol EngineLifecycle: Sendable {
+  func makeRuntime() -> any Sendable
+  func makeContext(in runtime: any Sendable) -> (any Sendable)?
+}
+
+private struct EngineFactory<E: JSEngineRuntimeDriver>: EngineLifecycle {
+  func makeRuntime() -> any Sendable {
+    E.makeRuntimeHandle()
+  }
+
+  func makeContext(in runtime: any Sendable) -> (any Sendable)? {
+    E.makeBorrowedContextHandleFromRuntime(in: runtime as! E.RuntimeHandle)
   }
 }

@@ -41,9 +41,11 @@
    对账,不能拥有"看不见的引用"。
 3. **引擎调用只允许发生在 VM 的专用串行 executor 上**——`JSVirtualMachine` 持有 `VMThread`
    (`ThreadAffinityExecutor` 库 `DedicatedThreadExecutor` 的薄包装,
-   `Sources/SwiftJavaScript/JSVirtualMachine.swift`),`JSContext` 的 teardown 已由
-   `isolated deinit` 搬到该线程(`Sources/SwiftJavaScript/JSContext.swift`)。持久层不得新增
-   任意线程的引擎访问。
+   `Sources/SwiftJavaScript/JSVirtualMachine.swift`)。`JSContext` 的 teardown 由
+   `isolated deinit` 在该线程执行(`Sources/SwiftJavaScript/JSContext.swift`);2026-11-23 起
+   生命周期两端也都在该线程:runtime 与 context 的创建经 `VMThread.runAndWait` 投递并等待,
+   runtime 的释放同样投递,自保活输入(`JSPreparedScript`/`JSPropertyStringKey`)的析构经
+   `VMThread.perform` 投递(§3.5)。持久层不得新增任意线程的引擎访问。
 
 Stage 4 的待办原文见 `TODO.md` §2.6;其中"弱引用不阻 GC"一条与本设计冲突,
 处置见 §4.4。
@@ -573,10 +575,19 @@ close),而它们与 resolve 共享同一 OS 线程。因此"resolve 在锁内看
 **VM 线程的判据与清箱路由(2026-11-23)**:执行器实现 `ThreadBoundExecutor.isIsolatingCurrentContext()`
 (线程标识)。它是 `SerialExecutor` 上由执行器自己实现的钩子,协议默认实现返回 `nil` = "未知",
 所以必须由执行器提供。`JSContext.init` 末尾经 `ScopeStackRegistry.bind` 把 context 绑到所属
-`VMThread`,绑定随 scope 栈的最后一次 `pop` 消失——`isolated deinit` 正是 pop 之后才清箱,
-所以那一次清箱必然内联。`installContextDataStorageBox` 对托管 context 的规则因此是:调用者已是
-VM 线程则内联,否则把引擎侧交换投递到 VM 线程——调用线程零引擎调用,交换先于其后入队的任何 job,
-也即调用返回时尚未生效。
+`VMThread`,绑定随 scope 栈的最后一次 `pop` 消失——`isolated deinit` 把 pop 放在最后一步,
+清箱与 context 释放期间绑定仍在(§4.1)。`VMThread` 在这判据上给两个入口:`perform`(已是
+VM 线程则内联,否则投递,不等待)与 `runAndWait`(内联,或投递并等待)。路由规则:
+
+- `installContextDataStorageBox`:经 `perform`——调用线程零引擎调用,交换先于其后入队的任何
+  job,也即调用返回时尚未生效;
+- runtime 与 context 的创建(`JSVirtualMachine.init`、`JSContext.init`):经 `runAndWait`——
+  `init` 是同步的,返回的 actor 必须已握着 handle,调用方若在别的线程就等待创建完成。VM 线程
+  从不等调用方,所以这个等待不会自己死锁;宿主不得在回调里阻塞一个正要建 context 的线程;
+- `JSVirtualMachine.deinit` 的 runtime 释放:经 `runAndWait`;
+- 自保活输入的析构:经 `perform`。它们 retain 引擎 context、可比 `JSContext` actor 活得久,
+  scope 栈上的绑定到那时已不在,所以在创建时经 `ScopeStackRegistry.vmThread(for:)` 记下
+  `VMThread`。
 
 ### 3.6 分叉与取舍
 
@@ -621,16 +632,16 @@ core 的 `swapContextDataStorageBox` 路由(§3.5),不新增 driver requirement�
 
 ### 4.1 容器消亡:`isolated deinit` 内的顺序
 
-现有顺序是 drain → pop → 清箱 → release(`JSContext` 的 `isolated deinit`)。新增一步,位置在
-**`releaseReference()` 之前**:
+顺序是 drain → 清箱 → release → pop(`JSContext` 的 `isolated deinit`;2026-11-23 把 pop 从清箱之前
+挪到最后一步,让 VM 线程绑定覆盖清箱与释放)。新增一步,位置在 **`releaseReference()` 之前**:
 
 ```swift
 isolated deinit {
   persistentRegistry.close()                    // 新增:结算 live + pendingRelease(settling 已移出,跳过)
   defaultScope.drain()                          // 既有
-  ScopeStackRegistry<E>.pop(for: driverContextHandle)
-  driverContextHandle.installContextDataStorageBox(nil)   // 仅移除访问路径(registry 仍由 self 持有)
+  driverContextHandle.installContextDataStorageBox(nil)   // 仅移除访问路径(registry 仍由 self 持有);路由判据为真,内联
   _ = driverContextHandle.releaseReference()    // 引擎 context 释放,必须最后
+  ScopeStackRegistry<E>.pop(for: driverContextHandle)    // 最后:随最后一帧撤掉 VM 线程绑定
 }
 ```
 
@@ -663,9 +674,9 @@ isolated deinit {
 
 `JSContext` 强持有 `JSVirtualMachine`(`JSContext` 的 `virtualMachine` 存储属性),因此 VM 的 deinit 必然晚于每个
 context 的 `isolated deinit`。settle 全部发生在各自 context 的收尾里;`JSVirtualMachine.deinit`
-保持现状(仅 `releaseReference()`,非 isolated,`Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit`)——
-**持久层不得在 runtime 层新增任何引擎访问**。这是对既有风险
-(`TODO.md` §2.5 ⑤,"`JSVirtualMachine.deinit` 线程归属尚非 isolated")的规避,而不是新增一处。
+只做 `releaseReference()`——2026-11-23 起该调用经 `VMThread.runAndWait` 在 VM 线程执行(§3.5),
+此前登记的"`JSVirtualMachine.deinit` 线程归属"风险随之关闭。
+**持久层不得在 runtime 层新增任何引擎访问**。
 
 ### 4.3 绑定替换 / 删除
 
@@ -1055,12 +1066,19 @@ extension JSScope {                                    // 手动 scope
 - **迟到的泵**:close 之后强制让已调度泵执行,断言零引擎调用(Mock 计数 + 线程记录);
 - ASan 满载轮:并发 `invalidate` + `resolve` + 容器销毁 + 外部清箱的交叉压力。
 
-闭环(2026-11-23):§8.1 全部用例与 §8.3 的线程直断言、迟到泵均已落测试——Mock 侧
+闭环(2026-11-23):§8.1 全部用例与 §8.3 的隔离断言、迟到泵均已落测试。"清理发生在 VM 线程"
+不记线程标识,记执行器的隔离判据:Mock 的引擎调用钩子经 context 的 scope 栈绑定取到 `VMThread`,
+记下 `isIsolatingCurrentContext()` 的真假——Mock 侧
 `settlingSlotIgnoresReleaseAndResolveAndMovesPayloadOnce`(case 10)、
-`contextDataStorageBoxSwapFromForeignThreadRunsOnVMThread` / `contextDataStorageBoxSwapOnVMThreadIsInline`
-(case 8 的外线程与内联两种形态)、`persistentSettlementEngineCallsRunOnVMExecutorThread`、
-`latePumpAfterCloseMakesNoEngineCalls`;双引擎侧 `contextDataStorageBoxSwapFromForeignThreadStaysOnVMThread`;
+`contextDataStorageBoxSwapFromForeignThreadIsIsolatedToVMExecutor` / `contextDataStorageBoxSwapOnVMThreadIsInline`
+(case 8 的外线程与内联两种形态)、`persistentSettlementEngineCallsAreIsolatedToVMExecutor`、
+`selfOwningInputsReleaseIsolatedToVMExecutor`、`latePumpAfterCloseMakesNoEngineCalls`;双引擎侧
+`contextDataStorageBoxSwapFromForeignThreadStaysOnVMThread`、`contextsOnABusySharedVMCanBeCreatedFromAnyThread`、
+`selfOwningInputsDroppedOffTheVMThreadReleaseCleanly`;
 QuickJS 内存基线 `quickJSPersistentHandleCycleReturnsAllocatorToBaseline`(§8.2-4)。
+创建时刻的引擎调用(建 runtime、建 context、首次装箱)与 runtime 释放不在 Mock 的隔离记录里:
+那时 context 还没有绑定,Mock 手里没有执行器;这四次的路由由代码结构(`VMThread.runAndWait`,
+§3.5)与双引擎契约测试覆盖。
 
 ### 8.4 基准(`TODO.md` §2.6)
 
@@ -1211,7 +1229,8 @@ synthetic 表原型跑四轮(三次独立 + 一次用本节 `--synthetic-only` �
 - **context 创建纪律**:`JSContext.init` 会执行 `JS_NewContext`,本身是引擎调用。基准先创建
   一个 bootstrap context(该 VM 上唯一在 cooperative 线程创建的 context),之后所有样本
   context 都经 `bootstrap.withIsolatedGlobalObject { JSContext(virtualMachine:) }` 在 VM
-  线程创建。原因与一次可复现崩溃见 §11.6。
+  线程创建。原因与一次可复现崩溃见 §11.6。(2026-11-23 起库自己把创建路由到 VM 线程,§3.5;
+  本条的 bootstrap 做法只是当时的基准纪律,闭环见 §11.6。)
 - **路径**:witness resolve 用公共 `JSScope.resolve`(与 `withInstantContext` 共用
   `resolvePersistentHandle` 和 context-data box);actor resolve 用 `JSContext.resolve`
   (直接持有 registry,产物锚默认 scope)。`invalidate miss` 在 VM 线程的 miss body 内测,
@@ -1483,6 +1502,11 @@ generation、并为每个 `~Copyable` payload 加 box——这三项恰好抵消
   没有线程门。基准改为 bootstrap + VM executor 创建后,连续 5 次 QuickJS quick 运行与
   4 次 standard 引擎运行(JSC/QuickJS 各两轮)全部通过。**本片不修改库**;多 context 共享
   VM 的宿主代码应自行串行化 context 创建(登记为审计发现)。
+  **已闭环(2026-11-23)**:`JSContext.init` 把 context 的创建经 `VMThread.runAndWait` 投递到
+  VM 线程并等待,`JSVirtualMachine` 的 runtime 创建与释放同样路由,公开初始化器不再需要宿主
+  自行串行化(§3.5)。契约测试 `contextsOnABusySharedVMCanBeCreatedFromAnyThread`
+  (双引擎)覆盖"VM 线程正忙时从别的线程建 context"这一形态,debug / release / ASan / TSan
+  全量通过。
 - **空 `ping()` 的优化**:无状态 actor 方法的 `await` 被优化为 ~4 ns 的不跳线程调用,使
   teardown 测量假性归零;有状态 `ping()` 得到 ~5.9 µs 的真实跨线程往返。后续基准应直接
   复用 `ExecutorBarrier` 的有状态形态。
@@ -1544,6 +1568,7 @@ local handle 的分工,以及"在热路径上用 local、长期身份用 persist
 | `JSScope` 的公共构造面 | `Sources/SwiftJavaScript/JSContext.swift` 的 `makeScope()`;`Sources/SwiftJavaScript/JSScope.swift` 的 `package init(handle:)` / `open()` |
 | VM 专用线程 executor 与 Owner | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `VMThread`、`VMThread.Owner`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`) |
 | 清箱的 VM 线程路由 | `Sources/SwiftJavaScript/JSContextData.swift` 的 `JSEngineRuntimeDriver.swapContextDataStorageBox(_:on:raw:)` |
+| 生命周期的 VM 线程路由(创建、runtime 释放、自保活输入析构) | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `VMThread.runAndWait` / `VMThread.perform`;`Sources/SwiftJavaScript/JSContext.swift` 的 `init(virtualMachine:)`;`Sources/SwiftJavaScript/JSPreparedInputs.swift` 两个类型的 `deinit` |
 | VM deinit(非 isolated) | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit` |
 | 借用/拥有 handle 协议 | `Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift` 的 `JSValueManualReferenceCountedHandle`、`JSOwnedValueManualReferenceCountedHandle` |
 | driver 的 release/claim/root/unroot 与箱子访问 | `Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift` 的 `JSContextRuntimeDriver` |
@@ -1560,7 +1585,7 @@ local handle 的分工,以及"在热路径上用 local、长期身份用 persist
 | QuickJS runtimeID(后端身份先例) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSRuntimeIdentityRegistry` |
 | `JSPreparedScript` 的保活形状(反例) | `Sources/SwiftJavaScript/JSPreparedInputs.swift` 的 `JSScopeWitness`、`JSPreparedScript` |
 | FIFO 哨兵测试先例 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `IsolatedDeinitBarrier`、`awaitContextTeardown` |
-| Mock 的 claim/root 口径与引擎调用线程日志 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `MockContextHandle` 同名方法、`contextReleaseLog` / `contextRootingLog`、`engineThreadLog` |
+| Mock 的 claim/root 口径与引擎调用的隔离记录 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `MockContextHandle` 同名方法、`contextReleaseLog` / `contextRootingLog`、`engineCallLog` |
 | 负向编译样例惯例 | `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 文件头的负面样例注释块 |
 | Stage 4 待办原文 | `TODO.md` §2.6、§2.7 |
 | 设计约束原文 | `docs/VALUE_MANAGEMENT_REFACTORING.md` §3.5、§3.7、§5 Stage 4、§7 问题 3 |

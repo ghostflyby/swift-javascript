@@ -67,3 +67,13 @@ Source breaks：`JSValue` 删除 `retainHandle`/`takeHandle`/`discard`/`init(ret
 - [x] `JSScope` 构造面收敛：`~Sendable`，`init(handle:)`/`open()` 降 `package`，公共面 `JSContext.makeScope()`
 
 Source breaks：`JSScope.init(handle:)`/`open()` 降为 `package`；新增 `JSContext.makeScope()`；非 VM 线程发起的箱子交换变为异步生效；VM 线程上的工作项改为严格 FIFO（闭包不再优先于已排队的 job）。
+
+## 线程归属收口
+
+- [x] `JSContext.init` 与 `JSVirtualMachine.init` 的引擎侧创建（建 context、读箱装箱、建 runtime）经 `VMThread.runAndWait` 投递到 VM 线程并等待；`JSVirtualMachine.deinit` 的 runtime 释放同样路由
+- [x] `JSPreparedScript` / `JSPropertyStringKey` 在创建时记下 `VMThread`，析构经 `VMThread.perform` 路由
+- [x] `isolated deinit` 把 scope 栈的 pop 挪到最后一步，VM 线程绑定覆盖清箱与 context 释放
+- [x] Mock 测试里引擎调用的线程记录改为执行器的隔离判据（`isIsolatingCurrentContext()`）
+- [x] 契约测试：忙的共享 VM 上从别的线程建 context；自保活输入在别的线程析构
+
+Source breaks：无。行为变化：在非 VM 线程构造 `JSContext` / `JSVirtualMachine` 会阻塞到创建在 VM 线程上完成。
