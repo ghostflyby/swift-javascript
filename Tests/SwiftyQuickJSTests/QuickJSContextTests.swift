@@ -84,6 +84,88 @@ import Testing
   context = nil
 }
 
+/// FIFO sentinel for the persistent-handle settlement path (same shape as
+/// the Mock tests' `IsolatedDeinitBarrier`, `JSEngineCoreTypesTests.swift`):
+/// the stateful ping forces a real isolation hop onto the VM's dedicated
+/// executor, so the await returns only after cleanup closures queued before
+/// it have run. The counter is load-bearing — an empty actor method is
+/// optimized into a non-hopping call.
+private actor QuickJSSettlementBarrier {
+  nonisolated let unownedExecutor: UnownedSerialExecutor
+  private var pings = 0
+
+  init(virtualMachine: JSVirtualMachine<QuickJSEngine>) {
+    self.unownedExecutor = virtualMachine.unownedExecutor
+  }
+
+  func ping() {
+    pings &+= 1
+  }
+
+  func pingCount() -> Int { pings }
+}
+
+private func awaitQuickJSSettlement(on virtualMachine: JSVirtualMachine<QuickJSEngine>) async {
+  let barrier = QuickJSSettlementBarrier(virtualMachine: virtualMachine)
+  await barrier.ping()
+  _ = await barrier.pingCount()
+}
+
+/// Stage 4 design §8.2 case 4: a full mint/invalidate cycle returns the
+/// runtime allocator to its baseline (`JS_ComputeMemoryUsage` as the proxy,
+/// the Stage 3 §2.3 ledger convention). Every binding duplicates a
+/// reference to a distinct engine-allocated string, so a never-settled or
+/// double-settled binding is observable as a permanent allocator delta.
+///
+/// The first cycle is warmup: it pays one-time costs (lazy runtime
+/// structures, registry slab) whose slots the measured cycle then reuses.
+/// "No growth" is the exact equality of the measured cycle — the leak
+/// detector is per-cycle growth, not first-touch allocation.
+@Test func quickJSPersistentHandleCycleReturnsAllocatorToBaseline() async {
+  let virtualMachine = JSVirtualMachine<QuickJSEngine>()
+  var context: JSContext<QuickJSEngine>? = JSContext(virtualMachine: virtualMachine)
+  let runtime = virtualMachine.driverRuntimeHandle
+  let bindings = 1000
+
+  func mintCycle() async -> [JSPersistentHandle<QuickJSEngine>] {
+    await context!.withInstantContext { scope in
+      var handles: [JSPersistentHandle<QuickJSEngine>] = []
+      handles.reserveCapacity(bindings)
+      for index in 0..<bindings {
+        let value = scope.makeString("stage4-baseline-\(index)")
+        handles.append(scope.makePersistentHandle(value))
+      }
+      return handles
+    }
+  }
+
+  // Warmup cycle: settles back onto the free list, so the measured cycle
+  // reuses its slots instead of growing the slab.
+  let warmupHandles = await mintCycle()
+  for handle in warmupHandles {
+    #expect(handle.invalidate())
+  }
+  await awaitQuickJSSettlement(on: virtualMachine)
+
+  var baseline = JSMemoryUsage()
+  JS_ComputeMemoryUsage(runtime.ref, &baseline)
+
+  // Measured cycle: 1000 engine-allocated strings kept alive only by their
+  // bindings, then all invalidated and settled through the VM executor.
+  let measuredHandles = await mintCycle()
+  for handle in measuredHandles {
+    #expect(handle.invalidate())
+  }
+  await awaitQuickJSSettlement(on: virtualMachine)
+
+  var after = JSMemoryUsage()
+  JS_ComputeMemoryUsage(runtime.ref, &after)
+  #expect(after.malloc_count == baseline.malloc_count)
+  #expect(after.malloc_size == baseline.malloc_size)
+
+  context = nil
+}
+
 private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sendable {
   typealias Engine = QuickJSEngine
   typealias ParentClass = JSClassParentDescriptor<QuickJSEngine, Never>

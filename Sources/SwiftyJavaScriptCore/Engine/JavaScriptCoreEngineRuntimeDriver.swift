@@ -330,8 +330,12 @@ extension JavaScriptCoreContextHandle: JSContextRuntimeDriver, JSContextPrepared
     JavaScriptCoreEngine.contextDataStorageBox(in: self)
   }
 
+  /// The engine-side swap runs on the context's VM thread: inline when the
+  /// caller is isolated to it, otherwise queued on it.
   public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
-    JavaScriptCoreEngine.installContextDataStorageBox(storage, in: self)
+    JavaScriptCoreEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
+      JavaScriptCoreEngine.installContextDataStorageBox(storage, in: context)
+    }
   }
 
   /// JSC is GC-managed: created handles need no explicit release.

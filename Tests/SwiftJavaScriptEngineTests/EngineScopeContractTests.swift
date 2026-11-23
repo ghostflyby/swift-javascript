@@ -72,6 +72,40 @@ import Testing
 //
 // 三个样例均因 `JSValue` 只能留在原隔离域而失败;`Sendable` 的
 // handle/context token 不改变该结论。
+
+// MARK: - Stage 4 (TODO §2.7.1) negative compile examples (not automatable in Swift Testing)
+
+// 「`JSScope` 只能生灭于 context 隔离域内」是编译期契约:公共构造面只有
+// actor 隔离工厂 `JSContext.makeScope()`,而 `JSScope` 既非 Copyable 也非
+// Sendable。Swift Testing 无法在测试内断言编译期失败,以下样例仅以文档形式
+// 保留,标注「应编译失败」,该验证未自动化:
+//
+//     // ✗ 应编译失败 —— 从 nonisolated 上下文调用工厂,结果跨 actor 边界:
+//     func leak(_ context: JSContext<JavaScriptCoreEngine>) async {
+//       let scope = await context.makeScope()
+//       _ = scope
+//     }
+//
+//     // ✗ 应编译失败 —— 把结果从 actor 隔离实例方法返回给 nonisolated 调用方:
+//     func leak(
+//       _ context: JSContext<JavaScriptCoreEngine>
+//     ) async -> JSScope<JavaScriptCoreEngine> {
+//       await context.makeScope()
+//     }
+//
+// 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 / swiftlang-6.4.2.1.9;探针文件
+// 临时加入 `SwiftJavaScriptEngineTests` target 后 `swift build --build-tests`,
+// 确认诊断后删除探针并重建通过):
+// - 两个样例均报 `error: non-Sendable 'JSScope<JavaScriptCoreEngine>'-typed
+//   result can not be returned from actor-isolated instance method 'makeScope()'
+//   to nonisolated context`,并附
+//   `note: generic struct 'JSScope' does not conform to the 'Sendable' protocol`。
+//
+// `JSScope.init(handle:)` / `open()` 为 `package` 访问级别,包外不可见;这是
+// 访问控制的事实,同包测试给不出可观测诊断,故不列为探针样例。
+//
+// 正例见下方 `contextDerivedScopeNestsPersistsAndResolves`:工厂在
+// `withIsolatedGlobalObject` 的同步窗口内调用,scope 随内层作用域结束而析构。
 @Suite
 struct EngineScopeContractTests {
   @Test(arguments: ScriptEngine.allCases)
@@ -87,6 +121,52 @@ struct EngineScopeContractTests {
   @Test(arguments: ScriptEngine.allCases)
   func localValueSurvivesAwaitWithinActor(_ engine: ScriptEngine) async {
     await engine.run(ValueSurvivesAwaitWithinActor.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func contextDerivedScopeNestsPersistsAndResolves(_ engine: ScriptEngine) async {
+    await engine.run(ContextDerivedScopeNestsPersistsAndResolves.self)
+  }
+}
+
+/// `JSContext.makeScope()` 是 `JSScope` 的公共构造路径(TODO §2.7.1):工厂
+/// actor 隔离,scope 生、用、析构都在 context 的隔离域内。嵌套 scope 内:
+/// 工厂产物经 `persist` 晋升到默认 scope;持久 handle 在其中 mint/resolve;
+/// scope 结束后帧弹回默认帧,晋升值仍可用。
+private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+
+    let (resolved, stackBackAtDefault) = await context.withIsolatedGlobalObject {
+      isolatedContext, globalObject -> (String, Bool) in
+      let contextHandle = isolatedContext.driverContextHandle
+      let defaultFrame = ScopeStackRegistry<E>.top(of: contextHandle)
+      let handle = isolatedContext.makePersistentHandle(
+        isolatedContext.makeString("bound"))
+
+      // 内层作用域:嵌套 scope 在其中打开,随作用域结束析构。
+      let resolved: String = {
+        let scope = isolatedContext.makeScope()
+        let durable = scope.persist(scope.makeString("promoted"))
+        globalObject.setProperty(durable, forKey: "durable", in: isolatedContext)
+        var resolved = "<nil>"
+        if let value = scope.resolve(handle) {
+          resolved = value.toString(in: isolatedContext)
+        }
+        return resolved
+      }()
+
+      return (resolved, ScopeStackRegistry<E>.top(of: contextHandle) === defaultFrame)
+    }
+
+    #expect(resolved == "bound")
+    #expect(stackBackAtDefault)
+
+    // 晋升值锚在默认 scope:嵌套 scope 析构后、跨窗口仍可读取。
+    let durableAfterScope = await context.withInstantContext { scope in
+      scope.toString(scope.getGlobalProperty(forKey: "durable"))
+    }
+    #expect(durableAfterScope == "promoted")
   }
 }
 

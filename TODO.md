@@ -5,6 +5,7 @@
 - [Core API、测试与宏完成项](docs/finished/core-api-tests-and-macros.md)
 - [引擎迁移完成项](docs/finished/engine-migration.md)
 - [清理与基线完成项](docs/finished/cleanup-and-baselines.md)
+- [值管理重构完成项](docs/finished/value-management.md)
 
 ## 0. 基线与流程
 
@@ -29,7 +30,7 @@
 第 6 步收尾约束（context/VM 语义）：
 
 - [ ] 约束A：区分 Home Context 与 Operation Context。Home Context 仅负责值生命周期（protect/unprotect、takeRef retain）；Operation Context 仅负责 API 执行。
-- [x] 修复 JSC callback 返回值 ownership handoff：`callbackRef()` 消费 wrapper 并跳过 `JSValue.deinit -> JSValueUnprotect`，补 Mock deinit/release 计数与跨引擎 callback 回归测试（已完成，`swift test` 通过）
+- [x] 修复 JSC callback 返回值 ownership handoff：`callbackRef()` 消费 wrapper 并跳过 `JSValue.deinit -> JSValueUnprotect`，补 Mock deinit/release 计数与跨引擎 callback 回归测试（已完成，`swift test` 通过）（2026-11-22 复核补遗：当时只配平了 QuickJS 侧；JSC 桥 persistent 返回缺 `JSValueUnprotect` 对称处理、每次泄漏一个 protect，已在 Stage 0 收尾补上）
 
 ### 1.3 引擎泛型标记
 
@@ -119,3 +120,27 @@
 - [x] 按 `JSEngine` 组合协议来源重排 shared engine tests：`EngineRuntimeDriverTests`、`EnginePropertyDriverTests`、`EngineInvocationDriverTests`、`EngineTypedArrayDriverTests`、`EngineStringDriverTests`、`EngineValueConversionTests` 分别覆盖对应 public API 边界
 - [x] 迁移更多 JSC-only public API tests 到 shared engine tests：`JSString`、`JSContext` thin wrapper、runtime/context identity、ArrayBuffer/TypedArray 细分行为、`JSValue` object/type helpers、`defineProperty`、codable/value converter 与 callback return/error coder；本轮迁移未暴露新的 QuickJS/JSC 行为不一致
 - [ ] 每发现一处“JSC 迁移得来的边界不符合第二引擎实际”的案例，都在 TODO 里记录并据此调整剩余迁移优先级
+
+## 2. 值管理架构重构
+
+设计：`docs/VALUE_MANAGEMENT_REFACTORING.md`、`docs/PERSISTENT_HANDLE_DESIGN.md`。已完成的阶段见 [值管理重构完成项](docs/finished/value-management.md)。
+
+### 2.1 待设计 / 待裁决
+
+- [ ] 弱引用的后续子集：class finalizer 驱动失效、JS `WeakRef` 互操作（QuickJS 可行，JSC 待确认）——`PERSISTENT_HANDLE_DESIGN` §10-7
+- [ ] 外部清箱后是否自动重建 scope 侧访问路径（v1 不重建）——§10-2
+- [ ] 未 `close()` 的 registry 是否需要可观测诊断——§10-3
+- [ ] `invalidate` 在 VM 线程上是否内联结算——§10-5
+- [ ] chunk 容量、尾部裁剪、`UInt32` 耗尽策略——§10-6
+- [ ] registry 访问路径：typed `package` 字段或缓存指针替代 context data box 查找（box 访问占 witness resolve 的 40–45%）——§10-1
+- [ ] 后续能力：typed host-value 存储、in-place rebind、`isAlive`、同一值多次 mint 去重、跨 context 解析与 `RuntimeLocal`、context 保活替代——§10-8 至 §10-14
+
+### 2.2 待实现
+
+- [ ] 默认 scope 逃逸值累积：无提前回收 / compact API
+- [ ] Stage 5（`@lifetime` 转正后）：本地值改 `Copyable + ~Escapable`；`JSValue`/`JSCallbackValue` 合并；`JSCallbackValue.decode` 去临时 scope；arena 降为释放记账
+- [ ] `JSVirtualMachine` / `JSPreparedScript` / `JSPropertyStringKey` 的 deinit 线程归属（非 isolated）
+- [ ] `JSContext.init` 在调用线程执行 `JS_NewContext`：共享 VM 的多 context 宿主需自行串行化创建
+- [ ] `IsolatedDeinit` 实验特性转正后移除 `enableExperimentalFeature`
+- [ ] 测试缺口：Mock `claimOwnedValueHandle` 为 identity，无法建模 QuickJS dup；缺 `persist(this/arguments)` borrowed fallback 用例
+- [ ] 引擎静态操作面退役（方法体搬进 context 扩展）、类系统约束收窄、`JSFunctionCallback` 去引擎参数化

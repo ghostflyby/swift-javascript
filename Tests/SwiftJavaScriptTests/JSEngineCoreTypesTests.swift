@@ -113,7 +113,8 @@ public struct MockContextHandle: JSContextManualReferenceCountedHandle, @uncheck
   }
 
   public func releaseReference() -> Bool {
-    true
+    recordEngineThread(for: rawContext.identity, "context-release")
+    return true
   }
 }
 
@@ -340,6 +341,7 @@ public enum MockEngine: JSEngine {
     // running a user finalizer, which is the settlement-reentry source the
     // persistent registry must survive without deadlocking (design §3.5).
     mockReleaseReentryHooks.withLock { $0[context.rawContext.identity] }?()
+    recordEngineThread(for: context.rawContext.identity, "release")
     contextReleaseLog.withLock {
       $0[context.rawContext.identity, default: []].append(handle.borrowed())
     }
@@ -2034,6 +2036,9 @@ extension MockEngine {
     _ storage: JSContextDataStorageBox?,
     in context: MockContextHandle
   ) {
+    // Engine-modelled call: like the real backends' `JSObjectSetPrivate` /
+    // `JS_SetContextOpaque`, it must only run on the context's VM thread.
+    recordEngineThread(for: context.rawContext.identity, "box-swap")
     mockContextDataStorageRegistry.withLock {
       $0[mockContextDataRegistryKey(for: context)] = storage
     }
@@ -2969,6 +2974,51 @@ private func removeReleaseReentryHook(for identity: String) {
   mockReleaseReentryHooks.withLock { $0[identity] = nil }
 }
 
+// MARK: - Engine-call thread log for MockEngine (Stage 4 §8.3)
+//
+// Records the thread identity of every engine-modelled call (claim / root /
+// unroot / release / storage-box swap / context release), so lifecycle tests
+// can assert directly that settlement and box swaps ran on the VM's
+// dedicated thread — the sentinel alone only proves ordering ("before
+// ping"), not the executing thread.
+
+struct MockEngineCall: Equatable {
+  let operation: String
+  let thread: ObjectIdentifier
+}
+
+private let contextEngineThreadLog = Mutex<[String: [MockEngineCall]]>([:])
+
+private func engineThreadLog(for identity: String) -> [MockEngineCall] {
+  contextEngineThreadLog.withLock { $0[identity] ?? [] }
+}
+
+private func clearEngineThreadLog(for identity: String) {
+  contextEngineThreadLog.withLock { $0[identity] = nil }
+}
+
+private func recordEngineThread(for identity: String, _ operation: String) {
+  contextEngineThreadLog.withLock {
+    $0[identity, default: []].append(
+      MockEngineCall(operation: operation, thread: ObjectIdentifier(Thread.current)))
+  }
+}
+
+/// Value-ledger engine calls only (teardown's box swap and context release
+/// excluded), for assertions about binding settlement.
+private func settlementEngineCalls(for identity: String) -> [MockEngineCall] {
+  engineThreadLog(for: identity).filter {
+    ["claim", "root", "unroot", "release"].contains($0.operation)
+  }
+}
+
+/// `Thread.current` is unavailable from async contexts; a test body runs
+/// synchronously between suspensions, so route the capture through this
+/// synchronous helper.
+private func currentThreadIdentifier() -> ObjectIdentifier {
+  ObjectIdentifier(Thread.current)
+}
+
 // MARK: - Context-side driver conformance (Stage 2B)
 //
 // The engine's operations remain implemented as statics on `MockDriver`; the
@@ -3056,7 +3106,11 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   }
 
   public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
-    MockEngine.installContextDataStorageBox(storage, in: self)
+    // Mirrors the production backends: the engine-side swap is routed to
+    // the context's VM thread.
+    MockEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
+      MockEngine.installContextDataStorageBox(storage, in: context)
+    }
   }
 
   public func releaseCreatedHandle(_ handle: consuming MockOwnedValueHandle) {
@@ -3068,6 +3122,7 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   /// operation (matching GC-engine semantics). Claims are logged separately
   /// so persistent mint/resolve can assert "one claim" exactly.
   public func claimOwnedValueHandle(_ handle: MockValueHandle) -> MockOwnedValueHandle {
+    recordEngineThread(for: rawContext.identity, "claim")
     contextClaimLog.withLock {
       $0[rawContext.identity, default: []].append(handle)
     }
@@ -3078,6 +3133,7 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   /// a rooted arena element takes one root on add and one unroot on
   /// drain/transfer (MockEngine §3.7 policy hook).
   public func rootOwnedValueHandle(_ handle: borrowing MockOwnedValueHandle) {
+    recordEngineThread(for: rawContext.identity, "root")
     contextRootingLog.withLock {
       $0[rawContext.identity, default: []].append(
         MockRootingEvent(handle: handle.borrowed(), isRoot: true))
@@ -3085,6 +3141,7 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   }
 
   public func unrootOwnedValueHandle(_ handle: borrowing MockOwnedValueHandle) {
+    recordEngineThread(for: rawContext.identity, "unroot")
     contextRootingLog.withLock {
       $0[rawContext.identity, default: []].append(
         MockRootingEvent(handle: handle.borrowed(), isRoot: false))
@@ -3760,6 +3817,288 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(handle.invalidate() == false)
 }
 
+/// Stage 4 design §8.1 case 10 (state machine): while a slot is `settling`
+/// — payload moved out of the slot, settlement's engine calls in flight —
+/// both `release` and resolve are no-ops, and the payload is never moved a
+/// second time. The settling window is entered through the release reentry
+/// hook (the same engine-reentry point as case 9's finalizer simulation).
+@Test func settlingSlotIgnoresReleaseAndResolveAndMovesPayloadOnce() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+    for: context!.driverContextHandle)
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("settling"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  // Written once from inside the settling window (VM thread), read after
+  // the sentinel — same cross-thread shape as the contract tests' mint box.
+  final class SettlingObservation: @unchecked Sendable {
+    var reenteredRelease: Bool?
+    var resolvedDuringSettling: MockValueHandle?
+  }
+  let observation = SettlingObservation()
+  installReleaseReentryHook(for: id) {
+    guard observation.reenteredRelease == nil else { return }
+    observation.reenteredRelease = handle.invalidate()
+    observation.resolvedDuringSettling = registry?.borrowLive(handle.identity)
+  }
+  defer { removeReleaseReentryHook(for: id) }
+
+  #expect(handle.invalidate())
+  await awaitContextTeardown(on: virtualMachine)
+
+  // The pump moved the payload out exactly once and settled it exactly
+  // once: one unroot, one release. A second move (late pump or close not
+  // honoring `settling`) would settle again and add a second entry.
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+
+  // Both re-entries from inside the settling window were no-ops.
+  #expect(observation.reenteredRelease == false)
+  #expect(observation.resolvedDuringSettling == nil)
+
+  // Container death afterwards settles nothing more.
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+}
+
+/// Stage 4 design §8.3: every settlement engine call runs on the VM's
+/// dedicated thread. The FIFO sentinel only proves ordering; this asserts
+/// the executing thread directly through the claim/root/unroot/release
+/// thread records, across the whole mint → settle → teardown lifecycle.
+@Test func persistentSettlementEngineCallsRunOnVMExecutorThread() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+  clearEngineThreadLog(for: id)
+
+  let vmThread = await context!.withInstantContext { _ in
+    ObjectIdentifier(Thread.current)
+  }
+  let testThread = currentThreadIdentifier()
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("threaded"))
+  }
+  #expect(handle.invalidate())
+  await awaitContextTeardown(on: virtualMachine)
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+
+  // The assertion discriminates: the dedicated executor really is a
+  // distinct thread, and every recorded engine call (mint's claim + root,
+  // settlement's unroot + release, teardown's box swap and context release)
+  // happened on it.
+  #expect(vmThread != testThread)
+  let calls = engineThreadLog(for: id)
+  #expect(!calls.isEmpty)
+  #expect(calls.allSatisfy { $0.thread == vmThread })
+  // Teardown order (design §3.5/§4.1): the box is cleared while the engine
+  // context is still alive, and both land on the VM thread.
+  let teardown = calls.map(\.operation).filter { ["box-swap", "context-release"].contains($0) }
+  #expect(teardown == ["box-swap", "context-release"])
+}
+
+/// Stage 4 design §8.3 (late pump): a cleanup closure queued while
+/// `close()` is executing on the VM thread must run as a pure no-op — zero
+/// engine calls, zero thread records. Deterministic construction: an actor
+/// job occupies the VM executor and blocks before closing; resuming the
+/// continuation proves the job is executing, so the settlement closure
+/// queued by the test-thread `invalidate` lands behind it. The gate opens,
+/// the job closes (settling the binding inline), and the sentinel then
+/// forces the already-queued closure to execute against the closed
+/// registry.
+@Test func latePumpAfterCloseMakesNoEngineCalls() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+    for: context!.driverContextHandle)
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("late-pump"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+  clearEngineThreadLog(for: id)
+
+  // Phase 1: occupy the VM executor with a job that blocks before closing.
+  let closeGate = DispatchSemaphore(value: 0)
+  var closer: Task<Void, Never>!
+  await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+    closer = Task { [weak context] in
+      guard let context else { return }
+      await context.withInstantContext { _ in
+        continuation.resume()
+        closeGate.wait()
+        registry?.close()
+      }
+    }
+  }
+
+  // Phase 2: release from the test thread. Identity dies here; the
+  // settlement closure is queued on the VM executor behind the blocked job.
+  #expect(handle.invalidate())
+
+  // Phase 3: the job closes on the VM thread and settles the
+  // pendingRelease inline — exactly one unroot + one release.
+  closeGate.signal()
+  await closer.value
+  #expect(claimLog(for: id).isEmpty)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+  let threadsAfterClose = engineThreadLog(for: id)
+  #expect(!threadsAfterClose.isEmpty)
+
+  // Phase 4: the sentinel orders after the queued closure. A live pump
+  // would settle an already-settled payload (second release entry) or at
+  // least record its thread; the closed registry makes it metadata-only.
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+  #expect(engineThreadLog(for: id).count == threadsAfterClose.count)
+
+  // The context's own isolated deinit closes again (idempotent) and
+  // settles nothing more (its own box swap and context release are the only
+  // new engine calls).
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+  #expect(settlementEngineCalls(for: id).count == threadsAfterClose.count)
+}
+
+/// The isolation criterion the storage-box routing relies on
+/// (`ThreadBoundExecutor.isIsolatingCurrentContext()`): false on any other
+/// thread, true inside the context's actor window.
+@Test func vmThreadIsolationCriterionDistinguishesCaller() async {
+  let context = JSContext<MockEngine>()
+  let onTestThread = context.virtualMachine.vmThread.isIsolatingCurrentContext()
+  let vmThread = await context.withInstantContext { _ in
+    (currentThreadIdentifier(), context.virtualMachine.vmThread.isIsolatingCurrentContext())
+  }
+  #expect(onTestThread == false)
+  #expect(vmThread.1 == true)
+  #expect(vmThread.0 != currentThreadIdentifier())
+}
+
+/// Stage 4 design §8.1 case 8, foreign-thread form: clearing or replacing
+/// the context data box from outside the VM thread makes no engine call on
+/// the calling thread — the swap is posted to the VM thread. The registry
+/// survives (only the scope-side access path is removed), the actor side
+/// keeps working, and a reinstall restores the scope side.
+@Test func contextDataStorageBoxSwapFromForeignThreadRunsOnVMThread() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("boxed"))
+  }
+  let box = await context.withInstantContext { scope in
+    scope.driverContextHandle.contextDataStorageBox()
+  }
+  guard let box else {
+    Issue.record("JSContext did not install a context data storage box")
+    return
+  }
+  let vmThread = await context.withInstantContext { _ in currentThreadIdentifier() }
+  let testThread = currentThreadIdentifier()
+  clearEngineThreadLog(for: id)
+
+  // No actor window: this is the test thread.
+  context.driverContextHandle.installContextDataStorageBox(nil)
+  await awaitContextTeardown(on: virtualMachine)
+
+  // Exactly one engine-side swap, on the VM thread, none on the caller.
+  let afterClear = engineThreadLog(for: id)
+  #expect(afterClear.map(\.operation) == ["box-swap"])
+  #expect(afterClear.first?.thread == vmThread)
+  #expect(!afterClear.contains { $0.thread == testThread })
+
+  // The registry survives: the scope side lost its access path, the actor
+  // side (which owns the registry) did not.
+  let scopeWithoutBox = await context.withInstantContext { scope in
+    scope.resolve(handle) == nil
+  }
+  let actorKeepsRegistry = await context.withIsolatedGlobalObject { isolatedContext, _ in
+    isolatedContext.resolve(handle) != nil
+  }
+  #expect(scopeWithoutBox)
+  #expect(actorKeepsRegistry)
+
+  // Reinstalling from the foreign thread restores the scope side the same way.
+  clearEngineThreadLog(for: id)
+  context.driverContextHandle.installContextDataStorageBox(box)
+  await awaitContextTeardown(on: virtualMachine)
+  let afterReinstall = engineThreadLog(for: id)
+  #expect(afterReinstall.map(\.operation) == ["box-swap"])
+  #expect(afterReinstall.first?.thread == vmThread)
+  let scopeRestored = await context.withInstantContext { scope in
+    scope.resolve(handle) != nil
+  }
+  #expect(scopeRestored)
+}
+
+/// A swap issued on the VM thread is inline: its effect is visible to the
+/// very next synchronous read.
+@Test func contextDataStorageBoxSwapOnVMThreadIsInline() async {
+  let context = JSContext<MockEngine>()
+  let inline = await context.withInstantContext { scope -> Bool in
+    let handle = scope.driverContextHandle
+    guard let box = handle.contextDataStorageBox() else { return false }
+    handle.installContextDataStorageBox(nil)
+    let clearedSynchronously = handle.contextDataStorageBox() == nil
+    handle.installContextDataStorageBox(box)
+    return clearedSynchronously && handle.contextDataStorageBox() === box
+  }
+  #expect(inline)
+}
+
+/// The public construction path for `JSScope`: `makeScope()` returns an
+/// opened scope nested on the context's stack, everything done through it
+/// runs on the VM thread, and the frame is gone once the scope leaves scope.
+@Test func contextMakeScopeOpensNestedFrameOnVMThread() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  clearEngineThreadLog(for: id)
+
+  let (defaultFrame, nested, vmThread) = await context.withIsolatedGlobalObject {
+    isolatedContext, _ -> (ScopeFrame<MockEngine>, Bool, ObjectIdentifier) in
+    let contextHandle = isolatedContext.driverContextHandle
+    let defaultFrame = ScopeStackRegistry<MockEngine>.top(of: contextHandle)
+    let scope = isolatedContext.makeScope()
+    let minted = scope.makePersistentHandle(scope.makeString("nested"))
+    let resolvedInNestedScope = !(scope.resolve(minted) == nil)
+    let top = ScopeStackRegistry<MockEngine>.top(of: contextHandle)
+    return (
+      defaultFrame!, resolvedInNestedScope && top === scope.scopeFrame && top !== defaultFrame,
+      currentThreadIdentifier()
+    )
+  }
+  #expect(nested)
+
+  // The scope left with the closure: its frame popped, the stack bottom is
+  // the context default scope again.
+  let topIsDefaultAgain =
+    ScopeStackRegistry<MockEngine>.top(
+      of: context.driverContextHandle) === defaultFrame
+  #expect(topIsDefaultAgain)
+
+  // Every engine call the nested scope caused (mint, resolve, drains)
+  // happened on the VM thread.
+  await awaitContextTeardown(on: context.virtualMachine)
+  let calls = engineThreadLog(for: id)
+  #expect(!calls.isEmpty)
+  #expect(calls.allSatisfy { $0.thread == vmThread })
+}
+
 /// Same runtime, two contexts: each context owns an independent registry,
 /// so handles are context-local in both directions and neither binding is
 /// disturbed by the other's lookups.
@@ -3870,17 +4209,25 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   let registry = JSPersistentHandleRegistry<MockEngine>.registry(
     for: context!.driverContextHandle)
 
-  _ = await context!.withInstantContext { scope in
+  // Keep the binding live until the manual close. A discarded handle would
+  // already be `pendingRelease`, and its scheduled pump — not the close —
+  // would be the one settling it, racing the log resets below.
+  var handle: JSPersistentHandle<MockEngine>? = await context!.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("close-twice"))
   }
   clearRootingLog(for: id)
   clearReleaseLog(for: id)
 
-  registry?.close()
-  await awaitContextTeardown(on: virtualMachine)  // FIFO behind close's settlement
+  // `close()` is VM-thread only (design §3.5).
+  await context!.withInstantContext { _ in registry?.close() }
   // The first close settled the binding exactly once.
   #expect(rootingLog(for: id).map(\.isRoot) == [false])
   #expect(releaseLog(for: id).count == 1)
+
+  // The identity died with the container: a late release from the surviving
+  // handle is a no-op, and dropping it schedules nothing.
+  #expect(handle?.invalidate() == false)
+  handle = nil
 
   // The second close — the context teardown's own — is a no-op: the counts
   // do not move and nothing dangles or crashes.
@@ -3902,7 +4249,8 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   let handle = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("closed"))
   }
-  registry?.close()
+  // `close()` is VM-thread only (design §3.5).
+  await context.withInstantContext { _ in registry?.close() }
   await awaitContextTeardown(on: virtualMachine)
 
   let resolved = await context.withInstantContext { scope in

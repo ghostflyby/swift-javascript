@@ -8,6 +8,10 @@ import Synchronization
 /// object that pushed it.
 internal final class ScopeStack<E: JSEngineRuntimeDriver>: @unchecked Sendable {
   private var frames: [ScopeFrame<E>] = []
+  /// The VM thread of a hosted context (design §0.2.3), or `nil` for a bare
+  /// one. Written once by `ScopeStackRegistry.bind`, under the registry
+  /// lock like every other access to this object.
+  private(set) var vmThread: VMThread? = nil
 
   func push(_ frame: ScopeFrame<E>) { frames.append(frame) }
   @discardableResult
@@ -18,6 +22,10 @@ internal final class ScopeStack<E: JSEngineRuntimeDriver>: @unchecked Sendable {
   /// explicit scope.
   var bottom: ScopeFrame<E>? { frames.first }
   var isEmpty: Bool { frames.isEmpty }
+
+  func bind(_ vmThread: VMThread) {
+    self.vmThread = vmThread
+  }
 }
 
 /// Non-generic mutex-backed storage for the per-engine registry below
@@ -63,6 +71,24 @@ internal enum ScopeStackRegistry<E: JSEngineRuntimeDriver> {
         $0.stacks.removeValue(forKey: key)
       }
       return popped
+    }
+  }
+
+  /// Bind a hosted context to the VM thread that owns its engine access.
+  ///
+  /// The binding lives exactly as long as the context's stack entry: it
+  /// disappears with the last `pop`, which `JSContext`'s isolated deinit
+  /// performs before clearing its data box — so that final swap runs
+  /// inline, on the thread the deinit is already guaranteed to run on.
+  static func bind(_ vmThread: VMThread, for context: E.ContextHandle) {
+    ScopeStackStorage.state.withLock {
+      ($0.stacks[AnyHashable(context)] as? ScopeStack<E>)?.bind(vmThread)
+    }
+  }
+
+  static func vmThread(for context: E.ContextHandle) -> VMThread? {
+    ScopeStackStorage.state.withLock {
+      ($0.stacks[AnyHashable(context)] as? ScopeStack<E>)?.vmThread
     }
   }
 

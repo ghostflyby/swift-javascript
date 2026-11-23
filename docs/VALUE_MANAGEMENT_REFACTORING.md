@@ -152,7 +152,7 @@ JSScope<E>: ~Copyable             ← 手动 scope(未提交):open() push,deinit
 
 1. **不持有、不释放**:创建即进入某个 scope 的 arena(回调 scope、手动 `JSScope`、或 context 默认 scope §3.6),释放统一由 `drain()` 记账;`deinit` 不再执行 `releaseReference(in:)`——"值拖着 context"的悬垂病根(§2.5 P1)随 owning 语义一并移除。
 2. **内嵌 `ContextHandle`,承重而非便利**:本地值的操作以 context 为键,直接使用值自带的 `ContextHandle`(§3.4)——不再逐操作穿引 scope 或 context 参数。它不构成所有权、不参与生命周期(释放权在 arena),但是操作寻址与引擎结果落账的依据。
-3. **生命周期声明式严格短于 context**:现阶段以结构化约束表达——`~Copyable`、非 `Sendable`(内部 handle 类型显式标 `~Sendable`,SE-0518,防"成员全 Sendable 的内部 struct 被隐式推断"导致的跨域泄漏)、仅可从 scope 见证工厂构造、回调签名全程 `borrowing`、同步 scope 的构造与值操作标注 `noasync`(SE-0340)。"窗口内无挂起点"的可靠编码是**同步闭包 confinement**——闭包非 async,`await` 词法上不可达;`noasync` 的浅检查语义(经同步包装可绕)恰好使"同步闭包路线 == 唯一合法路线"。`@lifetime` 转正后升级为编译期声明:显式 scope 值标 `@lifetime(borrow scope)`,默认 scope 值标 `@lifetime(copy context)`(Stage 5)。**不采用**保活(值 retain context)或运行时检测(TLS/断言)作为手段。
+3. **生命周期声明式严格短于 context**:现阶段以结构化约束表达——`~Copyable`、非 `Sendable`(内部 handle 类型显式标 `~Sendable`,SE-0518,防"成员全 Sendable 的内部 struct 被隐式推断"导致的跨域泄漏)、仅可从 scope 见证工厂构造、回调签名全程 `borrowing`、同步 scope 的构造与值操作标注 `noasync`(SE-0340)。"窗口内无挂起点"的可靠编码是**同步闭包 confinement**——闭包非 async,`await` 词法上不可达;`noasync` 的浅检查语义(经同步包装可绕)恰好使"同步闭包路线 == 唯一合法路线"。`@lifetime` 转正后升级为编译期声明:显式 scope 值标 `@lifetime(borrow scope)`,默认 scope 值标 `@lifetime(copy context)`(Stage 5)。**不采用**保活(值 retain context)或运行时检测(TLS/断言)作为手段。`JSScope` 的公共构造面据此收敛(2026-11-23):`init(handle:)`/`open()` 为 `package`,公共面只有 actor 隔离工厂 `JSContext.makeScope()`,类型为 `~Copyable + ~Sendable`——非 Sendable 使工厂结果跨不出 actor 边界,见证所在的 VM 线程由构造面保证。
 4. **`JSCallbackValue` 收敛并入**:其"作用域值"角色与本地值 `JSValue` 重合,终态统一为一个类型(过渡路径与命名见 §7);`~Copyable` 化与 handle 收敛(`package`)是 Stage 1 的第一步——`JSFunctionCallback` 与 `ScopeCore` 工厂签名已全程 `borrowing`,拷贝性当前并未被依赖。
 
 **为什么现阶段不做 `~Escapable`**:那是本地值的终态形态,但依赖 `@lifetime` 的工厂签名才能检查;特性未转正前,`~Escapable` 值无法合法地作为工厂返回值使用(闭包路径还会丢失依赖信息)。演进路径见 Stage 5。
@@ -229,7 +229,7 @@ protocol JSScopeWitness<E: JSEngine>: ~Copyable {
 
 - `JSContext` 持有一个 context 级默认 scope(一个长存 `ScopeCore`,走 `explicitRoots` 策略 §3.7),**即 context 作用域栈的栈底**(§3.4):context 建立时压入、deinit 时最后弹出 drain,QuickJS 释放配平与 JSC unprotect-on-drain 由它兜底;
 - actor 方法中的值工厂(`makeString` 等)落入默认 scope:产物在 context 存续期内有效(经显式根化,§3.7)、可在同一 actor 的后续调用与 `await` 之间使用,但不可离开 actor(非 `Sendable`)——保持现有 `JSContext` 公共 API 的工效不变;
-- 显式 scope(回调 `JSInstantContext`、手动 `JSScope`)是更短的嵌套窗口,用于回调与临时批量创建;默认 scope 是便利层,不是纪律的替代——**提前回收的边界(Stage 3 修正)**:显式 scope 只能提前回收其工厂产物与 persist 进它的值;经公共签名逃逸的 `JSValue` 结果(getProperty/call/evaluateScript/host object 等)一律锚默认 scope,到 context deinit 才回收,长寿命 context 会累积(JSC protect/QuickJS 引用)——默认 scope 的提前回收/compact API 为登记在案的后续项(TODO §2.5);
+- 显式 scope(回调 `JSInstantContext`、手动 `JSScope`)是更短的嵌套窗口,用于回调与临时批量创建;默认 scope 是便利层,不是纪律的替代——**提前回收的边界(Stage 3 修正)**:显式 scope 只能提前回收其工厂产物与 persist 进它的值;经公共签名逃逸的 `JSValue` 结果(getProperty/call/evaluateScript/host object 等)一律锚默认 scope,到 context deinit 才回收,长寿命 context 会累积(JSC protect/QuickJS 引用)——默认 scope 的提前回收/compact API 为登记在案的后续项(`TODO.md` §2.2);
 - 两类 scope 共享同一 `ScopeCore` 内核与 arena 记账,无第二套生命周期规则。
 
 ### 3.7 根化策略:同步 scope 与异步 scope
@@ -258,7 +258,7 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 1. **显式(同步)scope 不跨 `await`**:V8 文档 §6.3 同款结论;引擎级依据是 §2.4 根域规则——JSC 未根值随帧入堆而脱根,V8 模型/QuickJS 上跨挂起点本身安全,API 取交集换单一规则。回调与手动 scope 在同步窗口内 drain;
 2. **执行互斥由 actor 保证,与值生命周期无关**,两层不得互相替代;
-3. **专用线程 executor 保持不变**——它是两引擎线程约束的执行基础,未来 Promise 桥接(异步回调恢复到 JS 线程)也复用它,不在本重构范围内。Swift `await` 的语境分层:隔离域(语言保证必回)/ 串行 executor(actor 保证)/ OS 线程(语言不保证,由本 executor 补齐);取消为协作式,帧清理发生在原隔离域,无 C++ 式异线程析构。executor 已覆盖引擎侧线程语义,scope 侧约束的依据是根域(§3.7)而非线程。
+3. **专用线程 executor 语义保持不变**(实现于 2026-11-23 换为 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`,见 `docs/PERSISTENT_HANDLE_DESIGN.md` §2.4 末)——它是两引擎线程约束的执行基础,未来 Promise 桥接(异步回调恢复到 JS 线程)也复用它,不在本重构范围内。Swift `await` 的语境分层:隔离域(语言保证必回)/ 串行 executor(actor 保证)/ OS 线程(语言不保证,由本 executor 补齐);取消为协作式,帧清理发生在原隔离域,无 C++ 式异线程析构。executor 已覆盖引擎侧线程语义,scope 侧约束的依据是根域(§3.7)而非线程。
 
 ---
 
@@ -332,8 +332,8 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 **B. driver 协议分解与 context 实例方法化(已完成,与 TODO §1.3 合流):**
 
 - [x] driver 要求实例化到 `ContextHandle`:新增五个 `JSContext*Driver` 协议由各引擎 ContextHandle 遵循,引擎协议保留为描述符(associated types + 生命周期静态),where 同型链接;核心调用点全量迁移,`releaseCreatedHandle`/storage 三方法为**硬 requirement(无默认)**——静默 no-op 默认会让迁移引擎无声泄漏;引擎静态面保留为转发目标(双入口,方法体物理搬移排后续片)
-- [x] 值操作签名 owned 化重扫完成(逐签名表见 TODO §2.4):创建工厂 owned、双路径消费 borrowed、单 JSValue 路径(construct/toObject/evaluate 等)裁决维持 borrowed——唯一消费点即约定包装,owned 化零防护增益
-- [x] 约束收窄与退役(本轮份额):`SendableMetatype` 全删;`JSValueConversionEngine` 并集别名落位;`JSCallbackValue`/`JSArguments` 本体只约束 handle 面;类系统(JSClass*/ClassBridgeDriver)仍挂完整 `E: JSEngine`,独立 class driver 面与 `JSFunctionCallback` 去引擎参数化排后续。**Source-breaks 四项已登记(TODO §2.4)**
+- [x] 值操作签名 owned 化重扫完成:创建工厂 owned、双路径消费 borrowed、单 JSValue 路径(construct/toObject/evaluate 等)裁决维持 borrowed——唯一消费点即约定包装,owned 化零防护增益
+- [x] 约束收窄与退役(本轮份额):`SendableMetatype` 全删;`JSValueConversionEngine` 并集别名落位;`JSCallbackValue`/`JSArguments` 本体只约束 handle 面;类系统(JSClass*/ClassBridgeDriver)仍挂完整 `E: JSEngine`,独立 class driver 面与 `JSFunctionCallback` 去引擎参数化排后续。**Source-breaks 四项记录于 `docs/finished/value-management.md`**
 - [x] 按 TODO §1.3 合流推进:Slice 2(基础判型/转换)已随本块完成,Slice 3/4(属性访问/回调链路)随后续片
 
 ### Stage 3:`JSValue` 本地值化(核心反转)
@@ -342,7 +342,7 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 - [x] **【验收指标·已按 §7.2 定案变更形态】**persist QuickJS +1 泄漏清零 + exception/persistent 借用锚消解(§2.3 开放项):**原定形态**(owned 交接 + 先 retain 后 settle)在实现中被更优方案取代——`JSValue` 非持有化后 arena 即借用锚点,`JSCallbackReturn` 三态一律借用 + 引擎侧 Duplicate(§7.2 定案),`persist` 改创建引用转移。**三项验收全过**:转移语义(重放等价)、ASan 单测轮、ASan 满载并行轮;Mock 释放计数断言恢复结算语义
 - [x] `ScopeCore` 引入编译期 `Rooting` 策略参数(§3.7):`ScopeCore<E, Rooting>` 编译期参数 + 非泛型 `ScopeFrame` 持有 arena 共享同一 context 栈(运行时 bool 投影,单分支);同步 scope 行为零变化
-- [x] `JSContext` 默认 scope:`defaultScope: ScopeCore<E, JSExplicitRoots>` 压栈底、deinit 最后 drain;`rootOwnedValueHandle`/`unrootOwnedValueHandle` 硬 requirement(JSC `JSValueProtect`/`JSValueUnprotect`,QuickJS 显式恒等);actor 值工厂与**所有逃逸 JSValue 的引擎结果**统一落默认 scope(落当前同步帧会悬垂,代价是到 context deinit 才回收——见 §3.6 修正与 TODO §2.5 开放项)
+- [x] `JSContext` 默认 scope:`defaultScope: ScopeCore<E, JSExplicitRoots>` 压栈底、deinit 最后 drain;`rootOwnedValueHandle`/`unrootOwnedValueHandle` 硬 requirement(JSC `JSValueProtect`/`JSValueUnprotect`,QuickJS 显式恒等);actor 值工厂与**所有逃逸 JSValue 的引擎结果**统一落默认 scope(落当前同步帧会悬垂,代价是到 context deinit 才回收——见 §3.6 修正;后续项登记于 `TODO.md` §2.2)
 - [x] `JSValue` 去 owning 语义:`deinit`/`takeHandle`/`retainHandle`/`discard`/`init(taking:)` 删除,handle 为非 Optional 纯身份 token(`init(copying:)` 无副作用视图);根化片曾加的过渡引用已随值反转删除
 - [x] `persist` 重定义:创建引用转移(源 `takeFirst` 显式根随摘除解除 → 目标 `track` 重新根化),arena-owned 零 retain/release;borrowed fallback 经 `claimOwnedValueHandle` 认领恰好一次(QuickJS dup/JSC identity);默认目标为栈底帧
 - [x] `JSValue`/`JSCallbackValue` 统一评估:**暂不合并**(§7.4 定案)——构造面与 `noasync` 同步窗口契约不同,合并排期 Stage 5 随 `~Escapable`/`@lifetime`
@@ -356,7 +356,8 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 - [x] 设计子文档:`docs/PERSISTENT_HANDLE_DESIGN.md` 定稿并经独立评审修订(§4.3 替换 = invalidate + mint、§4.4 **v1 强绑定**(JSC/QuickJS 均无宿主侧弱引用 API,据此重写"弱引用不阻 GC"验收条——root 跨强制 GC 保活 + QuickJS JS `WeakRef` 释放后不阻 GC,JSC 不测释放后可回收性)、§6.1 `ContextLocal`、槽位 + generation registry、`schedulePersistentCleanup` 经 VM executor)
 - [x] core 层实现:`JSPersistentHandle`(identity 化 Sendable,零 JS 操作面)+ `JSPersistentHandleRegistry`(context 数据箱挂载、分块 slab + free list、generation 防误命中);`resolve` 经 scope 见证 claim 进接收帧 arena;零后端改动
 - [x] 基准测试:`Benchmarks/PersistentHandleBenchmarks` 独立 target,JSC/QuickJS 真实数据 + synthetic 槽位 vs Dictionary(复核员独立复现命中)。选型:维持 slab+free list(chunk 32);`pending` 队列建议 head cursor(尾风险登记);witness 优先 typed `package` 字段(box 查找占 resolve 40-45%)
-- [x] 跨引擎测试:契约测试双引擎参数化 + QuickJS 单引擎 WeakRef 用例;Mock 侧精确计数全套;哨兵全部状态化(空 ping 实测被优化为非跳转调用);VM 上第二 context 创建经存活 context 窗口(引擎访问不变量);双 close 幂等、close 后 resolve nil、bare-context 负面样例补齐。遗留(§8.1-10 settling 计数器、§8.2-4 QuickJS 内存基线、§8.3 线程直断言/迟到泵、外部清箱线程、`JSScope` 公共面线程归属)登记于 TODO §2.6
+- [x] 跨引擎测试:契约测试双引擎参数化 + QuickJS 单引擎 WeakRef 用例;Mock 侧精确计数全套;哨兵全部状态化(空 ping 实测被优化为非跳转调用);VM 上第二 context 创建经存活 context 窗口(引擎访问不变量);双 close 幂等、close 后 resolve nil、bare-context 负面样例补齐。遗留测试缺口(§8.1-10 settling 计数器、§8.2-4 QuickJS 内存基线、§8.3 线程直断言/迟到泵)与 `pending` 队列尾风险已于 2026-11-23 闭环(head cursor 化后基准复跑双引擎斜率不变);此前待定的两项(外部清箱线程归属、`JSScope` 公共面收紧)按裁决随后闭环,见下条
+- [x] 执行器重构与清箱路由(2026-11-23):执行器换为 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`,闭包投递为 `Task.detached(executorPreference:)`;`installContextDataStorageBox` 对托管 context 路由到 VM 线程;`JSScope` 构造面收敛为 `JSContext.makeScope()`。依据与实现落点见 `docs/PERSISTENT_HANDLE_DESIGN.md` §2.4 末与 §3.5;完成项归档于 `docs/finished/value-management.md`
 
 ### Stage 5:lifetime 依赖转正后的迁移(远期,特性门槛)
 

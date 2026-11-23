@@ -105,7 +105,16 @@ private struct PersistentHandleRegistryState<
   /// exhausted (design §1.3: exhausted slots are retired, never wrapped).
   var freeList: [UInt32] = []
   /// Slots whose binding ended but whose payload has not been settled yet.
+  ///
+  /// Dequeued through `pendingHead` (head cursor) instead of
+  /// `Array.removeFirst`: the pump drains under the metadata lock, and
+  /// `removeFirst` shifts every remaining element, which the benchmark
+  /// measured at 29.4–30.0 ms for a 32,768-deep drain (`docs/
+  /// PERSISTENT_HANDLE_DESIGN.md` §11.3). The consumed prefix is compacted
+  /// amortized-O(1) while the queue keeps churning, and dropped wholesale
+  /// when it drains.
   var pending: [UInt32] = []
+  var pendingHead = 0
   /// Next never-issued slab position. Fresh positions are handed out in
   /// ascending order, one chunk at a time.
   var nextFreshSlot: UInt32 = 0
@@ -361,8 +370,18 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
           state.pumpScheduled = false
           return nil
         }
-        while !state.pending.isEmpty {
-          let slot = state.pending.removeFirst()
+        while state.pendingHead < state.pending.count {
+          let slot = state.pending[state.pendingHead]
+          state.pendingHead &+= 1
+          // Compact the consumed prefix while entries keep arriving, so a
+          // churning queue never retains more than ~2x its live depth
+          // (trigger: the dead prefix is large and at least half the
+          // array). Work per compaction is bounded by the dequeues since
+          // the previous one — amortized O(1).
+          if state.pendingHead >= 32 && state.pendingHead * 2 >= state.pending.count {
+            state.pending.removeFirst(state.pendingHead)
+            state.pendingHead = 0
+          }
           guard let located = state.locate(slot),
             located.chunk.states[located.index]
               == PersistentSlotState.pendingRelease.rawValue
@@ -375,6 +394,8 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
             payload: located.chunk.payloads.advanced(by: located.index).move()
           )
         }
+        state.pending.removeAll()
+        state.pendingHead = 0
         state.pumpScheduled = false
         return nil
       }
@@ -417,6 +438,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
       state.closed = true
       state.pumpScheduled = false
       state.pending.removeAll()
+      state.pendingHead = 0
 
       var toSettle: [UInt32] = []
       for (chunkIndex, chunk) in state.chunks.enumerated() {

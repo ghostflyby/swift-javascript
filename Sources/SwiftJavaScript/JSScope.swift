@@ -1,18 +1,28 @@
 import Foundation
 
 /// Manual scope with explicit open/close. Uses ~Copyable for automatic cleanup
-/// on deinit. Must call `open()` before use to push the context scope stack.
+/// on deinit.
 ///
 /// 语义最小面:非回调出口语义不提供,对称不是目标。
 /// Minimal semantic surface: callback-exit semantics (`throw`/`return`/
 /// `returnUndefined`) are not provided on this type; symmetry with
 /// `JSInstantContext` is not a goal.
 ///
-///     var scope = JSScope<Engine>(handle: ctx)
-///     scope.open()
+/// Construction is context-derived on the public surface:
+/// `JSContext.makeScope()` returns an **opened** scope.
+///
+///     var scope = isolatedContext.makeScope()
 ///     let val = scope.persist(scope.makeString("hello"))
 ///     // scope auto-closes on deinit
-public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable {
+///
+/// `~Sendable` is what makes that factory a thread guarantee: the scope
+/// cannot leave the isolation — and therefore the VM thread — it was
+/// created in, and its arena drains through engine calls (design §3.5,
+/// `docs/PERSISTENT_HANDLE_DESIGN.md`). Code that already holds a context
+/// handle inside a synchronous window (callbacks, bare contexts) uses the
+/// `package` pair `init(handle:)` + `open()` under the same VM-thread
+/// precondition.
+public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable, ~Sendable {
   private var core: ScopeCore<E, JSImplicitStackRoots>
   private var isOpen = false
 
@@ -23,13 +33,13 @@ public struct JSScope<E: JSEngineRuntimeDriver>: ~Copyable {
   var scopeFrame: ScopeFrame<E> { core.frame }
 
   @available(*, noasync)
-  public init(handle: E.ContextHandle) {
+  package init(handle: E.ContextHandle) {
     self.core = ScopeCore<E, JSImplicitStackRoots>(handle: handle)
   }
 
   /// Push the context scope stack and begin arena tracking. Idempotent.
   @available(*, noasync)
-  public mutating func open() {
+  package mutating func open() {
     guard !isOpen else { return }
     ScopeStackRegistry.push(core, for: driverContextHandle)
     isOpen = true

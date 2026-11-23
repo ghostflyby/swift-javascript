@@ -44,6 +44,12 @@ public actor JSContext<E: JSContextEngine> {
     // context keeps the authoritative strong reference, so an external box
     // clear only removes this access path.
     storage.setData(persistentRegistry, for: JSPersistentHandleRegistryKey<E>.self)
+    // Bind after the install above. A context's `init` runs entirely on its
+    // caller's thread (the documented bootstrap exception: it issues
+    // `JS_NewContext` there too), so the first box install stays inline and
+    // synchronous with `init`. From here on, storage-box swaps are routed to
+    // the VM thread (`swapContextDataStorageBox`).
+    ScopeStackRegistry<E>.bind(virtualMachine.vmThread, for: driverContextHandle)
   }
 
   package init(
@@ -80,6 +86,10 @@ public actor JSContext<E: JSContextEngine> {
     // temporally nested scope has closed, then pop its frame.
     defaultScope.drain()
     ScopeStackRegistry<E>.pop(for: driverContextHandle)
+    // The pop above dropped this context's VM-thread binding with its last
+    // frame, so the box clear below is inline — it must be: a routed
+    // (deferred) clear could only run after this body, i.e. after
+    // `releaseReference()`.
     driverContextHandle.installContextDataStorageBox(nil)
     _ = driverContextHandle.releaseReference()
   }
@@ -114,6 +124,21 @@ extension JSContext {
   ) throws(Failure) -> R {
     let instantContext = JSInstantContext<E>(handle: driverContextHandle)
     return try body(instantContext)
+  }
+
+  /// Open a manual `JSScope` nested on this context's scope stack (design
+  /// §3.4): its frame is the context's top frame until the returned scope
+  /// leaves scope.
+  ///
+  /// The public construction path for `JSScope`. The factory is
+  /// actor-isolated and `JSScope` is neither `Copyable` nor `Sendable`, so
+  /// the scope is born, used and drained inside this context's isolation —
+  /// on the VM thread — which is the witness guarantee its mint/resolve
+  /// entry points rely on (`docs/PERSISTENT_HANDLE_DESIGN.md` §3.5).
+  public func makeScope() -> JSScope<E> {
+    var scope = JSScope<E>(handle: driverContextHandle)
+    scope.open()
+    return scope
   }
 
   public func makeString(_ value: String) -> JSValue<E> {

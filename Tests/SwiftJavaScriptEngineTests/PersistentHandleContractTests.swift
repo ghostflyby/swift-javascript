@@ -64,6 +64,15 @@ struct PersistentHandleContractTests {
     await engine.run(PersistentHandleWithoutBinding.self)
   }
 
+  /// Design §8.1 case 8, foreign-thread form: the storage box is cleared and
+  /// reinstalled from outside the VM thread. The engine-side swap must not
+  /// run on the calling thread — it is posted to the VM thread, ahead of
+  /// anything enqueued after it (the FIFO sentinel).
+  @Test(arguments: ScriptEngine.allCases)
+  func contextDataStorageBoxSwapFromForeignThreadStaysOnVMThread(_ engine: ScriptEngine) async {
+    await engine.run(PersistentHandleForeignThreadBoxSwap.self)
+  }
+
   /// GC engine half of design §4.4's rewritten acceptance: while a binding
   /// is alive its root (JSC protect / QuickJS duplicate) keeps a collectible
   /// object resolvable across a forced collection.
@@ -353,6 +362,48 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
       scope.resolve(dyingHandle) == nil
     }
     #expect(survivorResolved)
+  }
+}
+
+/// The box is cleared and reinstalled with no actor window: the calls come
+/// from the test's own thread. Scope-side resolution goes away and comes
+/// back; the actor side, which owns the registry, is never disturbed.
+/// Under ASan this is the real-engine form of "no engine call on the
+/// calling thread" for the posted swap.
+private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
+  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+    let context = JSContext<E>()
+    let virtualMachine = context.virtualMachine
+
+    let handle = await context.withInstantContext { scope in
+      scope.makePersistentHandle(scope.makeString("boxed"))
+    }
+    // An engine read: taken inside the actor window.
+    let box = await context.withInstantContext { scope in
+      scope.driverContextHandle.contextDataStorageBox()
+    }
+    guard let box else {
+      Issue.record("JSContext did not install a context data storage box")
+      return
+    }
+
+    context.driverContextHandle.installContextDataStorageBox(nil)
+    await awaitPersistentHandleSettlement(on: virtualMachine)
+    let scopeWithoutBox = await context.withInstantContext { scope in
+      scope.resolve(handle) == nil
+    }
+    let actorKeepsRegistry = await context.withIsolatedGlobalObject { isolatedContext, _ in
+      isolatedContext.resolve(handle) != nil
+    }
+    #expect(scopeWithoutBox)
+    #expect(actorKeepsRegistry)
+
+    context.driverContextHandle.installContextDataStorageBox(box)
+    await awaitPersistentHandleSettlement(on: virtualMachine)
+    let scopeRestored = await context.withInstantContext { scope in
+      scope.resolve(handle) != nil
+    }
+    #expect(scopeRestored)
   }
 }
 

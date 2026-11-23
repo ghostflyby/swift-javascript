@@ -34,17 +34,18 @@
 ### 0.2 三条不可协商的前提(来自现有代码)
 
 1. **`JSValue` 是本地值,不拥有引用**——它只有 `handle + ContextHandle` 两个 Copyable
-   身份 token,`deinit` 不释放(`Sources/SwiftJavaScript/JSValue.swift:21-41`)。
+   身份 token,`deinit` 不释放(`Sources/SwiftJavaScript/JSValue.swift` 的 `JSValue`)。
 2. **arena 是本地值的唯一释放账本**——`ScopeFrame.track` 按策略根化、`drain` 先 unroot
    再 `releaseCreatedHandle`,`takeFirst` 摘除时同步解除根化
-   (`Sources/SwiftJavaScript/JSInstantContext.swift:304-352`)。任何新增层都必须与这份账本
+   (`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeFrame`)。任何新增层都必须与这份账本
    对账,不能拥有"看不见的引用"。
-3. **引擎调用只允许发生在 VM 的专用串行 executor 上**——`JSVirtualMachine` 持有
-   `DedicatedThreadSerialExecutor`(`Sources/SwiftJavaScript/JSVirtualMachine.swift:38-112`),
-   `JSContext` 的 teardown 已由 `isolated deinit` 搬到该线程
-   (`Sources/SwiftJavaScript/JSContext.swift:73-84`)。持久层不得新增任意线程的引擎访问。
+3. **引擎调用只允许发生在 VM 的专用串行 executor 上**——`JSVirtualMachine` 持有 `VMThread`
+   (`ThreadAffinityExecutor` 库 `DedicatedThreadExecutor` 的薄包装,
+   `Sources/SwiftJavaScript/JSVirtualMachine.swift`),`JSContext` 的 teardown 已由
+   `isolated deinit` 搬到该线程(`Sources/SwiftJavaScript/JSContext.swift`)。持久层不得新增
+   任意线程的引擎访问。
 
-Stage 4 的待办原文见 `TODO.md:211-215`;其中"弱引用不阻 GC"一条与本设计冲突,
+Stage 4 的待办原文见 `TODO.md` §2.6;其中"弱引用不阻 GC"一条与本设计冲突,
 处置见 §4.4。
 
 ### 0.3 术语
@@ -99,7 +100,7 @@ public final class JSPersistentHandle<E: JSEngineRuntimeDriver>: Sendable, Hasha
 四条形态约束及其依据:
 
 1. **必须是 class(引用计数对象)**。父文档 §3.5 要求"最后一个 owner 释放时清理",而结构体没有
-   `deinit`;"handle 是引用计数对象"是 `VALUE_MANAGEMENT_REFACTORING.md:221` 的原文要求。
+   `deinit`;"handle 是引用计数对象"是 `VALUE_MANAGEMENT_REFACTORING.md` §3.5 的原文要求。
 2. **不能是 `~Copyable`**。本类型的存在意义就是被宿主对象存储、被放进集合、跨隔离域传递;
    `~Copyable` 会直接否定目标场景。这与 `JSValue` 的 `~Copyable` 不矛盾:`JSValue` 是"窗口内
    借用的本地值",handle 是"跨窗口持有的身份"。
@@ -139,10 +140,10 @@ struct 会让用户持有 struct 时 token 被复制,释放时机变成"最后�
 **为什么不用引擎 handle 做身份**:
 
 - JSC:`JavaScriptCoreRuntimeHandle` 只有 `JSContextGroupRef` 与 `ownsRuntime`
-  (`Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift:4-41`),group 释放后地址可被
+  (`Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JavaScriptCoreRuntimeHandle`),group 释放后地址可被
   下一次 `JSContextGroupCreate` 复用——用地址识别容器存在 ABA。
 - QuickJS:`QuickJSRuntimeHandle` 恰好为此加了 `runtimeID`
-  (`Sources/SwiftyQuickJS/QuickJSHandles.swift:13-45`),但那正是后端私有知识;
+  (`Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSRuntimeIdentityRegistry`),但那正是后端私有知识;
   core 不应依赖具体引擎的 identity 方案。
 - **registry 自铸 ID 是引擎无关的**:进程级原子计数器,registry 创建时取一次;进程内单调,
   永不复用。它还让"跨容器解析"退化成一次整数比较(§5.2 第 1 步)。
@@ -158,7 +159,7 @@ struct 会让用户持有 struct 时 token 被复制,释放时机变成"最后�
 
 **不采用"单调 token + Dictionary"**:token 永不复用意味着 32 位会耗尽、64 位会无界增长;
 每次解析要哈希;槽位复用这一节本身不存在,generation 也就没必要。Stage 4 的基准测试
-(`TODO.md:213`)用于校准槽位表的容量/分块,而不是在"是否槽位"上翻案(§3.6)。
+(`TODO.md` §2.6)用于校准槽位表的容量/分块,而不是在"是否槽位"上翻案(§3.6)。
 也不采用"裸指针/不透明 box 地址":容器销毁后地址可复用,且无法区分"容器不同"与"绑定不同"。
 
 ### 1.4 存储内容与"持有不授权访问"
@@ -180,7 +181,7 @@ registry 的内部依赖,不出现在 handle 上,也不增加 context 的引用�
 
 对照既有类型:`JSPreparedScript`/`JSPropertyStringKey` 是 `Sendable, ~Copyable`,并在 init 里
 `contextHandle.retainReference()`、在 `deinit` 里释放
-(`Sources/SwiftJavaScript/JSPreparedInputs.swift:14-18,36-39`)。**持久 handle 明确不采用这个
+(`Sources/SwiftJavaScript/JSPreparedInputs.swift` 的 `JSScopeWitness`、`JSPreparedScript`)。**持久 handle 明确不采用这个
 形状**:它不保活 context(理由见 §2.6),也不在 `deinit` 里直接触碰引擎(理由见 §2.3)。
 
 ### 1.5 分叉与取舍
@@ -210,7 +211,7 @@ registry 的内部依赖,不出现在 handle 上,也不增加 context 的引用�
 ### 2.2 mint 取独立引用:`claim` + `root`,而不是 `persist` 的转移
 
 mint 的引擎动作严格复用父文档 §3.7 `explicitRoots` 的结算对
-(`ScopeFrame.track`/`drain`,`Sources/SwiftJavaScript/JSInstantContext.swift:317-331`):
+(`ScopeFrame.track`/`drain`,`Sources/SwiftJavaScript/JSInstantContext.swift`):
 
 ```
 mint:    owned = context.claimOwnedValueHandle(borrowed)   // JSC identity / QuickJS JS_DupValue
@@ -223,11 +224,11 @@ settle:  context.unrootOwnedValueHandle(payload)           // JSC JSValueUnprote
 
 | 引擎 | mint 后的计数 | settle |
 |---|---|---|
-| JSC | protect +1(identity claim) | unprotect,`releaseCreatedHandle` 为 no-op(`JavaScriptCoreEngineRuntimeDriver.swift:337-358`) |
-| QuickJS | refcount +1(`claimOwnedValueHandle`,同文件 `QuickJSEngineRuntimeDriver.swift:466-471`) | `JS_FreeValue`(root 为 identity) |
+| JSC | protect +1(identity claim) | unprotect,`releaseCreatedHandle` 为 no-op(`JavaScriptCoreContextHandle` 的同名方法,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`) |
+| QuickJS | refcount +1(`claimOwnedValueHandle`,`QuickJSContextHandle` 的同名方法,`Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift`) | `JS_FreeValue`(root 为 identity) |
 
 **为什么 mint 不能像 `persist` 那样转移**:`persist` 是"提升",语义是源 arena 的引用随值搬走
-(`JSInstantContext.swift:535-553` 的 `takeFirst` + `target.track`,源无可摘除元素时
+(`ScopeCore.persist(_:into:)`,`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `takeFirst` + `target.track`,源无可摘除元素时
 `claimOwnedValueHandle` 兜底)。它隐含一个契约:调用后源值不再被使用。mint 无法继承这个隐含
 前提——调用者刚 mint 完,通常还要在同一个窗口里继续用那个值;而且一个 handle 会被多次解析
 (§5.3)。所以 **mint 是复制语义,`persist` 是转移语义**,二者在文档与注释里必须并列表述
@@ -239,7 +240,7 @@ resolve 之后本地视图的 root 是**另一份**,由接收帧按自己的策�
 
 binding 不限于对象:数字/布尔/null/undefined 同样可以 mint。refcounted 引擎对立即值 dup、
 GC 引擎对非对象 protect 都是既有默认 scope 已经在依赖的行为(`rootOwnedValueHandle` 对任意
-`JSValueRef` 成对调用,`JavaScriptCoreEngineRuntimeDriver.swift:351-357`),本层不引入新语义。
+`JSValueRef` 成对调用,`JavaScriptCoreContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),本层不引入新语义。
 
 ### 2.3 最后 owner 释放:deinit → 元数据 → VM executor 泵
 
@@ -270,7 +271,7 @@ VM 线程(pump):
 
 **为什么 payload 留在槽位、清理任务只携带 identity**:清理闭包必须是 `@Sendable`,
 而 `E.OwnedValueHandle` 是关联类型(`JSOwnedValueManualReferenceCountedHandle`,
-`Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift:42-58`),在泛型位置无法被
+`Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift` 的 `JSOwnedValueManualReferenceCountedHandle`),在泛型位置无法被
 逃逸闭包消费。实测(Swift 6 模式):
 
 - `probe9.swift:3:47: error: reference to captured parameter 'h' in concurrently-executing code`
@@ -299,9 +300,9 @@ VM 线程(pump):
 
 | 方案 | 保证 | 代价/风险 | 结论 |
 |---|---|---|---|
-| (a) `Task(executorPreference:)` | 需要执行器符合 `TaskExecutor` | 实测(6.4.2)`Task(executorPreference: e)` 对仅符合 `SerialExecutor` 的类型报 `probe1.swift:9:28: error: argument type 'MyExec' does not conform to expected type 'TaskExecutor'`;补上 `TaskExecutor` 后 typecheck 通过(`probe3.swift` `TYPECHECK_OK`)。**首段同步体是否必定落在该线程,需要运行时探针确认** | 备选 |
-| **(b) 专用 executor 增开 closure 队列** | 主循环本身就在该 OS 线程上,`semaphore` 已存在;锁内 append + `signal`,循环优先 drain | 需要改 `JSVirtualMachine.swift` 的私有 `State`(加 `cleanupJobs` + `stopped` 时丢弃) | **推荐** |
-| (c) 钉在 VM executor 上的 actor + `Task { await pump.drain() }` | 由 actor 语义保证落在 `unownedExecutor` 上(测试里的 FIFO 哨兵就是这个形状,`JSEngineCoreTypesTests.swift:2875-2891`) | pump actor 必须**强持有 executor 对象**才能保证 `unownedExecutor` 不悬垂;多一次 actor 分配 | 备选 |
+| (a) `Task(executorPreference:)` | 需要执行器符合 `TaskExecutor` | 实测(6.4.2)`Task(executorPreference: e)` 对仅符合 `SerialExecutor` 的类型报 `probe1.swift:9:28: error: argument type 'MyExec' does not conform to expected type 'TaskExecutor'`;补上 `TaskExecutor` 后 typecheck 通过(`probe3.swift` `TYPECHECK_OK`)。**首段同步体是否必定落在该线程,需要运行时探针确认**(已由 SE-0417 原文闭合,见本节末) | 首版备选,**2026-11-23 起现用** |
+| **(b) 专用 executor 增开 closure 队列** | 主循环本身就在该 OS 线程上,`semaphore` 已存在;锁内 append + `signal`,循环优先 drain | 需要改 `JSVirtualMachine.swift` 的私有 `State`(加 `cleanupJobs` + `stopped` 时丢弃) | 首版实现,**2026-11-23 起退役**(见本节末) |
+| (c) 钉在 VM executor 上的 actor + `Task { await pump.drain() }` | 由 actor 语义保证落在 `unownedExecutor` 上(测试里的 FIFO 哨兵就是这个形状:`IsolatedDeinitBarrier`,`Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift`) | pump actor 必须**强持有 executor 对象**才能保证 `unownedExecutor` 不悬垂;多一次 actor 分配 | 备选 |
 
 方案 (b) 的形状:
 
@@ -321,6 +322,20 @@ package func schedule(_ body: @escaping @Sendable () -> Void)
 关键性质:cleanup 与 actor job 共享**同一个 OS 线程**,因此 §3.5 的"payload 只在 VM 线程被
 触碰"不变量自动成立。`stopped` 后丢弃是安全的:所有 binding 在 `close()` 时已经内联结算。
 
+**实现演进(2026-11-23)**:Stage 4 首版按方案 (b) 落在自写的 `DedicatedThreadSerialExecutor` 上。执行器随后
+整体换成 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`,闭包投递随之改为方案 (a) 的形态——
+`Task.detached(executorPreference: executor) { body() }`。依据:
+
+- SE-0417:"Tasks created this way are **immediately enqueued** on given executor"——任务创建即进入
+  执行器唯一的那条 FIFO,与 actor job 同队列。所以 (b) 的"结算先于其后入队的 actor job"仍然成立,
+  而且从"闭包优先于已排队的 job"变为严格 FIFO。
+- (a) 那一格的"首段线程语义待运行时探针"由上一条原文闭合;执行器须符合 `TaskExecutor`,
+  `ThreadBoundExecutor` 同时符合 `SerialExecutor` 与 `TaskExecutor`。
+- 已知不遵守偏好的记录(swiftlang/swift#74395 的 `Task.yield()`/`Task.sleep()`、论坛帖 84626 内层
+  任务 await 后的 continuation)都发生在挂起/恢复;这里投递的闭包体是同步的,没有挂起点。
+- 用 `.detached`:不继承创建处的隔离、优先级与 task-local——从别的 actor 的 job 里触发结算时,
+  不会把那个 actor 的隔离带到 VM 线程。
+
 ### 2.5 显式 `invalidate()`:保留
 
 **保留**,语义三条:
@@ -333,10 +348,10 @@ package func schedule(_ body: @escaping @Sendable () -> Void)
 保留的理由:
 
 - **提前释放**是 handle 相对"塞进默认 scope"的唯一硬收益。默认 scope 到 context deinit 才
-  结算,长寿命 context 会持续累积(`TODO.md:205` 遗留项 ①);没有 `invalidate`,handle 只是
+  结算,长寿命 context 会持续累积(`TODO.md` §2.5 遗留项 ①);没有 `invalidate`,handle 只是
   多了一层间接的默认 scope。
 - **确定性地断环**:JS 对象 → 宿主对象 → handle → JS 对象这类环,只有显式失效能主动断开。
-- 基准测试需要一个可重复的"释放"动作(`TODO.md:213`)。
+- 基准测试需要一个可重复的"释放"动作(`TODO.md` §2.6)。
 
 否决"只保留自动清理":那样"最后 owner 释放"与"显式释放"两条路径中只剩一条,而唯一 owner
 可能是一个长寿命宿主对象——句柄的引用生命周期会比 JS 值的实际用途长得多。
@@ -360,7 +375,7 @@ context ──► registry ──► binding ──► JS 对象 ──► 宿�
   context 的最后一次释放仍由 `JSContext.isolated deinit` 的 `releaseReference()` 完成。
 
 与同族风险的关系:`JSPreparedScript` 的 `deinit` 在任意线程调用 `releaseReference()`
-(`JSPreparedInputs.swift:36-39`),这已被登记为同族线程风险(`TODO.md:205` ⑤)。持久层不复制
+(`JSPreparedScript.deinit`,`Sources/SwiftJavaScript/JSPreparedInputs.swift`),这已被登记为同族线程风险(`TODO.md` §2.5 ⑤)。持久层不复制
 这个形状:**任意线程只做元数据操作,引擎调用只在 VM 线程发生**(§2.3、§3.5)。
 
 ### 2.7 分叉与取舍
@@ -383,18 +398,18 @@ context ──► registry ──► binding ──► JS 对象 ──► 宿�
 
 - **权威生命周期**:`JSContext` 以一个存储属性持有它(`persistentRegistry`,两个 init 都创建);
 - **访问路径**:箱子存在时,把**同一个对象**发布进 `JSContextDataStorageBox`
-  (`Sources/SwiftJavaScript/JSContextData.swift:15-59`),由一个内部 `JSContextDataKey` 寻址,
+  (`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox`),由一个内部 `JSContextDataKey` 寻址,
   供 `JSInstantContext`/`JSScope` 在同步路径上取用。
 
 两条缺一不可:
 
 1. **访问路径必须在箱子里**。回调拿到的是 `borrowing JSInstantContext`,不是 actor;只有经
    `driverContextHandle.contextDataStorageBox()` 才能在同步路径上取到 registry
-   (`JSInstantContext.swift:932-938` 已用同一入口做 context data)。只放 actor 存储属性会强制
+   (`JSInstantContext.setData` / `data(for:)` 已用同一入口做 context data)。只放 actor 存储属性会强制
    每次 mint 穿一次 actor 隔离——回调里根本做不到。
 2. **生命周期不能交给箱子**。`installContextDataStorageBox(_:)` 是公开的 driver requirement
-   (`JSEngineRuntimeDriverProtocol.swift:77`),任何拿到 `ContextHandle` 的代码都能在**任意线程**
-   清空/替换箱子;箱子又会在 `releaseReference()` 之前被清空(`JSContext.swift:62-65`)。
+   (`JSContextRuntimeDriver.installContextDataStorageBox(_:)`,`Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift`),任何拿到 `ContextHandle` 的代码都能在**任意线程**
+   清空/替换箱子;箱子又会在 `releaseReference()` 之前被清空(`JSContext` 的 `isolated deinit`)。
    若 registry 只由箱子持有,一次外部清箱就会销毁一个仍有活绑定的 registry——引擎引用永久泄漏,
    且随后到来的泵可能用已释放的 context 结算。由 actor 持有后,外部清箱只降级为"scope 见证侧
    失去访问路径":registry 存活到 `isolated deinit`,在那里统一 `close()`;handle 的弱引用仍有效,
@@ -402,9 +417,11 @@ context ──► registry ──► binding ──► JS 对象 ──► 宿�
 
 此外,**不需要新 driver requirement**。
 `contextDataStorageBox()`/`installContextDataStorageBox(_:)` 已是 `JSContextRuntimeDriver` 的
-硬 requirement(`JSEngineRuntimeDriverProtocol.swift:74-77`),持久层的引擎面完全由既有的
+硬 requirement(`JSContextRuntimeDriver.contextDataStorageBox()` / `installContextDataStorageBox(_:)`),持久层的引擎面完全由既有的
 `claimOwnedValueHandle`/`rootOwnedValueHandle`/`unrootOwnedValueHandle`/`releaseCreatedHandle`
-组成——**Stage 4 的 core 实现不需要任何后端改动**。
+组成——**Stage 4 的 core 实现不需要任何后端改动**。(2026-11-23 起两个后端的
+`installContextDataStorageBox` 方法体改为经 core 的 `swapContextDataStorageBox` 路由,不新增
+requirement,见 §3.7 与 §3.5。)
 
 非选方案:
 
@@ -412,7 +429,7 @@ context ──► registry ──► binding ──► JS 对象 ──► 宿�
 |---|---|
 | 仅 `JSContext` 存储属性 | 回调/`JSScope` 不可达(actor 隔离);每次 mint 一次 hop |
 | 仅箱子持有 | 公开的清箱入口可在任意线程销毁仍存活的 registry(见上) |
-| 进程级静态表(仿 `ScopeStackRegistry`,`JSInstantContext.swift:42-86`) | 生命周期不随容器;容器未走正常路径时条目泄漏;已在 Stage 1 为此付出过 pop 纪律成本 |
+| 进程级静态表(仿 `ScopeStackRegistry`,`Sources/SwiftJavaScript/JSInstantContext.swift`) | 生命周期不随容器;容器未走正常路径时条目泄漏;已在 Stage 1 为此付出过 pop 纪律成本。这条否决只针对**持有 registry**;不持有任何东西的 VM 线程绑定后来直接挂在既有 scope 栈条目上,没有新增表(§3.5) |
 | VM 级注册表 | 见 §6(结算需要活 context;JSC root 是 context 寻址) |
 
 创建时机:`package init` 内创建(此时 `virtualMachine` 可用,用于取调度句柄);公开 `init` 在
@@ -438,12 +455,12 @@ state: Mutex<…>                              // closed / pumpScheduled / chunk
 
 - 必要性:`unrootOwnedValueHandle`/`releaseCreatedHandle`/`claimOwnedValueHandle`/
   `rootOwnedValueHandle` 是 `E.ContextHandle` 的实例方法
-  (`JSEngineRuntimeDriverProtocol.swift:81-98`),没有它就无法 settle。
+  (`JSContextRuntimeDriver` 的 release/claim/root/unroot 要求),没有它就无法 settle。
 - 不 retain 与 scope 层同形:`ScopeFrame.driverContextHandle` 就是非 retain 的值拷贝
-  (`JSInstantContext.swift:305`)。context 的最后一个引用仍由
+  (`ScopeFrame.driverContextHandle`)。context 的最后一个引用仍由
   `JSContext.isolated deinit` 的 `releaseReference()` 释放——QuickJS `JS_FreeContext`
-  (`QuickJSHandles.swift:114-124`)、JSC `JSGlobalContextRelease`
-  (`JavaScriptCoreContextHandle.swift:88-104`),且发生在 VM 线程。
+  (`QuickJSContextHandle.retainReference` / `releaseReference`)、JSC `JSGlobalContextRelease`
+  (`JavaScriptCoreContextHandle.releaseReference`),且发生在 VM 线程。
 - 代价是一条必须成文的规则:**`close()` 之后 registry 不得再解引用该 handle**。所有引擎入口
   先检查 `closed`(锁内);`close()` 在 `releaseReference()` 之前执行,所以不存在"用已释放
   context 结算"的窗口。
@@ -474,7 +491,7 @@ resolve(identity):
 ### 3.4 槽位分配、回收与存储形态
 
 分块 slab,与 `ScopeArenaChunk` 同样的理由:`Array` 不能持有 `~Copyable` 元素
-(`JSInstantContext.swift:144-160`),而槽位必须原样存放 `E.OwnedValueHandle`。
+(`ScopeArenaChunk`,`Sources/SwiftJavaScript/JSInstantContext.swift`),而槽位必须原样存放 `E.OwnedValueHandle`。
 
 ```
 chunk(capacity 32, 与 scopeArenaChunkCapacity 对齐):
@@ -507,7 +524,7 @@ settling ──锁外 settle 完成,锁内登记──► free(入 freeList)
 - **chunk 裁剪**:v1 不裁剪。chunk 数量由**峰值并发 handle 数**决定,不是累计 mint 次数;
   若基准显示峰值驱动的常驻内存重要,再引入"尾部空 chunk 释放"(openQuestions)。
 - 订阅式释放账本不需要:槽位状态就是唯一事实来源(与 `ScopeArena` 删除 `removed` 集合同理,
-  `JSInstantContext.swift:199-204`)。
+  `Sources/SwiftJavaScript/JSInstantContext.swift`)。
 
 ### 3.5 并发不变量:元数据锁 + payload 只在 VM 线程
 
@@ -538,14 +555,28 @@ close),而它们与 resolve 共享同一 OS 线程。因此"resolve 在锁内看
 
 **引擎调用一律不在锁内**,close 与 pump 同此规定。原因不只是锁粒度:QuickJS 的
 `releaseCreatedHandle` 就是 `JS_FreeValue`,它会**同步执行用户 finalizer**
-(`Sources/SwiftyQuickJS/Engine/QuickJSEngineClassDriver.swift:263-287`:finalizer 内调用
+(`Sources/SwiftyQuickJS/Engine/QuickJSEngineClassDriver.swift`:finalizer 内调用
 `definition.finalize(thisValue)`),而 finalizer 里丢掉一个 handle 就会重入 `registry.release`。
 `Synchronization.Mutex` 是非递归锁(本仓库的 scope 栈与 context data 都在用,
-`JSInstantContext.swift:1`、`JSContextData.swift:1`),锁内结算会直接死锁。
+`ScopeStackStorage.state`、`JSContextDataStorageBox.state`),锁内结算会直接死锁。
 `closed` 先置位保证这类重入立即 no-op;即便未 close,重入者看到的也是 `settling` 而非 `live`。
 
 `mint`/`resolve` 的线程前置条件不做运行时断言:与 Stage 1-3 的既有契约一致(scope 见证 =
 同步窗口),新增断言只会把已有的纪律重复一遍;Mock 层可以用测试显式验证。
+
+**公共面的保证(2026-11-23)**:上表"witness/actor 保证"在公共面上成立,是因为作用域见证只能从 context
+派生——`JSInstantContext.init(handle:)` 与 `JSScope.init(handle:)` / `open()` 都是 `package`,`JSScope`
+的公共构造面只有 actor 隔离工厂 `JSContext.makeScope()`,而 `JSScope` 既非 `Copyable` 也非 `Sendable`,
+结果跨不出 actor 边界(编译期拒绝;诊断原文记录在
+`Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 的负面样例注释块)。
+
+**VM 线程的判据与清箱路由(2026-11-23)**:执行器实现 `ThreadBoundExecutor.isIsolatingCurrentContext()`
+(线程标识)。它是 `SerialExecutor` 上由执行器自己实现的钩子,协议默认实现返回 `nil` = "未知",
+所以必须由执行器提供。`JSContext.init` 末尾经 `ScopeStackRegistry.bind` 把 context 绑到所属
+`VMThread`,绑定随 scope 栈的最后一次 `pop` 消失——`isolated deinit` 正是 pop 之后才清箱,
+所以那一次清箱必然内联。`installContextDataStorageBox` 对托管 context 的规则因此是:调用者已是
+VM 线程则内联,否则把引擎侧交换投递到 VM 线程——调用线程零引擎调用,交换先于其后入队的任何 job,
+也即调用返回时尚未生效。
 
 ### 3.6 分叉与取舍
 
@@ -563,21 +594,26 @@ close),而它们与 resolve 共享同一 OS 线程。因此"resolve 在锁内看
 release(~850 ns)里 ≤3%。**槽位仍然正确,但理由应从"lookup 更快"改为"内存按峰值并发有界 +
 `~Copyable` 载荷无需逐条 box + generation 在表内 + 无哈希/重哈希尾延迟"**。详见 §11.5。
 
-### 3.7 实现落点(core 内,零后端改动)
+### 3.7 实现落点
+
+Stage 4 首版零后端改动;2026-11-23 起两个后端的 `installContextDataStorageBox` 方法体改为经
+core 的 `swapContextDataStorageBox` 路由(§3.5),不新增 driver requirement。
 
 | 文件 | 改动 |
 |---|---|
 | 新增 `Sources/SwiftJavaScript/JSPersistentHandle.swift` | handle + identity + `invalidate`;`JSContext`/`JSInstantContext`/`JSScope` 的 mint/resolve 扩展 |
 | 新增 `Sources/SwiftJavaScript/JSPersistentHandleRegistry.swift` | registry(含非 retain 的 `E.ContextHandle`)、槽位表、pump、`close`、内部 `JSContextDataKey` |
-| `Sources/SwiftJavaScript/JSScope.swift`、`JSInstantContext.swift` | 无改动(`scopeFrame` 已存在:`JSScope.swift:23`、`JSInstantContext.swift:703`) |
+| `Sources/SwiftJavaScript/JSScope.swift`、`JSInstantContext.swift` | Stage 4 首版无改动(`scopeFrame` 已存在)。2026-11-23 起:`JSScope` 构造面收敛(`~Sendable`,`init(handle:)` / `open()` 降 `package`);`JSInstantContext.swift` 增加 `ScopeStack.bind` 与 `ScopeStackRegistry.bind` / `vmThread(for:)`(§3.5) |
 | `Sources/SwiftJavaScript/JSPreparedInputs.swift` | `JSScopeWitness` 增加 `var scopeFrame: ScopeFrame<E> { get }` 要求,供 resolve 定位接收 frame(两个 conformer 已具备同签名成员) |
-| `Sources/SwiftJavaScript/JSContext.swift` | 增加 `let persistentRegistry`(两个 init 都创建);公开 init 在装箱后发布到箱子;`isolated deinit` 首行 `registry.close()` |
-| `Sources/SwiftJavaScript/JSVirtualMachine.swift` | 私有 executor 增加 cleanup closure 队列与 `package func schedule(_:)`;向 registry 提供调度句柄 |
+| `Sources/SwiftJavaScript/JSContext.swift` | 增加 `let persistentRegistry`(两个 init 都创建);公开 init 在装箱后发布到箱子;`isolated deinit` 首行 `registry.close()`。2026-11-23 起:init 末尾绑定 VM 线程,新增公共工厂 `makeScope()` |
+| `Sources/SwiftJavaScript/JSContextData.swift` | 2026-11-23 新增 `JSEngineRuntimeDriver.swapContextDataStorageBox(_:on:raw:)`(清箱的 VM 线程路由) |
+| `Sources/SwiftJavaScript/JSVirtualMachine.swift` | 首版:私有 executor 增加 cleanup closure 队列。2026-11-23 起:自写 executor 删除,改为 `VMThread`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`),闭包投递为 `Task.detached(executorPreference:)`(§2.4 末) |
+| `Package.swift` | 2026-11-23 新增依赖 `swift-thread-affinity-executor`(0.1.2),`SwiftJavaScript` target 依赖其 `ThreadAffinityExecutor` 产品 |
 
 后端(`SwiftyJavaScriptCore`/`SwiftyQuickJS`)不需要新 requirement:所需的
 `claimOwnedValueHandle`/`rootOwnedValueHandle`/`unrootOwnedValueHandle`/`releaseCreatedHandle`
 与 context 数据箱访问都已是 `JSContextRuntimeDriver` 的既有硬 requirement
-(`Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift:74-99`)。
+(`Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift` 的 `JSContextRuntimeDriver`)。
 
 ---
 
@@ -585,7 +621,7 @@ release(~850 ns)里 ≤3%。**槽位仍然正确,但理由应从"lookup 更快"�
 
 ### 4.1 容器消亡:`isolated deinit` 内的顺序
 
-现有顺序是 drain → pop → 清箱 → release(`JSContext.swift:59-66`)。新增一步,位置在
+现有顺序是 drain → pop → 清箱 → release(`JSContext` 的 `isolated deinit`)。新增一步,位置在
 **`releaseReference()` 之前**:
 
 ```swift
@@ -607,10 +643,11 @@ isolated deinit {
   generation 递增、清空 free list。
 - **没有 deinit 兜底,这是刻意删除的**:registry 的 `deinit` 不结算、不触碰引擎。理由有三:
   (a) 泵闭包强持有 registry(§2.3),其生命周期不必与箱子同时结束;
-  (b) 箱子可被公开的 `installContextDataStorageBox(_:)` 在任意线程清空
-  (`JSEngineRuntimeDriverProtocol.swift:77`;两个后端的清箱都是在**调用线程**上
-  `takeRetainedValue`,`JavaScriptCoreEngineRuntimeDriver.swift:44-55`、
-  `QuickJSEngineRuntimeDriver.swift:58-69`),兜底 close 会把引擎调用搬到该线程;
+  (b) `installContextDataStorageBox(_:)` 是公开的 driver 要求
+  (`JSContextRuntimeDriver`,`Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift`),
+  调用可来自任意线程,所以箱子里的那份引用可以在任意线程被释放,registry 的兜底 close 会跟着
+  最后一个释放者所在的线程执行引擎调用。(2026-11-23 起清箱本身的引擎操作已被路由到
+  VM 线程,§3.5;但 registry deinit 的线程仍没有保证,这一条照旧成立);
   (c) actor 存储的销毁发生在 `isolated deinit` 体之后,此时 `releaseReference()` 已执行,
   registry 里保存的 context handle 已悬垂。三者任一都足以否决兜底。
   未 `close()` 的 registry 是编程错误:`deinit` 内 `assert(closed)`;release 构建下只释放
@@ -624,11 +661,11 @@ isolated deinit {
 
 ### 4.2 VM 消亡:不引入任何 runtime 级结算
 
-`JSContext` 强持有 `JSVirtualMachine`(`JSContext.swift:6`),因此 VM 的 deinit 必然晚于每个
+`JSContext` 强持有 `JSVirtualMachine`(`JSContext` 的 `virtualMachine` 存储属性),因此 VM 的 deinit 必然晚于每个
 context 的 `isolated deinit`。settle 全部发生在各自 context 的收尾里;`JSVirtualMachine.deinit`
-保持现状(仅 `releaseReference()`,非 isolated,`JSVirtualMachine.swift:20-22`)——
+保持现状(仅 `releaseReference()`,非 isolated,`Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit`)——
 **持久层不得在 runtime 层新增任何引擎访问**。这是对既有风险
-(`TODO.md:205` ⑤,"`JSVirtualMachine.deinit` 线程归属尚非 isolated")的规避,而不是新增一处。
+(`TODO.md` §2.5 ⑤,"`JSVirtualMachine.deinit` 线程归属尚非 isolated")的规避,而不是新增一处。
 
 ### 4.3 绑定替换 / 删除
 
@@ -641,14 +678,14 @@ context 的 `isolated deinit`。settle 全部发生在各自 context 的收尾�
   - 替换必须发生在 VM 线程(引擎调用),但 handle 是 `Sendable` 的任意线程持有物,
     用户很容易在没有容器的情况下以为可以替换;
   - 当前登记的目标场景(宿主构造函数缓存、每 context 的 JS 包装、长期 JS 回调、宿主 API 注册表,
-    `VALUE_MANAGEMENT_REFACTORING.md:216`)都可以用"换引用"表达。
+    `VALUE_MANAGEMENT_REFACTORING.md` §3.5)都可以用"换引用"表达。
   复活条件写入 openQuestions:出现"身份必须跨替换稳定"的真实用例(例如 JS 对象在重载后仍需
   被同一宿主表项索引)。
 
 ### 4.4 弱引用强度:v1 不发货,并说明为什么这是结论而不是拖延
 
 父文档 §3.5 把 `strength: .weak` 列为强度选项,Stage 4 的验收里也写着"弱引用不阻 GC"
-(`TODO.md:214`)。**本设计认为该条在现有引擎能力下不可实现,必须显式重写验收口径**,理由:
+(`TODO.md` §2.6)。**本设计认为该条在现有引擎能力下不可实现,必须显式重写验收口径**,理由:
 
 1. **JSC 的 C API 没有宿主侧弱引用**。`JSValueProtect`/`JSValueUnprotect` 是仅有的根化手段;
    弱引用只在 Objective-C 绑定的 `JSManagedValue` 层存在,它依赖那一层自己的 VM/GC 集成,
@@ -664,7 +701,7 @@ context 的 `isolated deinit`。settle 全部发生在各自 context 的收尾�
    - 读引用计数探测:引擎不暴露,且"计数 > 0"≠"未被标记回收"。
 
 **v1 的明确语义**:handle 是**强**引用——binding 存活期间 JS 对象不会被回收;
-`VALUE_MANAGEMENT_REFACTORING.md:216` 所说"handle 生命周期结束与 JS 对象被 GC 回收是两个独立
+`VALUE_MANAGEMENT_REFACTORING.md` §3.5 所说"handle 生命周期结束与 JS 对象被 GC 回收是两个独立
 事件"在 v1 只有一个事件(binding 结束)。这句必须写进公开文档,避免用户按 V8/WeakRef 的心智
 使用。
 
@@ -756,7 +793,7 @@ payload 的存活由 §3.5 的线程不变量保证。`JSContext` 入口是同�
 4. generation 不匹配或 state ≠ live(已 invalidate、已 close、已被自动清理)。
 
 **跨 context 在 v1 一律 nil**,即使 JSC 同一 context group 内值本身可用
-(`isContextCompatibleWith` 为 group 相等,`JavaScriptCoreEngineRuntimeDriver.swift:249-254`)。
+(`JavaScriptCoreEngine.isContextCompatibleWith`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`)。
 理由:binding 的 root 是用某一个 context 取的,unroot 必须回到兼容的 context;
 `ContextLocal` 的语义就是"谁创建、谁解析"(§6)。
 
@@ -780,18 +817,18 @@ v1 只发布 **context 级**绑定:`JSPersistentHandle<E>` 由某个 `JSContext`
 mint,并只能经同一 context 的见证解析。公开面不出现 `RuntimeLocal`/`ContextLocal` 这样的
 前沿类型参数,也不出现"绑定作用域"选项。
 
-### 6.2 四条理由(回答父文档 §7 问题 3,原问题见 `VALUE_MANAGEMENT_REFACTORING.md:386`)
+### 6.2 四条理由(回答父文档 §7 问题 3,原问题见 `VALUE_MANAGEMENT_REFACTORING.md` §7 问题 3)
 
 1. **QuickJS 的结算需要活的 context**。`JS_FreeValue(ctx, v)` 必须在一个 context 上执行;
    而 runtime 级绑定的结算点只能是 runtime 消亡,那时 `JSVirtualMachine.deinit` 在任意线程
-   非 isolated 执行(`JSVirtualMachine.swift:20-22`,`TODO.md:205` ⑤),没有可用的 context。
+   非 isolated 执行(`Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit`,`TODO.md` §2.5 ⑤),没有可用的 context。
    要修就得在 VM 里养一个"锚 context",那会引入第二个 realm,并使
    `JSContextGetGroup`/`JS_GetRuntime` 兼容判断多出一个隐形参与者。
 2. **JSC 的 root 是 context 寻址的**。`rootOwnedValueHandle` 用 `JSValueProtect(ref)`、
-   `unroot` 用 `JSValueUnprotect(ref)`(`JavaScriptCoreEngineRuntimeDriver.swift:351-357`),
+   `unroot` 用 `JSValueUnprotect(ref)`(`JavaScriptCoreContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),
    `ref` 是 `JSGlobalContextRef`。runtime 级绑定必须记录"哪个 context 取的根",并保证在该
    context 死亡前解除——这已经把两端都拖进了 per-context 记账,并没有简化。
-3. **realm 语义**。全局对象/构造函数是 context 级差异(`VALUE_MANAGEMENT_REFACTORING.md:85`);
+3. **realm 语义**。全局对象/构造函数是 context 级差异(`VALUE_MANAGEMENT_REFACTORING.md` §2.4);
    runtime 级句柄经另一个 context 解析会得到另一个 realm 的值。JSC 在 group 内允许这种使用,
    QuickJS 只要求同 runtime,但两者都不是"同一个东西",语义会变成陷阱。
 4. **公开面与测试矩阵的成本**。`RuntimeLocal` 需要第二个解析入口(VM 发起)与第二套失效
@@ -848,7 +885,7 @@ extension JSScope {                                    // 手动 scope
   不是异常状态。
 - **跨隔离域**:`Sendable` 是 handle 存在的理由。从外部铸造的标准写法是"在同步窗口内铸造并
   只把 handle 带出来",因为本地值不能离开隔离域(Stage 3 已实测的三类诊断,
-  `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift:31-70`):
+  `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 的负面样例注释块):
   ```swift
   let handle = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("value"))
@@ -889,7 +926,7 @@ extension JSScope {                                    // 手动 scope
 ### 7.2 resolve 的锚点:默认 scope 的累积问题与批量写法
 
 - `JSContext.resolve` 锚在默认 scope:重复解析会持续累积 protect/引用,直至 context 死亡——
-  与默认 scope 的既有累积问题同源(`TODO.md:205` ①)。这不是新缺陷,但必须写进文档。
+  与默认 scope 的既有累积问题同源(`TODO.md` §2.5 ①)。这不是新缺陷,但必须写进文档。
 - 批量/循环解析的正确写法是进入同步 scope:
   ```swift
   let total = await context.withInstantContext { scope in
@@ -935,7 +972,7 @@ extension JSScope {                                    // 手动 scope
 2. mint 不允许从 arena `takeFirst`(那就是 `persist`),否则源窗口的值会在用户手里变悬垂。
 
 验证方式:Mock 的释放账本可以精确断言"每次 claim 对应一次 release",与
-`contextReleaseLog`/`contextRootingLog` 的既有口径一致(`JSEngineCoreTypesTests.swift:2865-2915`)。
+`contextReleaseLog`/`contextRootingLog` 的既有口径一致(`contextReleaseLog` / `contextRootingLog`,`Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift`)。
 
 ### 7.5 回调、类桥与异步预留
 
@@ -943,7 +980,7 @@ extension JSScope {                                    // 手动 scope
   mint 是额外的一份引用,与 handoff 无关。
 - **类桥**:`JSClass` 实例转换产物也是本地值,经同一 `makePersistentHandle` 路径 mint;
   `ContextLocal` 与"每个 context 一份 JS 包装"的目标场景天然一致
-  (`VALUE_MANAGEMENT_REFACTORING.md:216`)。
+  (`VALUE_MANAGEMENT_REFACTORING.md` §3.5)。
 - **异步桥接(非目标 1)**:异步 scope 已规划为 `explicitRoots`(父文档 §3.7);handle 与它正交——
   promise 结算前的中间值仍由异步 scope 记账,不需要 handle 参与。
 
@@ -965,7 +1002,7 @@ extension JSScope {                                    // 手动 scope
 ### 8.1 Mock 单元层(`Tests/SwiftJavaScriptTests`)
 
 需要先补一项测试基础设施:当前 Mock 的 `claimOwnedValueHandle` 是 identity,无法建模 QuickJS
-的 dup(`JSEngineCoreTypesTests.swift:3011-3016`;这正是 `TODO.md:205` ④ 登记的缺口)。
+的 dup(`MockContextHandle.claimOwnedValueHandle`,`Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift`;这正是 `TODO.md` §2.5 ④ 登记的缺口)。
 新增 `claimLog`(与 `contextRootingLog` 分开,避免把"申领"与"根化"混为一谈)。
 
 用例(全部断言精确计数,不用轮询):
@@ -1005,12 +1042,12 @@ extension JSScope {                                    // 手动 scope
 6. 容器消亡后:创建新 context 仍正常工作(证明 registry 的释放顺序没有破坏引擎状态);
 7. `Sendable` 跨隔离域:`Task { handle }` 传递后经容器解析成功(正向);
    被否决的用法(不经见证解析)以文档块保留(编译期负面样例不可自动化,遵循
-   `EngineScopeContractTests.swift:1-70` 的惯例)。
+   `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 文件头负面样例注释块的惯例)。
 
 ### 8.3 生命周期 / 线程层
 
 - 用 FIFO 哨兵同步异步结算:`await IsolatedDeinitBarrier(virtualMachine: vm).ping()`
-  (先例 `JSEngineCoreTypesTests.swift:2875-2891`,`awaitContextTeardown`)。
+  (先例 `IsolatedDeinitBarrier`,`Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `awaitContextTeardown`)。
 - 断言清理发生在 VM 线程:与哨兵同形的顺序断言(settle 一定在 ping 之前完成);
   若实现能暴露执行线程标识,再加直接断言。
 - **context 释放严格最后**:close 后立刻断言引擎仍可访问(例如在 deinit 后经同 VM 新 context
@@ -1018,7 +1055,14 @@ extension JSScope {                                    // 手动 scope
 - **迟到的泵**:close 之后强制让已调度泵执行,断言零引擎调用(Mock 计数 + 线程记录);
 - ASan 满载轮:并发 `invalidate` + `resolve` + 容器销毁 + 外部清箱的交叉压力。
 
-### 8.4 基准(`TODO.md:213`)
+闭环(2026-11-23):§8.1 全部用例与 §8.3 的线程直断言、迟到泵均已落测试——Mock 侧
+`settlingSlotIgnoresReleaseAndResolveAndMovesPayloadOnce`(case 10)、
+`contextDataStorageBoxSwapFromForeignThreadRunsOnVMThread` / `contextDataStorageBoxSwapOnVMThreadIsInline`
+(case 8 的外线程与内联两种形态)、`persistentSettlementEngineCallsRunOnVMExecutorThread`、
+`latePumpAfterCloseMakesNoEngineCalls`;双引擎侧 `contextDataStorageBoxSwapFromForeignThreadStaysOnVMThread`;
+QuickJS 内存基线 `quickJSPersistentHandleCycleReturnsAllocatorToBaseline`(§8.2-4)。
+
+### 8.4 基准(`TODO.md` §2.6)
 
 - mint / resolve / invalidate / 全部失效四组,分别测吞吐与尾延迟;
 - 与"默认 scope 直接持有"对比(作为成本上限的参照,不是替代判据);
@@ -1082,13 +1126,22 @@ swift format <改动文件>
 4. **清理调度原语**:方案 (b) 需要改私有 executor 的状态机(加 closure 队列);
    方案 (a) 的 `Task(executorPreference:)` 首段线程语义是否需要运行时探针?若 (a) 成立且足够,
    可减少对 executor 的侵入。
+   **已闭环(2026-11-23)**:(a) 成立且足够——SE-0417 原文写明任务创建即入队;执行器换为
+   `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor` 后,闭包投递即
+   `Task.detached(executorPreference:)`,不再侵入任何 executor 的状态机(§2.4 末)。
 5. **`invalidate` 在 VM 线程上是否应内联结算**。当前无公开的"当前是否在 executor 上"判据;
    若要,需要 driver/executor 钩子。收益是少一个回合的延迟,代价是两条结算路径。
+   **判据已存在(2026-11-23)**:`ThreadBoundExecutor.isIsolatingCurrentContext()`(§3.5),
+   清箱路由已在用它;`invalidate` 内联结算本身仍未做,两条结算路径的取舍不变,登记于 `TODO.md`。
 6. **槽位容量与裁剪**:chunk 容量、是否释放尾部空 chunk、`UInt32` 上限耗尽时的行为
    (`preconditionFailure` vs 自动扩到 64 位)。§11.4 实测:32→64→128 只把 insert 降低
    ~3–8 ns/op,lookup/release/churn 不变;v1 维持 32。另见 §11.5:泵的 `pending.removeFirst()`
    在队列填满时是 O(N²)(32,768 槽一次排空 29.4–30.0 ms vs head cursor 1.3 µs),应改为 head
    cursor/环形队列——这是尾风险,不是当前端到端热点(端到端 65,536 个 handle 同时失效仍是线性)。
+   **已闭环(2026-11-23)**:`pending` 已改 head cursor + 摊还 O(1) 中途压实
+   (`JSPersistentHandleRegistry.swift`);复跑 §11.1 双引擎 mass invalidation 单轮,斜率仍为零
+   (JSC 913.8→929.8、QuickJS 924.2→941.1 ns/op,n=1,024→65,536;当日 1 分钟负载 71.5,
+   绝对值高于 §11.6 历史区间属负载漂移)。
 7. **弱引用的首个可实现子集**:class-backed finalizer 失效 vs JS 级 `WeakRef` 互操作,
    哪个先做?以及是否能覆盖"任意 evaluateScript 产物"这一最常用场景(目前看不能)。
    Stage 4 的"弱引用不阻 GC"验收条需要据此重写。
@@ -1287,6 +1340,13 @@ synthetic 表为宽度只列中位数,单轮 CI 宽度在段末说明(完整值�
   当前基准的端到端路径没有把队列压满,不代表它不可能被压满(executor 被长任务占用、慢
   finalizer、批量 invalidate 来自被阻塞线程等)。**建议把 `pending` 改为 head cursor/环形
   队列**(见 §11.5),这是行为保持的改动。
+  **已闭环(2026-11-23)**:head cursor 化落地后按 §11.1 命令复跑双引擎单轮
+  (JSC `--jsc-only`、QuickJS `--quickjs-only`),mass invalidation 每 op 仍不随深度增长:
+  JSC 913.78 [896.89, 930.34] / 930.18 [888.40, 935.87] / 929.77 [917.89, 944.81],
+  QuickJS 924.24 [901.86, 1015.38] / 912.25 [899.69, 975.70] / 941.09 [915.64, 942.43]
+  (ns/op,n=1,024/8,192/65,536,CV≤5.7%)——交错路径无回归,压满队列的最坏情况从 O(N²)
+  变为 O(N)。当日 1 分钟负载 71.5(§11.6 历史区间 7.1–26.8),绝对水平偏高属负载漂移,
+  斜率结论不受影响。
 - `close` 与 default teardown 也随 n 线性;`close` 的每 binding 成本在两个引擎都稳定在
   0.19–0.22 µs,`default` 稳定在 0.035–0.062 µs。
 
@@ -1375,7 +1435,7 @@ slot-32 release 42.3–45.3;boxed hit 15.6–16.9;boxed insert 61.2–65.9;boxed
 |---|---|---|
 | 表结构 | **保持槽位 slab + free list** | 元数据 lookup 比 boxed Dictionary 慢 2–5 ns,但 insert/release 快 7–24 ns;端到端差 ≤3%。真正的依据是:内存按峰值并发有界(而非累计 mint)、`~Copyable` payload 无需逐条 box、generation/ABA 在表内、无哈希/重哈希尾延迟 |
 | chunk 容量 | **保持 32** | 32→64→128 只把 insert 降 8/3 ns,lookup/release/churn 不变;32 的内存粒度更适合数十到数百 handle 的宿主缓存 |
-| pending 队列 | **改为 head cursor/环形** | `removeFirst` 在 32,768 深度是 29.4–30.0 ms;cursor 是 1.3 µs。端到端当前线性,但队列深度是尾风险;改动行为保持 |
+| pending 队列 | **已改为 head cursor**(2026-11-23;摊还 O(1) 中途压实,排空即整体重置) | `removeFirst` 在 32,768 深度是 29.4–30.0 ms;cursor 是 1.3 µs。改造后复跑双引擎单轮:mass invalidation 每 op 仍不随深度增长(JSC 913.8→929.8、QuickJS 924.2→941.1 ns/op,n=1,024→65,536),交错路径无回归;压满队列的最坏情况从 O(N²) 消除 |
 | witness 访问路径 | **typed `package` 字段/缓存指针优先于换表** | box 访问 254–288 ns/resolve,是 witness hit(~600 ns)的 40–45%,也是当前最大的可避免成本 |
 | 单 `Mutex` | **维持** | 4 任务争用把 lookup 从 ~18 推到 52–56 ns,两表同样;争用是锁,不是表。resolve 仅 VM 线程,单锁可接受 |
 | 默认 scope vs handle | **并存;默认 scope 用于热路径与容器同寿值** | mint 贵 3.7–4.0×,结算贵 12.1–24.5×(invalidate)或 3.4–5.7×(close);handle 的溢价买的是提前释放、Sendable 与显式身份 |
@@ -1426,6 +1486,17 @@ generation、并为每个 `~Copyable` payload 加 box——这三项恰好抵消
 - **空 `ping()` 的优化**:无状态 actor 方法的 `await` 被优化为 ~4 ns 的不跳线程调用,使
   teardown 测量假性归零;有状态 `ping()` 得到 ~5.9 µs 的真实跨线程往返。后续基准应直接
   复用 `ExecutorBarrier` 的有状态形态。
+- **执行器更换后的复跑(2026-11-23,单轮)**:`JSVirtualMachine` 的执行器由自写的
+  `DedicatedThreadSerialExecutor` 换成 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`,
+  闭包投递由私有 closure 队列改为 `Task.detached(executorPreference:)`(§2.4 末)。按 §11.1 命令
+  复跑 release 与 mass invalidation 两组。release:JSC invalidate+settle 868.30、last-owner
+  deinit+settle 717.25、registry close 234.09 ns/op;QuickJS 872.14、698.99、196.81。
+  mass invalidation:JSC 981.49 / 916.48 / 886.11,QuickJS 906.78 / 896.06 / 886.88 ns/op
+  (n=1,024/8,192/65,536),不随深度增长。相对 §11.3 的自写执行器数字:invalidate 比原跨轮区间
+  (742–858)高 1–17%(每次结算多一次 Task 分配);deinit 落在原区间内;JSC close 高约 10%,
+  QuickJS close 落在原区间内。负载:JSC 轮 1/5/15 分钟 22.9/28.1/21.7,QuickJS 轮 11.0/22.7/20.3。
+  **本节其余数字仍是自写执行器下测得的**;哨兵往返、teardown 差值这类直接依赖执行器的量
+  未在新执行器下重测。
 - **范围边界**:只测数字(立即值)路径。对象 mint 的 JSC GC / QuickJS 引用计数与 finalizer
   成本未测;`JS_FreeValue` 同步触发用户 finalizer 的重入(§3.5)是正确性问题,本次不测。
   `JSVirtualMachine` 析构、chunk 裁剪、free list 形态、跨线程 resolve(不允许)、
@@ -1451,39 +1522,45 @@ local handle 的分工,以及"在热路径上用 local、长期身份用 persist
 
 ---
 
-## 附录 A:代码锚点
+## 附录 A:代码与文档索引
+
+引用按 `文件` + 符号名给出:符号名不随编辑漂移,`rg` 可直接定位。本表不使用行号。
 
 | 引用 | 位置 |
 |---|---|
-| `JSValue` 为非持有本地值 | `Sources/SwiftJavaScript/JSValue.swift:21-41` |
-| `JSCallbackValue` 的 `handle + ContextHandle` | `Sources/SwiftJavaScript/JSCallbackValue.swift:25-38` |
-| 回调结果按栈顶落账 | `Sources/SwiftJavaScript/JSCallbackValue.swift:42-64` |
-| `ScopeFrame.track/drain/takeFirst` | `Sources/SwiftJavaScript/JSInstantContext.swift:304-352` |
-| `ScopeCore` 与 `persist`(转移) | `Sources/SwiftJavaScript/JSInstantContext.swift:358-379,535-553` |
-| 默认 scope 锚定与 claim 兜底 | `Sources/SwiftJavaScript/JSInstantContext.swift:646-690` |
-| `JSInstantContext` init/deinit(push/pop/drain) | `Sources/SwiftJavaScript/JSInstantContext.swift:696-730` |
-| 裸 scope 的 `scopeFrame` | `Sources/SwiftJavaScript/JSInstantContext.swift:703`;`JSScope.swift:23` |
-| arena chunk(raw pointer 存储) | `Sources/SwiftJavaScript/JSInstantContext.swift:142-197` |
-| `ScopeStackRegistry`(静态表先例) | `Sources/SwiftJavaScript/JSInstantContext.swift:42-86` |
-| `JSContext` 默认 scope 与 isolated deinit | `Sources/SwiftJavaScript/JSContext.swift:14,59-66` |
-| `JSContext` 强持 VM | `Sources/SwiftJavaScript/JSContext.swift:6` |
-| 箱子安装/绑定 | `Sources/SwiftJavaScript/JSContext.swift:29-37`;`JSContextData.swift:15-59` |
-| VM 专用线程 executor 与 Owner | `Sources/SwiftJavaScript/JSVirtualMachine.swift:38-112` |
-| VM deinit(非 isolated) | `Sources/SwiftJavaScript/JSVirtualMachine.swift:20-22` |
-| 借用/拥有 handle 协议 | `Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift:19-58` |
-| driver 的 release/claim/root/unroot | `Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift:79-99` |
-| JSC 的 release/claim/root/unroot | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift:337-358` |
-| JSC 跨 context 兼容(group) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift:249-254` |
-| QuickJS 的 claim(dup)/release/free | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift:459-471` |
-| QuickJS context handle 的 retain(`JS_DupContext`)/release(`JS_FreeContext`) | `Sources/SwiftyQuickJS/QuickJSHandles.swift:114-124` |
-| JSC context handle 的 release(`JSGlobalContextRelease`) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreContextHandle.swift:88-104` |
-| 清箱在两个后端都是调用线程上的 `takeRetainedValue` | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift:44-55`;`Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift:58-69` |
-| QuickJS finalizer 同步调用用户 `definition.finalize`(结算重入来源) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineClassDriver.swift:263-287` |
-| `Mutex`(非递归;scope 栈与 context data 的既有选择) | `Sources/SwiftJavaScript/JSInstantContext.swift:1`;`Sources/SwiftJavaScript/JSContextData.swift:1` |
-| QuickJS runtimeID(后端身份先例) | `Sources/SwiftyQuickJS/QuickJSHandles.swift:13-45` |
-| `JSPreparedScript` 的保活形状(反例) | `Sources/SwiftJavaScript/JSPreparedInputs.swift:14-18,36-39` |
-| FIFO 哨兵测试先例 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift:2875-2891` |
-| Mock 的 claim/root 口径 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift:2865-2915,3007-3027` |
-| 负向编译样例惯例 | `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift:1-70` |
-| Stage 4 待办原文 | `TODO.md:207-215` |
-| 设计约束原文 | `docs/VALUE_MANAGEMENT_REFACTORING.md:205-224,235-253,352-359,386` |
+| `JSValue` 为非持有本地值 | `Sources/SwiftJavaScript/JSValue.swift` 的 `JSValue` |
+| `JSCallbackValue` 的 `handle + ContextHandle` | `Sources/SwiftJavaScript/JSCallbackValue.swift` 的 `JSCallbackValue` |
+| 回调结果按栈顶落账 | `Sources/SwiftJavaScript/JSCallbackValue.swift` 的 `bridgeCallbackResult` |
+| `ScopeFrame.track/drain/takeFirst` | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeFrame` |
+| `ScopeCore` 与 `persist`(转移) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeCore`、`ScopeCore.persist(_:into:)` |
+| 默认 scope 锚定与 claim 兜底 | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeCore.persist(_:)` |
+| `JSInstantContext` init/deinit(push/pop/drain) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `JSInstantContext` |
+| 裸 scope 的 `scopeFrame` | `Sources/SwiftJavaScript/JSScope.swift`、`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `scopeFrame` |
+| arena chunk(raw pointer 存储) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeArenaChunk` |
+| `ScopeStackRegistry`(静态表先例;VM 线程绑定所在) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeStackRegistry`、`ScopeStack.bind` |
+| `JSContext` 默认 scope 与 isolated deinit | `Sources/SwiftJavaScript/JSContext.swift` 的 `defaultScope`、`isolated deinit` |
+| `JSContext` 强持 VM | `Sources/SwiftJavaScript/JSContext.swift` 的 `virtualMachine` 存储属性 |
+| 箱子安装/绑定 | `Sources/SwiftJavaScript/JSContext.swift` 的 `init(virtualMachine:)`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.bindContextOwner` |
+| `JSScope` 的公共构造面 | `Sources/SwiftJavaScript/JSContext.swift` 的 `makeScope()`;`Sources/SwiftJavaScript/JSScope.swift` 的 `package init(handle:)` / `open()` |
+| VM 专用线程 executor 与 Owner | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `VMThread`、`VMThread.Owner`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`) |
+| 清箱的 VM 线程路由 | `Sources/SwiftJavaScript/JSContextData.swift` 的 `JSEngineRuntimeDriver.swapContextDataStorageBox(_:on:raw:)` |
+| VM deinit(非 isolated) | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit` |
+| 借用/拥有 handle 协议 | `Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift` 的 `JSValueManualReferenceCountedHandle`、`JSOwnedValueManualReferenceCountedHandle` |
+| driver 的 release/claim/root/unroot 与箱子访问 | `Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift` 的 `JSContextRuntimeDriver` |
+| JSC 的 release/claim/root/unroot | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreContextHandle` 同名方法 |
+| JSC 跨 context 兼容(group) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreEngine.isContextCompatibleWith` |
+| JSC 的清箱(`takeRetainedValue`) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreEngine.installContextDataStorageBox(_:in:)` |
+| JSC runtime handle(group 所在) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JavaScriptCoreRuntimeHandle` |
+| QuickJS 的 claim(dup)/release/free | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QuickJSContextHandle.releaseCreatedHandle` / `claimOwnedValueHandle` / `rootOwnedValueHandle` |
+| QuickJS 的清箱(`takeRetainedValue`) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QuickJSEngine.installContextDataStorageBox(_:in:)` |
+| QuickJS context handle 的 retain(`JS_DupContext`)/release(`JS_FreeContext`) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSContextHandle.retainReference` / `releaseReference` |
+| JSC context handle 的 release(`JSGlobalContextRelease`) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreContextHandle.swift` 的 `JavaScriptCoreContextHandle.releaseReference` |
+| QuickJS finalizer 同步调用用户 `definition.finalize`(结算重入来源) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineClassDriver.swift` 的 finalizer |
+| `Mutex`(非递归;scope 栈与 context data 的既有选择) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeStackStorage.state`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.state` |
+| QuickJS runtimeID(后端身份先例) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSRuntimeIdentityRegistry` |
+| `JSPreparedScript` 的保活形状(反例) | `Sources/SwiftJavaScript/JSPreparedInputs.swift` 的 `JSScopeWitness`、`JSPreparedScript` |
+| FIFO 哨兵测试先例 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `IsolatedDeinitBarrier`、`awaitContextTeardown` |
+| Mock 的 claim/root 口径与引擎调用线程日志 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `MockContextHandle` 同名方法、`contextReleaseLog` / `contextRootingLog`、`engineThreadLog` |
+| 负向编译样例惯例 | `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 文件头的负面样例注释块 |
+| Stage 4 待办原文 | `TODO.md` §2.6、§2.7 |
+| 设计约束原文 | `docs/VALUE_MANAGEMENT_REFACTORING.md` §3.5、§3.7、§5 Stage 4、§7 问题 3 |

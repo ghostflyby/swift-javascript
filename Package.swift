@@ -25,12 +25,17 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
     .package(url: "https://github.com/ghostflyby/Swift-CQuickJS", from: "0.14.0-pack.1"),
+    .package(
+      url: "https://github.com/ghostflyby/swift-thread-affinity-executor.git", from: "0.1.2"),
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.
     // Targets can depend on other targets in this package and products from dependencies.
     .target(
       name: "SwiftJavaScript",
+      dependencies: [
+        .product(name: "ThreadAffinityExecutor", package: "swift-thread-affinity-executor")
+      ],
       swiftSettings: [
         // `isolated deinit` (SE-0371) runs JSContext's destructor on the
         // actor's dedicated VM thread, so the default-scope drain

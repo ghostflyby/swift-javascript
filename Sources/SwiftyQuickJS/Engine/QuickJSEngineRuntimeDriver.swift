@@ -452,8 +452,12 @@ extension QuickJSContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptD
     QuickJSEngine.contextDataStorageBox(in: self)
   }
 
+  /// The engine-side swap runs on the context's VM thread: inline when the
+  /// caller is isolated to it, otherwise queued on it.
   public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
-    QuickJSEngine.installContextDataStorageBox(storage, in: self)
+    QuickJSEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
+      QuickJSEngine.installContextDataStorageBox(storage, in: context)
+    }
   }
 
   public func releaseCreatedHandle(_ handle: consuming QuickJSOwnedValueHandle) {
