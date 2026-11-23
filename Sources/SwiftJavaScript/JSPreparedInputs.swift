@@ -5,6 +5,9 @@
 internal protocol JSScopeWitness<Engine>: ~Copyable {
   associatedtype Engine: JSEngineRuntimeDriver
   var driverContextHandle: Engine.ContextHandle { get }
+  /// The witness's own arena frame. Persistent-handle resolution anchors its
+  /// produced local view here (design §5.1/§5.2).
+  var scopeFrame: ScopeFrame<Engine> { get }
 }
 
 public struct JSPropertyStringKey<E: JSEnginePropertyDriver>: Sendable, ~Copyable {

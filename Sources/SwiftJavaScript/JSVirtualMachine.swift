@@ -5,6 +5,9 @@ import Synchronization
 public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
   package let driverRuntimeHandle: E.RuntimeHandle
   private let owner: DedicatedThreadSerialExecutor.Owner
+  /// Retained so registry cleanup jobs can be scheduled without retaining the
+  /// VM itself; the `Owner` is what shuts the thread down.
+  private let executor: DedicatedThreadSerialExecutor
   public let unownedExecutor: UnownedSerialExecutor
 
   public convenience init() {
@@ -15,6 +18,14 @@ public final class JSVirtualMachine<E: JSEngineRuntimeDriver>: Sendable {
     self.driverRuntimeHandle = E.makeRuntimeHandle()
     self.unownedExecutor = executor.asUnownedSerialExecutor()
     self.owner = executor.owner
+    self.executor = executor
+  }
+
+  /// Scheduling handle for persistent-binding settlement (design §2.4
+  /// option b). Cleanup closures run on the same serial OS thread as actor
+  /// jobs, so payload settlement never escapes the VM thread.
+  package var persistentCleanupScheduler: any JSPersistentCleanupScheduler {
+    executor
   }
 
   deinit {
@@ -35,9 +46,14 @@ extension JSVirtualMachine: Hashable where E.RuntimeHandle: Hashable {
   }
 }
 
-private final class DedicatedThreadSerialExecutor: Thread, SerialExecutor, @unchecked Sendable {
+private final class DedicatedThreadSerialExecutor: Thread, SerialExecutor,
+  JSPersistentCleanupScheduler, @unchecked Sendable
+{
   struct State {
     var jobs: [UnownedJob] = []
+    /// Registry settlement jobs (design §2.4 option b). They share this
+    /// thread with actor jobs, which is what keeps payloads VM-thread-only.
+    var cleanupJobs: [@Sendable () -> Void] = []
     var stopped = false
   }
   let state = Mutex(State())
@@ -56,11 +72,26 @@ private final class DedicatedThreadSerialExecutor: Thread, SerialExecutor, @unch
     while true {
       semaphore.wait()
 
-      let (job, shouldStop) = state.withLock { state in
-        if !state.jobs.isEmpty {
-          return (state.jobs.removeFirst() as UnownedJob?, false)
+      let (cleanup, job, shouldStop) = state.withLock {
+        state
+          -> (
+            cleanup: (@Sendable () -> Void)?,
+            job: UnownedJob?,
+            shouldStop: Bool
+          ) in
+        // Cleanup runs before the next actor job on the same thread.
+        if !state.cleanupJobs.isEmpty {
+          return (state.cleanupJobs.removeFirst(), nil, false)
         }
-        return (nil, state.stopped)
+        if !state.jobs.isEmpty {
+          return (nil, state.jobs.removeFirst(), false)
+        }
+        return (nil, nil, state.stopped)
+      }
+
+      if let cleanup {
+        cleanup()
+        continue
       }
 
       if let job {
@@ -76,6 +107,21 @@ private final class DedicatedThreadSerialExecutor: Thread, SerialExecutor, @unch
     let shouldSignal = state.withLock {
       if $0.stopped { return false }
       $0.jobs.append(unownedJob)
+      return true
+    }
+
+    if shouldSignal {
+      semaphore.signal()
+    }
+  }
+
+  /// Enqueue a settlement closure. After `stopped`, the closure is dropped:
+  /// every binding was settled inline by `close()` before shutdown, so
+  /// dropping cannot leak an engine reference (design §2.4).
+  func schedulePersistentCleanup(_ body: @escaping @Sendable () -> Void) {
+    let shouldSignal = state.withLock {
+      if $0.stopped { return false }
+      $0.cleanupJobs.append(body)
       return true
     }
 

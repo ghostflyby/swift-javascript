@@ -336,6 +336,10 @@ public enum MockEngine: JSEngine {
   public static func releaseCreatedHandle(
     _ handle: consuming MockOwnedValueHandle, in context: MockContextHandle
   ) {
+    // Optional reentry hook: models QuickJS `JS_FreeValue` synchronously
+    // running a user finalizer, which is the settlement-reentry source the
+    // persistent registry must survive without deadlocking (design §3.5).
+    mockReleaseReentryHooks.withLock { $0[context.rawContext.identity] }?()
     contextReleaseLog.withLock {
       $0[context.rawContext.identity, default: []].append(handle.borrowed())
     }
@@ -2876,18 +2880,32 @@ private func clearReleaseLog(for identity: String) {
 /// job. The VM executor is serial FIFO, so pinging a sentinel actor bound
 /// to it after the context's last release runs strictly after the deinit
 /// job — deterministic post-drain assertions without sleeps.
+///
+/// The stateful counter is load-bearing, not decoration: an empty actor
+/// method with a custom executor was observed to be optimized into a
+/// non-hopping call (~4 ns instead of a cross-thread round trip), which made
+/// the sentinel observe nothing. Mutating actor state forces the isolation
+/// hop, and `pingCount()` makes the write observable; see
+/// `Benchmarks/PersistentHandleBenchmarks/BenchmarkMain.swift`.
 private actor IsolatedDeinitBarrier {
   nonisolated let unownedExecutor: UnownedSerialExecutor
+  private var pings = 0
 
   init<E: JSEngine>(virtualMachine: JSVirtualMachine<E>) {
     self.unownedExecutor = virtualMachine.unownedExecutor
   }
 
-  func ping() {}
+  func ping() {
+    pings &+= 1
+  }
+
+  func pingCount() -> Int { pings }
 }
 
 private func awaitContextTeardown<E: JSEngine>(on virtualMachine: JSVirtualMachine<E>) async {
-  await IsolatedDeinitBarrier(virtualMachine: virtualMachine).ping()
+  let barrier = IsolatedDeinitBarrier(virtualMachine: virtualMachine)
+  await barrier.ping()
+  _ = await barrier.pingCount()
 }
 
 // MARK: - Explicit rooting log for MockEngine (Stage 3 §3.7)
@@ -2912,6 +2930,43 @@ private func rootingLog(for identity: String) -> [MockRootingEvent] {
 
 private func clearRootingLog(for identity: String) {
   contextRootingLog.withLock { $0[identity] = nil }
+}
+
+// MARK: - Claim log for MockEngine (Stage 4 persistent handles)
+//
+// Kept separate from the rooting log: `claimOwnedValueHandle` models
+// "duplicate an engine reference" (QuickJS `JS_DupValue`; identity on GC
+// engines), while rooting models the explicit-root policy hook. Persistent
+// mint/resolve take a claim; conflating the two would make the mint = one
+// claim + one root assertion meaningless.
+
+private let contextClaimLog = Mutex<[String: [MockValueHandle]]>([:])
+
+private func claimLog(for identity: String) -> [MockValueHandle] {
+  contextClaimLog.withLock { $0[identity] ?? [] }
+}
+
+private func clearClaimLog(for identity: String) {
+  contextClaimLog.withLock { $0[identity] = nil }
+}
+
+// MARK: - Release reentry hook for MockEngine (Stage 4 §3.5/§8.1 case 9)
+//
+// `releaseCreatedHandle` on QuickJS is `JS_FreeValue`, which can synchronously
+// run a user finalizer; that finalizer may drop a persistent handle and
+// re-enter the registry. The hook lets a test perform exactly that reentry.
+
+private let mockReleaseReentryHooks = Mutex<[String: @Sendable () -> Void]>([:])
+
+private func installReleaseReentryHook(
+  for identity: String,
+  _ hook: @escaping @Sendable () -> Void
+) {
+  mockReleaseReentryHooks.withLock { $0[identity] = hook }
+}
+
+private func removeReleaseReentryHook(for identity: String) {
+  mockReleaseReentryHooks.withLock { $0[identity] = nil }
 }
 
 // MARK: - Context-side driver conformance (Stage 2B)
@@ -3010,9 +3065,13 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
 
   /// Mock counterpart of the claim hook: the mock's ledger models creation
   /// references only, so claiming a borrowed identity is an identity
-  /// operation (matching GC-engine semantics).
+  /// operation (matching GC-engine semantics). Claims are logged separately
+  /// so persistent mint/resolve can assert "one claim" exactly.
   public func claimOwnedValueHandle(_ handle: MockValueHandle) -> MockOwnedValueHandle {
-    MockOwnedValueHandle.adopting(handle)
+    contextClaimLog.withLock {
+      $0[rawContext.identity, default: []].append(handle)
+    }
+    return MockOwnedValueHandle.adopting(handle)
   }
 
   /// Explicit roots are recorded separately from release accounting:
@@ -3376,4 +3435,530 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   let released = releaseLog(for: id)
   #expect(released.count == 1)
   #expect(released.first == handle)
+}
+
+// MARK: - Persistent handles (Stage 4, docs/PERSISTENT_HANDLE_DESIGN.md)
+//
+// Mock-level contract: settlement is observable through the claim, rooting,
+// and release ledgers; asynchronous settlement is synchronized with the FIFO
+// sentinel (`awaitContextTeardown`) so every assertion is exact-count, never
+// a poll.
+
+/// Mint = one claim + one explicit root (copy semantics, not `persist`'s
+/// transfer). The last owner's release is metadata-immediate and settles the
+/// engine reference exactly once on the VM executor.
+@Test func persistentHandleMintClaimsRootsAndSettlesOnLastOwnerRelease() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  var handle: JSPersistentHandle<MockEngine>? = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("mint"))
+  }
+  let claimed = claimLog(for: id)
+  #expect(claimed.count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true])
+  #expect(rootingLog(for: id).last?.handle == claimed.first)
+  // Only the source scope's creation reference has been settled so far.
+  #expect(releaseLog(for: id).count == 1)
+  #expect(handle != nil)
+
+  handle = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(claimLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
+  #expect(releaseLog(for: id).count == 2)
+  #expect(releaseLog(for: id).last == claimed.first)
+
+  // Container teardown has nothing left to settle.
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 2)
+}
+
+/// Resolve is a copy: it claims into the receiving scope's arena, the copy
+/// settles at that scope's drain, and the binding remains resolvable.
+@Test func persistentHandleResolveClaimsIntoReceivingScopeArena() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("resolve"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  let payload = await context!.withInstantContext { scope in
+    guard let value = scope.resolve(handle) else { return "" }
+    return scope.toString(value)
+  }
+  #expect(payload == "runtime:resolve")
+  #expect(claimLog(for: id).count == 1)
+  // Synchronous scope: implicit stack roots, no explicit root event.
+  #expect(rootingLog(for: id).isEmpty)
+  // The resolved copy was released when the receiving scope drained.
+  #expect(releaseLog(for: id).count == 1)
+
+  let stillAlive = await context!.withInstantContext { scope in
+    scope.resolve(handle) != nil
+  }
+  #expect(stillAlive)
+
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  // second resolve copy + binding settlement
+  #expect(releaseLog(for: id).count == 3)
+}
+
+/// The manual `JSScope` is the third witness entry: mint and resolve route
+/// through the same registry and anchor on that scope's arena.
+@Test func manualScopeMintsAndResolvesPersistentHandles() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  let result = await context.withIsolatedGlobalObject { isolatedContext, _ in
+    var scope = JSScope<MockEngine>(handle: isolatedContext.driverContextHandle)
+    scope.open()
+    let handle = scope.makePersistentHandle(scope.makeString("manual"))
+    guard let resolved = scope.resolve(handle) else { return "<nil>" }
+    return resolved.borrowHandle().rawValue.payload
+  }
+  #expect(result == "runtime:manual")
+
+  // The scope drained its creation reference and the resolved copy; the
+  // handle's last owner was the closure local, so its settlement is queued.
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(claimLog(for: id).count == 2)  // mint + resolve
+  #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
+  #expect(releaseLog(for: id).count == 3)
+}
+
+/// `invalidate` kills the identity immediately, is idempotent, and settles
+/// the engine reference exactly once after a serial executor turn.
+@Test func persistentHandleInvalidateKillsIdentityAndSettlesOnce() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("invalidate"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  #expect(handle.invalidate() == true)
+  #expect(handle.invalidate() == false)
+  #expect(claimLog(for: id).isEmpty)
+
+  // Dead identity resolves to nil even before the pump runs.
+  let resolvedAfterInvalidate = await context.withInstantContext { scope in
+    scope.resolve(handle) == nil
+  }
+  #expect(resolvedAfterInvalidate)
+
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+}
+
+/// Releasing the last owner without `invalidate` schedules the same cleanup;
+/// the settlement happens exactly once on the executor.
+@Test func persistentHandleDeinitSchedulesSingleSettlement() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+
+  var handle: JSPersistentHandle<MockEngine>? = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeNumber(7))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+  #expect(handle != nil)
+
+  handle = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(claimLog(for: id).isEmpty)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+}
+
+/// Slot reuse: after settle, reissue increments the generation again, so the
+/// old handle cannot resolve the new binding (ABA safety).
+@Test func persistentHandleSlotReuseRetiresOldGeneration() async {
+  let context = JSContext<MockEngine>()
+  let virtualMachine = context.virtualMachine
+
+  let first = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("first"))
+  }
+  let firstSlot = first.identity.slot
+  let firstGeneration = first.identity.generation
+  #expect(first.invalidate())
+  await awaitContextTeardown(on: virtualMachine)
+
+  let second = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("second"))
+  }
+  #expect(second.identity.slot == firstSlot)
+  #expect(second.identity.generation > firstGeneration)
+
+  let oldResolved = await context.withInstantContext { scope in
+    scope.resolve(first) != nil
+  }
+  let newResolved = await context.withInstantContext { scope in
+    scope.resolve(second) != nil
+  }
+  #expect(oldResolved == false)
+  #expect(newResolved == true)
+}
+
+/// Container death is not a dangling state: `close()` settles each live
+/// binding exactly once, a surviving handle becomes a dead identity, and a
+/// new context cannot resolve it (registryID mismatch).
+@Test func persistentHandleContainerDeathYieldsDeadIdentity() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("container"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(handle.invalidate() == false)
+
+  let other = JSContext<MockEngine>()
+  // Resolution stays inside the actor: JSValue is a non-Sendable local view.
+  let resolvedByOther = await other.withIsolatedGlobalObject {
+    isolatedContext, _ in
+    isolatedContext.resolve(handle) == nil
+  }
+  #expect(resolvedByOther)
+  _ = other
+}
+
+/// Close and an external release race: whichever path wins, each binding is
+/// settled exactly once (no missed settlement, no double settlement).
+@Test func persistentHandleConcurrentInvalidateAndCloseSettleOnce() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("race"))
+  }
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  context = nil
+  _ = handle.invalidate()
+  await awaitContextTeardown(on: virtualMachine)
+
+  #expect(releaseLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(handle.invalidate() == false)
+}
+
+/// External box clear removes only the synchronous access path: the registry
+/// stays alive (owned by the actor), actor-side resolve keeps working, and
+/// context teardown still settles every binding exactly once.
+@Test func externalBoxClearKeepsRegistryAliveForActorPaths() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("box"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  // Cleared from this (non-VM) thread: no engine call may happen here.
+  context!.driverContextHandle.installContextDataStorageBox(nil)
+
+  let scopeResolved = await context!.withInstantContext { scope in
+    scope.resolve(handle) != nil
+  }
+  #expect(scopeResolved == false)
+
+  // The registry is owned by the actor, so actor-side resolution still works;
+  // its copy is anchored on the default scope (claim + root now, release on
+  // teardown). Resolution stays inside the actor: JSValue is not Sendable.
+  let actorResolved = await context!.withIsolatedGlobalObject {
+    isolatedContext, _ in
+    isolatedContext.resolve(handle) != nil
+  }
+  #expect(actorResolved)
+  #expect(claimLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true])
+
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  // close settles the binding, then the default-scope drain settles the
+  // actor-resolved copy: one release each, both unrooted.
+  #expect(releaseLog(for: id).count == 2)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true, false, false])
+}
+
+/// `Sendable` is the reason the handle type exists: it crosses isolation
+/// domains while the local value cannot, and the receiving window resolves it.
+@Test func persistentHandleCrossesIsolationDomains() async {
+  let context = JSContext<MockEngine>()
+
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("sendable"))
+  }
+  let registryID = await Task.detached { handle.identity.registry }.value
+  #expect(registryID != 0)
+
+  let resolved = await context.withInstantContext { scope in
+    scope.resolve(handle) != nil
+  }
+  #expect(resolved)
+}
+
+/// Reentry from settlement (models QuickJS `JS_FreeValue` running a user
+/// finalizer that drops a handle): no deadlock, no second settlement.
+@Test func settlementReentryReleaseIsANoOp() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("reentry"))
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  installReleaseReentryHook(for: id) {
+    _ = handle.invalidate()
+  }
+  defer { removeReleaseReentryHook(for: id) }
+
+  #expect(handle.invalidate())
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(releaseLog(for: id).count == 1)
+  #expect(handle.invalidate() == false)
+}
+
+/// Same runtime, two contexts: each context owns an independent registry,
+/// so handles are context-local in both directions and neither binding is
+/// disturbed by the other's lookups.
+@Test func persistentHandlesDoNotCrossSameRuntimeContexts() async {
+  let first = JSContext<MockEngine>()
+  let second = JSContext<MockEngine>(virtualMachine: first.virtualMachine)
+  let firstID = first.driverContextHandle.rawContext.identity
+  let secondID = second.driverContextHandle.rawContext.identity
+  #expect(firstID != secondID)
+  clearClaimLog(for: firstID)
+  clearClaimLog(for: secondID)
+  clearRootingLog(for: firstID)
+  clearRootingLog(for: secondID)
+  clearReleaseLog(for: firstID)
+  clearReleaseLog(for: secondID)
+
+  let firstHandle = await first.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("first"))
+  }
+  let secondHandle = await second.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("second"))
+  }
+  #expect(firstHandle.identity.registry != secondHandle.identity.registry)
+
+  let firstText = await first.withInstantContext { scope -> String in
+    guard let value = scope.resolve(firstHandle) else { return "<nil>" }
+    return scope.toString(value)
+  }
+  let secondText = await second.withInstantContext { scope -> String in
+    guard let value = scope.resolve(secondHandle) else { return "<nil>" }
+    return scope.toString(value)
+  }
+  #expect(firstText == "runtime:first")
+  #expect(secondText == "runtime:second")
+
+  let firstSeesSecond = await first.withInstantContext { scope in
+    scope.resolve(secondHandle) == nil
+  }
+  let secondSeesFirst = await second.withInstantContext { scope in
+    scope.resolve(firstHandle) == nil
+  }
+  #expect(firstSeesSecond)
+  #expect(secondSeesFirst)
+
+  // Rejected lookups are pure misses: both bindings still resolve.
+  let firstStillValid = await first.withInstantContext { scope in
+    scope.resolve(firstHandle) != nil
+  }
+  let secondStillValid = await second.withInstantContext { scope in
+    scope.resolve(secondHandle) != nil
+  }
+  #expect(firstStillValid)
+  #expect(secondStillValid)
+}
+
+/// Last-owner release settles through the VM executor (FIFO sentinel), the
+/// registry has no live binding afterwards, and the freed slot is reissued
+/// with a bumped generation. This is the Mock-expressible form of "the
+/// released handle leaves nothing rooted" and of slot reclaim.
+@Test func persistentHandleDeinitClearsRegistrySlotOnVMExecutor() async {
+  let context = JSContext<MockEngine>()
+  let id = context.driverContextHandle.rawContext.identity
+  let virtualMachine = context.virtualMachine
+  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+    for: context.driverContextHandle)
+
+  var handle: JSPersistentHandle<MockEngine>? = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("deinit-registry"))
+  }
+  guard let identity = handle?.identity else {
+    Issue.record("failed to mint a persistent handle")
+    return
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+  #expect(registry?.borrowLive(identity) != nil)
+
+  handle = nil
+  await awaitContextTeardown(on: virtualMachine)
+
+  // Registry is empty for this identity: no root and no owned reference
+  // remains, and the settlement ran before the sentinel returned.
+  #expect(registry?.borrowLive(identity) == nil)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+  #expect(claimLog(for: id).isEmpty)
+
+  // The settled slot went back to the free list: the next mint reuses it and
+  // the generation advances past the dead identity.
+  let replacement = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("replacement"))
+  }
+  #expect(replacement.identity.slot == identity.slot)
+  #expect(replacement.identity.generation > identity.generation)
+  #expect(registry?.borrowLive(replacement.identity) != nil)
+  #expect(registry?.borrowLive(identity) == nil)
+}
+
+/// Design §8.1 case 7: closing twice must be a no-op the second time — no
+/// double settlement, no crash. A manual `close()` followed by the context
+/// teardown's own `close()` (`JSContext.isolated deinit` runs it) exercises
+/// exactly the double-close path.
+@Test func persistentHandleRegistryCloseTwiceSettlesExactlyOnce() async {
+  var context: JSContext<MockEngine>? = JSContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  let virtualMachine = context!.virtualMachine
+  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+    for: context!.driverContextHandle)
+
+  _ = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("close-twice"))
+  }
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  registry?.close()
+  await awaitContextTeardown(on: virtualMachine)  // FIFO behind close's settlement
+  // The first close settled the binding exactly once.
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+
+  // The second close — the context teardown's own — is a no-op: the counts
+  // do not move and nothing dangles or crashes.
+  context = nil
+  await awaitContextTeardown(on: virtualMachine)
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 1)
+}
+
+/// §8.1 case 6 的手动 close 形态:registry 关闭后是死容器而非悬垂容器,
+/// resolve 任何 handle 返回 nil(case 6 本体是 context deinit 路径,已由
+/// 引擎契约测试覆盖)。
+@Test func persistentHandleResolveAfterRegistryCloseReturnsNil() async {
+  let context = JSContext<MockEngine>()
+  let virtualMachine = context.virtualMachine
+  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+    for: context.driverContextHandle)
+
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("closed"))
+  }
+  registry?.close()
+  await awaitContextTeardown(on: virtualMachine)
+
+  let resolved = await context.withInstantContext { scope in
+    scope.resolve(handle) == nil
+  }
+  #expect(resolved)
+}
+
+// Negative runtime sample (design §8.1 case 11): minting a persistent handle
+// in a bare context — a scope whose context has no context-data storage box
+// (no hosted JSContext, so no registry) — is a programming error and traps
+// with `preconditionFailure`. The trap is fatal and cannot be asserted inside
+// a Swift Testing process, so it is documented here:
+//
+//     let bareScope = JSInstantContext<MockEngine>(handle: bareHandle)
+//     bareScope.makePersistentHandle(bareScope.makeString("x"))
+//     // ✗ runtime trap: the registry lives in the context data box of a
+//     // ✗ hosted JSContext; a bare context has none.
+
+/// `JSPersistentHandle` is Sendable: it travels between two actors while the
+/// non-Sendable local value stays behind, and resolves on return.
+@Test func persistentHandleRelaysAcrossIsolationDomains() async {
+  let context = JSContext<MockEngine>()
+  let handle = await context.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("relay"))
+  }
+
+  let first = PersistentHandleMailbox<MockEngine>()
+  let second = PersistentHandleMailbox<MockEngine>()
+  await first.deposit(handle)
+  guard let staged = await first.withdraw() else {
+    Issue.record("first mailbox lost the handle")
+    return
+  }
+  await second.deposit(staged)
+  guard let recovered = await second.withdraw() else {
+    Issue.record("second mailbox lost the handle")
+    return
+  }
+  #expect(recovered == handle)
+
+  let text = await context.withInstantContext { scope -> String in
+    guard let value = scope.resolve(recovered) else { return "<nil>" }
+    return scope.toString(value)
+  }
+  #expect(text == "runtime:relay")
+}
+
+private actor PersistentHandleMailbox<E: JSEngineRuntimeDriver> {
+  private var stored: JSPersistentHandle<E>?
+
+  func deposit(_ handle: JSPersistentHandle<E>) {
+    stored = handle
+  }
+
+  func withdraw() -> JSPersistentHandle<E>? {
+    stored
+  }
 }

@@ -13,6 +13,11 @@ public actor JSContext<E: JSContextEngine> {
   /// reference the arena owns.
   private let defaultScope: ScopeCore<E, JSExplicitRoots>
 
+  /// Context-side persistent-binding registry (design §3.1). Lifetime is
+  /// owned here; the same object is published into the context data storage
+  /// box so synchronous scope witnesses can reach it.
+  package let persistentRegistry: JSPersistentHandleRegistry<E>
+
   public init() {
     self.init(virtualMachine: JSVirtualMachine<E>())
   }
@@ -34,6 +39,11 @@ public actor JSContext<E: JSContextEngine> {
         return box
       }()
     storage.bindContextOwner(self)
+    // Publish the same registry object into the box: callbacks and `JSScope`
+    // can only reach it synchronously through the box (design §3.1). The
+    // context keeps the authoritative strong reference, so an external box
+    // clear only removes this access path.
+    storage.setData(persistentRegistry, for: JSPersistentHandleRegistryKey<E>.self)
   }
 
   package init(
@@ -43,6 +53,10 @@ public actor JSContext<E: JSContextEngine> {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
     self.driverContextHandle = driverContextHandle
+    self.persistentRegistry = JSPersistentHandleRegistry(
+      contextHandle: driverContextHandle,
+      scheduler: virtualMachine.persistentCleanupScheduler
+    )
     let defaultScope = ScopeCore<E, JSExplicitRoots>(handle: driverContextHandle)
     self.defaultScope = defaultScope
     ScopeStackRegistry.push(defaultScope, for: driverContextHandle)
@@ -57,6 +71,11 @@ public actor JSContext<E: JSContextEngine> {
   /// the VM executor from a nonisolated deinit) was evaluated and not
   /// needed.
   isolated deinit {
+    // Persistent bindings settle first (design §4.1): settlement needs a live
+    // engine context, and this must run before `releaseReference()`. It is
+    // deliberately independent of the default-scope drain: the two ledgers
+    // never reference each other (§7.4).
+    persistentRegistry.close()
     // The default scope is the stack bottom: drain it last, after every
     // temporally nested scope has closed, then pop its frame.
     defaultScope.drain()
@@ -64,6 +83,10 @@ public actor JSContext<E: JSContextEngine> {
     driverContextHandle.installContextDataStorageBox(nil)
     _ = driverContextHandle.releaseReference()
   }
+
+  /// The default-scope arena frame: the anchor for actor-side persistent
+  /// handle resolution (design §5.1/§7.2).
+  var defaultScopeFrame: ScopeFrame<E> { defaultScope.frame }
 }
 
 extension JSContext {

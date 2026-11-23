@@ -353,10 +353,10 @@ ScopeCore<E, Rooting>          ← 单一实现,Rooting 为编译期策略(空�
 
 前置:Stage 3 完成(本地值语义稳定——`resolve` 的产物是本地值);Stage 2 完成(handle 借用/拥有拆分,避免 registry 存储层二次返工)。设计子任务(纯文档与原型)可与 Stage 1-3 并行启动。
 
-- [ ] 设计子文档:handle 所有权(引用计数 + 自动清理 vs 显式 invalidate)、绑定粒度(`RuntimeLocal` vs `ContextLocal` 的公开面)、注册表组织(Dictionary vs 整数槽位 + generation)、失效通知路径
-- [ ] core 层实现可恢复 handle + 容器级 registry;恢复路径按 §3.5:handle → scope 见证 → 本地值(进当前 arena)
-- [ ] 基准测试(对应 V8 文档 §10.3/§12.4):handle 分配/释放、恢复、注册表查找、大量 handle 同时失效,与默认 scope 直接持有对比——基准结论用于校准实现选型(槽位 vs Dictionary),不是"是否做"的判据
-- [ ] 跨引擎测试:跨 context 解析、无绑定/容器消亡返回空、弱引用不阻 GC、handle 析构自动清理(经 VM executor)、Sendable 跨隔离域传递
+- [x] 设计子文档:`docs/PERSISTENT_HANDLE_DESIGN.md` 定稿并经独立评审修订(§4.3 替换 = invalidate + mint、§4.4 **v1 强绑定**(JSC/QuickJS 均无宿主侧弱引用 API,据此重写"弱引用不阻 GC"验收条——root 跨强制 GC 保活 + QuickJS JS `WeakRef` 释放后不阻 GC,JSC 不测释放后可回收性)、§6.1 `ContextLocal`、槽位 + generation registry、`schedulePersistentCleanup` 经 VM executor)
+- [x] core 层实现:`JSPersistentHandle`(identity 化 Sendable,零 JS 操作面)+ `JSPersistentHandleRegistry`(context 数据箱挂载、分块 slab + free list、generation 防误命中);`resolve` 经 scope 见证 claim 进接收帧 arena;零后端改动
+- [x] 基准测试:`Benchmarks/PersistentHandleBenchmarks` 独立 target,JSC/QuickJS 真实数据 + synthetic 槽位 vs Dictionary(复核员独立复现命中)。选型:维持 slab+free list(chunk 32);`pending` 队列建议 head cursor(尾风险登记);witness 优先 typed `package` 字段(box 查找占 resolve 40-45%)
+- [x] 跨引擎测试:契约测试双引擎参数化 + QuickJS 单引擎 WeakRef 用例;Mock 侧精确计数全套;哨兵全部状态化(空 ping 实测被优化为非跳转调用);VM 上第二 context 创建经存活 context 窗口(引擎访问不变量);双 close 幂等、close 后 resolve nil、bare-context 负面样例补齐。遗留(§8.1-10 settling 计数器、§8.2-4 QuickJS 内存基线、§8.3 线程直断言/迟到泵、外部清箱线程、`JSScope` 公共面线程归属)登记于 TODO §2.6
 
 ### Stage 5:lifetime 依赖转正后的迁移(远期,特性门槛)
 

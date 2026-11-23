@@ -91,5 +91,16 @@ let package = Package(
         "SwiftyQuickJS"
       ]
     ),
+    // Stage 4 calibration harness (`docs/PERSISTENT_HANDLE_DESIGN.md` §8.4/§11).
+    // Not a test target: it is run directly so `swift test` stays unaffected.
+    .executableTarget(
+      name: "PersistentHandleBenchmarks",
+      dependencies: [
+        "SwiftJavaScript",
+        "SwiftyJavaScriptCore",
+        "SwiftyQuickJS",
+      ],
+      path: "Benchmarks/PersistentHandleBenchmarks"
+    ),
   ]
 )
