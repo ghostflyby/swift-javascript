@@ -9,18 +9,18 @@ import Synchronization
   import CQuickJSSystem
 #endif
 
-public typealias QuickJSClassDefinition = JSEngineClassDefinition<
-  QuickJSEngine,
-  JSClassParentDescriptor<QuickJSEngine, Never>,
+public typealias QJSClassDefinition = JSEngineClassDefinition<
+  QJSEngine,
+  JSClassParentDescriptor<QJSEngine, Never>,
   Never
 >
 
 private final class QuickJSClassRecord: @unchecked Sendable {
-  let definition: QuickJSClassDefinition
-  let parentClass: JSClass<QuickJSEngine>?
+  let definition: QJSClassDefinition
+  let parentClass: QJSClass?
   let exoticMethods: UnsafeMutablePointer<JSClassExoticMethods>
 
-  init(definition: QuickJSClassDefinition, parentClass: JSClass<QuickJSEngine>?) {
+  init(definition: QJSClassDefinition, parentClass: QJSClass?) {
     self.definition = definition
     self.parentClass = parentClass
     self.exoticMethods = .allocate(capacity: 1)
@@ -44,7 +44,7 @@ private final class QuickJSClassRecord: @unchecked Sendable {
 }
 
 private struct QuickJSClassRegistryKey: Hashable, Sendable {
-  let runtime: QuickJSRuntimeHandle
+  let runtime: QJSRuntimeHandle
   let classID: JSClassID
 }
 
@@ -57,7 +57,7 @@ private struct QuickJSClassRegistry: Sendable, ~Copyable {
     }
   }
 
-  func definition(for key: QuickJSClassRegistryKey) -> QuickJSClassDefinition? {
+  func definition(for key: QuickJSClassRegistryKey) -> QJSClassDefinition? {
     records.withLock {
       $0[key]?.definition
     }
@@ -69,7 +69,7 @@ private struct QuickJSClassRegistry: Sendable, ~Copyable {
     }
   }
 
-  func removeRecords(in runtime: QuickJSRuntimeHandle) {
+  func removeRecords(in runtime: QJSRuntimeHandle) {
     records.withLock {
       $0 = $0.filter { $0.key.runtime != runtime }
     }
@@ -78,7 +78,7 @@ private struct QuickJSClassRegistry: Sendable, ~Copyable {
 
 private let quickJSClassRegistry = QuickJSClassRegistry()
 
-func removeQuickJSClassRecords(in runtime: QuickJSRuntimeHandle) {
+func removeQuickJSClassRecords(in runtime: QJSRuntimeHandle) {
   quickJSClassRegistry.removeRecords(in: runtime)
 }
 
@@ -103,13 +103,17 @@ private struct QuickJSClassObjectContextRegistry: Sendable, ~Copyable {
 
 private let quickJSClassObjectContextRegistry = QuickJSClassObjectContextRegistry()
 
-extension QuickJSEngine: JSEngineClassBridgeDriver {
+extension QJSEngine: JSEngineClassBridgeDriver {
+  public typealias Value = QJSValue
+  public typealias InstantContext = QJSInstantContext
+  public typealias Arguments = QJSArguments
+  public typealias Class = QJSClass
   public typealias ClassPropertyNameAccumulator = Never
 
   public static func makeClass(
-    definition: QuickJSClassDefinition,
-    in runtime: QuickJSRuntimeHandle
-  ) -> JSClass<QuickJSEngine> {
+    definition: QJSClassDefinition,
+    in runtime: QJSRuntimeHandle
+  ) -> QJSClass {
     var classID = JSClassID(0)
     JS_NewClassID(runtime.ref, &classID)
 
@@ -121,21 +125,21 @@ extension QuickJSEngine: JSEngineClassBridgeDriver {
       record,
       for: QuickJSClassRegistryKey(runtime: runtime, classID: classID)
     )
-    return JSClass(
-      adoptingHandleClass: QuickJSClassHandle(id: classID, runtime: runtime),
+    return QJSClass(
+      adoptingHandleClass: QJSClassHandle(id: classID, runtime: runtime),
       retainedOwner: record
     )
   }
 
-  public static func runtimeHandle(for context: QuickJSContextHandle) -> QuickJSRuntimeHandle? {
-    QuickJSRuntimeHandle(ref: JS_GetRuntime(context.ref), ownsRuntime: false)
+  public static func runtimeHandle(for context: QJSContextHandle) -> QJSRuntimeHandle? {
+    QJSRuntimeHandle(ref: JS_GetRuntime(context.ref), ownsRuntime: false)
   }
 
   public static func makeClassObjectResultHandle(
-    of jsClass: JSClass<QuickJSEngine>,
+    of jsClass: QJSClass,
     privateData: UnsafeMutableRawPointer,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     guard let definition = jsClassDefinition(jsClass, in: context) else {
       return nil
     }
@@ -147,18 +151,18 @@ extension QuickJSEngine: JSEngineClassBridgeDriver {
     if JS_SetOpaque(object, privateData) < 0 {
       JS_FreeValue(context.ref, object)
       let exception = JS_GetException(context.ref)
-      return .exception(QuickJSValueHandle(ref: exception))
+      return .exception(QJSValueHandle(ref: exception))
     }
     quickJSClassObjectContextRegistry.record(context.ref, for: privateData)
     initializeClassObject(object, definition: definition, in: context.ref)
     installStaticValueMembers(on: object, definition: definition, in: context.ref)
     installStaticFunctionMembers(on: object, definition: definition, in: context.ref)
-    return .value(QuickJSValueHandle(ref: object))
+    return .value(QJSValueHandle(ref: object))
   }
 
   public static func classObjectPrivateData(
-    from value: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    from value: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> JSResult<UnsafeMutableRawPointer?>? {
     let classID = JS_GetClassID(value.ref)
     guard classID != JS_INVALID_CLASS_ID else {
@@ -175,9 +179,9 @@ extension QuickJSEngine: JSEngineClassBridgeDriver {
   }
 
   public static func classDefinition(
-    for classHandle: QuickJSClassHandle,
-    in runtime: QuickJSRuntimeHandle
-  ) -> QuickJSClassDefinition? {
+    for classHandle: QJSClassHandle,
+    in runtime: QJSRuntimeHandle
+  ) -> QJSClassDefinition? {
     guard classHandle.runtime == nil || classHandle.runtime == runtime else {
       return nil
     }
@@ -188,10 +192,10 @@ extension QuickJSEngine: JSEngineClassBridgeDriver {
 }
 
 private func registerClassIfNeeded(
-  _ jsClass: JSClass<QuickJSEngine>, in context: QuickJSContextHandle
+  _ jsClass: QJSClass, in context: QJSContextHandle
 ) {
   let classID = jsClass.classHandle().id
-  guard let runtimeHandle = QuickJSEngine.runtimeHandle(for: context),
+  guard let runtimeHandle = QJSEngine.runtimeHandle(for: context),
     jsClass.classHandle().runtime == nil || jsClass.classHandle().runtime == runtimeHandle
   else {
     return
@@ -237,24 +241,24 @@ private func registerClassIfNeeded(
 }
 
 private func jsClassDefinition(
-  _ jsClass: JSClass<QuickJSEngine>,
-  in context: QuickJSContextHandle
-) -> QuickJSClassDefinition? {
-  guard let runtime = QuickJSEngine.runtimeHandle(for: context) else {
+  _ jsClass: QJSClass,
+  in context: QJSContextHandle
+) -> QJSClassDefinition? {
+  guard let runtime = QJSEngine.runtimeHandle(for: context) else {
     return nil
   }
-  return QuickJSEngine.classDefinition(for: jsClass.classHandle(), in: runtime)
+  return QJSEngine.classDefinition(for: jsClass.classHandle(), in: runtime)
 }
 
 private func quickJSClassDefinition(
   for value: CQuickJSValue,
   in contextRef: OpaquePointer
-) -> QuickJSClassDefinition? {
+) -> QJSClassDefinition? {
   let classID = JS_GetClassID(value)
   guard classID != JS_INVALID_CLASS_ID else {
     return nil
   }
-  let runtime = QuickJSRuntimeHandle(ref: JS_GetRuntime(contextRef), ownsRuntime: false)
+  let runtime = QJSRuntimeHandle(ref: JS_GetRuntime(contextRef), ownsRuntime: false)
   return quickJSClassRegistry.definition(
     for: QuickJSClassRegistryKey(runtime: runtime, classID: classID)
   )
@@ -266,7 +270,7 @@ private func quickJSClassFinalizer(_ runtimeRef: OpaquePointer?, _ value: CQuick
     classID != JS_INVALID_CLASS_ID,
     let definition = quickJSClassRegistry.definition(
       for: QuickJSClassRegistryKey(
-        runtime: QuickJSRuntimeHandle(ref: runtimeRef, ownsRuntime: false),
+        runtime: QJSRuntimeHandle(ref: runtimeRef, ownsRuntime: false),
         classID: classID
       )
     ),
@@ -276,12 +280,13 @@ private func quickJSClassFinalizer(_ runtimeRef: OpaquePointer?, _ value: CQuick
   }
   let contextRef = quickJSClassObjectContextRegistry.removeContext(for: privateData)
   if let finalize = definition.finalize, let contextRef {
-    let thisValue = JSValue<QuickJSEngine>(
-      handleValue: QuickJSValueHandle(ref: value), in: QuickJSContextHandle(ref: contextRef)
+    let thisValue = QJSValue(
+      handle: QJSValueHandle(ref: value),
+      contextHandle: QJSContextHandle(ref: contextRef)
     )
     finalize(thisValue)
   }
-  _ = Unmanaged<JSClassAutoObjectStorage<QuickJSClassDefinition>>
+  _ = Unmanaged<JSClassAutoObjectStorage<QJSClassDefinition>>
     .fromOpaque(privateData)
     .takeRetainedValue()
 }
@@ -299,11 +304,11 @@ private func quickJSClassGetProperty(
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object),
-    in: contextHandle
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: object),
+    contextHandle: contextHandle
   )
 
   guard definition.getProperty != nil,
@@ -332,14 +337,14 @@ private func quickJSClassSetProperty(
     return 0
   }
 
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object), in: contextHandle
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: object), contextHandle: contextHandle
   )
-  let newValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: value),
-    in: contextHandle
+  let newValue = QJSValue(
+    handle: QJSValueHandle(ref: value),
+    contextHandle: contextHandle
   )
 
   let shouldUseDynamicSetter =
@@ -390,10 +395,10 @@ private func quickJSClassHasProperty(
     return ownProperty
   }
 
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object), in: contextHandle
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: object), contextHandle: contextHandle
   )
 
   let result: Int32 =
@@ -430,11 +435,11 @@ private func quickJSClassDeleteProperty(
     return 0
   }
 
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object),
-    in: contextHandle
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: object),
+    contextHandle: contextHandle
   )
 
   let result: Int32
@@ -451,24 +456,24 @@ private func quickJSClassDeleteProperty(
 
 private func initializeClassObject(
   _ object: CQuickJSValue,
-  definition: QuickJSClassDefinition,
+  definition: QJSClassDefinition,
   in contextRef: OpaquePointer
 ) {
   guard let initialize = definition.initialize else {
     return
   }
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: object),
-    in: contextHandle
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: object),
+    contextHandle: contextHandle
   )
   initialize(thisValue, context)
 }
 
 private func installStaticValueMembers(
   on object: CQuickJSValue,
-  definition: QuickJSClassDefinition,
+  definition: QJSClassDefinition,
   in contextRef: OpaquePointer
 ) {
   for value in definition.staticValues {
@@ -495,7 +500,7 @@ private func installStaticValueMembers(
 
 private func installStaticFunctionMembers(
   on object: CQuickJSValue,
-  definition: QuickJSClassDefinition,
+  definition: QJSClassDefinition,
   in contextRef: OpaquePointer
 ) {
   for function in definition.staticFunctions {
@@ -516,15 +521,15 @@ private func installStaticFunctionMembers(
 }
 
 private final class QuickJSStaticValueBox: @unchecked Sendable {
-  let value: JSStaticValue<QuickJSEngine>
+  let value: JSStaticValue<QJSEngine>
 
-  init(_ value: JSStaticValue<QuickJSEngine>) {
+  init(_ value: JSStaticValue<QJSEngine>) {
     self.value = value
   }
 }
 
 private func quickJSStaticValueGetter(
-  _ value: JSStaticValue<QuickJSEngine>,
+  _ value: JSStaticValue<QJSEngine>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticValueBox(value))
@@ -546,7 +551,7 @@ private func quickJSStaticValueGetter(
 }
 
 private func quickJSStaticValueSetter(
-  _ value: JSStaticValue<QuickJSEngine>,
+  _ value: JSStaticValue<QJSEngine>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticValueBox(value))
@@ -578,15 +583,15 @@ private func quickJSStaticValueGetterCallback(
   guard let contextRef, let opaque else {
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
   let value = Unmanaged<QuickJSStaticValueBox>
     .fromOpaque(opaque)
     .takeUnretainedValue()
     .value
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef),
-    in: contextHandle
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: thisValueRef),
+    contextHandle: contextHandle
   )
   let result = value.propertyValue(in: context, on: thisValue)
   return quickJSClassCallbackReturnValue(result, in: contextRef)
@@ -603,22 +608,22 @@ private func quickJSStaticValueSetterCallback(
   guard let contextRef, let opaque else {
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
   let value = Unmanaged<QuickJSStaticValueBox>
     .fromOpaque(opaque)
     .takeUnretainedValue()
     .value
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef),
-    in: contextHandle
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: thisValueRef),
+    contextHandle: contextHandle
   )
-  let newValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(
+  let newValue = QJSValue(
+    handle: QJSValueHandle(
       ref: argumentCount > 0 && arguments != nil
         ? arguments![0] : quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
     ),
-    in: contextHandle
+    contextHandle: contextHandle
   )
   let exception = value.setPropertyException(in: context, on: thisValue, to: newValue)
   guard let exception else {
@@ -635,15 +640,15 @@ private func quickJSStaticValueFinalizer(_ opaque: UnsafeMutableRawPointer?) {
 }
 
 private final class QuickJSStaticFunctionBox: @unchecked Sendable {
-  let function: JSStaticFunction<QuickJSEngine>
+  let function: JSStaticFunction<QJSEngine>
 
-  init(_ function: JSStaticFunction<QuickJSEngine>) {
+  init(_ function: JSStaticFunction<QJSEngine>) {
     self.function = function
   }
 }
 
 private func quickJSStaticFunctionValue(
-  _ function: JSStaticFunction<QuickJSEngine>,
+  _ function: JSStaticFunction<QJSEngine>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticFunctionBox(function))
@@ -676,15 +681,15 @@ private func quickJSStaticFunctionCallback(
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
-  let contextHandle = QuickJSContextHandle(ref: contextRef)
-  let context = JSInstantContext<QuickJSEngine>(handle: contextHandle)
+  let contextHandle = QJSContextHandle(ref: contextRef)
+  let context = QJSInstantContext(handle: contextHandle)
   let function = Unmanaged<QuickJSStaticFunctionBox>
     .fromOpaque(opaque)
     .takeUnretainedValue()
     .function
-  let thisValue = JSValue<QuickJSEngine>(
-    handleValue: QuickJSValueHandle(ref: thisValueRef),
-    in: contextHandle
+  let thisValue = QJSValue(
+    handle: QJSValueHandle(ref: thisValueRef),
+    contextHandle: contextHandle
   )
 
   let result = quickJSClassArguments(arguments, count: Int(argumentCount), contextRef: contextRef) {
@@ -704,26 +709,26 @@ private func quickJSClassArguments<R: ~Copyable>(
   _ arguments: UnsafeMutablePointer<CQuickJSValue>?,
   count: Int,
   contextRef: OpaquePointer,
-  _ body: (borrowing JSArguments<QuickJSEngine>) -> R
+  _ body: (borrowing QJSArguments) -> R
 ) -> R {
-  let swiftArguments = JSArguments<QuickJSEngine>(
+  let swiftArguments = QJSArguments(
     count: count,
     borrowedValueHandleAt: { index, contextHandle in
       guard index >= 0, index < count, let arguments else {
         return nil
       }
-      return QuickJSValueHandle(ref: arguments[index])
+      return QJSValueHandle(ref: arguments[index])
     }
   )
   return body(swiftArguments)
 }
 
 private func quickJSClassCallbackReturnValue(
-  _ result: consuming JSResult<SwiftJavaScript.JSValue<QuickJSEngine>>,
+  _ result: consuming JSResult<QJSValue>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   // QuickJS takes ownership of callback return values and of values passed
-  // to JS_Throw. The `JSValue` is a non-owning local view whose backing
+  // to JS_Throw. The `QJSValue` is a non-owning local view whose backing
   // reference stays with its arena, so hand the engine a duplicate.
   switch consume result {
   case .value(let value):

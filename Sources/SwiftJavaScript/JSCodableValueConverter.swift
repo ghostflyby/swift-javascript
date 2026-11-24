@@ -1,6 +1,6 @@
 import Foundation
 
-private indirect enum JSCodableNode {
+indirect enum JSCodableNode {
   case object([String: JSCodableNode])
   case array([JSCodableNode])
   case string(String)
@@ -30,15 +30,18 @@ private indirect enum JSCodableNode {
       return .null
     }
 
-    if let bool = object as? Bool {
-      return .bool(bool)
-    }
-
+    // Numbers must be classified before `Bool`: `NSNumber` bridges to `Bool`
+    // for 0/1, so an early `as? Bool` check would turn the JSON number `1`
+    // into `true` (and make `[Int]` round-trips decode as bools).
     if let number = object as? NSNumber {
       if CFGetTypeID(number) == CFBooleanGetTypeID() {
         return .bool(number.boolValue)
       }
       return .number(number.doubleValue)
+    }
+
+    if let bool = object as? Bool {
+      return .bool(bool)
     }
 
     if let string = object as? String {
@@ -67,238 +70,10 @@ private indirect enum JSCodableNode {
   }
 }
 
-public enum JSCodableValueConverter<T: Codable>: JSValueConverter {
+/// A `Codable` ⇄ JavaScript converter. The surface conformances
+/// (`JSValueDecoder`/`JSValueEncoder`) live in
+/// `JSCodableValueConverterSurface.swift`; `JSCodableNode` is the shared
+/// intermediate tree.
+public enum JSCodableValueConverter<T: Codable> {
   public typealias SwiftType = T
-
-  public static func decode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) -> T {
-    do {
-      return try tryDecode(value, in: context)
-    } catch {
-      fatalError("JSCodableValueConverter.decode failed: \(error)")
-    }
-  }
-
-  public static func tryDecode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> T {
-    let node = try nodeFromJSValue(value, in: context)
-    let jsonObject = node.jsonObject()
-
-    let data: Data
-    do {
-      data = try JSONSerialization.data(
-        withJSONObject: jsonObject,
-        options: [.fragmentsAllowed]
-      )
-    } catch {
-      throw .codable("decode JSON serialization failed: \(error)")
-    }
-
-    do {
-      return try JSONDecoder().decode(T.self, from: data)
-    } catch {
-      throw .codable("decode failed: \(error)")
-    }
-  }
-
-  public static func encode<E: JSValueConversionEngine>(
-    _ value: T,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    do {
-      return try tryEncode(value, in: context)
-    } catch {
-      return context.persist(context.makeUndefined())
-    }
-  }
-
-  public static func tryEncode<E: JSValueConversionEngine>(
-    _ value: T,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    let data: Data
-    do {
-      data = try JSONEncoder().encode(value)
-    } catch {
-      throw .codable("encode failed: \(error)")
-    }
-
-    let jsonObject: Any
-    do {
-      jsonObject = try JSONSerialization.jsonObject(
-        with: data,
-        options: [.fragmentsAllowed]
-      )
-    } catch {
-      throw .codable("encode JSON parsing failed: \(error)")
-    }
-
-    let node = try JSCodableNode.fromJSONObject(jsonObject)
-    return try jsValueFromNode(node, in: context)
-  }
-
-  fileprivate static func nodeFromJSValue<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSCodableNode {
-    if value.isUndefined(in: context) || value.isNull(in: context) {
-      return .null
-    }
-
-    if value.isBoolean(in: context) {
-      return .bool(value.toBool(in: context))
-    }
-
-    if value.isNumber(in: context) {
-      return .number(value.toDouble(in: context))
-    }
-
-    if value.isString(in: context) {
-      return .string(value.toString(in: context))
-    }
-
-    if value.isObject(in: context) {
-      let valueHandle = value.borrowHandle()
-
-      if context.driverContextHandle.isArrayHandle(valueHandle) == true {
-        let lengthValue = try readStringProperty("length", on: valueHandle, in: context)
-        if lengthValue.isUndefined(in: context) {
-          throw .codable("array length missing")
-        }
-
-        let lengthNumber = lengthValue.toDouble(in: context)
-        if !lengthNumber.isFinite {
-          throw .codable("array length conversion failed")
-        }
-
-        let count = max(0, Int(lengthNumber))
-        var nodes: [JSCodableNode] = []
-        nodes.reserveCapacity(count)
-
-        for index in 0..<count {
-          let element = try readIndexProperty(UInt32(index), on: valueHandle, in: context)
-          nodes.append(try nodeFromJSValue(element, in: context))
-        }
-
-        return .array(nodes)
-      }
-
-      let names = context.driverContextHandle.propertyNamesForHandle(on: valueHandle) ?? []
-      var object: [String: JSCodableNode] = [:]
-      object.reserveCapacity(names.count)
-
-      for key in names {
-        let property = try readStringProperty(key, on: valueHandle, in: context)
-        object[key] = try nodeFromJSValue(property, in: context)
-      }
-
-      return .object(object)
-    }
-
-    throw .typeMismatch(expected: "codable compatible JSValue", actual: value.type(in: context))
-  }
-
-  fileprivate static func jsValueFromNode<E: JSValueConversionEngine>(
-    _ node: JSCodableNode,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    switch node {
-    case .null:
-      return context.persist(context.makeNull())
-
-    case .bool(let value):
-      return context.persist(context.makeBoolean(value))
-
-    case .number(let value):
-      return context.persist(context.makeNumber(Double(value)))
-
-    case .string(let value):
-      return context.persist(context.makeString(value))
-
-    case .array(let array):
-      let arrayResult = context.makeArray()
-      guard case .value(let arrayCb) = arrayResult else { throw .codable("array creation failed") }
-      let arrayValue = context.persist(arrayCb)
-      for (index, item) in array.enumerated() {
-        let encoded = try jsValueFromNode(item, in: context)
-        guard
-          context.driverContextHandle.setIndexPropertyHandle(
-            at: UInt32(index),
-            on: arrayValue.borrowHandle(),
-            to: encoded.borrowHandle()
-          )
-        else {
-          throw .codable("array element write failed at index \(index)")
-        }
-      }
-      return arrayValue
-
-    case .object(let object):
-      let objectResult = context.makeObject()
-      guard case .value(let objectCb) = objectResult else {
-        throw .codable("object creation failed")
-      }
-      let objectValue = context.persist(objectCb)
-      for (key, value) in object {
-        let encoded = try jsValueFromNode(value, in: context)
-        let propertyStringKey = context.makePropertyStringKey(key)
-        guard
-          context.driverContextHandle.setPropertyStringKeyHandle(
-            propertyStringKey.borrowHandle(in: context),
-            on: objectValue.borrowHandle(),
-            to: encoded.borrowHandle(),
-            attributes: .none
-          )
-        else {
-          throw .codable("object property write failed for key \(key)")
-        }
-      }
-      return objectValue
-    }
-  }
-
-  private static func readStringProperty<E: JSValueConversionEngine>(
-    _ key: String,
-    on object: JSValueHandle<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    let propertyStringKey = context.makePropertyStringKey(key)
-    let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      context.driverContextHandle.getPropertyStringKeyHandle(
-        propertyStringKey.borrowHandle(in: context),
-        on: object
-      ), in: context.driverContextHandle
-    )
-
-    switch consume result {
-    case .value(let value):
-      return value
-    case .exception:
-      throw .codable("object property read failed for key \(key)")
-    }
-  }
-
-  private static func readIndexProperty<E: JSValueConversionEngine>(
-    _ index: UInt32,
-    on object: JSValueHandle<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    let result: JSResult<JSValue<E>> = bridgeHandleResult(
-      context.driverContextHandle.getIndexPropertyHandle(
-        at: index,
-        on: object
-      ), in: context.driverContextHandle
-    )
-
-    switch consume result {
-    case .value(let value):
-      return value
-    case .exception:
-      throw .codable("array element read failed at index \(index)")
-    }
-  }
 }

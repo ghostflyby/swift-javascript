@@ -1,10 +1,16 @@
 /// The engine's value-handle type surface.
 ///
-/// Public value types (`JSValue`, callback values/arguments, prepared inputs)
-/// store only handle tokens and a context handle; they do not need the
-/// engine's operation capabilities. Constraining them on this protocol keeps
-/// each type on the driver face it actually uses — operation extensions add
-/// `JSEngineRuntimeDriver` / `JSEnginePropertyDriver` / … as needed.
+/// This protocol serves the **handle layer only**: the shared arena, registry,
+/// and conversion machinery that manipulates `(ContextHandle, ValueHandle,
+/// OwnedValueHandle)` triples and needs no engine capability. It says nothing
+/// about user-facing value types and has no default implementations; every
+/// engine states its handle behavior explicitly.
+///
+/// Every user-facing value type (`JSValue`, `JSCallbackValue`,
+/// `JSArguments`, `JSInstantContext`, `JSScope`, `JSContext`, …) is a protocol
+/// that declares and pins only its own members; code generic over an engine
+/// anchors on `JSContext`. `JSEngineValueTypes` is an implementation seam for
+/// the handle layer and is not referenced by any of those protocols.
 public protocol JSEngineValueTypes {
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
@@ -23,7 +29,10 @@ public protocol JSEngineValueTypes {
 /// `E.foo(handle, in: context)`. Each engine's `ContextHandle` type conforms;
 /// the engine type keeps only lifecycle/capability requirements.
 public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
-  associatedtype Engine: JSEngineRuntimeDriver
+  /// The synchronous scope type callbacks on this context run in. The
+  /// callback entry hands the engine its own callback views, so the context
+  /// names the scope type they belong to.
+  associatedtype InstantContext: JSInstantContext & ~Copyable
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
   where ValueHandle.Context == Self
   associatedtype OwnedValueHandle: JSOwnedValueManualReferenceCountedHandle
@@ -34,9 +43,11 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 
   func globalObjectValueHandle() -> ValueHandle?
 
+  /// Surface callback entry: the callback receives the engine's concrete
+  /// callback views and returns its concrete callback-return carrier.
   func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<Engine>
+    callback: @escaping JSFunctionCallback<InstantContext>
   ) -> OwnedValueHandle?
 
   func valueTypeForHandle(_ value: ValueHandle) -> JSType?
@@ -50,7 +61,7 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   // Value-creation factories return the ownership carrier: the engine
   // produces a new owning reference (+1 under reference counting), which
   // flows into a scope arena (the current synchronous frame or the context
-  // default scope; `JSValue` itself owns nothing).
+  // default scope; the local value view itself owns nothing).
 
   func makeStringValueHandle(_ value: String) -> OwnedValueHandle?
 
@@ -86,11 +97,19 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   /// JSC: identity — the target arena's explicit root is the anchor.
   /// QuickJS: duplicate (`JS_DupValue`), because the engine call frame only
   /// lends the original reference.
+  ///
+  /// This is a handle-layer requirement with no default implementation. The
+  /// public ledger primitives that use it are `adoptCreatedHandle` (transfer
+  /// an engine-created reference) and `anchorBorrowedHandle` (claim a borrowed
+  /// one); there is deliberately no public `makeValue(handle:)`.
   func claimOwnedValueHandle(_ handle: ValueHandle) -> OwnedValueHandle
 
   /// Enter this context's explicit root for an arena-owned value (§3.7).
   /// JSC: `JSValueProtect`. Reference-counted engines: identity — the
   /// creation reference already keeps the value alive.
+  ///
+  /// No default implementation: identity is a deliberate per-engine statement,
+  /// not an invisible no-op.
   func rootOwnedValueHandle(_ handle: borrowing OwnedValueHandle)
 
   /// Leave the explicit root taken by `rootOwnedValueHandle` (§3.7).
@@ -110,7 +129,6 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 public protocol JSEngineRuntimeDriver: JSEngineValueTypes
 where
   ContextHandle: JSContextRuntimeDriver,
-  ContextHandle.Engine == Engine,
   ContextHandle.ValueHandle == ValueHandle,
   ContextHandle.OwnedValueHandle == OwnedValueHandle
 {

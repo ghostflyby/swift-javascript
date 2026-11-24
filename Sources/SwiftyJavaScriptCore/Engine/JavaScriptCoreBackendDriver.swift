@@ -4,18 +4,18 @@ import SwiftJavaScript
 
 enum JavaScriptCoreObjectLookup {
   case object(JSObjectRef)
-  case exception(JavaScriptCoreValueHandle)
+  case exception(JSCValueHandle)
 }
 
-public enum JavaScriptCoreEngine: Sendable {
-  public typealias ValueHandle = JavaScriptCoreValueHandle
-  public typealias OwnedValueHandle = JavaScriptCoreOwnedValueHandle
-  public typealias ClassHandle = JavaScriptCoreClassHandle
-  public typealias Engine = JavaScriptCoreEngine
-  public typealias RuntimeHandle = JavaScriptCoreRuntimeHandle
-  public typealias ContextHandle = JavaScriptCoreContextHandle
-  public typealias PropertyStringKeyHandle = JavaScriptCorePropertyStringKeyHandle
-  public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
+public enum JSCEngine: Sendable {
+  public typealias ValueHandle = JSCValueHandle
+  public typealias OwnedValueHandle = JSCOwnedValueHandle
+  public typealias ClassHandle = JSCClassHandle
+  public typealias Engine = JSCEngine
+  public typealias RuntimeHandle = JSCRuntimeHandle
+  public typealias ContextHandle = JSCContextHandle
+  public typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
+  public typealias PreparedScriptHandle = JSCPreparedScriptHandle
 }
 
 private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {
@@ -31,13 +31,13 @@ private var javaScriptCoreEmptyStringRef: JSStringRef {
 }
 
 func javaScriptCoreObjectRef(
-  for value: JavaScriptCoreValueHandle,
-  in context: JavaScriptCoreContextHandle
+  for value: JSCValueHandle,
+  in context: JSCContextHandle
 ) -> JavaScriptCoreObjectLookup {
   var exception: JSValueRef?
   guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
     if let exception {
-      return .exception(JavaScriptCoreValueHandle(ref: exception))
+      return .exception(JSCValueHandle(ref: exception))
     }
     return .exception(javaScriptCoreMakeUndefined(in: context))
   }
@@ -47,35 +47,35 @@ func javaScriptCoreObjectRef(
 func javaScriptCoreResult(
   value resultRef: JSValueRef?,
   exception exceptionRef: JSValueRef?,
-  in context: JavaScriptCoreContextHandle
-) -> JSResult<JavaScriptCoreValueHandle> {
+  in context: JSCContextHandle
+) -> JSResult<JSCValueHandle> {
   if let exceptionRef {
-    return .exception(JavaScriptCoreValueHandle(ref: exceptionRef))
+    return .exception(JSCValueHandle(ref: exceptionRef))
   }
   if let resultRef {
-    return .value(JavaScriptCoreValueHandle(ref: resultRef))
+    return .value(JSCValueHandle(ref: resultRef))
   }
   return .value(javaScriptCoreMakeUndefined(in: context))
 }
 
-func javaScriptCoreMakeUndefined(in context: JavaScriptCoreContextHandle)
-  -> JavaScriptCoreValueHandle
+func javaScriptCoreMakeUndefined(in context: JSCContextHandle)
+  -> JSCValueHandle
 {
-  JavaScriptCoreValueHandle(ref: JSValueMakeUndefined(context.ref)!)
+  JSCValueHandle(ref: JSValueMakeUndefined(context.ref)!)
 }
 
 func javaScriptCoreMakeStringValue(
   _ value: String,
-  in context: JavaScriptCoreContextHandle
-) -> JavaScriptCoreValueHandle {
+  in context: JSCContextHandle
+) -> JSCValueHandle {
   guard !value.isEmpty else {
-    return JavaScriptCoreValueHandle(
+    return JSCValueHandle(
       ref: JSValueMakeString(context.ref, javaScriptCoreEmptyStringRef)!
     )
   }
 
   return withJavaScriptCoreString(value) { stringHandle in
-    JavaScriptCoreValueHandle(
+    JSCValueHandle(
       ref: JSValueMakeString(context.ref, stringHandle)!
     )
   }

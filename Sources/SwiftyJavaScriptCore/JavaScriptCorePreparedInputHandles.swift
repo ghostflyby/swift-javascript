@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCorePropertyStringKeyHandle:
+public struct JSCPropertyStringKeyHandle:
   JSPropertyStringKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
@@ -24,7 +24,7 @@ public struct JavaScriptCorePropertyStringKeyHandle:
   }
 }
 
-public struct JavaScriptCorePreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
+public struct JSCPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSStringRef

@@ -22,23 +22,27 @@ public final class JSContextDataStorageBox: @unchecked Sendable {
 
   package init() {}
 
-  package func bindContextOwner<E: JSContextEngine>(_ owner: JSContext<E>) {
+  /// Bind the context that installs this box as its unretained owner.
+  ///
+  /// The owner is erased to `AnyObject` because the installing context is an
+  /// engine's concrete context actor (`JSCContext`, `QJSContext`); the engine
+  /// that reads it back casts to the type it expects.
+  package func bindContextOwner(_ owner: AnyObject) {
     state.withLock {
       $0.ownerAddress = UInt(bitPattern: Unmanaged.passUnretained(owner).toOpaque())
     }
   }
 
-  package func borrowContextOwner<E: JSContextEngine>(
-    as engine: E.Type = E.self
-  ) -> JSContext<E>? {
-    _ = engine
+  /// The unretained owner bound by `bindContextOwner`, or `nil` when the box
+  /// has no owner (a bare engine context or an already-cleared box).
+  package func borrowContextOwner() -> AnyObject? {
     guard
       let ownerAddress = state.withLock({ $0.ownerAddress }),
       let owner = UnsafeMutableRawPointer(bitPattern: ownerAddress)
     else {
       return nil
     }
-    return Unmanaged<JSContext<E>>.fromOpaque(owner).takeUnretainedValue()
+    return Unmanaged<AnyObject>.fromOpaque(owner).takeUnretainedValue()
   }
 
   package func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
@@ -67,19 +71,19 @@ extension JSEngineRuntimeDriver {
   /// `raw` mutates engine state (JSC `JSObjectSetPrivate` on the global
   /// object, QuickJS `JS_SetContextOpaque`) and releases the displaced box, so
   /// it belongs on the VM thread (design §0.2.3). A context bound to a VM
-  /// thread — every `JSContext`, from the end of its `init` to its isolated
-  /// deinit — swaps inline when the caller already is that thread and
+  /// thread — every host `JSContext` actor, from the end of its `init` to its
+  /// isolated deinit — swaps inline when the caller already is that thread and
   /// otherwise posts the swap to the VM thread's queue: the calling thread
   /// makes no engine call, and the swap lands ahead of anything enqueued
   /// after it, which also means the call returns before it takes effect. A
-  /// context with no `JSContext` host has no VM thread to protect and swaps
+  /// context with no host actor has no VM thread to protect and swaps
   /// inline.
   package static func swapContextDataStorageBox(
     _ storage: JSContextDataStorageBox?,
     on context: ContextHandle,
     raw: @escaping @Sendable (ContextHandle, JSContextDataStorageBox?) -> Void
   ) {
-    guard let vmThread = ScopeStackRegistry<Self>.vmThread(for: context) else {
+    guard let vmThread = ScopeStackRegistry<ContextHandle>.vmThread(for: context) else {
       raw(context, storage)
       return
     }

@@ -3,22 +3,22 @@ import Testing
 
 @testable import SwiftJavaScript
 
-private func mockClass(_ id: String) -> JSClass<MockEngine> {
-  JSClass(handleClass: MockClassHandle(rawClass: MockClass(id: id)))
+private func mockClass(_ id: String) -> MockSurfaceClass {
+  MockSurfaceClass(classHandle: MockClassHandle(rawClass: MockClass(id: id)))
 }
 
-private func mockUndefinedValue() -> JSValue<MockEngine> {
+private func mockUndefinedValue() -> MockSurfaceValue {
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  return JSValue<MockEngine>(
-    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
-    in: context
+  return MockSurfaceValue(
+    handle: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
+    contextHandle: context
   )
 }
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
   let parentClass = mockClass("BaseType")
 
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
@@ -81,7 +81,7 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
 }
 
 @Test func classDefinitionProjectsHostDescriptorBindings() {
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.className = "BackendProjected"
   definition.staticValues = [
     JSStaticValue<MockEngine>(
@@ -125,7 +125,7 @@ private func mockUndefinedValue() -> JSValue<MockEngine> {
 }
 
 @Test func classNameMutationStillBuildsClass() {
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.className = "A"
   definition.className = "B"
   definition.className = "C"

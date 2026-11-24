@@ -1,7 +1,9 @@
-/// Driver face required by `JSContext`: context/runtime value operations,
-/// property access, and prepared-script evaluation. Invocation and
-/// typed-array operations live on `JSValue` extensions with their own
-/// driver constraints, so `JSContext` does not demand those capabilities.
+/// Capability composition for engines that support the full value surface:
+/// context/runtime value operations, property access, prepared-script
+/// evaluation, invocation, and typed arrays.
+///
+/// This alias only names the driver capabilities. An engine's user-facing
+/// types are bound by its context (`JSContext`), not by its engine type.
 public typealias JSContextEngine = JSEnginePropertyDriver & JSEnginePreparedScriptDriver
 
 public typealias JSEngine = Sendable & JSContextEngine

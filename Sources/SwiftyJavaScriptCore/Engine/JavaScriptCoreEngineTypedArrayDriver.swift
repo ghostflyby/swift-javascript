@@ -1,16 +1,16 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
+extension JSCEngine: JSEngineTypedArrayDriver {
   public static func makeArrayBufferWithBytesNoCopyHandle(
-    in context: JavaScriptCoreContextHandle,
+    in context: JSCContextHandle,
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
     bytesDeallocator: (
       @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
     )?,
     deallocatorContext: UnsafeMutableRawPointer?
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+  ) -> JSValueHandle<JSCEngine>? {
     guard
       let objectRef = makeJavaScriptCoreArrayBufferWithBytesNoCopy(
         in: context.ref,
@@ -23,12 +23,12 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
       return nil
     }
 
-    return JavaScriptCoreValueHandle(ref: objectRef)
+    return JSCValueHandle(ref: objectRef)
   }
 
   public static func arrayBufferByteLengthForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Int? {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -39,8 +39,8 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func arrayBufferBytesPtrForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -51,10 +51,10 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func makeTypedArrayHandle(
-    in context: JavaScriptCoreContextHandle,
+    in context: JSCContextHandle,
     kind: JSTypedArrayKind,
     length: Int
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+  ) -> JSValueHandle<JSCEngine>? {
     guard
       let objectRef = makeJavaScriptCoreTypedArray(
         in: context.ref,
@@ -65,14 +65,14 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
       return nil
     }
 
-    return JavaScriptCoreValueHandle(ref: objectRef)
+    return JSCValueHandle(ref: objectRef)
   }
 
   public static func makeTypedArrayHandle(
-    in context: JavaScriptCoreContextHandle,
+    in context: JSCContextHandle,
     kind: JSTypedArrayKind,
-    arrayBuffer: JSValueHandle<JavaScriptCoreEngine>
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    arrayBuffer: JSValueHandle<JSCEngine>
+  ) -> JSValueHandle<JSCEngine>? {
     switch javaScriptCoreObjectRef(for: arrayBuffer, in: context) {
     case .exception:
       return nil
@@ -87,17 +87,17 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: typedArrayRef)
+      return JSCValueHandle(ref: typedArrayRef)
     }
   }
 
   public static func makeTypedArrayHandle(
-    in context: JavaScriptCoreContextHandle,
+    in context: JSCContextHandle,
     kind: JSTypedArrayKind,
-    arrayBuffer: JSValueHandle<JavaScriptCoreEngine>,
+    arrayBuffer: JSValueHandle<JSCEngine>,
     byteOffset: Int,
     length: Int
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+  ) -> JSValueHandle<JSCEngine>? {
     switch javaScriptCoreObjectRef(for: arrayBuffer, in: context) {
     case .exception:
       return nil
@@ -114,13 +114,13 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: typedArrayRef)
+      return JSCValueHandle(ref: typedArrayRef)
     }
   }
 
   public static func typedArrayLengthForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Int? {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -131,8 +131,8 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func typedArrayByteLengthForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Int? {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -143,8 +143,8 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func typedArrayByteOffsetForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Int? {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -155,9 +155,9 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func typedArrayBufferForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
+  ) -> JSValueHandle<JSCEngine>? {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
       return nil
@@ -166,13 +166,13 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
         return nil
       }
 
-      return JavaScriptCoreValueHandle(ref: bufferRef)
+      return JSCValueHandle(ref: bufferRef)
     }
   }
 
   public static func typedArrayBytesPtrForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception:
@@ -183,8 +183,8 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func isArrayBufferHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool {
     guard
       let type = javaScriptCoreTypedArrayType(of: value.ref, in: context.ref)
@@ -196,8 +196,8 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
   }
 
   public static func typedArrayKindForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> JSTypedArrayKind? {
     guard
       let type = javaScriptCoreTypedArrayType(of: value.ref, in: context.ref)
@@ -211,7 +211,7 @@ extension JavaScriptCoreEngine: JSEngineTypedArrayDriver {
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension JavaScriptCoreContextHandle: JSContextTypedArrayDriver {
+extension JSCContextHandle: JSContextTypedArrayDriver {
   public func makeArrayBufferWithBytesNoCopyHandle(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
@@ -219,8 +219,8 @@ extension JavaScriptCoreContextHandle: JSContextTypedArrayDriver {
       @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
     )?,
     deallocatorContext: UnsafeMutableRawPointer?
-  ) -> JavaScriptCoreValueHandle? {
-    JavaScriptCoreEngine.makeArrayBufferWithBytesNoCopyHandle(
+  ) -> JSCValueHandle? {
+    JSCEngine.makeArrayBufferWithBytesNoCopyHandle(
       in: self,
       bytes: bytes,
       byteLength: byteLength,
@@ -229,37 +229,37 @@ extension JavaScriptCoreContextHandle: JSContextTypedArrayDriver {
     )
   }
 
-  public func arrayBufferByteLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
-    JavaScriptCoreEngine.arrayBufferByteLengthForHandle(value, in: self)
+  public func arrayBufferByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
+    JSCEngine.arrayBufferByteLengthForHandle(value, in: self)
   }
 
   public func arrayBufferBytesPtrForHandle(
-    _ value: JavaScriptCoreValueHandle
+    _ value: JSCValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    JavaScriptCoreEngine.arrayBufferBytesPtrForHandle(value, in: self)
+    JSCEngine.arrayBufferBytesPtrForHandle(value, in: self)
   }
 
   public func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
     length: Int
-  ) -> JavaScriptCoreValueHandle? {
-    JavaScriptCoreEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
+  ) -> JSCValueHandle? {
+    JSCEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
   }
 
   public func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
-    arrayBuffer: JavaScriptCoreValueHandle
-  ) -> JavaScriptCoreValueHandle? {
-    JavaScriptCoreEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
+    arrayBuffer: JSCValueHandle
+  ) -> JSCValueHandle? {
+    JSCEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
   }
 
   public func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
-    arrayBuffer: JavaScriptCoreValueHandle,
+    arrayBuffer: JSCValueHandle,
     byteOffset: Int,
     length: Int
-  ) -> JavaScriptCoreValueHandle? {
-    JavaScriptCoreEngine.makeTypedArrayHandle(
+  ) -> JSCValueHandle? {
+    JSCEngine.makeTypedArrayHandle(
       in: self,
       kind: kind,
       arrayBuffer: arrayBuffer,
@@ -268,37 +268,37 @@ extension JavaScriptCoreContextHandle: JSContextTypedArrayDriver {
     )
   }
 
-  public func typedArrayLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
-    JavaScriptCoreEngine.typedArrayLengthForHandle(value, in: self)
+  public func typedArrayLengthForHandle(_ value: JSCValueHandle) -> Int? {
+    JSCEngine.typedArrayLengthForHandle(value, in: self)
   }
 
-  public func typedArrayByteLengthForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
-    JavaScriptCoreEngine.typedArrayByteLengthForHandle(value, in: self)
+  public func typedArrayByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
+    JSCEngine.typedArrayByteLengthForHandle(value, in: self)
   }
 
-  public func typedArrayByteOffsetForHandle(_ value: JavaScriptCoreValueHandle) -> Int? {
-    JavaScriptCoreEngine.typedArrayByteOffsetForHandle(value, in: self)
+  public func typedArrayByteOffsetForHandle(_ value: JSCValueHandle) -> Int? {
+    JSCEngine.typedArrayByteOffsetForHandle(value, in: self)
   }
 
-  public func typedArrayBufferForHandle(_ value: JavaScriptCoreValueHandle)
-    -> JavaScriptCoreValueHandle?
+  public func typedArrayBufferForHandle(_ value: JSCValueHandle)
+    -> JSCValueHandle?
   {
-    JavaScriptCoreEngine.typedArrayBufferForHandle(value, in: self)
+    JSCEngine.typedArrayBufferForHandle(value, in: self)
   }
 
   public func typedArrayBytesPtrForHandle(
-    _ value: JavaScriptCoreValueHandle
+    _ value: JSCValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    JavaScriptCoreEngine.typedArrayBytesPtrForHandle(value, in: self)
+    JSCEngine.typedArrayBytesPtrForHandle(value, in: self)
   }
 
-  public func isArrayBufferHandle(_ value: JavaScriptCoreValueHandle) -> Bool {
-    JavaScriptCoreEngine.isArrayBufferHandle(value, in: self)
+  public func isArrayBufferHandle(_ value: JSCValueHandle) -> Bool {
+    JSCEngine.isArrayBufferHandle(value, in: self)
   }
 
   public func typedArrayKindForHandle(
-    _ value: JavaScriptCoreValueHandle
+    _ value: JSCValueHandle
   ) -> JSTypedArrayKind? {
-    JavaScriptCoreEngine.typedArrayKindForHandle(value, in: self)
+    JSCEngine.typedArrayKindForHandle(value, in: self)
   }
 }

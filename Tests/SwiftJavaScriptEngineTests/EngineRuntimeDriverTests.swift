@@ -45,9 +45,9 @@ struct EngineRuntimeDriverTests {
   func virtualMachineHashableAndIdentity(_ engine: ScriptEngine) async {
     switch engine {
     case .javaScriptCore:
-      runVirtualMachineHashableAndIdentity(JavaScriptCoreEngine.self)
+      runVirtualMachineHashableAndIdentity(JSCContext.self)
     case .quickJS:
-      runVirtualMachineHashableAndIdentity(QuickJSEngine.self)
+      runVirtualMachineHashableAndIdentity(QJSContext.self)
     }
   }
 
@@ -55,9 +55,9 @@ struct EngineRuntimeDriverTests {
   func contextHashableAndGlobalObject(_ engine: ScriptEngine) async {
     switch engine {
     case .javaScriptCore:
-      await runContextHashableAndGlobalObject(JavaScriptCoreEngine.self)
+      await runContextHashableAndGlobalObject(JSCContext.self)
     case .quickJS:
-      await runContextHashableAndGlobalObject(QuickJSEngine.self)
+      await runContextHashableAndGlobalObject(QJSContext.self)
     }
   }
 
@@ -68,13 +68,13 @@ struct EngineRuntimeDriverTests {
 
   @Test
   func engineCapabilitiesMatchImplementedPublicSurface() {
-    #expect(JavaScriptCoreEngine.capabilities.supportsHostObjects)
-    #expect(!JavaScriptCoreEngine.capabilities.supportsESModules)
-    #expect(!JavaScriptCoreEngine.capabilities.supportsPromiseJobQueueControl)
+    expectTrue(JSCEngine.capabilities.supportsHostObjects)
+    expectTrue(!JSCEngine.capabilities.supportsESModules)
+    expectTrue(!JSCEngine.capabilities.supportsPromiseJobQueueControl)
 
-    #expect(QuickJSEngine.capabilities.supportsHostObjects)
-    #expect(!QuickJSEngine.capabilities.supportsESModules)
-    #expect(!QuickJSEngine.capabilities.supportsPromiseJobQueueControl)
+    expectTrue(QJSEngine.capabilities.supportsHostObjects)
+    expectTrue(!QJSEngine.capabilities.supportsESModules)
+    expectTrue(!QJSEngine.capabilities.supportsPromiseJobQueueControl)
   }
 }
 
@@ -83,16 +83,16 @@ private enum EngineContextDataKey: JSContextDataKey {
 }
 
 private enum EvaluateScriptReturnsValueForValidScript: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
       let result = context.evaluateScript("1 + 2")
 
       switch consume result {
       case .value(let value):
-        let resultValue = value.toDouble(in: context)
-        #expect(resultValue == 3)
+        let resultValue = value.toNumber()
+        expectTrue(resultValue == 3)
       case .exception:
         Issue.record("Expected script to evaluate successfully")
       }
@@ -101,8 +101,8 @@ private enum EvaluateScriptReturnsValueForValidScript: ScriptEngineAssertion {
 }
 
 private enum EvaluateScriptSupportsSourceURL: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
       let script = "40 + 2"
@@ -115,8 +115,8 @@ private enum EvaluateScriptSupportsSourceURL: ScriptEngineAssertion {
 
       switch consume result {
       case .value(let value):
-        let resultValue = value.toDouble(in: context)
-        #expect(resultValue == 42)
+        let resultValue = value.toNumber()
+        expectTrue(resultValue == 42)
       case .exception:
         Issue.record("Expected script with sourceURL to evaluate successfully")
       }
@@ -125,8 +125,8 @@ private enum EvaluateScriptSupportsSourceURL: ScriptEngineAssertion {
 }
 
 private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
       let result = context.evaluateScript("throw new Error('boom')", sourceURL: "inline://throw.js")
@@ -135,11 +135,11 @@ private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssert
       case .value:
         Issue.record("Expected JavaScript exception")
       case .exception(let exception):
-        let isObject = exception.isObject(in: context)
-        #expect(isObject)
-        if E.self == QuickJSEngine.self {
-          let message = exception.toString(in: context)
-          #expect(message == "Error: boom")
+        let isObject = exception.isObject()
+        expectTrue(isObject)
+        if C.self == QJSContext.self {
+          let message = exception.toString()
+          expectTrue(message == "Error: boom")
         }
       }
     }
@@ -147,199 +147,206 @@ private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssert
 }
 
 private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.setData("actor", for: EngineContextDataKey.self)
     let instantValue: String? = await context.withInstantContext {
       $0.data(for: EngineContextDataKey.self)
     }
-    #expect(instantValue == "actor")
+    expectTrue(instantValue == "actor")
 
     let callbackValue = await context.withInstantContext { ic in
       let function = ic.makeFunction(named: "readContextData") { c, _, _ in
         let value = c.data(for: EngineContextDataKey.self) ?? "missing"
         _ = c.makeFunction(named: "nested") { c2, _, _ in
-          JSCallbackReturn(temporary: c2.makeUndefined().handle)
+          c2.returnUndefined()
         }
-        return JSCallbackReturn(persistent: c.persist(c.makeString(value)))
+        return c.return(c.persist(c.makeString(value)))
       }
-      let result = function.call(in: ic)
+      let result = function.call(arguments: [], in: ic)
       switch consume result {
       case .value(let value):
-        return value.toString(in: ic)
+        return value.toString()
       case .exception:
         Issue.record("Expected context data callback to return a value")
         return "exception"
       }
     }
 
-    #expect(callbackValue == "actor")
+    expectTrue(callbackValue == "actor")
 
     await context.withInstantContext {
       $0.setData("instant", for: EngineContextDataKey.self)
     }
     let actorValue: String? = await context.data(for: EngineContextDataKey.self)
 
-    #expect(actorValue == "instant")
+    expectTrue(actorValue == "instant")
   }
 }
 
 private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let answerKey: StaticString = "answer"
-      context.setGlobalProperty(41, forKey: answerKey)
-      let hasAnswer = context.hasGlobalProperty(answerKey)
-      let answer = context.getGlobalProperty(forKey: answerKey).toDouble(in: context)
-      #expect(hasAnswer)
-      #expect(answer == 41)
+      scope.setGlobalProperty(Int32(41), forKey: answerKey, with: .none)
+      let hasAnswer = scope.hasGlobalProperty(answerKey)
+      let answer = scope.getGlobalProperty(forKey: answerKey).toNumber()
+      expectTrue(hasAnswer)
+      expectTrue(answer == 41)
 
-      let object = context.makePersistentObject()
+      let objectCallback: C.CallbackValue
+      switch scope.makeObject() {
+      case .value(let made):
+        objectCallback = made
+      case .exception:
+        Issue.record("Expected makeObject to succeed")
+        return
+      }
+      let object = scope.persist(objectCallback)
       let flagKey: StaticString = "flag"
-      object.setProperty(context.persist(context.makeBoolean(true)), forKey: flagKey, in: context)
-      let flag = object.getProperty(forKey: flagKey, in: context).toBool(in: context)
-      #expect(flag)
+      object.setProperty(
+        flagKey, to: scope.makeBoolean(true), attributes: .none, in: scope)
+      let flagResult = object.getProperty(flagKey, in: scope)
+      guard case .value(let flag) = flagResult else {
+        Issue.record("Expected flag property read")
+        return
+      }
+      expectTrue(flag.toBoolean())
 
-      context.installGlobalFunction(named: "bump") { c, _, arguments in
-        let value: Double = arguments.unpack(types: Double.self, in: c)
-        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value + 1)))
+      scope.installGlobalFunction(named: "bump") { c, _, arguments in
+        let value: Double = arguments.withValue(at: 0, in: c) { $0.toNumber() }
+        return c.return(c.persist(c.makeNumber(value + 1)))
       }
 
-      let result = context.evaluateScript("bump(answer)")
+      let result = scope.evaluateScript("bump(answer)")
       switch consume result {
       case .value(let value):
-        let resultValue = value.toDouble(in: context)
-        #expect(resultValue == 42)
+        expectTrue(value.toNumber() == 42)
       case .exception:
         Issue.record("Expected installed global function to be callable")
       }
 
-      context.deleteGlobalProperty(forKey: answerKey)
-      let hasAnswerAfterDelete = context.hasGlobalProperty(answerKey)
-      #expect(!hasAnswerAfterDelete)
+      scope.deleteGlobalProperty(forKey: answerKey)
+      let hasAnswerAfterDelete = scope.hasGlobalProperty(answerKey)
+      expectTrue(!hasAnswerAfterDelete)
     }
   }
 }
 
 private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withIsolatedGlobalObject { context, _ in
+    await context.withInstantContext { scope in
       let countKey: StaticString = "count"
-      context.setGlobalProperty(5, forKey: countKey)
-      let hasCount = context.hasGlobalProperty(countKey)
-      #expect(hasCount)
+      scope.setGlobalProperty(Int32(5), forKey: countKey, with: .none)
+      let hasCount = scope.hasGlobalProperty(countKey)
+      expectTrue(hasCount)
 
-      context.installGlobalFunction(named: "double") { c, _, arguments in
-        let value: Double = arguments.unpack(types: Double.self, in: c)
-        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value * 2)))
+      scope.installGlobalFunction(named: "double") { c, _, arguments in
+        let value: Double = arguments.withValue(at: 0, in: c) { $0.toNumber() }
+        return c.return(c.persist(c.makeNumber(value * 2)))
       }
 
-      let result = context.evaluateScript("double(count)")
+      let result = scope.evaluateScript("double(count)")
       switch consume result {
       case .value(let value):
-        let doubled = value.toDouble(in: context)
-        #expect(doubled == 10)
+        expectTrue(value.toNumber() == 10)
       case .exception:
-        Issue.record("Expected JSContext thin wrappers to install callable globals")
+        Issue.record("Expected the context thin wrappers to install callable globals")
       }
 
-      let count = context.getGlobalProperty(forKey: countKey)
-      let countValue = count.toDouble(in: context)
-      #expect(countValue == 5)
+      let count = scope.getGlobalProperty(forKey: countKey)
+      expectTrue(count.toNumber() == 5)
 
-      context.deleteGlobalProperty(forKey: countKey)
-      let hasCountAfterDelete = context.hasGlobalProperty(countKey)
-      #expect(!hasCountAfterDelete)
+      scope.deleteGlobalProperty(forKey: countKey)
+      let hasCountAfterDelete = scope.hasGlobalProperty(countKey)
+      expectTrue(!hasCountAfterDelete)
     }
   }
 }
 
 private enum ValueInitializersAndTypePredicates: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let undefined = JSValue(undefinedIn: context)
-      let null = JSValue(nullIn: context)
-      let bool = JSValue(boolean: true, in: context)
-      let number = JSValue(number: 42, in: context)
-      let string = JSValue(string: "abc", in: context)
-      let symbol = JSValue(symbol: "s", in: context)
-      let intNumber = JSValue(number: 7 as Int, in: context)
+    await context.withInstantContext { scope in
+      let undefined = scope.makeUndefined()
+      let null = scope.makeNull()
+      let bool = scope.makeBoolean(true)
+      let number = scope.makeNumber(42)
+      let string = scope.makeString("abc")
+      let symbol = scope.makeSymbol("s")
+      let intNumber = scope.makeNumber(7 as Int)
 
-      let undefinedIsUndefined = undefined.isUndefined(in: context)
-      let undefinedType = undefined.type(in: context)
-      let nullIsNull = null.isNull(in: context)
-      let nullType = null.type(in: context)
-      let boolIsBoolean = bool.isBoolean(in: context)
-      let boolType = bool.type(in: context)
-      let numberIsNumber = number.isNumber(in: context)
-      let numberType = number.type(in: context)
-      let stringIsString = string.isString(in: context)
-      let stringType = string.type(in: context)
-      let symbolIsSymbol = symbol.isSymbol(in: context)
-      let symbolType = symbol.type(in: context)
-      let intIsNumber = intNumber.isNumber(in: context)
-      let intIsBigInt = intNumber.isBigInt(in: context)
+      let undefinedIsUndefined = undefined.isUndefined()
+      let undefinedType = undefined.type()
+      let nullIsNull = null.isNull()
+      let nullType = null.type()
+      let boolIsBoolean = bool.isBoolean()
+      let boolType = bool.type()
+      let numberIsNumber = number.isNumber()
+      let numberType = number.type()
+      let stringIsString = string.isString()
+      let stringType = string.type()
+      let symbolIsSymbol = symbol.isSymbol()
+      let symbolType = symbol.type()
+      let intIsNumber = intNumber.isNumber()
+      let intIsBigInt = intNumber.isBigInt()
 
-      #expect(undefinedIsUndefined)
-      #expect(undefinedType == .undefined)
-      #expect(nullIsNull)
-      #expect(nullType == .null)
-      #expect(boolIsBoolean)
-      #expect(boolType == .boolean)
-      #expect(numberIsNumber)
-      #expect(numberType == .number)
-      #expect(stringIsString)
-      #expect(stringType == .string)
-      #expect(symbolIsSymbol)
-      #expect(symbolType == .symbol)
-      #expect(intIsNumber)
-      #expect(!intIsBigInt)
+      expectTrue(undefinedIsUndefined)
+      expectTrue(undefinedType == .undefined)
+      expectTrue(nullIsNull)
+      expectTrue(nullType == .null)
+      expectTrue(boolIsBoolean)
+      expectTrue(boolType == .boolean)
+      expectTrue(numberIsNumber)
+      expectTrue(numberType == .number)
+      expectTrue(stringIsString)
+      expectTrue(stringType == .string)
+      expectTrue(symbolIsSymbol)
+      expectTrue(symbolType == .symbol)
+      expectTrue(intIsNumber)
+      expectTrue(!intIsBigInt)
     }
   }
 }
 
-private func runVirtualMachineHashableAndIdentity<E: JSEngine>(_: E.Type)
-where E.Engine == E, E.RuntimeHandle: Hashable {
-  let vm1 = JSVirtualMachine<E>()
-  let vm2 = JSVirtualMachine<E>()
+private func runVirtualMachineHashableAndIdentity<C: JSContext>(_: C.Type) {
+  let vm1 = C.VirtualMachine()
+  let vm2 = C.VirtualMachine()
 
-  #expect(vm1 == vm1)
-  #expect(vm1 != vm2)
-  #expect(vm1.hashValue == vm1.hashValue)
+  expectTrue(vm1 == vm1)
+  expectTrue(vm1 != vm2)
+  expectTrue(vm1.hashValue == vm1.hashValue)
 }
 
-private func runContextHashableAndGlobalObject<E: JSEngine>(_: E.Type) async
-where E.Engine == E, E.ContextHandle: Hashable {
-  let vm = JSVirtualMachine<E>()
-  let context1 = JSContext(virtualMachine: vm)
-  let context2 = JSContext(virtualMachine: vm)
+private func runContextHashableAndGlobalObject<C: JSContext>(_: C.Type) async {
+  let vm = C.VirtualMachine()
+  let context1 = C(virtualMachine: vm)
+  let context2 = C(virtualMachine: vm)
 
-  #expect(context1 == context1)
-  #expect(context1 != context2)
+  expectTrue(context1 == context1)
+  expectTrue(context1 != context2)
 
-  await context1.withIsolatedGlobalObject { context, global in
-    let isObject = global.isObject(in: context)
-    let type = global.type(in: context)
-    #expect(isObject)
-    #expect(type == .object)
+  await context1.withInstantContext { scope in
+    let global = scope.globalObjectValue()
+    expectTrue(global.isObject())
+    expectTrue(global.type() == .object)
   }
 }
 
 private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let virtualMachine = JSVirtualMachine<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let virtualMachine = C.VirtualMachine()
+    // Two raw context handles on one VM, deliberately without `C` actors: the
+    // test releases them itself.
     guard
-      let sourceContext = E.makeBorrowedContextHandleFromRuntime(
-        in: virtualMachine.driverRuntimeHandle),
-      let targetContext = E.makeBorrowedContextHandleFromRuntime(
-        in: virtualMachine.driverRuntimeHandle),
+      let sourceContext = virtualMachine.makeContextHandle(),
+      let targetContext = virtualMachine.makeContextHandle(),
       let value = sourceContext.makeNumberValueHandle(7)
     else {
       Issue.record("Expected same-VM driver handles to be creatable")
@@ -357,14 +364,16 @@ private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAsse
     let targetValue = targetContext.toNumberForHandle(borrowed)
     sourceContext.releaseCreatedHandle(value)
 
-    #expect(isCompatible)
-    #expect(targetValue == 7)
+    expectTrue(isCompatible)
+    expectTrue(targetValue == 7)
   }
 }
-extension JSInstantContext {
-  fileprivate func makePersistentObject() -> JSValue<E> {
-    let result = makeObject()
-    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
-    return persist(cb)
-  }
+
+/// `#expect` cannot capture the non-copyable surface value views; binding the
+/// boolean first keeps the macro on a plain `Bool`.
+private func expectTrue(
+  _ condition: Bool,
+  sourceLocation: SourceLocation = #_sourceLocation
+) {
+  #expect(condition, sourceLocation: sourceLocation)
 }

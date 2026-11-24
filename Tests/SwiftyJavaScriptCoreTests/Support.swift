@@ -2,176 +2,62 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-struct TestNumberMarshal: Sendable, JSValueCodable {
+struct TestNumberMarshal: Sendable, JSValueDecodable, JSValueEncodable {
   let value: Double
 
   init(_ value: Double) {
     self.value = value
   }
 
-  init<E: JSValueConversionEngine>(
-    value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  init<C: JSInstantContext & ~Copyable>(
+    value: borrowing C.Value,
+    in context: borrowing C
   ) {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    self.init(
-      value: JSValue<JavaScriptCoreEngine>(
-        handleValue: unsafeBitCast(
-          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
-        in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      ),
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
+    _ = context
+    self.value = value.isNumber() ? 1 : 0
   }
 
-  init(
-    value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) {
-    self.value = value.isNumber(in: context) ? 1 : 0
-  }
-
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<JavaScriptCoreEngine>
-  {
-    JSValue(number: value, in: context)
-  }
-
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
-      in: context.driverContextHandle)
+  func toSurfaceValue<C: JSValueScope & ~Copyable>(in context: borrowing C) -> C.Value {
+    context.persist(context.makeNumber(value))
   }
 }
 
-struct TestStringMarshal: Sendable, JSValueCodable, Error {
+struct TestStringMarshal: Sendable, JSValueDecodable, JSValueEncodable, Error {
   let value: String
 
   init(_ value: String) {
     self.value = value
   }
 
-  init<E: JSValueConversionEngine>(
-    value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  init<C: JSInstantContext & ~Copyable>(
+    value: borrowing C.Value,
+    in context: borrowing C
   ) {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    self.init(
-      value: JSValue<JavaScriptCoreEngine>(
-        handleValue: unsafeBitCast(
-          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
-        in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      ),
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
+    _ = context
+    self.value = value.isString() ? "string" : "other"
   }
 
-  init(
-    value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) {
-    self.value = value.isString(in: context) ? "string" : "other"
-  }
-
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<JavaScriptCoreEngine>
-  {
-    JSValue(string: value, in: context)
-  }
-
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
-      in: context.driverContextHandle)
+  func toSurfaceValue<C: JSValueScope & ~Copyable>(in context: borrowing C) -> C.Value {
+    context.persist(context.makeString(value))
   }
 }
 
-struct TestBoolMarshal: Sendable, JSValueCodable {
+struct TestBoolMarshal: Sendable, JSValueDecodable, JSValueEncodable {
   let value: Bool
 
   init(_ value: Bool) {
     self.value = value
   }
 
-  init<E: JSValueConversionEngine>(
-    value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  init<C: JSInstantContext & ~Copyable>(
+    value: borrowing C.Value,
+    in context: borrowing C
   ) {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    self.init(
-      value: JSValue<JavaScriptCoreEngine>(
-        handleValue: unsafeBitCast(
-          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
-        in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      ),
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
+    _ = context
+    self.value = value.isBoolean()
   }
 
-  init(
-    value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  ) {
-    self.value = value.isBoolean(in: context)
-  }
-
-  func toJSValue(in context: borrowing JSInstantContext<JavaScriptCoreEngine>)
-    -> JSValue<JavaScriptCoreEngine>
-  {
-    JSValue(boolean: value, in: context)
-  }
-
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = self.toJSValue(
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
-      in: context.driverContextHandle)
+  func toSurfaceValue<C: JSValueScope & ~Copyable>(in context: borrowing C) -> C.Value {
+    context.persist(context.makeBoolean(value))
   }
 }

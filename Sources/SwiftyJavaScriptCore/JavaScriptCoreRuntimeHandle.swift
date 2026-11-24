@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCoreRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
+public struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSContextGroupRef
@@ -17,8 +17,8 @@ public struct JavaScriptCoreRuntimeHandle: JSRuntimeManualReferenceCountedHandle
     self.ownsRuntime = false
   }
 
-  public var engineType: JavaScriptCoreEngine.Type {
-    JavaScriptCoreEngine.self
+  public var engineType: JSCEngine.Type {
+    JSCEngine.self
   }
 
   @discardableResult
@@ -40,8 +40,8 @@ public struct JavaScriptCoreRuntimeHandle: JSRuntimeManualReferenceCountedHandle
   }
 }
 
-extension JavaScriptCoreRuntimeHandle: Hashable {
-  public static func == (lhs: JavaScriptCoreRuntimeHandle, rhs: JavaScriptCoreRuntimeHandle)
+extension JSCRuntimeHandle: Hashable {
+  public static func == (lhs: JSCRuntimeHandle, rhs: JSCRuntimeHandle)
     -> Bool
   {
     lhs.ref == rhs.ref

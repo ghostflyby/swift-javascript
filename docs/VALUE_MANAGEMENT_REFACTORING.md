@@ -1,10 +1,15 @@
 # 值管理架构重构设计
 
-**状态:设计文档(待评审)**
+**状态:已实现(S1–S15;本文保留设计决策与迁移前盘点)**
 **日期:2026-11**
-**关联分支:`scope_arena`**
+**关联分支:`main`**
 
-本文档结合三方面输入,规划 `SwiftJavaScript` core 的值管理架构重构:
+本文档记录 `SwiftJavaScript` core 的值管理架构重构。最终用户面是
+public `JS*` 协议 + `JSC*`/`QJS*` 具体类型；下文标注为“迁移前”的分层与
+`JSValue<E>` 等泛型名称只表示设计历史，当前 API 见
+`Sources/SwiftJavaScript/Surface/`。
+
+本文档结合三方面输入:
 
 1. 当前代码现状(`scope_arena` 分支,含未提交的 `ScopeCore`/`JSScope` 工作);
 2. Swift 6.4 所有权能力边界(SE-0503/SE-0499 转正,`@lifetime` 仍为实验特性);
@@ -26,10 +31,10 @@
 
 | V8 文档概念 | 本仓库对应物 |
 |---|---|
-| 本地值 `Local<T>`(有效性与 Scope 绑定,不存 context) | `JSValue<E>` 重定义为本地值(§3.2):不持有、不释放,可带 `ContextHandle` 仅作便利 |
-| 持久引用(持有不授权访问、不保活) | 可恢复持久 handle(`ContextLocal`/`RuntimeLocal`,identity 决定绑定,§3.5) |
+| 本地值 `Local<T>`(有效性与 Scope 绑定,不存 context) | `JSValue` 协议 + `JSCValue`/`QJSValue` 本地视图(§3.2):不持有、不释放,带 `ContextHandle` 寻址 |
+| 持久引用(持有不授权访问、不保活) | `JSPersistentHandle` 协议 + `JSCPersistentHandle`/`QJSPersistentHandle`:identity 决定绑定(§3.5) |
 | 访问见证(必须经合法上下文恢复 Local) | 值自带 `ContextHandle` 寻址 + context 挂载作用域栈(§3.4) |
-| 执行权限(actor / Locker) | `JSContext<E>: actor` + `JSVirtualMachine` 专用线程 executor |
+| 执行权限(actor / Locker) | `JSContext` 协议 + `JSCContext`/`QJSContext` actor + `JSVirtualMachine` 专用线程 executor |
 
 **本仓库新增的第四维:释放记账。** V8 的 Local 生命周期由 HandleScope 在引擎内部管理;本仓库的引擎差异要求 core 自己记账——QuickJS 的 `ValueHandle` 引用计数必须配平(`releaseCreatedHandle` = `JS_FreeValue`),JSC 则由 GC 接管(`releaseCreatedHandle` = no-op)。arena 就是这份记账的载体,它不是可优化项,而是 QuickJS 正确性的运行时事实来源。与之并存的是**根域差异**:JSC 未 Protect 的值靠保守扫描执行线程栈存活,QuickJS 靠与位置无关的引用计数——挂起点把引用帧从栈搬进堆,对 JSC 即脱根(§2.4、§3.7)。
 
@@ -41,18 +46,21 @@
 
 ---
 
-## 2. 现状盘点
+## 2. 迁移前状态(历史)
 
-### 2.1 值类型分层
+以下分层与问题记录迁移起点;S1–S15 已把用户面切换为协议 + 具体类型,
+问题清单中的缺口均已收口。
 
-| 类型 | 拷贝性 | 生命周期归属 | 说明 |
-|---|---|---|---|
-| `JSValue<E>` | `~Copyable` | 自持(home context 打包进 24 字节 storage words,deinit 时在 home context 释放) | 持久值;操作走显式 `in context` 参数(操作上下文) |
-| `JSCallbackValue<E>` | **可拷贝** | 不自持;创建来源二分:回调参数帧(引擎持有)/ scope 工厂(arena 持有) | 每个操作经 `resolveContext()` 从 TLS 取 context |
-| `JSCallbackReturn<E>` | `~Copyable` | 回调出口的 ownership handoff(temporary / persistent / exception 三态) | `persistent` 路径跳过 `JSValue.deinit` 的重复释放 |
-| `JSPropertyStringKey<E>` / `JSPreparedScript<E>` | — | context 作用域句柄 | `borrowHandle(in: JSInstantContext<E>)` 强制要求 instant scope 作见证 |
+### 2.1 值类型分层(迁移前 → 当前)
 
-### 2.2 作用域层(`scope_arena` 分支进行中)
+| 迁移前 | 当前 |
+|---|---|
+| `JSValue<E>` 自持(24 字节 storage words,deinit 释放) | `JSValue` 协议 + `JSCValue`/`QJSValue` 非拥有本地视图,arena 拥有引用 |
+| `JSCallbackValue<E>` 可拷贝、经 TLS 解析 context | `JSCallbackValue` 协议 + `JSCCallbackValue`/`QJSCallbackValue`,`~Copyable` 且内嵌 `ContextHandle` |
+| `JSCallbackReturn<E>` 三态 handoff | `JSCallbackReturn` 协议 + `JSCCallbackReturn`/`QJSCallbackReturn` |
+| `JSPropertyStringKey<E>` / `JSPreparedScript<E>` | `JSPropertyStringKey`/`JSPreparedScript` 协议 + `JSC*`/`QJS*` 自持有输入 |
+
+### 2.2 作用域层(迁移前)
 
 ```
 ScopeCore<E>                      ← 共享内核(未提交)
@@ -67,10 +75,19 @@ JSInstantContext<E>: ~Copyable    ← 自动 scope:init push TLS,deinit drain + 
 JSScope<E>: ~Copyable             ← 手动 scope(未提交):open() push,deinit drain + 条件 pop
 ```
 
+当前实现见 `Sources/SwiftJavaScript/ScopeCore.swift`、
+`Sources/SwiftJavaScript/ScopeCoreHandleSurface.swift`;`ScopeCore` 只保留
+handle 级 API,`JSCInstantContext`/`JSCScope`/`QJSInstantContext`/`QJSScope`
+是具体类型。
+
 ### 2.3 执行层
 
-- `JSVirtualMachine<E>`:`RuntimeHandle` + 专用线程 `SerialExecutor`——执行线程身份固定,强于普通 actor 的串行保证,满足 JSC/QuickJS 的线程约束(对应 V8 文档"固定 OS 线程"分支)。
-- `JSContext<E>: actor`:绑定 VM executor;所有公共操作经 `withInstantContext` 进入同步 scope。**actor 保证执行互斥,scope 保证引用生命周期,二者职责不同且都已存在**——这与 V8 文档 §6.3 的结论一致,本仓库无需改动。
+- `JSVirtualMachine` 协议 + `JSCVirtualMachine`/`QJSVirtualMachine`:
+  `RuntimeHandle` + 专用线程 `SerialExecutor`——执行线程身份固定,强于普通 actor
+  的串行保证,满足 JSC/QuickJS 的线程约束(对应 V8 文档"固定 OS 线程"分支)。
+- `JSContext` 协议 + `JSCContext`/`QJSContext` actor:绑定 VM executor;所有
+  公共操作经 `withInstantContext` 进入同步 scope。**actor 保证执行互斥,scope
+  保证引用生命周期,二者职责不同且都已存在**——这与 V8 文档 §6.3 的结论一致。
 
 ### 2.4 引擎语义差异
 
@@ -86,7 +103,9 @@ JSScope<E>: ~Copyable             ← 手动 scope(未提交):open() push,deinit
 
 **挂起点是根域边界。** `await` 把引用帧从栈搬进堆分配的协程帧——JSC 下未 Protect 的值随之脱根,挂起期间同 actor 的其他执行(含 host 回调)触发分配与 GC 即可回收它,恢复后即悬垂。对照:V8 的 HandleScope 本质是把隐式根域做成显式结构(handle block 挂进 isolate 根链),所以跨挂起点安全;QuickJS 引用计数与位置无关,亦安全。由此得出最小规则:**未显式根化的值不得离开同步栈窗口(跨挂起点、进堆存储);显式根化(`persist`/`JSValueProtect`/持久 handle)是唯一跨窗口手段**——该规则在 JSC 上是引擎硬约束,在 V8 模型/QuickJS 上是"可以但没必要",API 取交集换单一规则(§3.7)。
 
-### 2.5 现存问题(按优先级)
+### 2.5 迁移前问题(已收口)
+
+以下保留迁移起点的问题分级,便于追溯设计决策;当前实现已按 §3 收口。
 
 **P0 – 作用域栈挂在线程上(TLS)**
 `JSCallbackValue.resolveContext()` 从 `Thread.threadDictionary` 读 scope 栈。病根需要精确表述:**ambient 栈顶解析本身不是错**——V8 的 `HandleScope` 栈同样是 ambient,挂在 isolate 上;错在把这份状态挂在了**线程**上——线程 ≠ 执行域:与结构化并发不兼容,跨 `await` 后失效,误用时只有 `preconditionFailure` 崩溃兜底,值逃逸到其它 context 的 scope 时可能解析到**错误的 context** 而非崩溃。修正方向是搬家而非删除(§3.4)。
@@ -130,19 +149,19 @@ JSScope<E>: ~Copyable             ← 手动 scope(未提交):open() push,deinit
                     └──────┬───────────────────────┬───────────┘
                   工厂创建 │                       │ return / throw(handoff)
                 ┌─────────▼─────────┐     ┌───────▼─────────────────────┐
-                │ JSValue           │     │ JSCallbackReturn            │
-                │ (本地值,借用      │     │ (回调出口 handoff)           │
+                │ JSValue 协议       │     │ JSCallbackReturn 协议        │
+                │ (本地视图,借用     │     │ (回调出口 handoff)           │
                 │  handle+ctx)     │     └─────────────────────────────┘
                 └─────────┬─────────┘
-                          │ resolve(in: witness) → JSValue?
+                          │ resolve(in: witness) → Engine.Value?
                 ┌─────────▼──────────────────────────────────┐
-                │  持久层:可恢复 handle(ContextLocal /         │
-                │  RuntimeLocal,identity 绑定,Sendable)      │
+                │  持久层:JSPersistentHandle 协议              │
+                │  identity 绑定,Sendable                    │
                 └─────────┬──────────────────────────────────┘
                           │
                 ┌─────────▼──────────────────────────────────┐
-                │  引擎层:JSEngine driver 协议                 │
-                │  JSC(GC) / QuickJS(引用计数)               │
+                │  context 层:JSContext 锚点 + driver 协议      │
+                │  JSCContext(GC) / QJSContext(引用计数)       │
                 └────────────────────────────────────────────┘
 ```
 
@@ -173,13 +192,14 @@ scope 层          同步值 Stage 5 起 Copyable + ~Escapable + @lifetime(替�
 引入内部见证协议(而非具体类型)承载 `borrowHandle(in:)` 等签名:
 
 ```swift
-// 引擎无关、core 内部
-protocol JSScopeWitness<E: JSEngine>: ~Copyable {
-  var driverContextHandle: E.ContextHandle { get }
+// 引擎无关、core package 内部;成员类型都是所属 context 的别名
+package protocol JSScopeWitness: JSValueScope, ~Copyable {
+  var scopeFrame: ScopeFrame<ContextHandle> { get }
+  func makeValue(handle: ContextHandle.ValueHandle) -> Value
 }
 // JSInstantContext 与 JSScope 均符合;JSPropertyStringKey/JSPreparedScript 的
-// borrowHandle(in:) 改收 JSScopeWitness,消除 decode/getProperty 内部的
-// 临时 JSInstantContext 构造。
+// witness 版 borrowHandle(in:) 改收 JSScopeWitness,消除 decode/getProperty 内部的
+// 临时 scope 构造。
 ```
 
 `JSContextDataStorageBox` 等 context 附属设施同样改收 handle,不再要求 scope 类型。
@@ -204,20 +224,20 @@ protocol JSScopeWitness<E: JSEngine>: ~Copyable {
 
 ### 3.5 持久层:可恢复 handle(唯一长期存储形态)
 
-值不能长久存储(§2.5 P1),长期持有的唯一公开形态是**可恢复持久 handle**——一个只持有 identity 的 `Sendable` 类型(命名待定,`JSPersistentHandle` / `JSRef` 候选),对应 V8 文档 `IsolateLocal<T>`/`ContextLocal<T>` 模型:
+值不能长久存储(§2.5 P1),长期持有的唯一公开形态是**可恢复持久 handle**——`JSPersistentHandle` 协议(具体类型 `JSCPersistentHandle`/`QJSPersistentHandle`)只持有 public `JSPersistentHandleIdentity`,对应 V8 文档 `IsolateLocal<T>`/`ContextLocal<T>` 模型:
 
 **生命周期语义(同 ThreadLocal/AsyncLocal,承接 V8 文档 §3.3):**
 
-- 绑定住在**容器侧**(Context 或 Runtime 的 registry),handle 只持 identity;
-- handle 可跨线程、跨隔离域传递;解析 `resolve(in: witness) -> JSValue?` 在合法 scope 见证下进行,恢复产物是本地值(进入当前 arena);
+- 绑定住在**容器侧**(Context 的 registry),handle 只持 identity;
+- handle 可跨线程、跨隔离域传递;解析 `resolve(_:) -> Engine.Value?` 在合法 scope 见证下进行,恢复产物是本地视图(进入当前 arena);
 - 容器消亡或绑定不存在 → 解析返回 `nil`,而非悬垂——handle 不保活 context,context 死亡也不留悬垂 handle;
-- 绑定的存储粒度是设计决策点:`RuntimeLocal`(VM 级,对应两引擎堆边界 §2.4)vs `ContextLocal`(context 级,同 runtime 多 context 各自绑定),见 §7。
+- 绑定粒度最终采用 `ContextLocal`(context 级,同 runtime 多 context 各自绑定),设计论证见 `docs/PERSISTENT_HANDLE_DESIGN.md` §6。
 
 **目标场景**(V8 文档 §10.1 表映射):宿主内建函数与构造函数缓存的稳定身份、Native 对象跨 context 的 JS 包装(同一 Swift 对象在多个 `JSContext` 各有 JS 表示)、JS 提供的长期回调保存、宿主 API 注册表;弱引用作为强度选项(`strength: .weak`),handle 生命周期结束与 JS 对象被 GC 回收是两个独立事件。V8 文档 §10.2 的结论同样成立——`JSFunctionCallback` 是 native 闭包直接持有,临时值走本地值;handle 只承接身份型引用。
 
 **实现要点:**
 
-1. registry 挂容器级(`RuntimeLocal` → VM 级);identity 采用整数槽位 + generation(`index: UInt32, generation: UInt32`),支持槽位回收与失效防误命中;
+1. registry 挂 context 级;identity 采用 public `JSPersistentHandleIdentity`(`registry` + `slot` + `generation`),支持槽位回收与失效防误命中;
 2. handle 为引用计数对象,最后一个 owner 释放时经 **VM executor 调度**清理对应绑定——不允许在任意线程直接操作引擎;
 3. handle 自身不暴露任何 JS 操作——恢复访问必须经 scope 见证,与"持有不授权访问"一致。
 

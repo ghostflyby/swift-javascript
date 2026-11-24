@@ -8,47 +8,47 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: JSEnginePropertyDriver {
+extension QJSEngine: JSEnginePropertyDriver {
   public static func makePropertyStringKeyHandle(
     _ value: String,
-    in context: QuickJSContextHandle
-  ) -> QuickJSPropertyStringKeyHandle? {
+    in context: QJSContextHandle
+  ) -> QJSPropertyStringKeyHandle? {
     let atom = makePropertyStringAtom(value, in: context)
     guard atom != 0 else {
       return nil
     }
-    return QuickJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
+    return QJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
   public static func makePropertyStringKeyHandle(
     _ value: StaticString,
-    in context: QuickJSContextHandle
-  ) -> QuickJSPropertyStringKeyHandle? {
+    in context: QJSContextHandle
+  ) -> QJSPropertyStringKeyHandle? {
     let atom = makePropertyStringAtom(value, in: context)
     guard atom != 0 else {
       return nil
     }
-    return QuickJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
+    return QJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
   public static func isPropertyStringKeyHandleCompatibleWithContext(
-    _ key: QuickJSPropertyStringKeyHandle,
-    in context: QuickJSContextHandle
+    _ key: QJSPropertyStringKeyHandle,
+    in context: QJSContextHandle
   ) -> Bool {
     key.contextRef == context.ref
   }
 
   public static func makeStringValueHandle(
-    fromPropertyStringKey key: QuickJSPropertyStringKeyHandle,
-    in context: QuickJSContextHandle
-  ) -> QuickJSOwnedValueHandle? {
+    fromPropertyStringKey key: QJSPropertyStringKeyHandle,
+    in context: QJSContextHandle
+  ) -> QJSOwnedValueHandle? {
     let value = JS_AtomToString(context.ref, key.atom)
-    return QuickJSOwnedValueHandle(ref: value)
+    return QJSOwnedValueHandle(ref: value)
   }
 
   public static func propertyNamesForHandle(
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> [String]? {
     var propertyEnumPointer: UnsafeMutablePointer<JSPropertyEnum>?
     var propertyCount: UInt32 = 0
@@ -77,28 +77,28 @@ extension QuickJSEngine: JSEnginePropertyDriver {
 
   public static func getStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     withPropertyStringAtom(key, in: context) { atom in
       quickJSResultHandle(for: JS_GetProperty(context.ref, object.ref, atom), in: context.ref)
     }
   }
 
   public static func getPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     let result = JS_GetProperty(context.ref, object.ref, key.atom)
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
   public static func setStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
-    in context: QuickJSContextHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
+    in context: QJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
     withPropertyStringAtom(key, in: context) { atom in
@@ -107,20 +107,20 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 
   public static func setPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
-    in context: QuickJSContextHandle,
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
+    in context: QJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
     setProperty(key.atom, on: object, to: value, in: context, attributes: attributes)
   }
 
   public static func getValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     let atom = JS_ValueToAtom(context.ref, key.ref)
     guard atom != 0 else {
       return nil
@@ -131,9 +131,9 @@ extension QuickJSEngine: JSEnginePropertyDriver {
 
   public static func getIndexPropertyHandle(
     at index: UInt32,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     quickJSResultHandle(
       for: JS_GetPropertyUint32(context.ref, object.ref, index),
       in: context.ref
@@ -141,10 +141,10 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 
   public static func setValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
-    in context: QuickJSContextHandle,
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
+    in context: QJSContextHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
     let atom = JS_ValueToAtom(context.ref, key.ref)
@@ -167,18 +167,18 @@ extension QuickJSEngine: JSEnginePropertyDriver {
 
   public static func setIndexPropertyHandle(
     at index: UInt32,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool {
     return JS_SetPropertyUint32(context.ref, object.ref, index, JS_DupValue(context.ref, value.ref))
       == 1
   }
 
   public static func hasPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     let result = JS_HasProperty(context.ref, object.ref, key.atom)
     return result >= 0 ? result == 1 : nil
@@ -186,8 +186,8 @@ extension QuickJSEngine: JSEnginePropertyDriver {
 
   public static func hasStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     guard
       let result = withPropertyStringAtom(
@@ -203,9 +203,9 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 
   public static func hasValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     let atom = JS_ValueToAtom(context.ref, key.ref)
     guard atom != 0 else {
@@ -217,17 +217,17 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 
   public static func deletePropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool {
     return JS_DeleteProperty(context.ref, object.ref, key.atom, Int32(JS_PROP_THROW)) == 1
   }
 
   public static func deleteStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool {
     withPropertyStringAtom(key, in: context) { atom in
       JS_DeleteProperty(context.ref, object.ref, atom, Int32(JS_PROP_THROW)) == 1
@@ -235,9 +235,9 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 
   public static func deleteValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool {
     let atom = JS_ValueToAtom(context.ref, key.ref)
     guard atom != 0 else {
@@ -248,7 +248,7 @@ extension QuickJSEngine: JSEnginePropertyDriver {
   }
 }
 
-private func makePropertyStringAtom(_ value: String, in context: QuickJSContextHandle) -> JSAtom {
+private func makePropertyStringAtom(_ value: String, in context: QJSContextHandle) -> JSAtom {
   value.withCString { pointer in
     JS_NewAtomLen(
       context.ref,
@@ -260,7 +260,7 @@ private func makePropertyStringAtom(_ value: String, in context: QuickJSContextH
 
 private func makePropertyStringAtom(
   _ value: StaticString,
-  in context: QuickJSContextHandle
+  in context: QJSContextHandle
 ) -> JSAtom {
   value.withUTF8Buffer { buffer in
     let pointer = buffer.baseAddress.map {
@@ -272,7 +272,7 @@ private func makePropertyStringAtom(
 
 private func withPropertyStringAtom<R>(
   _ value: String,
-  in context: QuickJSContextHandle,
+  in context: QJSContextHandle,
   _ body: (JSAtom) -> R
 ) -> R? {
   let atom = makePropertyStringAtom(value, in: context)
@@ -285,7 +285,7 @@ private func withPropertyStringAtom<R>(
 
 private func withPropertyStringAtom<R>(
   _ value: StaticString,
-  in context: QuickJSContextHandle,
+  in context: QJSContextHandle,
   _ body: (JSAtom) -> R
 ) -> R? {
   let atom = makePropertyStringAtom(value, in: context)
@@ -298,9 +298,9 @@ private func withPropertyStringAtom<R>(
 
 private func setProperty(
   _ atom: JSAtom,
-  on object: QuickJSValueHandle,
-  to value: QuickJSValueHandle,
-  in context: QuickJSContextHandle,
+  on object: QJSValueHandle,
+  to value: QJSValueHandle,
+  in context: QJSContextHandle,
   attributes: JSHostMemberAttributes
 ) -> Bool {
   if attributes.isEmpty {
@@ -343,51 +343,51 @@ private func propertyFlags(for attributes: JSHostMemberAttributes) -> Int32 {
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension QuickJSContextHandle: JSContextPropertyDriver {
-  public typealias PropertyStringKeyHandle = QuickJSPropertyStringKeyHandle
+extension QJSContextHandle: JSContextPropertyDriver {
+  public typealias PropertyStringKeyHandle = QJSPropertyStringKeyHandle
 
   public func makePropertyStringKeyHandle(_ value: String)
-    -> QuickJSPropertyStringKeyHandle?
+    -> QJSPropertyStringKeyHandle?
   {
-    QuickJSEngine.makePropertyStringKeyHandle(value, in: self)
+    QJSEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
   public func makePropertyStringKeyHandle(_ value: StaticString)
-    -> QuickJSPropertyStringKeyHandle?
+    -> QJSPropertyStringKeyHandle?
   {
-    QuickJSEngine.makePropertyStringKeyHandle(value, in: self)
+    QJSEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
   public func isPropertyStringKeyHandleCompatibleWithContext(
-    _ key: QuickJSPropertyStringKeyHandle
+    _ key: QJSPropertyStringKeyHandle
   ) -> Bool {
-    QuickJSEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
+    QJSEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
   }
 
   public func makeStringValueHandle(
-    fromPropertyStringKey key: QuickJSPropertyStringKeyHandle
-  ) -> QuickJSOwnedValueHandle? {
-    QuickJSEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
+    fromPropertyStringKey key: QJSPropertyStringKeyHandle
+  ) -> QJSOwnedValueHandle? {
+    QJSEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
   }
 
-  public func propertyNamesForHandle(on object: QuickJSValueHandle) -> [String]? {
-    QuickJSEngine.propertyNamesForHandle(on: object, in: self)
+  public func propertyNamesForHandle(on object: QJSValueHandle) -> [String]? {
+    QJSEngine.propertyNamesForHandle(on: object, in: self)
   }
 
   public func getStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.getStaticStringPropertyHandle(key, on: object, in: self)
+    on object: QJSValueHandle
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.getStaticStringPropertyHandle(key, on: object, in: self)
   }
 
   public func setStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    QuickJSEngine.setStaticStringPropertyHandle(
+    QJSEngine.setStaticStringPropertyHandle(
       key,
       on: object,
       to: value,
@@ -397,19 +397,19 @@ extension QuickJSContextHandle: JSContextPropertyDriver {
   }
 
   public func getPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.getPropertyStringKeyHandle(key, on: object, in: self)
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.getPropertyStringKeyHandle(key, on: object, in: self)
   }
 
   public func setPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    QuickJSEngine.setPropertyStringKeyHandle(
+    QJSEngine.setPropertyStringKeyHandle(
       key,
       on: object,
       to: value,
@@ -419,26 +419,26 @@ extension QuickJSContextHandle: JSContextPropertyDriver {
   }
 
   public func getValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.getValuePropertyHandle(key, on: object, in: self)
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.getValuePropertyHandle(key, on: object, in: self)
   }
 
   public func getIndexPropertyHandle(
     at index: UInt32,
-    on object: QuickJSValueHandle
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.getIndexPropertyHandle(at: index, on: object, in: self)
+    on object: QJSValueHandle
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.getIndexPropertyHandle(at: index, on: object, in: self)
   }
 
   public func setValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle,
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle,
+    to value: QJSValueHandle,
     attributes: JSHostMemberAttributes
   ) -> Bool {
-    QuickJSEngine.setValuePropertyHandle(
+    QJSEngine.setValuePropertyHandle(
       key,
       on: object,
       to: value,
@@ -449,51 +449,51 @@ extension QuickJSContextHandle: JSContextPropertyDriver {
 
   public func setIndexPropertyHandle(
     at index: UInt32,
-    on object: QuickJSValueHandle,
-    to value: QuickJSValueHandle
+    on object: QJSValueHandle,
+    to value: QJSValueHandle
   ) -> Bool {
-    QuickJSEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
+    QJSEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
   }
 
   public func hasStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle
+    on object: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
+    QJSEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
   }
 
   public func hasPropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
+    QJSEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
   }
 
   public func hasValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.hasValuePropertyHandle(key, on: object, in: self)
+    QJSEngine.hasValuePropertyHandle(key, on: object, in: self)
   }
 
   public func deleteStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: QuickJSValueHandle
+    on object: QJSValueHandle
   ) -> Bool {
-    QuickJSEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
+    QJSEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
   }
 
   public func deletePropertyStringKeyHandle(
-    _ key: QuickJSPropertyStringKeyHandle,
-    on object: QuickJSValueHandle
+    _ key: QJSPropertyStringKeyHandle,
+    on object: QJSValueHandle
   ) -> Bool {
-    QuickJSEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
+    QJSEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
   }
 
   public func deleteValuePropertyHandle(
-    _ key: QuickJSValueHandle,
-    on object: QuickJSValueHandle
+    _ key: QJSValueHandle,
+    on object: QJSValueHandle
   ) -> Bool {
-    QuickJSEngine.deleteValuePropertyHandle(key, on: object, in: self)
+    QJSEngine.deleteValuePropertyHandle(key, on: object, in: self)
   }
 }

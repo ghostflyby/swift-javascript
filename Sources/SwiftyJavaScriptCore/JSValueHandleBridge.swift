@@ -1,46 +1,29 @@
 import JavaScriptCore
 
-extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
-  /// Wrap a JavaScriptCore value reference into handle-backed value storage.
-  /// - Parameters:
-  ///   - ref: The JSValueRef to wrap
-  ///   - ctx: The JSContext in which the value exists
-  init(
-    ref: JSValueRef,
-    ctx: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine>
-  ) {
-    let instant = SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>(
-      handle: ctx.driverContextHandle
+// MARK: - Surface value bridge (S4)
+//
+// These are the `JSCValue` counterparts of the former legacy value bridge;
+// These are the `JSCValue` overloads. Both are non-owning
+// identity wrappers: the caller (a scope arena or engine callback frame) still
+// owns the reference.
+
+extension JSCValue {
+  init(ref: JSValueRef, ctx: isolated JSCContext) {
+    self.init(
+      handle: JSCValueHandle(ref: ref),
+      contextHandle: ctx.driverContextHandle
     )
-    self.init(ref: ref, in: instant)
   }
 
-  init(
-    ref: JSValueRef,
-    ctx: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
-  ) {
-    self.init(ref: ref, in: ctx)
+  init(ref: JSValueRef, in context: borrowing JSCInstantContext) {
+    self.init(
+      handle: JSCValueHandle(ref: ref),
+      contextHandle: context.driverContextHandle
+    )
   }
 
-  /// Borrow the underlying raw reference for a JavaScriptCore callback ABI.
-  ///
-  /// `JSValue` is a non-owning local view, so no ownership is transferred;
-  /// the arena (or the engine's callback frame) that backs the handle keeps
-  /// the reference alive.
   borrowing func borrowedRef() -> JSValueRef {
     borrowHandle().ref
-  }
-}
-
-extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
-  init(
-    ref: JSValueRef,
-    in context: borrowing SwiftJavaScript.JSInstantContext<JavaScriptCoreEngine>
-  ) {
-    let handle = JavaScriptCoreValueHandle(
-      ref: ref
-    )
-    self.init(handleValue: handle, in: context.driverContextHandle)
   }
 
   var ref: JSValueRef {

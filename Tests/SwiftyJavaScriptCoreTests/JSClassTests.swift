@@ -3,23 +3,110 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
+@JSClassAutoConvertible
+final class JSCMacroNode {
+  var name: String = ""
+}
+
+enum JSCMacroMethodError: Error {
+  case bad
+}
+
+@JSClassAutoConvertible
+final class JSCMacroMethodNode {
+  var base: Double = 1
+
+  @JSClassFunction
+  func sum(_ lhs: Double, _ rhs: Double) -> Double {
+    base + lhs + rhs
+  }
+
+  @JSClassFunction("describe")
+  func describe(_ prefix: String) -> String {
+    "\(prefix):\(base)"
+  }
+
+  @JSClassFunction("fail")
+  func fail() throws(JSCMacroMethodError) -> String {
+    throw .bad
+  }
+
+  @JSClassFunction("flag")
+  @JSClassFunctionArguments(ZeroOneBoolConverter.self)
+  func flag(_ enabled: Bool) -> Bool {
+    enabled
+  }
+
+  @JSClassFunction("payload")
+  @JSClassFunctionReturn(ReturnPayloadEncoder.self)
+  func payload() -> ReturnPayload {
+    ReturnPayload(value: base * 2)
+  }
+
+  @JSClassFunction("failEncoded")
+  @JSClassFunctionError(FailurePayloadEncoder.self)
+  func failEncoded() throws(FailurePayload) -> String {
+    throw .bad
+  }
+}
+
+private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendable {
+  typealias Engine = JSCEngine
+  typealias ParentClass = JSCClassParentDescriptor
+  typealias PropertyNameAccumulator = JSPropertyNameAccumulatorRef
+  typealias ClassDefinition = JSCAutoClassDefinition
+
+  var name: String
+
+  init(name: String) {
+    self.name = name
+  }
+
+  static var jsClassDefinition: JSCAutoClassDefinition {
+    var definition = JSCAutoClassDefinition()
+    definition.className = "JSCExportedNode"
+    definition.hasProperty = { _, _, property in property == "name" }
+    definition.getProperty = { context, this, property in
+      guard let instance = try? Self.tryDecode(this, in: context) else {
+        return .exception(JSCValue(string: "failed to decode JSCExportedNode", in: context))
+      }
+      switch property {
+      case "name":
+        return .value(JSCValue(string: instance.name, in: context))
+      default:
+        return .value(JSCValue(undefinedIn: context))
+      }
+    }
+    definition.setProperty = { context, this, property, value in
+      guard let instance = try? Self.tryDecode(this, in: context) else {
+        return JSCValue(string: "failed to decode JSCExportedNode", in: context)
+      }
+      if property == "name" {
+        instance.name = value.toString()
+      }
+      return nil
+    }
+    return definition
+  }
+}
+
 @Test func staticValueAndFunctionStorage() {
-  let staticValue = SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
+  let staticValue = SwiftJavaScript.JSStaticValue<JSCEngine>(
     name: "value",
     attributes: .readOnly,
     getProperty: { context, _ in
-      .value(JSValue(number: 1, in: context))
+      .value(JSCValue(number: 1, in: context))
     },
     setProperty: { context, _, _ in
-      .value(JSValue(undefinedIn: context))
+      .value(JSCValue(undefinedIn: context))
     }
   )
 
-  let staticFunction = SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
+  let staticFunction = SwiftJavaScript.JSStaticFunction<JSCEngine>(
     name: "fn",
     attributes: .dontEnum,
     callAsFunction: { context, _, _ in
-      .value(JSValue(undefinedIn: context))
+      .value(JSCValue(undefinedIn: context))
     }
   )
 
@@ -31,7 +118,7 @@ import Testing
 
 @Test func classDefinitionDefaultsAndClassCreation() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
 
   #expect(definition.version == 0)
@@ -44,8 +131,8 @@ import Testing
   definition.className = "MyClass"
   definition.attributes = .noAutomaticPrototype
 
-  let cls = JSClass(defination: definition)
-  let retained = JSClass(ref: cls.ref)
+  let cls = JSCClass(defination: definition)
+  let retained = JSCClass(ref: cls.ref)
 
   _ = cls
   _ = retained
@@ -53,27 +140,27 @@ import Testing
 
 @Test func classDefinitionCallbacksAreSettable() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
 
   definition.initialize = { _, _ in }
   definition.finalize = { _ in }
   definition.hasProperty = { _, _, name in name == "x" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(undefinedIn: context))
+    .value(JSCValue(undefinedIn: context))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
 
   #expect(definition.initialize != nil)
@@ -91,36 +178,36 @@ import Testing
 
 @Test func classDefinitionFullWiringSmoke() {
   var base = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
   base.className = "Base"
-  let baseClass = JSClass(defination: base)
+  let baseClass = JSCClass(defination: base)
 
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.version = 0
   definition.attributes = .noAutomaticPrototype
   definition.className = "FullWired"
   definition.parentClass = baseClass
   definition.staticValues = [
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
+    SwiftJavaScript.JSStaticValue<JSCEngine>(
       name: "version",
       attributes: .readOnly,
       getProperty: { context, _ in
-        .value(JSValue(number: 1, in: context))
+        .value(JSCValue(number: 1, in: context))
       },
       setProperty: { context, _, _ in
-        .value(JSValue(undefinedIn: context))
+        .value(JSCValue(undefinedIn: context))
       }
     )
   ]
   definition.staticFunctions = [
-    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
+    SwiftJavaScript.JSStaticFunction<JSCEngine>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
-        .value(JSValue(string: "pong", in: context))
+        .value(JSCValue(string: "pong", in: context))
       }
     )
   ]
@@ -128,24 +215,24 @@ import Testing
   definition.finalize = { _ in }
   definition.hasProperty = { _, _, name in name == "version" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(number: 42, in: context))
+    .value(JSCValue(number: 42, in: context))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
 
-  let cls = JSClass(defination: definition)
-  let retained = JSClass(ref: cls.ref)
+  let cls = JSCClass(defination: definition)
+  let retained = JSCClass(ref: cls.ref)
 
   _ = retained
   #expect(definition.parentClass != nil)
@@ -155,14 +242,14 @@ import Testing
 
 @Test func classNameMutationStillBuildsClass() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "A"
   definition.className = "B"
   definition.className = "C"
 
-  let cls = JSClass(defination: definition)
-  let retained = JSClass(ref: cls.ref)
+  let cls = JSCClass(defination: definition)
+  let retained = JSCClass(ref: cls.ref)
 
   _ = cls
   _ = retained
@@ -171,54 +258,54 @@ import Testing
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
   var parentDefinition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
   parentDefinition.className = "BaseType"
-  let parentClass = JSClass(defination: parentDefinition)
+  let parentClass = JSCClass(defination: parentDefinition)
 
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine, JSClass, JSPropertyNameAccumulatorRef
+    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>(
+    SwiftJavaScript.JSStaticValue<JSCEngine>(
       name: "version",
       attributes: [.readOnly, .dontDelete],
       getProperty: { context, _ in
-        .value(JSValue(number: 1, in: context))
+        .value(JSCValue(number: 1, in: context))
       },
       setProperty: { context, _, _ in
-        .value(JSValue(undefinedIn: context))
+        .value(JSCValue(undefinedIn: context))
       }
     )
   ]
   definition.staticFunctions = [
-    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>(
+    SwiftJavaScript.JSStaticFunction<JSCEngine>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
-        .value(JSValue(string: "pong", in: context))
+        .value(JSCValue(string: "pong", in: context))
       }
     )
   ]
   definition.initialize = { _, _ in }
   definition.hasProperty = { _, _, name in name == "version" }
   definition.getProperty = { context, _, _ in
-    .value(JSValue(number: 1, in: context))
+    .value(JSCValue(number: 1, in: context))
   }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
   definition.callAsFunction = { context, _, _, _ in
-    JSValue(undefinedIn: context)
+    JSCValue(undefinedIn: context)
   }
   definition.callAsConstructor = { context, _, _, _ in
-    JSValue(objectIn: context)
+    JSCValue(objectIn: context)
   }
   definition.hasInstance = { _, _, _ in false }
   definition.convertToType = { context, _, _, _ in
-    JSValue(string: "converted", in: context)
+    JSCValue(string: "converted", in: context)
   }
   definition.finalize = { _ in }
 
@@ -249,4 +336,110 @@ import Testing
   #expect(descriptor.properties[0].setterBinding == "ProjectedType.property.set.version")
   #expect(descriptor.properties[0].attributes.contains(.readOnly))
   #expect(descriptor.properties[0].attributes.contains(.dontDelete))
+}
+
+@Test func autoClassDefinitionRoundTripsThroughJavaScript() throws {
+  let runtime = JSCEngine.makeRuntimeHandle()
+  guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("JSCEngine could not create a context handle")
+    return
+  }
+  let context = JSCInstantContext(handle: contextHandle)
+
+  let instance = JSCExportedNode(name: "leaf")
+  let encoded = try JSCExportedNode.tryEncode(instance, in: context)
+  context.setGlobalProperty(encoded, forKey: "node")
+
+  switch context.evaluateScript("node.name") {
+  case .value(let value):
+    #expect(value.toString() == "leaf")
+  case .exception:
+    Issue.record("Expected auto class-backed property to be readable")
+  }
+
+  _ = context.evaluateScript("node.name = 'branch'")
+  #expect(instance.name == "branch")
+
+  let decoded = try JSCExportedNode.tryDecode(encoded, in: context)
+  #expect(decoded === instance)
+}
+
+@Test func macroGeneratedClassDefinitionUsesSurfaceCallbacks() throws {
+  let runtime = JSCEngine.makeRuntimeHandle()
+  guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("JSCEngine could not create a context handle")
+    return
+  }
+  let context = JSCInstantContext(handle: contextHandle)
+
+  let node = JSCMacroNode()
+  node.name = "macro"
+  let encoded = try JSCMacroNode.tryEncode(node, in: context)
+  context.setGlobalProperty(encoded, forKey: "node")
+
+  switch context.evaluateScript("node.name") {
+  case .value(let value):
+    #expect(value.toString() == "macro")
+  case .exception:
+    Issue.record("Expected macro-generated class property to be readable")
+  }
+
+  _ = context.evaluateScript("node.name = 'updated'")
+  #expect(node.name == "updated")
+}
+
+@Test func macroGeneratedClassMethodsUseSurfaceCallbacks() throws {
+  let runtime = JSCEngine.makeRuntimeHandle()
+  guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("JSCEngine could not create a context handle")
+    return
+  }
+  let context = JSCInstantContext(handle: contextHandle)
+
+  let node = JSCMacroMethodNode()
+  let encoded = try JSCMacroMethodNode.tryEncode(node, in: context)
+  context.setGlobalProperty(encoded, forKey: "methodNode")
+
+  switch context.evaluateScript("methodNode.sum(2, 3)") {
+  case .value(let value):
+    #expect(value.toNumber() == 6)
+  case .exception:
+    Issue.record("Expected macro-generated class method to decode arguments and encode its return")
+  }
+
+  switch context.evaluateScript("methodNode.describe('base')") {
+  case .value(let value):
+    #expect(value.toString() == "base:1.0")
+  case .exception:
+    Issue.record("Expected macro-generated class method to honor its custom JS name")
+  }
+
+  switch context.evaluateScript("methodNode.fail()") {
+  case .value:
+    Issue.record("Expected macro-generated throwing class method to surface an exception")
+  case .exception(let value):
+    #expect(value.toString() == "bad")
+  }
+
+  switch context.evaluateScript("methodNode.flag(2)") {
+  case .value(let value):
+    let isEnabled = value.toBoolean()
+    #expect(isEnabled)
+  case .exception:
+    Issue.record("Expected macro-generated argument decoder override to be used")
+  }
+
+  switch context.evaluateScript("methodNode.payload()") {
+  case .value(let value):
+    #expect(value.toNumber() == 2)
+  case .exception:
+    Issue.record("Expected macro-generated return encoder to be used")
+  }
+
+  switch context.evaluateScript("methodNode.failEncoded()") {
+  case .value:
+    Issue.record("Expected macro-generated error encoder to surface an exception")
+  case .exception(let value):
+    #expect(value.toString() == "bad")
+  }
 }

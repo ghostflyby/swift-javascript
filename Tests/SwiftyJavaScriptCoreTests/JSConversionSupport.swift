@@ -2,38 +2,35 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-enum ZeroOneBoolConverter: JSValueConverter {
+enum ZeroOneBoolConverter: JSValueDecoder, JSValueEncoder {
   typealias SwiftType = Bool
 
-  static func decode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  static func decode<C: JSInstantContext & ~Copyable>(
+    _ value: borrowing C.Value,
+    in context: borrowing C
   ) -> Bool {
-    value.toDouble(in: context) != 0
+    value.toNumber() != 0
   }
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: Bool,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    JSValue(number: value ? 1 : 0, in: context)
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeNumber(value ? 1 : 0))
   }
 }
 
 struct FailingEncodeValue: JSValueEncodable {
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    JSValue(undefinedIn: context)
+  func toSurfaceValue<C: JSValueScope & ~Copyable>(in context: borrowing C) -> C.Value {
+    context.persist(context.makeUndefined())
   }
 
-  func tryEncode<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
+  func tryEncodeSurface<C: JSValueScope & ~Copyable>(
+    in context: borrowing C
+  ) throws(JSValueConversionError) -> C.Value {
     _ = context
     throw .nonFiniteNumber(target: "FailingEncodeValue")
   }
-
 }
 
 struct ReturnPayload {
@@ -43,11 +40,11 @@ struct ReturnPayload {
 enum ReturnPayloadEncoder: JSValueEncoder {
   typealias SwiftType = ReturnPayload
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: ReturnPayload,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    JSValue(number: value.value, in: context)
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeNumber(value.value))
   }
 }
 
@@ -58,13 +55,13 @@ enum FailurePayload: Error {
 enum FailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = FailurePayload
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: FailurePayload,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
+    in context: borrowing C
+  ) -> C.Value {
     switch value {
     case .bad:
-      return JSValue(string: "bad", in: context)
+      return context.persist(context.makeString("bad"))
     }
   }
 }
@@ -96,64 +93,23 @@ struct MacroDelegatedUser: Equatable {
 enum MacroDelegatedUserDecoder: JSValueDecoder {
   typealias SwiftType = MacroDelegatedUser
 
-  static func decode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  static func decode<C: JSInstantContext & ~Copyable>(
+    _ value: borrowing C.Value,
+    in context: borrowing C
   ) -> MacroDelegatedUser {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    return decode(
-      JSValue<JavaScriptCoreEngine>(
-        handleValue: unsafeBitCast(
-          value.borrowHandle(), to: JSValueHandle<JavaScriptCoreEngine>.self),
-        in: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      ),
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-  }
-
-  static func decode(
-    _ value: borrowing JSValue<JavaScriptCoreEngine>,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> MacroDelegatedUser
-  {
-    MacroDelegatedUser(score: value.toDouble(in: context))
+    _ = context
+    return MacroDelegatedUser(score: value.toNumber())
   }
 }
 
 enum MacroDelegatedUserEncoder: JSValueEncoder {
   typealias SwiftType = MacroDelegatedUser
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: MacroDelegatedUser,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    precondition(
-      E.self == JavaScriptCoreEngine.self,
-      "This conversion path only supports JavaScriptCoreEngine"
-    )
-    let encoded = encode(
-      value,
-      in: JSInstantContext<JavaScriptCoreEngine>(
-        handle: unsafeBitCast(context.driverContextHandle, to: JavaScriptCoreContextHandle.self)
-      )
-    )
-    return JSValue<E>(
-      handleValue: unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self),
-      in: context.driverContextHandle)
-  }
-
-  static func encode(
-    _ value: MacroDelegatedUser, in context: borrowing JSInstantContext<JavaScriptCoreEngine>
-  )
-    -> JSValue<JavaScriptCoreEngine>
-  {
-    JSValue(number: value.score, in: context)
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeNumber(value.score))
   }
 }
 

@@ -15,7 +15,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataUsesMarkerTypeIdentityAndDefaultValues() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   let defaultValue: String? = await context.data(for: StringContextDataKey.self)
   let missingInt: Int? = await context.data(for: IntContextDataKey.self)
@@ -34,7 +34,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataOverwritesAndRemovesValues() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   await context.setData(1, for: IntContextDataKey.self)
   await context.setData(2, for: IntContextDataKey.self)
@@ -48,7 +48,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataCanStoreSemanticOptionalNil() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   await context.setData(.some(nil), for: OptionalContextDataKey.self)
   let stored: Int?? = await context.data(for: OptionalContextDataKey.self)
@@ -58,8 +58,8 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataIsSeparatePerContext() async {
-  let first = JSContext<MockEngine>()
-  let second = JSContext<MockEngine>()
+  let first = MockSurfaceContext()
+  let second = MockSurfaceContext()
 
   await first.setData("first", for: StringContextDataKey.self)
   await second.setData("second", for: StringContextDataKey.self)
@@ -72,7 +72,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextAndInstantContextShareData() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   await context.setData("actor", for: StringContextDataKey.self)
   let instantRead: String? = await context.withInstantContext {

@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
+extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
 
   public static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
@@ -12,26 +12,26 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
     supportsPromiseJobQueueControl: false
   )
 
-  public static func makeRuntimeHandle() -> JavaScriptCoreRuntimeHandle {
-    JavaScriptCoreRuntimeHandle()
+  public static func makeRuntimeHandle() -> JSCRuntimeHandle {
+    JSCRuntimeHandle()
   }
 
   public static func makeBorrowedContextHandleFromRuntime(
-    in runtime: JavaScriptCoreRuntimeHandle
-  ) -> JavaScriptCoreContextHandle? {
-    JavaScriptCoreContextHandle(runtime: runtime)
+    in runtime: JSCRuntimeHandle
+  ) -> JSCContextHandle? {
+    JSCContextHandle(runtime: runtime)
   }
 
   public static func globalObjectValueHandle(
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSValueHandle<JavaScriptCoreEngine>? {
+    _ context: JSCContextHandle
+  ) -> JSValueHandle<JSCEngine>? {
     guard let objectRef = JSContextGetGlobalObject(context.ref) else {
       return nil
     }
-    return JavaScriptCoreValueHandle(ref: objectRef)
+    return JSCValueHandle(ref: objectRef)
   }
 
-  public static func contextDataStorageBox(in context: JavaScriptCoreContextHandle)
+  public static func contextDataStorageBox(in context: JSCContextHandle)
     -> JSContextDataStorageBox?
   {
     guard let privateData = JSObjectGetPrivate(context.globalObjectRef) else {
@@ -43,7 +43,7 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
 
   public static func installContextDataStorageBox(
     _ storage: JSContextDataStorageBox?,
-    in context: JavaScriptCoreContextHandle
+    in context: JSCContextHandle
   ) {
     if let oldData = JSObjectGetPrivate(context.globalObjectRef) {
       JSObjectSetPrivate(context.globalObjectRef, nil)
@@ -56,17 +56,17 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
 
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    callback: @escaping JSFunctionCallback<JSCInstantContext>,
+    in context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
     let callbackRef = Unmanaged.passRetained(Box(callback)).toOpaque()
-    guard let functionRef = JSObjectMake(context.ref, context.functionClassRef, callbackRef) else {
-      let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
-        callbackRef
-      )
-      .takeRetainedValue()
+    guard
+      let functionRef = JSObjectMake(context.ref, context.surfaceFunctionClassRef, callbackRef)
+    else {
+      let callback = Unmanaged<Box<JSFunctionCallback<JSCInstantContext>>>.fromOpaque(callbackRef)
+        .takeRetainedValue()
       _ = callback.value
-      return JavaScriptCoreOwnedValueHandle.adopting(
+      return JSCOwnedValueHandle.adopting(
         javaScriptCoreMakeUndefined(in: context))
     }
     if !name.isEmpty {
@@ -82,21 +82,21 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
         )
       }
     }
-    return JavaScriptCoreOwnedValueHandle(ref: functionRef)
+    return JSCOwnedValueHandle(ref: functionRef)
   }
 
   public static func makePreparedScriptHandle(
     _ source: String,
-    in context: JavaScriptCoreContextHandle
-  ) -> JavaScriptCorePreparedScriptHandle? {
+    in context: JSCContextHandle
+  ) -> JSCPreparedScriptHandle? {
     _ = context
     let scriptRef = JSStringCreateWithCFString(source as CFString)!
-    return JavaScriptCorePreparedScriptHandle(ref: scriptRef)
+    return JSCPreparedScriptHandle(ref: scriptRef)
   }
 
   public static func isPreparedScriptHandleCompatibleWithContext(
-    _ script: JavaScriptCorePreparedScriptHandle,
-    in context: JavaScriptCoreContextHandle
+    _ script: JSCPreparedScriptHandle,
+    in context: JSCContextHandle
   ) -> Bool {
     _ = script
     _ = context
@@ -104,11 +104,11 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   }
 
   public static func evaluatePreparedScriptResultHandle(
-    _ script: JavaScriptCorePreparedScriptHandle,
-    _ context: JavaScriptCoreContextHandle,
+    _ script: JSCPreparedScriptHandle,
+    _ context: JSCContextHandle,
     sourceURL: String? = nil,
     startingLineNumber: Int32 = 1
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+  ) -> JSResult<JSValueHandle<JSCEngine>>? {
     withOptionalJavaScriptCoreString(sourceURL) { sourceURLRef in
       var exception: JSValueRef?
       let resultRef = JSEvaluateScript(
@@ -124,8 +124,8 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   }
 
   public static func valueTypeForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> SwiftJavaScript.JSType? {
     switch JSValueGetType(context.ref, value.ref) {
     case kJSTypeUndefined:
@@ -150,105 +150,105 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
   }
 
   public static func toBooleanForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool {
     JSValueToBoolean(context.ref, value.ref)
   }
 
   public static func toNumberForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Double {
     JSValueToNumber(context.ref, value.ref, nil)
   }
 
   public static func toStringForHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> String? {
     javaScriptCoreString(value.ref, in: context.ref)
   }
 
   public static func makeStringValueHandle(
     _ value: String,
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeStringValue(value, in: context))
+    _ context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
+    JSCOwnedValueHandle.adopting(javaScriptCoreMakeStringValue(value, in: context))
   }
 
   public static func makeSymbolValueHandle(
     _ value: String,
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
+    _ context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
     // The string helper's generic result must stay Copyable; build the raw
     // ref inside and wrap the ownership carrier outside.
     let symbolRef = withJavaScriptCoreString(value) { stringHandle in
       JSValueMakeSymbol(context.ref, stringHandle)!
     }
-    return JavaScriptCoreOwnedValueHandle(ref: symbolRef)
+    return JSCOwnedValueHandle(ref: symbolRef)
   }
 
   public static func makeNumberValueHandle(
     _ value: Double,
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreOwnedValueHandle(
+    _ context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
+    JSCOwnedValueHandle(
       ref: JSValueMakeNumber(context.ref, value)!
     )
   }
 
   public static func makeBooleanValueHandle(
     _ value: Bool,
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreOwnedValueHandle(
+    _ context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
+    JSCOwnedValueHandle(
       ref: JSValueMakeBoolean(context.ref, value)!
     )
   }
 
-  public static func makeNullValueHandle(_ context: JavaScriptCoreContextHandle)
-    -> JSOwnedValueHandle<JavaScriptCoreEngine>?
+  public static func makeNullValueHandle(_ context: JSCContextHandle)
+    -> JSOwnedValueHandle<JSCEngine>?
   {
-    JavaScriptCoreOwnedValueHandle(
+    JSCOwnedValueHandle(
       ref: JSValueMakeNull(context.ref)
     )
   }
 
   public static func makeUndefinedValueHandle(
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSOwnedValueHandle<JavaScriptCoreEngine>? {
-    JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context))
+    _ context: JSCContextHandle
+  ) -> JSOwnedValueHandle<JSCEngine>? {
+    JSCOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context))
   }
 
   public static func makeObjectResultHandle(
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSOwnedValueHandle<JavaScriptCoreEngine>>? {
+    _ context: JSCContextHandle
+  ) -> JSResult<JSOwnedValueHandle<JSCEngine>>? {
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
       return .exception(
-        JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
+        JSCOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
     }
-    return .value(JavaScriptCoreOwnedValueHandle(ref: objectRef))
+    return .value(JSCOwnedValueHandle(ref: objectRef))
   }
 
   public static func makeArrayResultHandle(
-    _ context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSOwnedValueHandle<JavaScriptCoreEngine>>? {
+    _ context: JSCContextHandle
+  ) -> JSResult<JSOwnedValueHandle<JSCEngine>>? {
     var exception: JSValueRef?
     let objectRef = JSObjectMakeArray(context.ref, 0, nil, &exception)
     if let exception {
-      return .exception(JavaScriptCoreOwnedValueHandle(ref: exception))
+      return .exception(JSCOwnedValueHandle(ref: exception))
     }
     guard let objectRef else {
       return .value(
-        JavaScriptCoreOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
+        JSCOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context)))
     }
-    return .value(JavaScriptCoreOwnedValueHandle(ref: objectRef))
+    return .value(JSCOwnedValueHandle(ref: objectRef))
   }
 
   public static func isContextCompatibleWith(
-    _ this: JavaScriptCoreContextHandle,
-    _ that: JavaScriptCoreContextHandle
+    _ this: JSCContextHandle,
+    _ that: JSCContextHandle
   ) -> Bool {
     JSContextGetGroup(this.ref) == JSContextGetGroup(that.ref)
   }
@@ -257,128 +257,128 @@ extension JavaScriptCoreEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDri
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension JavaScriptCoreContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
-  public typealias Engine = JavaScriptCoreEngine
-  public typealias ValueHandle = JavaScriptCoreValueHandle
-  public typealias OwnedValueHandle = JavaScriptCoreOwnedValueHandle
-  public typealias PreparedScriptHandle = JavaScriptCorePreparedScriptHandle
+extension JSCContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
+  public typealias InstantContext = JSCInstantContext
+  public typealias ValueHandle = JSCValueHandle
+  public typealias OwnedValueHandle = JSCOwnedValueHandle
+  public typealias PreparedScriptHandle = JSCPreparedScriptHandle
 
-  public func globalObjectValueHandle() -> JavaScriptCoreValueHandle? {
-    JavaScriptCoreEngine.globalObjectValueHandle(self)
+  public func globalObjectValueHandle() -> JSCValueHandle? {
+    JSCEngine.globalObjectValueHandle(self)
   }
 
   public func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<JavaScriptCoreEngine>
-  ) -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
+    callback: @escaping JSFunctionCallback<JSCInstantContext>
+  ) -> JSCOwnedValueHandle? {
+    JSCEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
   }
 
-  public func valueTypeForHandle(_ value: JavaScriptCoreValueHandle) -> SwiftJavaScript.JSType? {
-    JavaScriptCoreEngine.valueTypeForHandle(value, in: self)
+  public func valueTypeForHandle(_ value: JSCValueHandle) -> SwiftJavaScript.JSType? {
+    JSCEngine.valueTypeForHandle(value, in: self)
   }
 
-  public func toBooleanForHandle(_ value: JavaScriptCoreValueHandle) -> Bool {
-    JavaScriptCoreEngine.toBooleanForHandle(value, in: self)
+  public func toBooleanForHandle(_ value: JSCValueHandle) -> Bool {
+    JSCEngine.toBooleanForHandle(value, in: self)
   }
 
-  public func toNumberForHandle(_ value: JavaScriptCoreValueHandle) -> Double {
-    JavaScriptCoreEngine.toNumberForHandle(value, in: self)
+  public func toNumberForHandle(_ value: JSCValueHandle) -> Double {
+    JSCEngine.toNumberForHandle(value, in: self)
   }
 
-  public func toStringForHandle(_ value: JavaScriptCoreValueHandle) -> String? {
-    JavaScriptCoreEngine.toStringForHandle(value, in: self)
+  public func toStringForHandle(_ value: JSCValueHandle) -> String? {
+    JSCEngine.toStringForHandle(value, in: self)
   }
 
-  public func makeStringValueHandle(_ value: String) -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeStringValueHandle(value, self)
+  public func makeStringValueHandle(_ value: String) -> JSCOwnedValueHandle? {
+    JSCEngine.makeStringValueHandle(value, self)
   }
 
-  public func makeSymbolValueHandle(_ value: String) -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeSymbolValueHandle(value, self)
+  public func makeSymbolValueHandle(_ value: String) -> JSCOwnedValueHandle? {
+    JSCEngine.makeSymbolValueHandle(value, self)
   }
 
-  public func makeNumberValueHandle(_ value: Double) -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeNumberValueHandle(value, self)
+  public func makeNumberValueHandle(_ value: Double) -> JSCOwnedValueHandle? {
+    JSCEngine.makeNumberValueHandle(value, self)
   }
 
-  public func makeBooleanValueHandle(_ value: Bool) -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeBooleanValueHandle(value, self)
+  public func makeBooleanValueHandle(_ value: Bool) -> JSCOwnedValueHandle? {
+    JSCEngine.makeBooleanValueHandle(value, self)
   }
 
-  public func makeNullValueHandle() -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeNullValueHandle(self)
+  public func makeNullValueHandle() -> JSCOwnedValueHandle? {
+    JSCEngine.makeNullValueHandle(self)
   }
 
-  public func makeUndefinedValueHandle() -> JavaScriptCoreOwnedValueHandle? {
-    JavaScriptCoreEngine.makeUndefinedValueHandle(self)
+  public func makeUndefinedValueHandle() -> JSCOwnedValueHandle? {
+    JSCEngine.makeUndefinedValueHandle(self)
   }
 
-  public func makeObjectResultHandle() -> JSResult<JavaScriptCoreOwnedValueHandle>? {
-    JavaScriptCoreEngine.makeObjectResultHandle(self)
+  public func makeObjectResultHandle() -> JSResult<JSCOwnedValueHandle>? {
+    JSCEngine.makeObjectResultHandle(self)
   }
 
-  public func makeArrayResultHandle() -> JSResult<JavaScriptCoreOwnedValueHandle>? {
-    JavaScriptCoreEngine.makeArrayResultHandle(self)
+  public func makeArrayResultHandle() -> JSResult<JSCOwnedValueHandle>? {
+    JSCEngine.makeArrayResultHandle(self)
   }
 
-  public func isContextCompatibleWith(_ other: JavaScriptCoreContextHandle) -> Bool {
-    JavaScriptCoreEngine.isContextCompatibleWith(self, other)
+  public func isContextCompatibleWith(_ other: JSCContextHandle) -> Bool {
+    JSCEngine.isContextCompatibleWith(self, other)
   }
 
   public func contextDataStorageBox() -> JSContextDataStorageBox? {
-    JavaScriptCoreEngine.contextDataStorageBox(in: self)
+    JSCEngine.contextDataStorageBox(in: self)
   }
 
   /// The engine-side swap runs on the context's VM thread: inline when the
   /// caller is isolated to it, otherwise queued on it.
   public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
-    JavaScriptCoreEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
-      JavaScriptCoreEngine.installContextDataStorageBox(storage, in: context)
+    JSCEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
+      JSCEngine.installContextDataStorageBox(storage, in: context)
     }
   }
 
   /// JSC is GC-managed: created handles need no explicit release.
-  public func releaseCreatedHandle(_ handle: consuming JavaScriptCoreOwnedValueHandle) {}
+  public func releaseCreatedHandle(_ handle: consuming JSCOwnedValueHandle) {}
 
   /// Claiming a borrowed JSC reference is an identity operation: JSC has no
   /// reference count, and the target arena's explicit root (if any) is what
   /// keeps the value alive.
   public func claimOwnedValueHandle(
-    _ handle: JavaScriptCoreValueHandle
-  ) -> JavaScriptCoreOwnedValueHandle {
-    JavaScriptCoreOwnedValueHandle.adopting(handle)
+    _ handle: JSCValueHandle
+  ) -> JSCOwnedValueHandle {
+    JSCOwnedValueHandle.adopting(handle)
   }
 
   /// Explicit root for heap-resident scopes (context default scope): JSC's
   /// conservative stack scan cannot see arena storage, so protect on add.
-  public func rootOwnedValueHandle(_ handle: borrowing JavaScriptCoreOwnedValueHandle) {
+  public func rootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
     JSValueProtect(ref, handle.ref)
   }
 
   /// Leave the explicit root taken by `rootOwnedValueHandle` (drain/unlink).
-  public func unrootOwnedValueHandle(_ handle: borrowing JavaScriptCoreOwnedValueHandle) {
+  public func unrootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
     JSValueUnprotect(ref, handle.ref)
   }
 
   public func makePreparedScriptHandle(_ source: String)
-    -> JavaScriptCorePreparedScriptHandle?
+    -> JSCPreparedScriptHandle?
   {
-    JavaScriptCoreEngine.makePreparedScriptHandle(source, in: self)
+    JSCEngine.makePreparedScriptHandle(source, in: self)
   }
 
   public func isPreparedScriptHandleCompatibleWithContext(
-    _ script: JavaScriptCorePreparedScriptHandle
+    _ script: JSCPreparedScriptHandle
   ) -> Bool {
-    JavaScriptCoreEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
+    JSCEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
   }
 
   public func evaluatePreparedScriptResultHandle(
-    _ script: JavaScriptCorePreparedScriptHandle,
+    _ script: JSCPreparedScriptHandle,
     sourceURL: String?,
     startingLineNumber: Int32
-  ) -> JSResult<JavaScriptCoreValueHandle>? {
-    JavaScriptCoreEngine.evaluatePreparedScriptResultHandle(
+  ) -> JSResult<JSCValueHandle>? {
+    JSCEngine.evaluatePreparedScriptResultHandle(
       script,
       self,
       sourceURL: sourceURL,

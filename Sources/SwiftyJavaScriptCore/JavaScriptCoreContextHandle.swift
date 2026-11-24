@@ -1,16 +1,18 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle, Equatable,
+public struct JSCContextHandle: JSContextManualReferenceCountedHandle, Equatable,
   @unchecked Sendable
 {
   package let ref: JSGlobalContextRef
   package let ownsContext: Bool
   package let globalObjectClass: JSClassRef?
-  package let functionClass: JSClassRef?
+  /// The surface callback entry's function class: its `callAsFunction`
+  /// trampoline boxes `JSFunctionCallback<JSCEngine>`.
+  package let surfaceFunctionClass: JSClassRef?
   package let propertyNamesFunction: JSObjectRef?
 
-  package init(runtime: JavaScriptCoreRuntimeHandle) {
+  package init(runtime: JSCRuntimeHandle) {
     var definition = kJSClassDefinitionEmpty
     let globalObjectClass = JSClassCreate(&definition)
     guard let ref = JSGlobalContextCreateInGroup(runtime.ref, globalObjectClass) else {
@@ -23,7 +25,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ref = ref
     self.ownsContext = true
     self.globalObjectClass = globalObjectClass
-    self.functionClass = makeJavaScriptCoreFunctionClass()
+    self.surfaceFunctionClass = makeJavaScriptCoreSurfaceFunctionClass()
     self.propertyNamesFunction = propertyNamesFunction
   }
 
@@ -31,7 +33,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ref = ref
     self.ownsContext = false
     self.globalObjectClass = nil
-    self.functionClass = nil
+    self.surfaceFunctionClass = nil
     self.propertyNamesFunction = nil
   }
 
@@ -39,7 +41,7 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     self.ref = ref
     self.ownsContext = true
     self.globalObjectClass = nil
-    self.functionClass = nil
+    self.surfaceFunctionClass = nil
     self.propertyNamesFunction = nil
   }
 
@@ -47,24 +49,35 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     JSContextGetGlobalObject(ref)
   }
 
-  package var functionClassRef: JSClassRef {
-    if let functionClass {
-      return functionClass
+  package var surfaceFunctionClassRef: JSClassRef {
+    if let surfaceFunctionClass {
+      return surfaceFunctionClass
     }
-    return SwiftJavaScript.JSContext<JavaScriptCoreEngine>.borrow(ctx: ref)
-      .driverContextHandle.functionClassRef
+    guard let ownerSurfaceFunctionClass = ownerDriverContextHandle?.surfaceFunctionClass else {
+      preconditionFailure(
+        "JSCContextHandle could not resolve the surface function class for a borrowing context"
+      )
+    }
+    return ownerSurfaceFunctionClass
   }
 
   package var propertyNamesFunctionRef: JSObjectRef? {
     if let propertyNamesFunction {
       return propertyNamesFunction
     }
-    return SwiftJavaScript.JSContext<JavaScriptCoreEngine>.borrow(ctx: ref)
-      .driverContextHandle.propertyNamesFunctionRef
+    return ownerDriverContextHandle?.propertyNamesFunction
   }
 
-  public var engineType: JavaScriptCoreEngine.Type {
-    JavaScriptCoreEngine.self
+  /// The driver handle of the context that installed this borrowing handle's
+  /// data box. A borrowing handle is built inside an engine callback from the
+  /// raw context, so the class refs and the property-names helper live on the
+  /// owning context's handle.
+  private var ownerDriverContextHandle: JSCContextHandle? {
+    JSCContext.borrow(ctx: ref)?.driverContextHandle
+  }
+
+  public var engineType: JSCEngine.Type {
+    JSCEngine.self
   }
 
   @discardableResult
@@ -75,8 +88,8 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     if let globalObjectClass {
       JSClassRetain(globalObjectClass)
     }
-    if let functionClass {
-      JSClassRetain(functionClass)
+    if let surfaceFunctionClass {
+      JSClassRetain(surfaceFunctionClass)
     }
     if let propertyNamesFunction {
       JSValueProtect(ref, propertyNamesFunction)
@@ -90,8 +103,8 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
     guard ownsContext else {
       return false
     }
-    if let functionClass {
-      JSClassRelease(functionClass)
+    if let surfaceFunctionClass {
+      JSClassRelease(surfaceFunctionClass)
     }
     if let globalObjectClass {
       JSClassRelease(globalObjectClass)
@@ -104,8 +117,8 @@ public struct JavaScriptCoreContextHandle: JSContextManualReferenceCountedHandle
   }
 }
 
-private func makeJavaScriptCoreFunctionClass() -> JSClassRef {
-  var definition = makeJavaScriptCoreFunctionClassDefinition()
+private func makeJavaScriptCoreSurfaceFunctionClass() -> JSClassRef {
+  var definition = makeJavaScriptCoreSurfaceFunctionClassDefinition()
   return JSClassCreate(&definition)!
 }
 
@@ -131,8 +144,8 @@ private func makeJavaScriptCorePropertyNamesFunction(in context: JSGlobalContext
   }
 }
 
-extension JavaScriptCoreContextHandle: Hashable {
-  public static func == (lhs: JavaScriptCoreContextHandle, rhs: JavaScriptCoreContextHandle)
+extension JSCContextHandle: Hashable {
+  public static func == (lhs: JSCContextHandle, rhs: JSCContextHandle)
     -> Bool
   {
     lhs.ref == rhs.ref
@@ -140,11 +153,5 @@ extension JavaScriptCoreContextHandle: Hashable {
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ref)
-  }
-}
-
-extension SwiftJavaScript.JSContext where E == JavaScriptCoreEngine {
-  nonisolated internal var javaScriptCoreContextRef: JSGlobalContextRef {
-    driverContextHandle.ref
   }
 }

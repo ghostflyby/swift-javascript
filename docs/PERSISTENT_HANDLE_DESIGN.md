@@ -1,9 +1,18 @@
 # 持久 handle 层设计(`JSPersistentHandle`)
 
-**状态:设计文档(Stage 4 实现已落盘;§11 为基准实测)**
+**状态:已实现(Stage 4;S1–S15 已切换到协议 + 具体类型;§11 为基准实测)**
 **日期:2026-11**
-**关联分支:`scope_arena`(基线提交 `908bf98`)**
+**关联分支:`main`**
 **定位:`docs/VALUE_MANAGEMENT_REFACTORING.md` 的子文档,落实其 §3.5、§3.7、§5 Stage 4 与 §7 问题 3**
+
+> **实现说明(S15)。** public 面是 `JSPersistentHandle` 协议，具体类型为
+> `JSCPersistentHandle`/`QJSPersistentHandle`；identity 是 public
+> `JSPersistentHandleIdentity`，registry 仍是 package
+> `JSPersistentHandleRegistry<ContextHandle>`。scope/context 上的
+> `makePersistentHandle` 接受非拥有值视图（`Value` /
+> `CallbackValue`，都是所属 context 的类型），不再使用 `JSValue<E>` 这类泛型。下文保留少量
+> 设计时的 `JSPersistentHandle<E>` 记法用于解释决策；实现以当前
+> `Sources/SwiftJavaScript/Surface/JSPersistentHandle.swift` 为准。
 
 本文档 §1–§10 为设计;§11 是 2026-11-23 的基准实测记录。本片只运行了
 `swift build -c release --product PersistentHandleBenchmarks` 与基准可执行文件;
@@ -33,16 +42,16 @@
 
 ### 0.2 三条不可协商的前提(来自现有代码)
 
-1. **`JSValue` 是本地值,不拥有引用**——它只有 `handle + ContextHandle` 两个 Copyable
-   身份 token,`deinit` 不释放(`Sources/SwiftJavaScript/JSValue.swift` 的 `JSValue`)。
+1. **值视图是本地值,不拥有引用**——`JSValue` 协议的具体实现只有 `handle + ContextHandle`
+   两个 Copyable 身份 token,`deinit` 不释放（`Sources/SwiftJavaScript/Surface/JSValue.swift`）。
 2. **arena 是本地值的唯一释放账本**——`ScopeFrame.track` 按策略根化、`drain` 先 unroot
    再 `releaseCreatedHandle`,`takeFirst` 摘除时同步解除根化
-   (`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeFrame`)。任何新增层都必须与这份账本
+   (`Sources/SwiftJavaScript/ScopeCore.swift` 的 `ScopeFrame`)。任何新增层都必须与这份账本
    对账,不能拥有"看不见的引用"。
-3. **引擎调用只允许发生在 VM 的专用串行 executor 上**——`JSVirtualMachine` 持有 `VMThread`
-   (`ThreadAffinityExecutor` 库 `DedicatedThreadExecutor` 的薄包装,
-   `Sources/SwiftJavaScript/JSVirtualMachine.swift`)。`JSContext` 的 teardown 由
-   `isolated deinit` 在该线程执行(`Sources/SwiftJavaScript/JSContext.swift`);2026-11-23 起
+3. **引擎调用只允许发生在 VM 的专用串行 executor 上**——`JSVirtualMachine` 协议的具体 VM
+   持有 `VMThread`(`ThreadAffinityExecutor` 库 `DedicatedThreadExecutor` 的薄包装,
+   `Sources/SwiftJavaScript/VMThread.swift`)。`JSCContext`/`QJSContext` 的 teardown 由
+   `isolated deinit` 在该线程执行(`Sources/SwiftJavaScript/JSContextStorage.swift`);2026-11-23 起
    生命周期两端也都在该线程:runtime 与 context 的创建经 `VMThread.runAndWait` 投递并等待,
    runtime 的释放同样投递,自保活输入(`JSPreparedScript`/`JSPropertyStringKey`)的析构经
    `VMThread.perform` 投递(§3.5)。持久层不得新增任意线程的引擎访问。
@@ -64,38 +73,41 @@ Stage 4 的待办原文见 `TODO.md` §2.6;其中"弱引用不阻 GC"一条与�
 
 ## 1. handle 类型形态
 
-### 1.1 命名:选 `JSPersistentHandle<E>`
+### 1.1 命名:选 `JSPersistentHandle`
 
 候选与结论:
 
 | 候选 | 判断 | 理由 |
 |---|---|---|
-| **`JSPersistentHandle<E>`** | **采用** | 与仓库命名一致(`JSCallbackValue`/`JSPreparedScript`/`JSCallbackReturn` 均为 `JS` + 描述性后缀);"handle"在本仓库已明确指身份 token(`JSValueHandle` 借用、`OwnedValueHandle` 所有权载体),而本类型正是"身份、无访问权"的极端形态;`persistent` 精确对应父文档 §3.5 的"唯一长期存储形态" |
-| `JSRef` | 否决 | 与后端的 `ref`/`rawRef`(`JavaScriptCoreValueHandle.ref`、`QuickJSValueHandle.rawRef`)以及 `JSValueRef` 概念撞车;它读起来像"借用引用",而本类型的核心是"容器侧绑定 + 可失效身份" |
+| **`JSPersistentHandle` 协议 + `JSCPersistentHandle`/`QJSPersistentHandle`** | **采用** | 与仓库命名一致(`JSCallbackValue`/`JSPreparedScript`/`JSCallbackReturn` 均为 `JS` + 描述性后缀);"handle"在本仓库已明确指身份 token(`JSValueHandle` 借用、`OwnedValueHandle` 所有权载体),而本类型正是"身份、无访问权"的极端形态;`persistent` 精确对应父文档 §3.5 的"唯一长期存储形态" |
+| `JSRef` | 否决 | 与后端的 `ref`/`rawRef`(`JSCValueHandle.ref`、`QJSValueHandle.rawRef`)以及 `JSValueRef` 概念撞车;它读起来像"借用引用",而本类型的核心是"容器侧绑定 + 可失效身份" |
 
-配套命名:`JSPersistentHandleRegistry<E>`(internal/package)、
-嵌套 `JSPersistentHandle<E>.Identity`(package,测试可见;未另建顶层 `JSPersistentHandleIdentity`,与实现一致)、
-`PersistentHandleRegistryKey<E>`(internal,`JSContextDataKey` 实现)。
+配套命名:`JSPersistentHandleRegistry<ContextHandle>`(package,按 context handle
+参数化)、public `JSPersistentHandleIdentity`、
+`JSPersistentHandleRegistryKey<ContextHandle>`(package,`JSContextDataKey` 实现)。
 
 ### 1.2 载体形态:引用计数类、真 `Sendable`、`Hashable`、**不是** `~Copyable`
 
 ```swift
-public final class JSPersistentHandle<E: JSEngineRuntimeDriver>: Sendable, Hashable {
-  package struct Identity: Sendable, Hashable {
-    package let registry: UInt64   // registry 创建时从进程级原子计数器取得
-    package let slot: UInt32
-    package let generation: UInt32
-  }
-
-  package let identity: Identity
-  private let registryReference: PersistentRegistryReference<E>  // 内部 WeakBox,见下
-
-  package init(identity: Identity, registry: JSPersistentHandleRegistry<E>)
+public protocol JSPersistentHandle: Sendable, Hashable {
+  var identity: JSPersistentHandleIdentity { get }
 
   /// 立即让身份失效;引擎引用在下一个串行执行回合结算。幂等。
   /// - Returns: 本次调用是否杀掉了一个仍存活的绑定。
   @discardableResult
-  public func invalidate() -> Bool
+  func invalidate() -> Bool
+}
+
+public struct JSPersistentHandleIdentity: Sendable, Hashable {
+  public let registry: UInt64   // registry 创建时从进程级原子计数器取得
+  public let slot: UInt32
+  public let generation: UInt32
+}
+
+public final class JSCPersistentHandle: JSPersistentHandle, Sendable {
+  public let identity: JSPersistentHandleIdentity
+  private let registryReference: PersistentRegistryReference<JSCEngine>
+  // ...
 }
 ```
 
@@ -113,8 +125,8 @@ public final class JSPersistentHandle<E: JSEngineRuntimeDriver>: Sendable, Hasha
    因此用标准的 `WeakBox` 包装后,handle 本身只有 `let` 存储属性,可诚实地声明 `Sendable`
    (`probe14.swift` 同命令 `TYPECHECK_OK`):
    ```swift
-   final class PersistentRegistryReference<E: JSEngineRuntimeDriver>: @unchecked Sendable {
-     weak var value: JSPersistentHandleRegistry<E>?
+   final class PersistentRegistryReference<ContextHandle: JSContextRuntimeDriver>: @unchecked Sendable {
+     weak var value: JSPersistentHandleRegistry<ContextHandle>?
    }
    ```
    `@unchecked` 的承诺仅限该内部箱:弱引用在 `init` 设置一次、之后只读;ARC 的弱加载/清零
@@ -141,10 +153,10 @@ struct 会让用户持有 struct 时 token 被复制,释放时机变成"最后�
 
 **为什么不用引擎 handle 做身份**:
 
-- JSC:`JavaScriptCoreRuntimeHandle` 只有 `JSContextGroupRef` 与 `ownsRuntime`
-  (`Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JavaScriptCoreRuntimeHandle`),group 释放后地址可被
+- JSC:`JSCRuntimeHandle` 只有 `JSContextGroupRef` 与 `ownsRuntime`
+  (`Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JSCRuntimeHandle`),group 释放后地址可被
   下一次 `JSContextGroupCreate` 复用——用地址识别容器存在 ABA。
-- QuickJS:`QuickJSRuntimeHandle` 恰好为此加了 `runtimeID`
+- QuickJS:`QJSRuntimeHandle` 恰好为此加了 `runtimeID`
   (`Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSRuntimeIdentityRegistry`),但那正是后端私有知识;
   core 不应依赖具体引擎的 identity 方案。
 - **registry 自铸 ID 是引擎无关的**:进程级原子计数器,registry 创建时取一次;进程内单调,
@@ -195,7 +207,7 @@ registry 的内部依赖,不出现在 handle 上,也不增加 context 的引用�
 | 可拷贝性 | `Copyable + Sendable` | `~Copyable`:否定"被存储/跨域传递"的存在意义 |
 | Sendable 实现 | 真 `Sendable` + 内部 `WeakBox` | `@unchecked Sendable` 直接标在公开类型上:对用户的承诺面太大 |
 | identity | registry 自铸 ID + slot + generation | 引擎 handle 地址(JSC ABA)、单调 token + Dictionary(无界增长/哈希) |
-| 泛型 | `JSPersistentHandle<E: JSEngineRuntimeDriver>` | 对 `JSEngineValueTypes` 约束:registry 的 claim/root/settle 需要 driver 面;公开类型已普遍带 driver 约束(`JSScope`/`JSInstantContext`) |
+| 泛型 | `JSPersistentHandle` 协议 + context 的 `PersistentHandle` 具体类型 | 直接在 handle 上暴露 engine 静态面:registry 的 claim/root/settle 只存在于 `JSEngineValueTypes` 的 handle 层 |
 
 ---
 
@@ -213,7 +225,7 @@ registry 的内部依赖,不出现在 handle 上,也不增加 context 的引用�
 ### 2.2 mint 取独立引用:`claim` + `root`,而不是 `persist` 的转移
 
 mint 的引擎动作严格复用父文档 §3.7 `explicitRoots` 的结算对
-(`ScopeFrame.track`/`drain`,`Sources/SwiftJavaScript/JSInstantContext.swift`):
+(`ScopeFrame.track`/`drain`,`Sources/SwiftJavaScript/ScopeCore.swift`):
 
 ```
 mint:    owned = context.claimOwnedValueHandle(borrowed)   // JSC identity / QuickJS JS_DupValue
@@ -226,11 +238,11 @@ settle:  context.unrootOwnedValueHandle(payload)           // JSC JSValueUnprote
 
 | 引擎 | mint 后的计数 | settle |
 |---|---|---|
-| JSC | protect +1(identity claim) | unprotect,`releaseCreatedHandle` 为 no-op(`JavaScriptCoreContextHandle` 的同名方法,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`) |
-| QuickJS | refcount +1(`claimOwnedValueHandle`,`QuickJSContextHandle` 的同名方法,`Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift`) | `JS_FreeValue`(root 为 identity) |
+| JSC | protect +1(identity claim) | unprotect,`releaseCreatedHandle` 为 no-op(`JSCContextHandle` 的同名方法,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`) |
+| QuickJS | refcount +1(`claimOwnedValueHandle`,`QJSContextHandle` 的同名方法,`Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift`) | `JS_FreeValue`(root 为 identity) |
 
 **为什么 mint 不能像 `persist` 那样转移**:`persist` 是"提升",语义是源 arena 的引用随值搬走
-(`ScopeCore.persist(_:into:)`,`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `takeFirst` + `target.track`,源无可摘除元素时
+(`ScopeCoreHandleSurface.persistHandle`,`Sources/SwiftJavaScript/ScopeCoreHandleSurface.swift` 的 `takeFirst` + `target.track`,源无可摘除元素时
 `claimOwnedValueHandle` 兜底)。它隐含一个契约:调用后源值不再被使用。mint 无法继承这个隐含
 前提——调用者刚 mint 完,通常还要在同一个窗口里继续用那个值;而且一个 handle 会被多次解析
 (§5.3)。所以 **mint 是复制语义,`persist` 是转移语义**,二者在文档与注释里必须并列表述
@@ -242,7 +254,7 @@ resolve 之后本地视图的 root 是**另一份**,由接收帧按自己的策�
 
 binding 不限于对象:数字/布尔/null/undefined 同样可以 mint。refcounted 引擎对立即值 dup、
 GC 引擎对非对象 protect 都是既有默认 scope 已经在依赖的行为(`rootOwnedValueHandle` 对任意
-`JSValueRef` 成对调用,`JavaScriptCoreContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),本层不引入新语义。
+`JSValueRef` 成对调用,`JSCContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),本层不引入新语义。
 
 ### 2.3 最后 owner 释放:deinit → 元数据 → VM executor 泵
 
@@ -431,7 +443,7 @@ requirement,见 §3.7 与 §3.5。)
 |---|---|
 | 仅 `JSContext` 存储属性 | 回调/`JSScope` 不可达(actor 隔离);每次 mint 一次 hop |
 | 仅箱子持有 | 公开的清箱入口可在任意线程销毁仍存活的 registry(见上) |
-| 进程级静态表(仿 `ScopeStackRegistry`,`Sources/SwiftJavaScript/JSInstantContext.swift`) | 生命周期不随容器;容器未走正常路径时条目泄漏;已在 Stage 1 为此付出过 pop 纪律成本。这条否决只针对**持有 registry**;不持有任何东西的 VM 线程绑定后来直接挂在既有 scope 栈条目上,没有新增表(§3.5) |
+| 进程级静态表(仿 `ScopeStackRegistry`,`Sources/SwiftJavaScript/ScopeCore.swift`) | 生命周期不随容器;容器未走正常路径时条目泄漏;已在 Stage 1 为此付出过 pop 纪律成本。这条否决只针对**持有 registry**;不持有任何东西的 VM 线程绑定后来直接挂在既有 scope 栈条目上,没有新增表(§3.5) |
 | VM 级注册表 | 见 §6(结算需要活 context;JSC root 是 context 寻址) |
 
 创建时机:`package init` 内创建(此时 `virtualMachine` 可用,用于取调度句柄);公开 `init` 在
@@ -461,8 +473,8 @@ state: Mutex<…>                              // closed / pumpScheduled / chunk
 - 不 retain 与 scope 层同形:`ScopeFrame.driverContextHandle` 就是非 retain 的值拷贝
   (`ScopeFrame.driverContextHandle`)。context 的最后一个引用仍由
   `JSContext.isolated deinit` 的 `releaseReference()` 释放——QuickJS `JS_FreeContext`
-  (`QuickJSContextHandle.retainReference` / `releaseReference`)、JSC `JSGlobalContextRelease`
-  (`JavaScriptCoreContextHandle.releaseReference`),且发生在 VM 线程。
+  (`QJSContextHandle.retainReference` / `releaseReference`)、JSC `JSGlobalContextRelease`
+  (`JSCContextHandle.releaseReference`),且发生在 VM 线程。
 - 代价是一条必须成文的规则:**`close()` 之后 registry 不得再解引用该 handle**。所有引擎入口
   先检查 `closed`(锁内);`close()` 在 `releaseReference()` 之前执行,所以不存在"用已释放
   context 结算"的窗口。
@@ -493,7 +505,7 @@ resolve(identity):
 ### 3.4 槽位分配、回收与存储形态
 
 分块 slab,与 `ScopeArenaChunk` 同样的理由:`Array` 不能持有 `~Copyable` 元素
-(`ScopeArenaChunk`,`Sources/SwiftJavaScript/JSInstantContext.swift`),而槽位必须原样存放 `E.OwnedValueHandle`。
+(`ScopeArenaChunk`,`Sources/SwiftJavaScript/ScopeCore.swift`),而槽位必须原样存放 `E.OwnedValueHandle`。
 
 ```
 chunk(capacity 32, 与 scopeArenaChunkCapacity 对齐):
@@ -526,7 +538,7 @@ settling ──锁外 settle 完成,锁内登记──► free(入 freeList)
 - **chunk 裁剪**:v1 不裁剪。chunk 数量由**峰值并发 handle 数**决定,不是累计 mint 次数;
   若基准显示峰值驱动的常驻内存重要,再引入"尾部空 chunk 释放"(openQuestions)。
 - 订阅式释放账本不需要:槽位状态就是唯一事实来源(与 `ScopeArena` 删除 `removed` 集合同理,
-  `Sources/SwiftJavaScript/JSInstantContext.swift`)。
+  `Sources/SwiftJavaScript/ScopeCore.swift`)。
 
 ### 3.5 并发不变量:元数据锁 + payload 只在 VM 线程
 
@@ -612,13 +624,13 @@ core 的 `swapContextDataStorageBox` 路由(§3.5),不新增 driver requirement�
 
 | 文件 | 改动 |
 |---|---|
-| 新增 `Sources/SwiftJavaScript/JSPersistentHandle.swift` | handle + identity + `invalidate`;`JSContext`/`JSInstantContext`/`JSScope` 的 mint/resolve 扩展 |
+| 新增 `Sources/SwiftJavaScript/Surface/JSPersistentHandle.swift` | `JSPersistentHandle` 协议 + public identity + `invalidate`;具体类型 `JSCPersistentHandle`/`QJSPersistentHandle` |
 | 新增 `Sources/SwiftJavaScript/JSPersistentHandleRegistry.swift` | registry(含非 retain 的 `E.ContextHandle`)、槽位表、pump、`close`、内部 `JSContextDataKey` |
-| `Sources/SwiftJavaScript/JSScope.swift`、`JSInstantContext.swift` | Stage 4 首版无改动(`scopeFrame` 已存在)。2026-11-23 起:`JSScope` 构造面收敛(`~Sendable`,`init(handle:)` / `open()` 降 `package`);`JSInstantContext.swift` 增加 `ScopeStack.bind` 与 `ScopeStackRegistry.bind` / `vmThread(for:)`(§3.5) |
+| `Sources/SwiftJavaScript/Surface/JSScope.swift`、`JSInstantContext.swift` | Stage 4 首版无改动(`scopeFrame` 已存在)。2026-11-23 起:`JSScope` 构造面收敛(`~Sendable`,`init(handle:)` / `open()` 降 `package`);`JSInstantContext.swift` 增加 `ScopeStack.bind` 与 `ScopeStackRegistry.bind` / `vmThread(for:)`(§3.5) |
 | `Sources/SwiftJavaScript/JSPreparedInputs.swift` | `JSScopeWitness` 增加 `var scopeFrame: ScopeFrame<E> { get }` 要求,供 resolve 定位接收 frame(两个 conformer 已具备同签名成员) |
-| `Sources/SwiftJavaScript/JSContext.swift` | 增加 `let persistentRegistry`(两个 init 都创建);公开 init 在装箱后发布到箱子;`isolated deinit` 首行 `registry.close()`。2026-11-23 起:init 末尾绑定 VM 线程,新增公共工厂 `makeScope()` |
+| `Sources/SwiftJavaScript/JSContextStorage.swift` | 增加 `let persistentRegistry`(两个 init 都创建);公开 init 在装箱后发布到箱子;`isolated deinit` 首行 `registry.close()`。2026-11-23 起:init 末尾绑定 VM 线程,新增公共工厂 `makeScope()` |
 | `Sources/SwiftJavaScript/JSContextData.swift` | 2026-11-23 新增 `JSEngineRuntimeDriver.swapContextDataStorageBox(_:on:raw:)`(清箱的 VM 线程路由) |
-| `Sources/SwiftJavaScript/JSVirtualMachine.swift` | 首版:私有 executor 增加 cleanup closure 队列。2026-11-23 起:自写 executor 删除,改为 `VMThread`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`),闭包投递为 `Task.detached(executorPreference:)`(§2.4 末) |
+| `Sources/SwiftJavaScript/VMThread.swift` | 首版:私有 executor 增加 cleanup closure 队列。2026-11-23 起:自写 executor 删除,改为 `VMThread`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`),闭包投递为 `Task.detached(executorPreference:)`(§2.4 末) |
 | `Package.swift` | 2026-11-23 新增依赖 `swift-thread-affinity-executor`(0.1.2),`SwiftJavaScript` target 依赖其 `ThreadAffinityExecutor` 产品 |
 
 后端(`SwiftyJavaScriptCore`/`SwiftyQuickJS`)不需要新 requirement:所需的
@@ -740,16 +752,21 @@ context 的 `isolated deinit`。settle 全部发生在各自 context 的收尾�
 ### 5.1 入口:三处,全部由见证发起
 
 ```swift
-extension JSContext {        // actor;产物锚默认 scope
-  public func resolve(_ handle: JSPersistentHandle<E>) -> JSValue<E>?
+// actor;产物锚默认 scope
+public protocol JSContext: Actor, Hashable {
+  func resolve(_ handle: PersistentHandle) -> Value?
 }
-extension JSInstantContext { // 同步窗口;产物锚该 scope 的 arena
+
+// 同步窗口;产物锚该 scope 的 arena
+public protocol JSInstantContext: JSValueScope, ~Copyable {
   @available(*, noasync)
-  public func resolve(_ handle: JSPersistentHandle<E>) -> JSValue<E>?
+  func resolve(_ handle: PersistentHandle) -> Value?
 }
-extension JSScope {          // 手动 scope;产物锚该 scope 的 arena
+
+// 手动 scope;产物锚该 scope 的 arena
+public protocol JSScope: JSValueScope, ~Copyable {
   @available(*, noasync)
-  public func resolve(_ handle: JSPersistentHandle<E>) -> JSValue<E>?
+  func resolve(_ handle: PersistentHandle) -> Value?
 }
 ```
 
@@ -767,7 +784,7 @@ resolve(handle, in witness):
   3. witness.scopeFrame.track(
         witness.driverContextHandle.claimOwnedValueHandle(borrowed))
        // 为接收帧申领一份新的 owned 引用(复制语义)
-  4. return JSValue(handleValue: borrowed, in: witness.driverContextHandle)
+  4. return Engine.makeValue(handle: borrowed, contextHandle: witness.driverContextHandle)
 ```
 
 `borrowLive` 只返回 Copyable 的 `E.ValueHandle`(不搬 payload),因此锁内没有引擎调用;
@@ -804,7 +821,7 @@ payload 的存活由 §3.5 的线程不变量保证。`JSContext` 入口是同�
 4. generation 不匹配或 state ≠ live(已 invalidate、已 close、已被自动清理)。
 
 **跨 context 在 v1 一律 nil**,即使 JSC 同一 context group 内值本身可用
-(`JavaScriptCoreEngine.isContextCompatibleWith`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`)。
+(`JSCEngine.isContextCompatibleWith`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`)。
 理由:binding 的 root 是用某一个 context 取的,unroot 必须回到兼容的 context;
 `ContextLocal` 的语义就是"谁创建、谁解析"(§6)。
 
@@ -824,7 +841,7 @@ payload 的存活由 §3.5 的线程不变量保证。`JSContext` 入口是同�
 
 ### 6.1 结论:`ContextLocal`
 
-v1 只发布 **context 级**绑定:`JSPersistentHandle<E>` 由某个 `JSContext`(或其 scope 见证)
+v1 只发布 **context 级**绑定:`JSPersistentHandle` 由某个 `JSContext`(或其 scope 见证)
 mint,并只能经同一 context 的见证解析。公开面不出现 `RuntimeLocal`/`ContextLocal` 这样的
 前沿类型参数,也不出现"绑定作用域"选项。
 
@@ -832,11 +849,11 @@ mint,并只能经同一 context 的见证解析。公开面不出现 `RuntimeLoc
 
 1. **QuickJS 的结算需要活的 context**。`JS_FreeValue(ctx, v)` 必须在一个 context 上执行;
    而 runtime 级绑定的结算点只能是 runtime 消亡,那时 `JSVirtualMachine.deinit` 在任意线程
-   非 isolated 执行(`Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit`,`TODO.md` §2.5 ⑤),没有可用的 context。
+   非 isolated 执行(`Sources/SwiftJavaScript/VMThread.swift` 的 `deinit`,`TODO.md` §2.5 ⑤),没有可用的 context。
    要修就得在 VM 里养一个"锚 context",那会引入第二个 realm,并使
    `JSContextGetGroup`/`JS_GetRuntime` 兼容判断多出一个隐形参与者。
 2. **JSC 的 root 是 context 寻址的**。`rootOwnedValueHandle` 用 `JSValueProtect(ref)`、
-   `unroot` 用 `JSValueUnprotect(ref)`(`JavaScriptCoreContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),
+   `unroot` 用 `JSValueUnprotect(ref)`(`JSCContextHandle.rootOwnedValueHandle` / `unrootOwnedValueHandle`,`Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift`),
    `ref` 是 `JSGlobalContextRef`。runtime 级绑定必须记录"哪个 context 取的根",并保证在该
    context 死亡前解除——这已经把两端都拖进了 per-context 记账,并没有简化。
 3. **realm 语义**。全局对象/构造函数是 context 级差异(`VALUE_MANAGEMENT_REFACTORING.md` §2.4);
@@ -864,24 +881,28 @@ mint,并只能经同一 context 的见证解析。公开面不出现 `RuntimeLoc
 
 ```swift
 // 创建
-extension JSContext {                                  // actor;值必须属于本 context
-  public func makePersistentHandle(_ value: borrowing JSValue<E>) -> JSPersistentHandle<E>
+public protocol JSContext: Actor, Hashable {           // actor;值必须属于本 context
+  func makePersistentHandle(_ value: borrowing Value) -> PersistentHandle
 }
-extension JSInstantContext {                           // 回调窗口
+public protocol JSInstantContext: JSValueScope, ~Copyable {  // 回调窗口
   @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing JSCallbackValue<E>) -> JSPersistentHandle<E>
+  func makePersistentHandle(_ value: borrowing CallbackValue) -> PersistentHandle
+  @available(*, noasync)
+  func makePersistentHandle(_ value: borrowing Value) -> PersistentHandle
 }
-extension JSScope {                                    // 手动 scope
+public protocol JSScope: JSValueScope, ~Copyable {           // 手动 scope
   @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing JSCallbackValue<E>) -> JSPersistentHandle<E>
+  func makePersistentHandle(_ value: borrowing CallbackValue) -> PersistentHandle
+  @available(*, noasync)
+  func makePersistentHandle(_ value: borrowing Value) -> PersistentHandle
 }
 
 // 恢复:见 §5.1
 // 释放:handle.invalidate()(§2.5)
 
-// 约束:扩展沿用宿主类型的约束(JSContext<E: JSContextEngine> / JSInstantContext<E> / JSScope<E>),
-// 其中 JSContextEngine 已 refine JSEngineRuntimeDriver;JSPersistentHandle 自身要求 E: JSEngineRuntimeDriver。
-// E.ContextHandle 的相等性用于校验 value.contextHandle == driverContextHandle。
+// 约束:所有入口的类型都由 context 固定(`JSContext` 是锚点,scope/值把它的
+// PersistentHandle/Value 别名过来);JSPersistentHandle 自身不声明关联类型。
+// ContextHandle 的相等性用于校验 value.contextHandle == driverContextHandle。
 ```
 
 语义细节:
@@ -913,7 +934,7 @@ extension JSScope {                                    // 手动 scope
 | 分叉 | 选择 | 被否决方案及理由 |
 |---|---|---|
 | 粒度 | ContextLocal | RuntimeLocal:结算需要活 context、JSC root 为 context 寻址、realm 差异、无目标场景 |
-| 公开类型 | 单一 `JSPersistentHandle<E>` | 两个类型(`ContextHandle`/`RuntimeHandle`):语义分叉进类型层,Stage 4 返工 |
+| 公开类型 | 单一 `JSPersistentHandle` 协议 | 两个类型(`ContextHandle`/`RuntimeHandle`):语义分叉进类型层,Stage 4 返工 |
 | 强度 | 仅强引用 | `.weak`:§4.4,引擎无安全判定 |
 | mint 校验 | context 身份相等 | `isContextCompatibleWith`:group 级兼容会放进跨 realm 的值 |
 | 创建入口 | `makePersistentHandle` | `persistAsHandle`:与 `persist`(转移语义)混淆;`make*` 与既有工厂一致 |
@@ -1552,38 +1573,38 @@ local handle 的分工,以及"在热路径上用 local、长期身份用 persist
 
 | 引用 | 位置 |
 |---|---|
-| `JSValue` 为非持有本地值 | `Sources/SwiftJavaScript/JSValue.swift` 的 `JSValue` |
-| `JSCallbackValue` 的 `handle + ContextHandle` | `Sources/SwiftJavaScript/JSCallbackValue.swift` 的 `JSCallbackValue` |
-| 回调结果按栈顶落账 | `Sources/SwiftJavaScript/JSCallbackValue.swift` 的 `bridgeCallbackResult` |
-| `ScopeFrame.track/drain/takeFirst` | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeFrame` |
-| `ScopeCore` 与 `persist`(转移) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeCore`、`ScopeCore.persist(_:into:)` |
-| 默认 scope 锚定与 claim 兜底 | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeCore.persist(_:)` |
-| `JSInstantContext` init/deinit(push/pop/drain) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `JSInstantContext` |
-| 裸 scope 的 `scopeFrame` | `Sources/SwiftJavaScript/JSScope.swift`、`Sources/SwiftJavaScript/JSInstantContext.swift` 的 `scopeFrame` |
-| arena chunk(raw pointer 存储) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeArenaChunk` |
-| `ScopeStackRegistry`(静态表先例;VM 线程绑定所在) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeStackRegistry`、`ScopeStack.bind` |
-| `JSContext` 默认 scope 与 isolated deinit | `Sources/SwiftJavaScript/JSContext.swift` 的 `defaultScope`、`isolated deinit` |
-| `JSContext` 强持 VM | `Sources/SwiftJavaScript/JSContext.swift` 的 `virtualMachine` 存储属性 |
-| 箱子安装/绑定 | `Sources/SwiftJavaScript/JSContext.swift` 的 `init(virtualMachine:)`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.bindContextOwner` |
-| `JSScope` 的公共构造面 | `Sources/SwiftJavaScript/JSContext.swift` 的 `makeScope()`;`Sources/SwiftJavaScript/JSScope.swift` 的 `package init(handle:)` / `open()` |
-| VM 专用线程 executor 与 Owner | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `VMThread`、`VMThread.Owner`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`) |
+| `JSValue` 为非持有本地值 | `Sources/SwiftJavaScript/Surface/JSValue.swift` 的 `JSValue` |
+| `JSCallbackValue` 的 `handle + ContextHandle` | `Sources/SwiftJavaScript/Surface/JSCallbackValue.swift` 的 `JSCallbackValue` |
+| 回调结果按栈顶落账 | `Sources/SwiftJavaScript/Surface/JSValueOperations.swift` 的 `bridgeSurfaceCallbackResult` |
+| `ScopeFrame.track/drain/takeFirst` | `Sources/SwiftJavaScript/ScopeCore.swift` 的 `ScopeFrame` |
+| `ScopeCore` 与 `persist`(转移) | `Sources/SwiftJavaScript/ScopeCoreHandleSurface.swift` 的 `persistHandle`、`takeFirst` + `target.track` |
+| 默认 scope 锚定与 claim 兜底 | `Sources/SwiftJavaScript/ScopeCoreHandleSurface.swift` 的 `persistHandle`;默认 frame 来自 `ScopeStackRegistry.defaultFrame` |
+| `JSInstantContext` init/deinit(push/pop/drain) | `Sources/SwiftyJavaScriptCore/Surface/JavaScriptCoreScopes.swift`、`Sources/SwiftyQuickJS/Surface/QuickJSScopes.swift` |
+| 裸 scope 的 `scopeFrame` | `Sources/SwiftJavaScript/Surface/JSScope.swift`、`Sources/SwiftJavaScript/ScopeCore.swift` 的 `scopeFrame` |
+| arena chunk(raw pointer 存储) | `Sources/SwiftJavaScript/ScopeCore.swift` 的 `ScopeArenaChunk` |
+| `ScopeStackRegistry`(静态表先例;VM 线程绑定所在) | `Sources/SwiftJavaScript/ScopeCore.swift` 的 `ScopeStackRegistry`、`ScopeStack.bind` |
+| `JSContext` 默认 scope 与 isolated deinit | `Sources/SwiftJavaScript/JSContextStorage.swift` 的 `defaultScope`、`teardown` |
+| `JSContext` 强持 VM | `Sources/SwiftyJavaScriptCore/JSCContext.swift`、`Sources/SwiftyQuickJS/QJSContext.swift` 的 `virtualMachine` |
+| 箱子安装/绑定 | `Sources/SwiftJavaScript/JSContextStorage.swift`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.bindContextOwner` |
+| `JSScope` 的公共构造面 | `Sources/SwiftyJavaScriptCore/JSCContext.swift`、`Sources/SwiftyQuickJS/QJSContext.swift` 的 `makeScope()`;`Surface/JSScope.swift` 的 `package init(handle:)` / `open()` |
+| VM 专用线程 executor 与 Owner | `Sources/SwiftJavaScript/VMThread.swift` 的 `VMThread`、`VMThread.Owner`(包装 `ThreadAffinityExecutor` 库的 `DedicatedThreadExecutor`) |
 | 清箱的 VM 线程路由 | `Sources/SwiftJavaScript/JSContextData.swift` 的 `JSEngineRuntimeDriver.swapContextDataStorageBox(_:on:raw:)` |
-| 生命周期的 VM 线程路由(创建、runtime 释放、自保活输入析构) | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `VMThread.runAndWait` / `VMThread.perform`;`Sources/SwiftJavaScript/JSContext.swift` 的 `init(virtualMachine:)`;`Sources/SwiftJavaScript/JSPreparedInputs.swift` 两个类型的 `deinit` |
-| VM deinit(非 isolated) | `Sources/SwiftJavaScript/JSVirtualMachine.swift` 的 `deinit` |
+| 生命周期的 VM 线程路由(创建、runtime 释放、自保活输入析构) | `Sources/SwiftJavaScript/VMThread.swift` 的 `VMThread.runAndWait` / `VMThread.perform`;`Sources/SwiftJavaScript/JSContextStorage.swift` 的 `init(virtualMachine:)`;`Sources/SwiftJavaScript/JSPreparedInputs.swift` 两个类型的 `deinit` |
+| VM deinit(runtime 释放) | `Sources/SwiftyJavaScriptCore/JSCVirtualMachine.swift`、`Sources/SwiftyQuickJS/QJSVirtualMachine.swift` 的 `deinit` |
 | 借用/拥有 handle 协议 | `Sources/SwiftJavaScript/JSManualReferenceCountedHandle.swift` 的 `JSValueManualReferenceCountedHandle`、`JSOwnedValueManualReferenceCountedHandle` |
 | driver 的 release/claim/root/unroot 与箱子访问 | `Sources/SwiftJavaScript/Engine/JSEngineRuntimeDriverProtocol.swift` 的 `JSContextRuntimeDriver` |
-| JSC 的 release/claim/root/unroot | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreContextHandle` 同名方法 |
-| JSC 跨 context 兼容(group) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreEngine.isContextCompatibleWith` |
-| JSC 的清箱(`takeRetainedValue`) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JavaScriptCoreEngine.installContextDataStorageBox(_:in:)` |
-| JSC runtime handle(group 所在) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JavaScriptCoreRuntimeHandle` |
-| QuickJS 的 claim(dup)/release/free | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QuickJSContextHandle.releaseCreatedHandle` / `claimOwnedValueHandle` / `rootOwnedValueHandle` |
-| QuickJS 的清箱(`takeRetainedValue`) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QuickJSEngine.installContextDataStorageBox(_:in:)` |
-| QuickJS context handle 的 retain(`JS_DupContext`)/release(`JS_FreeContext`) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSContextHandle.retainReference` / `releaseReference` |
-| JSC context handle 的 release(`JSGlobalContextRelease`) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreContextHandle.swift` 的 `JavaScriptCoreContextHandle.releaseReference` |
+| JSC 的 release/claim/root/unroot | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JSCContextHandle` 同名方法 |
+| JSC 跨 context 兼容(group) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JSCEngine.isContextCompatibleWith` |
+| JSC 的清箱(`takeRetainedValue`) | `Sources/SwiftyJavaScriptCore/Engine/JavaScriptCoreEngineRuntimeDriver.swift` 的 `JSCEngine.installContextDataStorageBox(_:in:)` |
+| JSC runtime handle(group 所在) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreRuntimeHandle.swift` 的 `JSCRuntimeHandle` |
+| QuickJS 的 claim(dup)/release/free | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QJSContextHandle.releaseCreatedHandle` / `claimOwnedValueHandle` / `rootOwnedValueHandle` |
+| QuickJS 的清箱(`takeRetainedValue`) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineRuntimeDriver.swift` 的 `QJSEngine.installContextDataStorageBox(_:in:)` |
+| QuickJS context handle 的 retain(`JS_DupContext`)/release(`JS_FreeContext`) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QJSContextHandle.retainReference` / `releaseReference` |
+| JSC context handle 的 release(`JSGlobalContextRelease`) | `Sources/SwiftyJavaScriptCore/JavaScriptCoreContextHandle.swift` 的 `JSCContextHandle.releaseReference` |
 | QuickJS finalizer 同步调用用户 `definition.finalize`(结算重入来源) | `Sources/SwiftyQuickJS/Engine/QuickJSEngineClassDriver.swift` 的 finalizer |
-| `Mutex`(非递归;scope 栈与 context data 的既有选择) | `Sources/SwiftJavaScript/JSInstantContext.swift` 的 `ScopeStackStorage.state`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.state` |
+| `Mutex`(非递归;scope 栈与 context data 的既有选择) | `Sources/SwiftJavaScript/ScopeCore.swift` 的 `ScopeStackStorage.state`;`Sources/SwiftJavaScript/JSContextData.swift` 的 `JSContextDataStorageBox.state` |
 | QuickJS runtimeID(后端身份先例) | `Sources/SwiftyQuickJS/QuickJSHandles.swift` 的 `QuickJSRuntimeIdentityRegistry` |
-| `JSPreparedScript` 的保活形状(反例) | `Sources/SwiftJavaScript/JSPreparedInputs.swift` 的 `JSScopeWitness`、`JSPreparedScript` |
+| `JSPreparedScript` 的保活形状(反例) | `Sources/SwiftJavaScript/JSScopeWitness.swift` 的 `JSScopeWitness`;`Sources/SwiftJavaScript/JSPreparedInputs.swift` 的 `JSPreparedScript` |
 | FIFO 哨兵测试先例 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `IsolatedDeinitBarrier`、`awaitContextTeardown` |
 | Mock 的 claim/root 口径与引擎调用的隔离记录 | `Tests/SwiftJavaScriptTests/JSEngineCoreTypesTests.swift` 的 `MockContextHandle` 同名方法、`contextReleaseLog` / `contextRootingLog`、`engineCallLog` |
 | 负向编译样例惯例 | `Tests/SwiftJavaScriptEngineTests/EngineScopeContractTests.swift` 文件头的负面样例注释块 |

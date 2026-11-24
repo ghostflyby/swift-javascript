@@ -1,4 +1,23 @@
-public protocol JSEngineClassBridgeDriver: JSEngine where RuntimeHandle: Hashable {
+/// Engine-side class bridge: what the shared class definition, storage and
+/// lookup templates need from an engine — the statics that create classes and
+/// host objects, plus the engine's value, scope, argument and class types
+/// (aliases of its context's). No value-side protocol refers to it.
+public protocol JSEngineClassBridgeDriver: JSEngineRuntimeDriver
+where
+  ContextHandle == Context.ContextHandle,
+  ClassHandle == Context.ClassHandle,
+  RuntimeHandle: Hashable
+{
+  /// The context type this engine's host objects live in.
+  associatedtype Context: JSContext
+  associatedtype Value: JSValue & ~Copyable
+  where Value == Context.Value
+  associatedtype InstantContext: JSInstantContext & ~Copyable
+  where InstantContext == Context.InstantContext
+  associatedtype Arguments: JSArguments & ~Copyable
+  where Arguments == Context.Arguments
+  associatedtype Class: JSClass
+  where Class == Context.Class
   associatedtype ClassPropertyNameAccumulator
 
   static func makeClass(
@@ -8,12 +27,12 @@ public protocol JSEngineClassBridgeDriver: JSEngine where RuntimeHandle: Hashabl
       ClassPropertyNameAccumulator
     >,
     in runtime: RuntimeHandle
-  ) -> JSClass<Self>
+  ) -> Class
 
   static func runtimeHandle(for context: ContextHandle) -> RuntimeHandle?
 
   static func makeClassObjectResultHandle(
-    of jsClass: JSClass<Self>,
+    of jsClass: Class,
     privateData: UnsafeMutableRawPointer,
     in context: ContextHandle
   ) -> JSResult<ValueHandle>?
@@ -62,7 +81,7 @@ where
     Engine.ClassPropertyNameAccumulator
   >
 {
-  public static func jsClass(in runtime: Engine.RuntimeHandle) -> JSClass<Engine> {
+  public static func jsClass(in runtime: Engine.RuntimeHandle) -> Engine.Class {
     let key = JSClassValueConvertibleRegistryKey(
       typeID: ObjectIdentifier(Self.self),
       runtime: AnyHashable(runtime)
@@ -72,15 +91,17 @@ where
         Engine.makeClass(definition: Self.autoClassDefinition(), in: runtime)
       )
     }
-    return boxed.value as! JSClass<Engine>
+    return boxed.value as! Engine.Class
   }
 
-  public static func tryDecode(
-    _ value: borrowing JSValue<Engine>,
-    in context: borrowing JSInstantContext<Engine>
-  ) throws(JSValueConversionError) -> Self {
-    guard value.isObject(in: context) else {
-      throw .typeMismatch(expected: "object", actual: value.type(in: context))
+  public static func tryDecode<C: JSInstantContext & ~Copyable>(
+    _ value: borrowing C.Value,
+    in context: borrowing C
+  ) throws(JSValueConversionError) -> Self
+  where C == Engine.InstantContext {
+    let valueType = value.type()
+    guard valueType == .object else {
+      throw .typeMismatch(expected: "object", actual: valueType)
     }
 
     let privateData: UnsafeMutableRawPointer?
@@ -109,10 +130,11 @@ where
     return instance
   }
 
-  public static func tryEncode(
+  public static func tryEncode<C: JSInstantContext & ~Copyable>(
     _ value: Self,
-    in context: borrowing JSInstantContext<Engine>
-  ) throws(JSValueConversionError) -> JSValue<Engine> {
+    in context: borrowing C
+  ) throws(JSValueConversionError) -> C.Value
+  where C == Engine.InstantContext {
     guard let runtime = Engine.runtimeHandle(for: context.driverContextHandle) else {
       throw .codable("Could not resolve runtime for \(Engine.self) context")
     }
@@ -135,8 +157,7 @@ where
       // on the context default scope instead would keep the object alive (and
       // its finalizer unfired) until the context dies, even after JavaScript
       // drops every reference to it.
-      context.scopeFrame.track(Engine.OwnedValueHandle.adopting(object))
-      return JSValue<Engine>(handleValue: object, in: context.driverContextHandle)
+      return context.adoptCreatedHandle(Engine.OwnedValueHandle.adopting(object))
     case .exception(let exception):
       // The creation result carries an owned reference on the failure path
       // too (QuickJS: `JS_GetException` returns +1). The conversion error
@@ -155,80 +176,5 @@ where
         .takeRetainedValue()
       throw .codable("Host object creation is not supported by \(Engine.self)")
     }
-  }
-
-  public static func decode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) -> Self {
-    do {
-      return try Self.tryDecode(value, in: context)
-    } catch {
-      fatalError("\(Self.self).decode(_:in:) failed: \(error)")
-    }
-  }
-
-  public static func tryDecode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> Self {
-    precondition(
-      E.self == Engine.self,
-      "This conversion path only supports \(Engine.self)"
-    )
-    let engineValue = JSValue<Engine>(
-      handleValue: unsafeBitCast(value.borrowHandle(), to: JSValueHandle<Engine>.self),
-      in: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
-    )
-    let engineContext = JSInstantContext<Engine>(
-      handle: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
-    )
-    return try Self.tryDecode(engineValue, in: engineContext)
-  }
-
-  public static func tryEncode<E: JSValueConversionEngine>(
-    _ value: Self,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    precondition(
-      E.self == Engine.self,
-      "This conversion path only supports \(Engine.self)"
-    )
-    let engineContext = JSInstantContext<Engine>(
-      handle: unsafeBitCast(context.driverContextHandle, to: Engine.ContextHandle.self)
-    )
-    let encoded = try Self.tryEncode(value, in: engineContext)
-    // `engineContext` is a temporary witness over the same driver context;
-    // its frame drains when this function returns. Claim an owned reference
-    // into the caller's frame so the returned view stays valid for the
-    // caller's scope window instead of dying with the temporary.
-    let handle = unsafeBitCast(encoded.borrowHandle(), to: JSValueHandle<E>.self)
-    context.scopeFrame.track(
-      context.driverContextHandle.claimOwnedValueHandle(handle)
-    )
-    return JSValue<E>(handleValue: handle, in: context.driverContextHandle)
-  }
-
-  public static func encode<E: JSValueConversionEngine>(
-    _ value: Self,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    do {
-      return try Self.tryEncode(value, in: context)
-    } catch {
-      return JSValue<E>(undefinedIn: context)
-    }
-  }
-
-  public func toJSValue<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    Self.encode(self, in: context)
-  }
-
-  public func tryEncode<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    try Self.tryEncode(self, in: context)
   }
 }

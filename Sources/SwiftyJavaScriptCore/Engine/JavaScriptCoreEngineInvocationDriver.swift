@@ -1,75 +1,75 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JavaScriptCoreEngine: JSEngineInvocationDriver {
+extension JSCEngine: JSEngineInvocationDriver {
   public static func callFunctionHandle(
-    _ function: JSValueHandle<JavaScriptCoreEngine>,
-    this thisValue: JSValueHandle<JavaScriptCoreEngine>? = nil,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    _ function: JSValueHandle<JSCEngine>,
+    this thisValue: JSValueHandle<JSCEngine>? = nil,
+    arguments: [JSValueHandle<JSCEngine>] = [],
+    in context: JSCContextHandle
+  ) -> JSResult<JSValueHandle<JSCEngine>>? {
     callFunction(function, this: thisValue, arguments: arguments, in: context)
   }
 
   public static func constructHandle(
-    _ constructor: JSValueHandle<JavaScriptCoreEngine>,
-    arguments: [JSValueHandle<JavaScriptCoreEngine>] = [],
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    _ constructor: JSValueHandle<JSCEngine>,
+    arguments: [JSValueHandle<JSCEngine>] = [],
+    in context: JSCContextHandle
+  ) -> JSResult<JSValueHandle<JSCEngine>>? {
     construct(constructor, arguments: arguments, in: context)
   }
 
   public static func toObjectHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
+  ) -> JSResult<JSValueHandle<JSCEngine>>? {
     toObject(value, in: context)
   }
 
   public static func isArrayHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool? {
     JSValueIsArray(context.ref, value.ref)
   }
 
   public static func isDateHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool? {
     JSValueIsDate(context.ref, value.ref)
   }
 
   public static func isInstanceOfHandle(
-    _ value: JSValueHandle<JavaScriptCoreEngine>,
-    constructor: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSValueHandle<JSCEngine>,
+    constructor: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool? {
     isInstanceOf(value, constructor: constructor, in: context)
   }
 
   public static func looselyEqualsHandle(
-    _ lhs: JSValueHandle<JavaScriptCoreEngine>,
-    _ rhs: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ lhs: JSValueHandle<JSCEngine>,
+    _ rhs: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool? {
     JSValueIsEqual(context.ref, lhs.ref, rhs.ref, nil)
   }
 
   public static func strictlyEqualsHandle(
-    _ lhs: JSValueHandle<JavaScriptCoreEngine>,
-    _ rhs: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    _ lhs: JSValueHandle<JSCEngine>,
+    _ rhs: JSValueHandle<JSCEngine>,
+    in context: JSCContextHandle
   ) -> Bool? {
     JSValueIsStrictEqual(context.ref, lhs.ref, rhs.ref)
   }
 
   private static func callFunction(
-    _ function: JavaScriptCoreValueHandle,
-    this thisValue: JavaScriptCoreValueHandle?,
-    arguments: [JavaScriptCoreValueHandle],
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JavaScriptCoreValueHandle> {
+    _ function: JSCValueHandle,
+    this thisValue: JSCValueHandle?,
+    arguments: [JSCValueHandle],
+    in context: JSCContextHandle
+  ) -> JSResult<JSCValueHandle> {
     switch javaScriptCoreObjectRef(for: function, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -103,10 +103,10 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
   }
 
   private static func construct(
-    _ constructor: JavaScriptCoreValueHandle,
-    arguments: [JavaScriptCoreValueHandle],
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JavaScriptCoreValueHandle> {
+    _ constructor: JSCValueHandle,
+    arguments: [JSCValueHandle],
+    in context: JSCContextHandle
+  ) -> JSResult<JSCValueHandle> {
     switch javaScriptCoreObjectRef(for: constructor, in: context) {
     case .exception(let exception):
       return .exception(exception)
@@ -127,21 +127,21 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
   }
 
   private static func toObject(
-    _ value: JavaScriptCoreValueHandle,
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JavaScriptCoreValueHandle> {
+    _ value: JSCValueHandle,
+    in context: JSCContextHandle
+  ) -> JSResult<JSCValueHandle> {
     switch javaScriptCoreObjectRef(for: value, in: context) {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
-      return .value(JavaScriptCoreValueHandle(ref: objectRef))
+      return .value(JSCValueHandle(ref: objectRef))
     }
   }
 
   private static func isInstanceOf(
-    _ value: JavaScriptCoreValueHandle,
-    constructor: JavaScriptCoreValueHandle,
-    in context: JavaScriptCoreContextHandle
+    _ value: JSCValueHandle,
+    constructor: JSCValueHandle,
+    in context: JSCContextHandle
   ) -> Bool {
     switch javaScriptCoreObjectRef(for: constructor, in: context) {
     case .exception:
@@ -161,13 +161,13 @@ extension JavaScriptCoreEngine: JSEngineInvocationDriver {
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension JavaScriptCoreContextHandle: JSContextInvocationDriver {
+extension JSCContextHandle: JSContextInvocationDriver {
   public func callFunctionHandle(
-    _ function: JavaScriptCoreValueHandle,
-    this thisValue: JavaScriptCoreValueHandle?,
-    arguments: [JavaScriptCoreValueHandle]
-  ) -> JSResult<JavaScriptCoreValueHandle>? {
-    JavaScriptCoreEngine.callFunctionHandle(
+    _ function: JSCValueHandle,
+    this thisValue: JSCValueHandle?,
+    arguments: [JSCValueHandle]
+  ) -> JSResult<JSCValueHandle>? {
+    JSCEngine.callFunctionHandle(
       function,
       this: thisValue,
       arguments: arguments,
@@ -176,44 +176,44 @@ extension JavaScriptCoreContextHandle: JSContextInvocationDriver {
   }
 
   public func constructHandle(
-    _ constructor: JavaScriptCoreValueHandle,
-    arguments: [JavaScriptCoreValueHandle]
-  ) -> JSResult<JavaScriptCoreValueHandle>? {
-    JavaScriptCoreEngine.constructHandle(constructor, arguments: arguments, in: self)
+    _ constructor: JSCValueHandle,
+    arguments: [JSCValueHandle]
+  ) -> JSResult<JSCValueHandle>? {
+    JSCEngine.constructHandle(constructor, arguments: arguments, in: self)
   }
 
-  public func toObjectHandle(_ value: JavaScriptCoreValueHandle)
-    -> JSResult<JavaScriptCoreValueHandle>?
+  public func toObjectHandle(_ value: JSCValueHandle)
+    -> JSResult<JSCValueHandle>?
   {
-    JavaScriptCoreEngine.toObjectHandle(value, in: self)
+    JSCEngine.toObjectHandle(value, in: self)
   }
 
-  public func isArrayHandle(_ value: JavaScriptCoreValueHandle) -> Bool? {
-    JavaScriptCoreEngine.isArrayHandle(value, in: self)
+  public func isArrayHandle(_ value: JSCValueHandle) -> Bool? {
+    JSCEngine.isArrayHandle(value, in: self)
   }
 
-  public func isDateHandle(_ value: JavaScriptCoreValueHandle) -> Bool? {
-    JavaScriptCoreEngine.isDateHandle(value, in: self)
+  public func isDateHandle(_ value: JSCValueHandle) -> Bool? {
+    JSCEngine.isDateHandle(value, in: self)
   }
 
   public func isInstanceOfHandle(
-    _ value: JavaScriptCoreValueHandle,
-    constructor: JavaScriptCoreValueHandle
+    _ value: JSCValueHandle,
+    constructor: JSCValueHandle
   ) -> Bool? {
-    JavaScriptCoreEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
+    JSCEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
   }
 
   public func looselyEqualsHandle(
-    _ lhs: JavaScriptCoreValueHandle,
-    _ rhs: JavaScriptCoreValueHandle
+    _ lhs: JSCValueHandle,
+    _ rhs: JSCValueHandle
   ) -> Bool? {
-    JavaScriptCoreEngine.looselyEqualsHandle(lhs, rhs, in: self)
+    JSCEngine.looselyEqualsHandle(lhs, rhs, in: self)
   }
 
   public func strictlyEqualsHandle(
-    _ lhs: JavaScriptCoreValueHandle,
-    _ rhs: JavaScriptCoreValueHandle
+    _ lhs: JSCValueHandle,
+    _ rhs: JSCValueHandle
   ) -> Bool? {
-    JavaScriptCoreEngine.strictlyEqualsHandle(lhs, rhs, in: self)
+    JSCEngine.strictlyEqualsHandle(lhs, rhs, in: self)
   }
 }

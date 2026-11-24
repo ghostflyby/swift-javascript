@@ -46,146 +46,161 @@ struct EnginePropertyDriverTests {
 }
 
 private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = context.makePersistentObject()
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
       let key: StaticString = "strKey"
-      object.setProperty(3.5, forKey: key, in: context)
+      _ = object.setProperty(key, to: scope.makeNumber(3.5), attributes: .none, in: scope)
 
-      let hasBeforeDelete = object.hasProperty(key, in: context)
-      let readIsNumber = object.getProperty(forKey: key, in: context).isNumber(in: context)
-      #expect(hasBeforeDelete)
-      #expect(readIsNumber)
+      let hasBeforeDelete = object.hasProperty(key, in: scope)
+      guard let read = valueOrNil(object.getProperty(key, in: scope)) else {
+        Issue.record("Expected property read to succeed")
+        return
+      }
+      expectTrue(hasBeforeDelete)
+      expectTrue(read.isNumber())
 
-      object.deleteProperty(forKey: key, in: context)
-      let hasAfterDelete = object.hasProperty(key, in: context)
-      #expect(!hasAfterDelete)
+      _ = object.deleteProperty(key, in: scope)
+      let hasAfterDelete = object.hasProperty(key, in: scope)
+      expectTrue(!hasAfterDelete)
     }
   }
 }
 
 private enum SetGetHasDeletePropertyWithValueKey: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = context.makePersistentObject()
-      let key = JSValue(string: "valueKey", in: context)
-      object.setProperty("abc", forKey: key, in: context)
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
+      let key = scope.persist(scope.makeString("valueKey"))
+      _ = setValueProperty(
+        key, on: object, to: scope.persist(scope.makeString("abc")), attributes: .none, in: scope)
 
-      let hasBeforeDelete = object.hasProperty(key, in: context)
-      let readIsString = object.getProperty(forKey: key, in: context).isString(in: context)
-      #expect(hasBeforeDelete)
-      #expect(readIsString)
+      let hasBeforeDelete = hasValueProperty(key, on: object, in: scope)
+      guard let read = valueOrNil(getValueProperty(key, on: object, in: scope)) else {
+        Issue.record("Expected property read to succeed")
+        return
+      }
+      expectTrue(hasBeforeDelete)
+      expectTrue(read.isString())
 
-      object.deleteProperty(forKey: key, in: context)
-      let hasAfterDelete = object.hasProperty(key, in: context)
-      #expect(!hasAfterDelete)
+      _ = deleteValueProperty(key, on: object, in: scope)
+      let hasAfterDelete = hasValueProperty(key, on: object, in: scope)
+      expectTrue(!hasAfterDelete)
     }
   }
 }
 
 private enum SetGetPropertyAtIndex: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = context.makePersistentObject()
-      object.setProperty(true, at: 2, in: context)
-      let readIsBoolean = object.getProperty(at: 2, in: context).isBoolean(in: context)
-      #expect(readIsBoolean)
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
+      _ = setIndexProperty(2, on: object, to: scope.persist(scope.makeBoolean(true)), in: scope)
+      guard let read = valueOrNil(getIndexProperty(2, on: object, in: scope)) else {
+        Issue.record("Expected index property read to succeed")
+        return
+      }
+      expectTrue(read.isBoolean())
     }
   }
 }
 
 private enum PropertyAttributesAreRespected: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = JSValue(objectIn: context)
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
 
-      object.setProperty(11, forKey: "stringLocked", with: [.readOnly], in: context)
-      object.setProperty(13, forKey: "stringLocked", in: context)
-      let stringLockedValue = object.getProperty(forKey: "stringLocked", in: context)
-        .toInt32(in: context)
-      #expect(stringLockedValue == 11)
+      _ = object.setProperty(
+        "stringLocked", to: scope.makeNumber(11), attributes: .readOnly, in: scope)
+      _ = object.setProperty(
+        "stringLocked", to: scope.makeNumber(13), attributes: .none, in: scope)
+      let stringLockedValue = numberValue(
+        object.getProperty("stringLocked", in: scope))
+      expectTrue(stringLockedValue == 11)
 
-      object.setProperty(17, forKey: "stringHidden", with: [.dontEnum], in: context)
-      object.setProperty(19, forKey: "stringPinned", with: [.dontDelete], in: context)
+      _ = object.setProperty(
+        "stringHidden", to: scope.makeNumber(17), attributes: .dontEnum, in: scope)
+      _ = object.setProperty(
+        "stringPinned", to: scope.makeNumber(19), attributes: .dontDelete, in: scope)
 
-      let lockedKey = JSValue(string: "locked", in: context)
-      object.setProperty(7, forKey: lockedKey, with: [.readOnly], in: context)
-      object.setProperty(9, forKey: lockedKey, in: context)
-      let lockedValue = object.getProperty(forKey: lockedKey, in: context).toInt32(in: context)
-      #expect(lockedValue == 7)
+      let lockedKey = scope.persist(scope.makeString("locked"))
+      _ = setValueProperty(
+        lockedKey, on: object, to: scope.persist(scope.makeNumber(7)),
+        attributes: .readOnly, in: scope)
+      _ = setValueProperty(
+        lockedKey, on: object, to: scope.persist(scope.makeNumber(9)),
+        attributes: .none, in: scope)
+      let lockedValue = numberValue(
+        getValueProperty(lockedKey, on: object, in: scope))
+      expectTrue(lockedValue == 7)
 
-      let hiddenKey = JSValue(string: "hidden", in: context)
-      object.setProperty(1, forKey: hiddenKey, with: [.dontEnum], in: context)
+      let hiddenKey = scope.persist(scope.makeString("hidden"))
+      _ = setValueProperty(
+        hiddenKey, on: object, to: scope.persist(scope.makeNumber(1)),
+        attributes: .dontEnum, in: scope)
 
-      let pinnedKey = JSValue(string: "pinned", in: context)
-      object.setProperty(2, forKey: pinnedKey, with: [.dontDelete], in: context)
+      let pinnedKey = scope.persist(scope.makeString("pinned"))
+      _ = setValueProperty(
+        pinnedKey, on: object, to: scope.persist(scope.makeNumber(2)),
+        attributes: .dontDelete, in: scope)
 
-      context.withGlobalObject { global in
-        global.setProperty(object, forKey: "attributeObject", in: context)
-      }
-      let hiddenEnumerated = context.evaluateScript(
+      scope.setGlobalProperty(object, forKey: "attributeObject", with: .none)
+      let hiddenEnumerated = scope.evaluateScript(
         "Object.keys(attributeObject).includes('hidden')"
       )
-      let stringHiddenEnumerated = context.evaluateScript(
+      let stringHiddenEnumerated = scope.evaluateScript(
         "Object.keys(attributeObject).includes('stringHidden')"
       )
-      let pinnedDeleted = context.evaluateScript("delete attributeObject.pinned")
-      let pinnedStillPresent = context.evaluateScript("'pinned' in attributeObject")
-      let stringPinnedDeleted = context.evaluateScript("delete attributeObject.stringPinned")
-      let stringPinnedStillPresent = context.evaluateScript("'stringPinned' in attributeObject")
+      let pinnedDeleted = scope.evaluateScript("delete attributeObject.pinned")
+      let pinnedStillPresent = scope.evaluateScript("'pinned' in attributeObject")
+      let stringPinnedDeleted = scope.evaluateScript("delete attributeObject.stringPinned")
+      let stringPinnedStillPresent = scope.evaluateScript("'stringPinned' in attributeObject")
 
       switch consume hiddenEnumerated {
       case .value(let value):
-        let isHiddenEnumerated = value.toBool(in: context)
-        #expect(!isHiddenEnumerated)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected Object.keys check for hidden value-key property")
       }
 
       switch consume stringHiddenEnumerated {
       case .value(let value):
-        let isHiddenEnumerated = value.toBool(in: context)
-        #expect(!isHiddenEnumerated)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected Object.keys check for hidden string-key property")
       }
 
       switch consume pinnedDeleted {
       case .value(let value):
-        let didDeletePinned = value.toBool(in: context)
-        #expect(!didDeletePinned)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected delete check for pinned value-key property")
       }
 
       switch consume pinnedStillPresent {
       case .value(let value):
-        let isPinnedStillPresent = value.toBool(in: context)
-        #expect(isPinnedStillPresent)
+        expectTrue(value.toBoolean())
       case .exception:
         Issue.record("Expected membership check for pinned value-key property")
       }
 
       switch consume stringPinnedDeleted {
       case .value(let value):
-        let didDeletePinned = value.toBool(in: context)
-        #expect(!didDeletePinned)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected delete check for pinned string-key property")
       }
 
       switch consume stringPinnedStillPresent {
       case .value(let value):
-        let isPinnedStillPresent = value.toBool(in: context)
-        #expect(isPinnedStillPresent)
+        expectTrue(value.toBoolean())
       case .exception:
         Issue.record("Expected membership check for pinned string-key property")
       }
@@ -194,11 +209,11 @@ private enum PropertyAttributesAreRespected: ScriptEngineAssertion {
 }
 
 private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let objectResult = context.evaluateScript(
+    await context.withInstantContext { scope in
+      let objectResult = scope.evaluateScript(
         """
         (() => {
           const parent = { inherited: 1 };
@@ -214,10 +229,10 @@ private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAss
 
       switch consume objectResult {
       case .value(let object):
-        _ = context.evaluateScript("Object.keys = () => ['patched']")
+        _ = scope.evaluateScript("Object.keys = () => ['patched']")
         let names =
-          context.driverContextHandle.propertyNamesForHandle(on: object.borrowHandle()) ?? []
-        #expect(names == ["3", "visible"])
+          scope.driverContextHandle.propertyNamesForHandle(on: object.borrowHandle()) ?? []
+        expectTrue(names == ["3", "visible"])
       case .exception:
         Issue.record("Expected propertyNames fixture object")
       }
@@ -226,71 +241,70 @@ private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAss
 }
 
 private enum DefinePropertyAppliesAttributes: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = JSValue(objectIn: context)
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
       let key: StaticString = "locked"
 
-      let defineResult = object.defineProperty(7, forKey: key, with: [.readOnly], in: context)
-      switch consume defineResult {
-      case .value(let stored):
-        #expect(stored.toInt32(in: context) == 7)
-      case .exception:
+      _ = object.setProperty(
+        key, to: scope.makeNumber(7), attributes: .readOnly, in: scope)
+      guard let stored = valueOrNil(object.getProperty(key, in: scope)) else {
         Issue.record("Expected defineProperty to succeed")
+        return
       }
+      expectTrue(stored.toNumber() == 7)
 
-      object.setProperty(9, forKey: key, in: context)
-      let stored = object.getProperty(forKey: key, in: context)
-      #expect(stored.toInt32(in: context) == 7)
+      _ = object.setProperty(
+        key, to: scope.makeNumber(9), attributes: .none, in: scope)
+      guard let storedAfterWrite = valueOrNil(object.getProperty(key, in: scope)) else {
+        Issue.record("Expected property read after read-only write")
+        return
+      }
+      expectTrue(storedAfterWrite.toNumber() == 7)
     }
   }
 }
 
 private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let hiddenKey: StaticString = "hiddenFlag"
       let pinnedKey: StaticString = "pinnedFlag"
 
-      context.withGlobalObject { global in
-        _ = global.defineProperty(true, forKey: hiddenKey, with: [.dontEnum], in: context)
-        _ = global.defineProperty(1, forKey: pinnedKey, with: [.dontDelete], in: context)
-      }
+      scope.setGlobalProperty(true, forKey: hiddenKey, with: .dontEnum)
+      scope.setGlobalProperty(Int32(1), forKey: pinnedKey, with: .dontDelete)
 
-      let hiddenEnumerated = context.evaluateScript(
+      let hiddenEnumerated = scope.evaluateScript(
         "Object.keys(globalThis).includes('hiddenFlag')"
       )
-      let pinnedDeleted = context.evaluateScript(
+      let pinnedDeleted = scope.evaluateScript(
         "delete globalThis.pinnedFlag"
       )
-      let pinnedStillPresent = context.evaluateScript(
+      let pinnedStillPresent = scope.evaluateScript(
         "'pinnedFlag' in globalThis"
       )
 
       switch consume hiddenEnumerated {
       case .value(let value):
-        let isEnumerated = value.toBool(in: context)
-        #expect(!isEnumerated)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected Object.keys check for hiddenFlag")
       }
 
       switch consume pinnedDeleted {
       case .value(let value):
-        let didDelete = value.toBool(in: context)
-        #expect(!didDelete)
+        expectTrue(!value.toBoolean())
       case .exception:
         Issue.record("Expected delete operator check for pinnedFlag")
       }
 
       switch consume pinnedStillPresent {
       case .value(let value):
-        let stillPresent = value.toBool(in: context)
-        #expect(stillPresent)
+        expectTrue(value.toBoolean())
       case .exception:
         Issue.record("Expected membership check for pinnedFlag")
       }
@@ -299,93 +313,206 @@ private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion 
 }
 
 private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = context.makePersistentObject()
+    await context.withInstantContext { scope in
+      let object = makePersistentObject(in: scope)
 
       // --- value type roundtrips ---
       let numKey: StaticString = "num"
-      object.setProperty(42.5, forKey: numKey, in: context)
-      let numVal = object.getProperty(forKey: numKey, in: context).toDouble(in: context)
-      #expect(numVal == 42.5)
-      let hasNum = object.hasProperty(numKey, in: context)
-      #expect(hasNum)
+      _ = object.setProperty(
+        numKey, to: scope.makeNumber(42.5), attributes: .none, in: scope)
+      expectTrue(numberValue(object.getProperty(numKey, in: scope)) == 42.5)
+      expectTrue(object.hasProperty(numKey, in: scope))
 
       let boolKey: StaticString = "flag"
-      object.setProperty(true, forKey: boolKey, in: context)
-      let boolVal = object.getProperty(forKey: boolKey, in: context).toBool(in: context)
-      #expect(boolVal)
+      _ = object.setProperty(
+        boolKey, to: scope.makeBoolean(true), attributes: .none, in: scope)
+      expectTrue(booleanValue(object.getProperty(boolKey, in: scope)) == true)
 
       let strKey: StaticString = "greeting"
-      object.setProperty("hello", forKey: strKey, in: context)
-      let strVal = object.getProperty(forKey: strKey, in: context).toString(in: context)
-      #expect(strVal == "hello")
+      _ = object.setProperty(
+        strKey, to: scope.makeString("hello"), attributes: .none, in: scope)
+      expectTrue(stringValue(object.getProperty(strKey, in: scope)) == "hello")
 
-      // --- typed converter read via StaticString ---
+      // --- surface decoder read via StaticString ---
       let typedKey: StaticString = "pi"
-      object.setProperty(3.14, forKey: typedKey, in: context)
-      let decoded: Double = object.getProperty(
-        forKey: typedKey, using: JSDefaultConverter<Double>.self, in: context)
-      #expect(decoded == 3.14)
+      _ = object.setProperty(
+        typedKey, to: scope.makeNumber(3.14), attributes: .none, in: scope)
+      guard let piValue = valueOrNil(object.getProperty(typedKey, in: scope)) else {
+        Issue.record("Expected pi property read")
+        return
+      }
+      let decoded = try? Double(value: piValue, in: scope)
+      expectTrue(decoded == 3.14)
 
       let typedBoolKey: StaticString = "yes"
-      object.setProperty(true, forKey: typedBoolKey, in: context)
-      let decodedBool: Bool = object.getProperty(
-        forKey: typedBoolKey, using: JSDefaultConverter<Bool>.self, in: context)
-      #expect(decodedBool)
+      _ = object.setProperty(
+        typedBoolKey, to: scope.makeBoolean(true), attributes: .none, in: scope)
+      guard let yesValue = valueOrNil(object.getProperty(typedBoolKey, in: scope)) else {
+        Issue.record("Expected yes property read")
+        return
+      }
+      let decodedBool = try? Bool(value: yesValue, in: scope)
+      expectTrue(decodedBool == true)
 
       // --- delete + hasProperty ---
       let delKey: StaticString = "temp"
-      object.setProperty(1, forKey: delKey, in: context)
-      let hasDel = object.hasProperty(delKey, in: context)
-      #expect(hasDel)
-      object.deleteProperty(forKey: delKey, in: context)
-      let hasDelAfter = object.hasProperty(delKey, in: context)
-      #expect(!hasDelAfter)
+      _ = object.setProperty(
+        delKey, to: scope.makeNumber(1), attributes: .none, in: scope)
+      expectTrue(object.hasProperty(delKey, in: scope))
+      _ = object.deleteProperty(delKey, in: scope)
+      expectTrue(!object.hasProperty(delKey, in: scope))
 
       // --- non-existent key ---
       let missingKey: StaticString = "nope"
-      let hasMissing = object.hasProperty(missingKey, in: context)
-      #expect(!hasMissing)
-      object.deleteProperty(forKey: missingKey, in: context)
+      expectTrue(!object.hasProperty(missingKey, in: scope))
+      _ = object.deleteProperty(missingKey, in: scope)
 
       // --- empty StaticString key ---
       let emptyKey: StaticString = ""
-      object.setProperty("empty-val", forKey: emptyKey, in: context)
-      let hasEmpty = object.hasProperty(emptyKey, in: context)
-      #expect(hasEmpty)
-      let emptyVal = object.getProperty(forKey: emptyKey, in: context).toString(in: context)
-      #expect(emptyVal == "empty-val")
-      object.deleteProperty(forKey: emptyKey, in: context)
-      let hasEmptyAfter = object.hasProperty(emptyKey, in: context)
-      #expect(!hasEmptyAfter)
+      _ = object.setProperty(
+        emptyKey, to: scope.makeString("empty-val"), attributes: .none, in: scope)
+      expectTrue(object.hasProperty(emptyKey, in: scope))
+      expectTrue(stringValue(object.getProperty(emptyKey, in: scope)) == "empty-val")
+      _ = object.deleteProperty(emptyKey, in: scope)
+      expectTrue(!object.hasProperty(emptyKey, in: scope))
 
       // --- unicode and special char StaticString key ---
       let uniKey: StaticString = "key_😀"
-      object.setProperty("unicode", forKey: uniKey, in: context)
-      let hasUni = object.hasProperty(uniKey, in: context)
-      #expect(hasUni)
-      let uniVal = object.getProperty(forKey: uniKey, in: context).toString(in: context)
-      #expect(uniVal == "unicode")
+      _ = object.setProperty(
+        uniKey, to: scope.makeString("unicode"), attributes: .none, in: scope)
+      expectTrue(object.hasProperty(uniKey, in: scope))
+      expectTrue(stringValue(object.getProperty(uniKey, in: scope)) == "unicode")
 
       let nullCharKey: StaticString = "a\0b"
-      object.setProperty("null", forKey: nullCharKey, in: context)
-      let hasNullChar = object.hasProperty(nullCharKey, in: context)
-      #expect(hasNullChar)
-      let nullCharVal = object.getProperty(forKey: nullCharKey, in: context).toString(in: context)
-      #expect(nullCharVal == "null")
-      object.deleteProperty(forKey: nullCharKey, in: context)
-      let hasNullCharAfter = object.hasProperty(nullCharKey, in: context)
-      #expect(!hasNullCharAfter)
+      _ = object.setProperty(
+        nullCharKey, to: scope.makeString("null"), attributes: .none, in: scope)
+      expectTrue(object.hasProperty(nullCharKey, in: scope))
+      expectTrue(stringValue(object.getProperty(nullCharKey, in: scope)) == "null")
+      _ = object.deleteProperty(nullCharKey, in: scope)
+      expectTrue(!object.hasProperty(nullCharKey, in: scope))
     }
   }
 }
-extension JSInstantContext {
-  fileprivate func makePersistentObject() -> JSValue<E> {
-    let result = makeObject()
-    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
-    return persist(cb)
+
+// MARK: - Value-key and index property helpers
+//
+// The surface value API covers static-string keys; value-key and numeric
+// index access stay on the context driver and adopt their results on the
+// calling window's arena.
+
+private func makePersistentObject<C: JSInstantContext & ~Copyable>(
+  in context: borrowing C
+) -> C.Value {
+  guard let object = valueOrNil(context.makeObject()) else {
+    preconditionFailure("makeObject failed")
+  }
+  return context.persist(object)
+}
+
+private func getValueProperty<C: JSInstantContext & ~Copyable>(
+  _ key: borrowing C.Value,
+  on object: borrowing C.Value,
+  in context: borrowing C
+) -> JSResult<C.Value> {
+  bridgeSurfaceHandleResult(
+    context.driverContextHandle.getValuePropertyHandle(
+      key.borrowHandle(), on: object.borrowHandle()),
+    in: context
+  )
+}
+
+private func setValueProperty<C: JSInstantContext & ~Copyable>(
+  _ key: borrowing C.Value,
+  on object: borrowing C.Value,
+  to value: borrowing C.Value,
+  attributes: JSHostMemberAttributes,
+  in context: borrowing C
+) -> Bool {
+  context.driverContextHandle.setValuePropertyHandle(
+    key.borrowHandle(),
+    on: object.borrowHandle(),
+    to: value.borrowHandle(),
+    attributes: attributes
+  )
+}
+
+private func hasValueProperty<C: JSInstantContext & ~Copyable>(
+  _ key: borrowing C.Value,
+  on object: borrowing C.Value,
+  in context: borrowing C
+) -> Bool {
+  context.driverContextHandle.hasValuePropertyHandle(
+    key.borrowHandle(), on: object.borrowHandle()) ?? false
+}
+
+private func deleteValueProperty<C: JSInstantContext & ~Copyable>(
+  _ key: borrowing C.Value,
+  on object: borrowing C.Value,
+  in context: borrowing C
+) -> Bool {
+  context.driverContextHandle.deleteValuePropertyHandle(
+    key.borrowHandle(), on: object.borrowHandle())
+}
+
+private func getIndexProperty<C: JSInstantContext & ~Copyable>(
+  _ index: UInt32,
+  on object: borrowing C.Value,
+  in context: borrowing C
+) -> JSResult<C.Value> {
+  bridgeSurfaceHandleResult(
+    context.driverContextHandle.getIndexPropertyHandle(
+      at: index, on: object.borrowHandle()),
+    in: context
+  )
+}
+
+private func setIndexProperty<C: JSInstantContext & ~Copyable>(
+  _ index: UInt32,
+  on object: borrowing C.Value,
+  to value: borrowing C.Value,
+  in context: borrowing C
+) -> Bool {
+  context.driverContextHandle.setIndexPropertyHandle(
+    at: index, on: object.borrowHandle(), to: value.borrowHandle())
+}
+
+// MARK: - Result readers
+
+private func numberValue<V: JSValue & ~Copyable>(_ result: consuming JSResult<V>) -> Double? {
+  guard let value = valueOrNil(result) else { return nil }
+  return value.toNumber()
+}
+
+private func booleanValue<V: JSValue & ~Copyable>(_ result: consuming JSResult<V>) -> Bool? {
+  guard let value = valueOrNil(result) else { return nil }
+  return value.toBoolean()
+}
+
+private func stringValue<V: JSValue & ~Copyable>(_ result: consuming JSResult<V>) -> String? {
+  guard let value = valueOrNil(result) else { return nil }
+  return value.toString()
+}
+
+/// `#expect` rewrites its expression and cannot capture the non-copyable
+/// surface value views; binding the boolean first keeps the macro on a plain
+/// `Bool` while the test still uses the protocol-level APIs.
+private func expectTrue(
+  _ condition: Bool,
+  sourceLocation: SourceLocation = #_sourceLocation
+) {
+  #expect(condition, sourceLocation: sourceLocation)
+}
+
+/// Take the value arm of a non-copyable `JSResult` without touching the
+/// exception payload.
+private func valueOrNil<V: ~Copyable>(_ result: consuming JSResult<V>) -> V? {
+  switch consume result {
+  case .value(let value):
+    return value
+  case .exception:
+    return nil
   }
 }

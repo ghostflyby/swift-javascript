@@ -3,8 +3,8 @@ import JavaScriptCore
 
 private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNativeClassBacking<
   SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine,
-    JavaScriptCoreClassParentDescriptor,
+    JSCEngine,
+    JSCClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >,
   JavaScriptCore.JSStaticValue,
@@ -13,29 +13,33 @@ private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNat
 
 private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectStorage<
   SwiftJavaScript.JSEngineClassDefinition<
-    JavaScriptCoreEngine,
-    JavaScriptCoreClassParentDescriptor,
+    JSCEngine,
+    JSCClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >
 >
 
-public typealias JavaScriptCoreClassParentDescriptor = SwiftJavaScript.JSClassParentDescriptor<
-  JavaScriptCoreEngine,
+public typealias JSCClassParentDescriptor = SwiftJavaScript.JSClassParentDescriptor<
+  JSCEngine,
   JSPropertyNameAccumulatorRef
 >
 
-public typealias JavaScriptCoreAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinition<
-  JavaScriptCoreEngine,
-  JavaScriptCoreClassParentDescriptor,
+public typealias JSCStaticValue = SwiftJavaScript.JSStaticValue<JSCEngine>
+
+public typealias JSCStaticFunction = SwiftJavaScript.JSStaticFunction<JSCEngine>
+
+public typealias JSCAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinition<
+  JSCEngine,
+  JSCClassParentDescriptor,
   JSPropertyNameAccumulatorRef
 >
 
-private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSClass>()
-private let javaScriptCoreCompatibilityClassRuntime = JavaScriptCoreRuntimeHandle()
+private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSCClass>()
+private let javaScriptCoreCompatibilityClassRuntime = JSCRuntimeHandle()
 
 private func javaScriptCorePrivateData(
-  from value: JSValueHandle<JavaScriptCoreEngine>,
-  in context: JavaScriptCoreContextHandle
+  from value: JSCValueHandle,
+  in context: JSCContextHandle
 ) -> JSResult<UnsafeMutableRawPointer?> {
   var exception: JSValueRef?
   guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
@@ -47,21 +51,21 @@ private func javaScriptCorePrivateData(
 private func makeJavaScriptCoreObjectResultHandle(
   of jsClass: JSClassRef,
   privateData: UnsafeMutableRawPointer?,
-  in context: JavaScriptCoreContextHandle
-) -> JSResult<JSValueHandle<JavaScriptCoreEngine>> {
+  in context: JSCContextHandle
+) -> JSResult<JSCValueHandle> {
   guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
-    let exception = JavaScriptCoreValueHandle(
+    let exception = JSCValueHandle(
       ref: JSValueMakeUndefined(context.ref)!
     )
     return .exception(exception)
   }
-  return .value(JavaScriptCoreValueHandle(ref: objectRef))
+  return .value(JSCValueHandle(ref: objectRef))
 }
 
 private func makeJavaScriptCoreAutoJSClass(
-  definition: JavaScriptCoreAutoClassDefinition,
-  in runtime: JavaScriptCoreRuntimeHandle
-) -> JSClass {
+  definition: JSCAutoClassDefinition,
+  in runtime: JSCRuntimeHandle
+) -> JSCClass {
   let backing = JSClassAutoNativeClassBacking(
     definition: definition,
     lookup: SwiftJavaScript.JSClassDefinitionLookup {
@@ -69,33 +73,37 @@ private func makeJavaScriptCoreAutoJSClass(
     }
   )
   let nativeDefinition = autoNativeDefinition(backing: backing, in: runtime)
-  return JSClass(
+  return JSCClass(
     nativeDefinition: nativeDefinition,
     retainedBacking: backing
   )
 }
 
-extension JavaScriptCoreEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
+extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
+  public typealias Value = JSCValue
+  public typealias InstantContext = JSCInstantContext
+  public typealias Arguments = JSCArguments
+  public typealias Class = JSCClass
   public typealias ClassPropertyNameAccumulator = JSPropertyNameAccumulatorRef
 
   public static func makeClass(
-    definition: JavaScriptCoreAutoClassDefinition,
-    in runtime: JavaScriptCoreRuntimeHandle
-  ) -> JSClass {
+    definition: JSCAutoClassDefinition,
+    in runtime: JSCRuntimeHandle
+  ) -> JSCClass {
     makeJavaScriptCoreAutoJSClass(definition: definition, in: runtime)
   }
 
   public static func runtimeHandle(
-    for context: JavaScriptCoreContextHandle
-  ) -> JavaScriptCoreRuntimeHandle? {
-    JavaScriptCoreRuntimeHandle(borrowing: JSContextGetGroup(context.ref))
+    for context: JSCContextHandle
+  ) -> JSCRuntimeHandle? {
+    JSCRuntimeHandle(borrowing: JSContextGetGroup(context.ref))
   }
 
   public static func makeClassObjectResultHandle(
-    of jsClass: JSClass,
+    of jsClass: JSCClass,
     privateData: UnsafeMutableRawPointer,
-    in context: JavaScriptCoreContextHandle
-  ) -> JSResult<JSValueHandle<JavaScriptCoreEngine>>? {
+    in context: JSCContextHandle
+  ) -> JSResult<JSCValueHandle>? {
     makeJavaScriptCoreObjectResultHandle(
       of: jsClass.ref,
       privateData: privateData,
@@ -104,8 +112,8 @@ extension JavaScriptCoreEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
   }
 
   public static func classObjectPrivateData(
-    from value: JSValueHandle<JavaScriptCoreEngine>,
-    in context: JavaScriptCoreContextHandle
+    from value: JSCValueHandle,
+    in context: JSCContextHandle
   ) -> JSResult<UnsafeMutableRawPointer?>? {
     javaScriptCorePrivateData(from: value, in: context)
   }
@@ -114,17 +122,17 @@ extension JavaScriptCoreEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
 
 extension JSClassValueConvertible
 where
-  Engine == JavaScriptCoreEngine,
-  ParentClass == JavaScriptCoreClassParentDescriptor,
+  Engine == JSCEngine,
+  ParentClass == JSCClassParentDescriptor,
   PropertyNameAccumulator == JSPropertyNameAccumulatorRef,
-  ClassDefinition == JavaScriptCoreAutoClassDefinition
+  ClassDefinition == JSCAutoClassDefinition
 {
-  public static var jsClass: JSClass {
+  public static var jsClass: JSCClass {
     let key = ObjectIdentifier(Self.self)
     return jsClassRegistry.value(forKey: key, orInsert: Self.makeAutoJSClass)
   }
 
-  fileprivate static func makeAutoJSClass() -> JSClass {
+  fileprivate static func makeAutoJSClass() -> JSCClass {
     let backing: JSClassAutoNativeClassBacking = Self.autoNativeClassBacking(
       lookup: SwiftJavaScript.JSClassDefinitionLookup {
         $0.definition()
@@ -134,20 +142,24 @@ where
       backing: backing,
       in: javaScriptCoreCompatibilityClassRuntime
     )
-    return JSClass(
+    return JSCClass(
       nativeDefinition: nativeDefinition,
       retainedBacking: backing
     )
   }
 }
 
-extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
+// The value-level convenience entries live on the concrete value view (S11):
+// the generic class conversion is engine-bound, so the caller's value already
+// names the engine and no handle cast is involved.
+
+extension JSCValue {
   public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
-    in context: borrowing JSInstantContext<JavaScriptCoreEngine>
+    in context: borrowing JSCInstantContext
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JavaScriptCoreEngine, T.ParentClass == JavaScriptCoreClassParentDescriptor,
+    T.Engine == JSCEngine, T.ParentClass == JSCClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -156,10 +168,10 @@ extension SwiftJavaScript.JSValue where E == JavaScriptCoreEngine {
 
   public func tryDecode<T: JSClassValueConvertible>(
     as type: T.Type = T.self,
-    in context: isolated SwiftJavaScript.JSContext<JavaScriptCoreEngine> = #isolation
+    in context: isolated JSCContext = #isolation
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JavaScriptCoreEngine, T.ParentClass == JavaScriptCoreClassParentDescriptor,
+    T.Engine == JSCEngine, T.ParentClass == JSCClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -218,8 +230,8 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    JavaScriptCoreAutoClassDefinition, borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>, String
+    JSCAutoClassDefinition, borrowing JSCInstantContext,
+    borrowing JSCValue, String
   ) -> R
 ) -> R? {
   guard let ctx, let object, let propertyName,
@@ -235,9 +247,9 @@ private func withAutoDynamicPropertyCallbackInput<R>(
 }
 
 private func autoDynamicGetPropertyCallbackValue(
-  definition: JavaScriptCoreAutoClassDefinition,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+  definition: JSCAutoClassDefinition,
+  context: borrowing JSCInstantContext,
+  thisValue: borrowing JSCValue,
   key: String,
   ctx: JSContextRef?,
   exception: UnsafeMutablePointer<JSValueRef?>?
@@ -254,11 +266,11 @@ private func autoDynamicGetPropertyCallbackValue(
 }
 
 private func autoDynamicSetPropertyCallbackResult(
-  definition: JavaScriptCoreAutoClassDefinition,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+  definition: JSCAutoClassDefinition,
+  context: borrowing JSCInstantContext,
+  thisValue: borrowing JSCValue,
   key: String,
-  newValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+  newValue: borrowing JSCValue,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> Bool {
   if let error = definition.setDynamicPropertyException(
@@ -267,7 +279,7 @@ private func autoDynamicSetPropertyCallbackResult(
     forKey: key,
     to: newValue
   ) {
-    let privateResult = JSResult<SwiftJavaScript.JSValue<JavaScriptCoreEngine>>.exception(error)
+    let privateResult = JSResult<JSCValue>.exception(error)
       .toPrivateResult()
     guard case .exception(let errorRef) = privateResult else {
       return true
@@ -285,9 +297,9 @@ private func withAutoStaticValueCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
-    borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    SwiftJavaScript.JSStaticValue<JSCEngine>,
+    borrowing JSCInstantContext,
+    borrowing JSCValue
   ) -> R
 ) -> R? {
   guard let ctx, let object, let propertyName,
@@ -316,9 +328,9 @@ private func withAutoStaticFunctionCallbackInput<R>(
   function: JSObjectRef?,
   thisObject: JSObjectRef?,
   _ body: (
-    SwiftJavaScript.JSStaticFunction<JavaScriptCoreEngine>,
-    borrowing JSInstantContext<JavaScriptCoreEngine>,
-    borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>
+    SwiftJavaScript.JSStaticFunction<JSCEngine>,
+    borrowing JSCInstantContext,
+    borrowing JSCValue
   ) ->
     R
 ) -> R? {
@@ -329,11 +341,14 @@ private func withAutoStaticFunctionCallbackInput<R>(
   }
 
   return withRememberedClassObjectValue(ctx, object: thisObject) { context, thisValue in
-    let functionValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: function, ctx: context)
-    let functionName = functionValue.getProperty(
-      forKey: "name", in: context
-    )
-    .toString(in: context)
+    let functionValue = JSCValue(ref: function, in: context)
+    let functionName: String
+    switch functionValue.getProperty("name", in: context) {
+    case .value(let name):
+      functionName = name.toString()
+    case .exception:
+      return nil
+    }
     guard
       let functionDefinition = definition.inheritedStaticFunction(
         named: functionName,
@@ -347,10 +362,10 @@ private func withAutoStaticFunctionCallbackInput<R>(
 }
 
 private func autoStaticSetPropertyCallbackResult(
-  valueDefinition: SwiftJavaScript.JSStaticValue<JavaScriptCoreEngine>,
-  context: borrowing JSInstantContext<JavaScriptCoreEngine>,
-  thisValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
-  newValue: borrowing SwiftJavaScript.JSValue<JavaScriptCoreEngine>,
+  valueDefinition: SwiftJavaScript.JSStaticValue<JSCEngine>,
+  context: borrowing JSCInstantContext,
+  thisValue: borrowing JSCValue,
+  newValue: borrowing JSCValue,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> Bool {
   javaScriptCoreCallbackSucceeded(
@@ -358,7 +373,7 @@ private func autoStaticSetPropertyCallbackResult(
       in: context,
       on: thisValue,
       to: newValue
-    )?.callbackRef(),
+    )?.ref,
     exception: exception
   )
 }
@@ -389,7 +404,7 @@ private let autoStaticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     object: object,
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
-    let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
+    let newValue = JSCValue(ref: value, in: context)
     return autoStaticSetPropertyCallbackResult(
       valueDefinition: valueDefinition,
       context: context,
@@ -454,7 +469,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        let newValue = SwiftJavaScript.JSValue<JavaScriptCoreEngine>(ref: value, ctx: context)
+        let newValue = JSCValue(ref: value, in: context)
         return autoDynamicSetPropertyCallbackResult(
           definition: definition,
           context: context,
@@ -552,7 +567,7 @@ private func installAutoStaticFunctionMembers(
 
 private func autoNativeDefinition(
   backing: JSClassAutoNativeClassBacking,
-  in runtime: JavaScriptCoreRuntimeHandle
+  in runtime: JSCRuntimeHandle
 )
   -> JavaScriptCore.JSClassDefinition
 {

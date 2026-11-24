@@ -2,20 +2,29 @@
 ///
 /// The generated conformance uses value semantics. When applied to a final class,
 /// decoding creates a new Swift instance and does not preserve object identity.
-/// Use `JSClassAutoConvertible` instead when reference semantics or a JSClass-backed
+/// Use `JSClassAutoConvertible` instead when reference semantics or a JSCClass-backed
 /// prototype chain must be preserved.
 ///
 /// For enums without associated values, the macro uses case names by default. Enums declared
 /// with built-in raw-value syntax such as `enum Kind: String` or `enum Code: Int` are encoded
 /// and decoded using `rawValue` instead. Only this built-in declaration form is recognized
 /// automatically; a manual `RawRepresentable` conformance added later is not detected.
+///
+/// The generated conformance is the engine-agnostic surface contract
+/// (`JSValueCodable`): decoding is generic over any `JSInstantContext` window
+/// and takes that window's own value view, and encoding produces the window's
+/// own value view.
 @attached(
   extension,
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization() =
   #externalMacro(
@@ -39,8 +48,12 @@ public macro JSValueAutoSerialization() =
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization(
   tagKey: StaticString,
@@ -59,8 +72,12 @@ public macro JSValueAutoSerialization(
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization(
   _ converter: any JSValueConverter.Type
@@ -83,8 +100,12 @@ public macro JSValueAutoSerialization(
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization(
   _ converter: any JSValueConverter.Type,
@@ -106,8 +127,12 @@ public macro JSValueAutoSerialization(
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization(
   _ decoder: any JSValueDecoder.Type,
@@ -132,8 +157,12 @@ public macro JSValueAutoSerialization(
   conformances: JSValueCodable,
   names: named(init(value:in:)),
   named(tryDecode(_:in:)),
-  named(toJSValue(in:)),
-  named(tryEncode(in:))
+  named(toSurfaceValue(in:)),
+  named(tryEncodeSurface(in:)),
+  named(__jsPropertyValue(_:from:in:)),
+  named(__jsIndexValue(_:from:in:)),
+  named(__jsObject(in:)),
+  named(__jsArray(in:))
 )
 public macro JSValueAutoSerialization(
   _ decoder: any JSValueDecoder.Type,
@@ -270,7 +299,7 @@ public macro JSValueFieldEncoding(
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Marks an instance method for export as a JavaScript function on a `JSClass`.
+/// Marks an instance method for export as a JavaScript function on a `JSCClass`.
 ///
 /// The generated function is added to `staticFunctions` in the synthesized
 /// `jsClassDefinition` and is invoked with `this` bound to the exported Swift instance.
@@ -293,7 +322,7 @@ public macro JSClassFunction(_ name: StaticString) =
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Overrides argument decoders for an exported `JSClass` method.
+/// Overrides argument decoders for an exported `JSCClass` method.
 ///
 /// The number of decoders must match the number of method parameters.
 @attached(peer, names: overloaded)
@@ -303,7 +332,7 @@ public macro JSClassFunctionArguments(_ decoders: any JSValueDecoder.Type...) =
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Overrides the return-value encoder for an exported `JSClass` method.
+/// Overrides the return-value encoder for an exported `JSCClass` method.
 @attached(peer, names: overloaded)
 public macro JSClassFunctionReturn(_ encoder: any JSValueEncoder.Type) =
   #externalMacro(
@@ -311,7 +340,7 @@ public macro JSClassFunctionReturn(_ encoder: any JSValueEncoder.Type) =
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Overrides the thrown-error encoder for an exported `JSClass` method.
+/// Overrides the thrown-error encoder for an exported `JSCClass` method.
 ///
 /// This only applies to throwing methods.
 @attached(peer, names: overloaded)
@@ -321,15 +350,18 @@ public macro JSClassFunctionError(_ encoder: any JSValueEncoder.Type) =
     type: "JSValueFieldMarkerMacro"
   )
 
-/// Generates a runtime-independent `SwiftJavaScript.JSEngineClassDefinition` and
-/// `JSClassValueConvertible` conformance for a Swift class.
+/// Generates a JavaScriptCore-specific `JSCAutoClassDefinition`
+/// (`JSEngineClassDefinition<JSCEngine, JSCClassParentDescriptor,
+/// JSPropertyNameAccumulatorRef>`) and a `JSClassValueConvertible` conformance for a
+/// Swift class.
 ///
 /// Unlike `JSValueAutoSerialization`, this macro preserves reference semantics by
-/// exporting the Swift instance as a JSClass-backed object whose identity, prototype
+/// exporting the Swift instance as a `JSCClass`-backed object whose identity, prototype
 /// chain, and inheritance chain remain visible to JavaScript.
 /// Stored properties are exported automatically. Methods are exported only when they are
 /// marked with `JSClassFunction`, optionally combined with `JSClassFunctionArguments`,
-/// `JSClassFunctionReturn`, and `JSClassFunctionError`.
+/// `JSClassFunctionReturn`, and `JSClassFunctionError`; the generated callbacks use
+/// `JSCValue`, `JSCInstantContext`, `JSCArguments`, and `JSCStaticFunction`.
 @attached(member, names: named(jsClassDefinition))
 @attached(
   extension,

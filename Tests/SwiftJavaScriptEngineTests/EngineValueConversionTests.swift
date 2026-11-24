@@ -1,3 +1,5 @@
+import SwiftyJavaScriptCore
+import SwiftyQuickJS
 import Testing
 
 @testable import SwiftJavaScript
@@ -46,38 +48,44 @@ struct EngineValueConversionTests {
 
   @Test(arguments: ScriptEngine.allCases)
   func functionInitSupportsReturnAndErrorCoder(_ engine: ScriptEngine) async {
-    await engine.run(FunctionInitSupportsReturnAndErrorCoder.self)
+    switch engine {
+    case .javaScriptCore:
+      await FunctionInitSupportsReturnAndErrorCoderJSC.run()
+    case .quickJS:
+      await FunctionInitSupportsReturnAndErrorCoderQJS.run()
+    }
   }
 }
 
 private enum SharedZeroOneBoolConverter: JSValueConverter {
   typealias SwiftType = Bool
 
-  static func decode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  static func decode<C: JSInstantContext & ~Copyable>(
+    _ value: borrowing C.Value,
+    in context: borrowing C
   ) -> Bool {
-    value.toDouble(in: context) != 0
+    _ = context
+    return value.toNumber() != 0
   }
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: Bool,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    JSValue(number: value ? 1 : 0, in: context)
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeNumber(value ? 1 : 0))
   }
 }
 
 private struct SharedFailingEncodeValue: JSValueEncodable {
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    JSValue(undefinedIn: context)
+  func toSurfaceValue<C: JSValueScope & ~Copyable>(
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeUndefined())
   }
 
-  func tryEncode<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
+  func tryEncodeSurface<C: JSValueScope & ~Copyable>(
+    in context: borrowing C
+  ) throws(JSValueConversionError) -> C.Value {
     _ = context
     throw .nonFiniteNumber(target: "SharedFailingEncodeValue")
   }
@@ -90,11 +98,11 @@ private struct SharedReturnPayload {
 private enum SharedReturnPayloadEncoder: JSValueEncoder {
   typealias SwiftType = SharedReturnPayload
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: SharedReturnPayload,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    JSValue(number: value.value, in: context)
+    in context: borrowing C
+  ) -> C.Value {
+    context.persist(context.makeNumber(value.value))
   }
 }
 
@@ -105,13 +113,13 @@ private enum SharedFailurePayload: Error {
 private enum SharedFailurePayloadEncoder: JSValueEncoder {
   typealias SwiftType = SharedFailurePayload
 
-  static func encode<E: JSValueConversionEngine>(
+  static func encode<C: JSValueScope & ~Copyable>(
     _ value: SharedFailurePayload,
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
+    in context: borrowing C
+  ) -> C.Value {
     switch value {
     case .bad:
-      return JSValue(string: "bad", in: context)
+      return context.persist(context.makeString("bad"))
     }
   }
 }
@@ -130,24 +138,21 @@ private struct SharedCodableUser: Codable, Equatable {
 }
 
 private enum BuiltinCodableRoundtrip: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let key: StaticString = "number"
-      context.withGlobalObject { global in
-        global.setProperty(42.5, forKey: key, in: context)
-      }
+      scope.setGlobalProperty(42.5, forKey: key)
 
-      let decoded = context.withGlobalObject { global in
-        global.getProperty(forKey: key, using: JSDefaultConverter<Double>.self, in: context)
-      }
+      let raw = scope.getGlobalProperty(forKey: key)
+      let decoded = try? Double(value: raw, in: scope)
       #expect(decoded == 42.5)
 
-      let scriptValue = context.evaluateScript("'abc'")
+      let scriptValue = scope.evaluateScript("'abc'")
       switch consume scriptValue {
       case .value(let value):
-        #expect(value.toString(in: context) == "abc")
+        #expect(value.toString() == "abc")
       case .exception:
         Issue.record("Expected string result")
       }
@@ -156,10 +161,10 @@ private enum BuiltinCodableRoundtrip: ScriptEngineAssertion {
 }
 
 private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let user = SharedCodableUser(
         name: "alice",
         age: 30,
@@ -169,22 +174,15 @@ private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
       )
       let key: StaticString = "user"
 
-      context.withGlobalObject { global in
-        global.setProperty(
-          user,
-          forKey: key,
-          using: JSCodableValueConverter<SharedCodableUser>.self,
-          in: context
-        )
-      }
+      scope.setGlobalProperty(
+        user,
+        forKey: key,
+        using: JSCodableValueConverter<SharedCodableUser>.self
+      )
 
-      let decoded: SharedCodableUser = context.withGlobalObject { global in
-        global.getProperty(
-          forKey: key,
-          using: JSCodableValueConverter<SharedCodableUser>.self,
-          in: context
-        )
-      }
+      let encoded = scope.getGlobalProperty(forKey: key)
+      let decoded = try? JSCodableValueConverter<SharedCodableUser>.tryDecode(
+        encoded, in: scope)
 
       #expect(decoded == user)
     }
@@ -192,72 +190,79 @@ private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
 }
 
 private enum ConverterOverrideForPropertyReadWrite: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let key: StaticString = "flag"
 
-      context.withGlobalObject { global in
-        global.setProperty(true, forKey: key, using: SharedZeroOneBoolConverter.self, in: context)
-      }
+      scope.setGlobalProperty(
+        true, forKey: key, using: SharedZeroOneBoolConverter.self)
 
-      let raw = context.withGlobalObject { global in
-        global.getProperty(forKey: key, in: context)
-      }
-      #expect(raw.toInt32(in: context) == 1)
+      let raw = scope.getGlobalProperty(forKey: key)
+      #expect(raw.toNumber() == 1)
 
-      let decoded = context.withGlobalObject { global in
-        global.getProperty(forKey: key, using: SharedZeroOneBoolConverter.self, in: context)
-      }
-      #expect(decoded)
+      let decoded = try? SharedZeroOneBoolConverter.tryDecode(raw, in: scope)
+      #expect(decoded == true)
     }
   }
 }
 
-private enum ConverterOverrideForArgumentsRead: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+// MARK: - Test argument view
+//
+// The surface `JSArguments` protocol is the argument face; this stand-in
+// exposes borrowed handles as the engine's value views, so the shared
+// variadic decode helpers can be exercised without an engine call frame.
 
-    await context.withInstantContext { context in
-      let source = JSValue(number: 1, in: context)
-      let sourceHandle = source.borrowHandle()
-      let args = JSArguments<E>(
-        count: 1,
-        borrowedValueHandleAt: { index, _ in index == 0 ? sourceHandle : nil }
+private struct SurfaceTestArguments<C: JSContext>: JSArguments, ~Copyable {
+  typealias Context = C
+  typealias Value = C.Value
+  typealias InstantContext = C.InstantContext
+
+  let handles: [C.ValueHandle]
+
+  var count: Int { handles.count }
+
+  func withValue<R: ~Copyable>(
+    at index: Int,
+    in context: borrowing C.InstantContext,
+    _ body: (borrowing C.Value) -> R
+  ) -> R {
+    precondition(index >= 0 && index < count, "Index out of bounds")
+    return body(context.anchorBorrowedHandle(handles[index]))
+  }
+}
+
+private enum ConverterOverrideForArgumentsRead: ScriptEngineAssertion {
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
+
+    await context.withInstantContext { scope in
+      let source = scope.makeNumber(1)
+      let args = SurfaceTestArguments<C>(
+        handles: [source.borrowHandle()]
       )
-      let decoded = args.unpack(at: 0, using: SharedZeroOneBoolConverter.self, in: context)
+      let decoded: Bool = args.unpack(
+        using: SharedZeroOneBoolConverter.self, in: scope)
       #expect(decoded)
     }
   }
 }
 
 private enum ConverterOverrideForArgumentsReadVariadic: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let boolSource = JSValue(number: 1, in: context)
-      let numberSource = JSValue(number: 42.5, in: context)
-      let boolHandle = boolSource.borrowHandle()
-      let numberHandle = numberSource.borrowHandle()
-      let args = JSArguments<E>(
-        count: 2,
-        borrowedValueHandleAt: { index, _ in
-          switch index {
-          case 0:
-            return boolHandle
-          case 1:
-            return numberHandle
-          default:
-            return nil
-          }
-        }
+    await context.withInstantContext { scope in
+      let boolSource = scope.makeNumber(1)
+      let numberSource = scope.makeNumber(42.5)
+      let args = SurfaceTestArguments<C>(
+        handles: [boolSource.borrowHandle(), numberSource.borrowHandle()]
       )
       let (decodedBool, decodedNumber): (Bool, Double) = args.unpack(
         using: SharedZeroOneBoolConverter.self,
         JSDefaultConverter<Double>.self,
-        in: context
+        in: scope
       )
       #expect(decodedBool)
       #expect(decodedNumber == 42.5)
@@ -266,13 +271,14 @@ private enum ConverterOverrideForArgumentsReadVariadic: ScriptEngineAssertion {
 }
 
 private enum StrictTryDecodeRejectsMismatchedType: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let stringValue = JSValue(string: "x", in: context)
+    await context.withInstantContext { scope in
+      let stringValue = scope.persist(scope.makeString("x"))
       do {
-        let _: Double = try JSDefaultConverter<Double>.tryDecode(stringValue, in: context)
+        let _: Double = try JSDefaultConverter<Double>.tryDecode(
+          stringValue, in: scope)
         Issue.record("Expected strict decode to fail")
       } catch {
         #expect(Bool(true))
@@ -282,19 +288,17 @@ private enum StrictTryDecodeRejectsMismatchedType: ScriptEngineAssertion {
 }
 
 private enum StrictTryUnpackRejectsMismatchedType: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let source = JSValue(string: "x", in: context)
-      let sourceHandle = source.borrowHandle()
-      let args = JSArguments<E>(
-        count: 1,
-        borrowedValueHandleAt: { index, _ in index == 0 ? sourceHandle : nil }
+    await context.withInstantContext { scope in
+      let source = scope.makeString("x")
+      let args = SurfaceTestArguments<C>(
+        handles: [source.borrowHandle()]
       )
       do {
         let _: Double = try args.tryUnpack(
-          at: 0, using: JSDefaultConverter<Double>.self, in: context)
+          using: JSDefaultConverter<Double>.self, in: scope)
         Issue.record("Expected strict unpack to fail")
       } catch {
         #expect(Bool(true))
@@ -304,13 +308,13 @@ private enum StrictTryUnpackRejectsMismatchedType: ScriptEngineAssertion {
 }
 
 private enum StrictTryEncodeCanFail: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
+    await context.withInstantContext { scope in
       let value = SharedFailingEncodeValue()
       do {
-        _ = try value.tryEncode(in: context)
+        _ = try value.tryEncodeSurface(in: scope)
         Issue.record("Expected strict encode to fail")
       } catch {
         #expect(Bool(true))
@@ -319,42 +323,95 @@ private enum StrictTryEncodeCanFail: ScriptEngineAssertion {
   }
 }
 
-private enum FunctionInitSupportsReturnAndErrorCoder: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+/// The function-callback initializer lives on the concrete engine value type
+/// and takes an isolated engine context, so this contract runs once per
+/// engine instead of generically.
+private enum FunctionInitSupportsReturnAndErrorCoderJSC {
+  static func run() async {
+    let context = JSCContext()
+    await context.installCodedFunctionAndCheck()
+  }
+}
 
-    await context.withIsolatedGlobalObject { context, global in
-      let fn: JSValue<E> = JSValue(
-        in: context,
-        name: "coded",
-        converters: JSDefaultConverter<Double>.self,
-        returnCoder: SharedReturnPayloadEncoder.self,
-        errorCoder: SharedFailurePayloadEncoder.self,
-        function: { (value: Double) throws(SharedFailurePayload) -> SharedReturnPayload in
-          if value < 0 {
-            throw .bad
-          }
-          return SharedReturnPayload(value: value + 2)
+private enum FunctionInitSupportsReturnAndErrorCoderQJS {
+  static func run() async {
+    let context = QJSContext()
+    await context.installCodedFunctionAndCheck()
+  }
+}
+
+extension JSCContext {
+  fileprivate func installCodedFunctionAndCheck() {
+    let fn = JSCValue(
+      in: self,
+      name: "coded",
+      converters: JSDefaultConverter<Double>.self,
+      returnCoder: SharedReturnPayloadEncoder.self,
+      errorCoder: SharedFailurePayloadEncoder.self,
+      function: { (value: Double) throws(SharedFailurePayload) -> SharedReturnPayload in
+        if value < 0 {
+          throw .bad
         }
-      )
-
-      global.setProperty(fn, forKey: ("coded"), in: context)
-
-      let success = context.evaluateScript("coded(40)")
-      switch consume success {
-      case .value(let value):
-        #expect(value.toDouble(in: context) == 42)
-      case .exception:
-        Issue.record("Expected success path to use return coder")
+        return SharedReturnPayload(value: value + 2)
       }
+    )
+    setGlobalProperty(fn, forKey: "coded", with: .none)
+    assertFunctionInitCoderBehavior()
+  }
 
-      let failure = context.evaluateScript("try { coded(-1) } catch (e) { e }")
-      switch consume failure {
-      case .value(let value):
-        #expect(value.toString(in: context) == "bad")
-      case .exception:
-        Issue.record("Expected failure path to use error coder")
+  private func assertFunctionInitCoderBehavior() {
+    let success = evaluateScript("coded(40)")
+    switch consume success {
+    case .value(let value):
+      #expect(value.toNumber() == 42)
+    case .exception:
+      Issue.record("Expected success path to use return coder")
+    }
+
+    let failure = evaluateScript("try { coded(-1) } catch (e) { e }")
+    switch consume failure {
+    case .value(let value):
+      #expect(value.toString() == "bad")
+    case .exception:
+      Issue.record("Expected failure path to use error coder")
+    }
+  }
+}
+
+extension QJSContext {
+  fileprivate func installCodedFunctionAndCheck() {
+    let fn = QJSValue(
+      in: self,
+      name: "coded",
+      converters: JSDefaultConverter<Double>.self,
+      returnCoder: SharedReturnPayloadEncoder.self,
+      errorCoder: SharedFailurePayloadEncoder.self,
+      function: { (value: Double) throws(SharedFailurePayload) -> SharedReturnPayload in
+        if value < 0 {
+          throw .bad
+        }
+        return SharedReturnPayload(value: value + 2)
       }
+    )
+    setGlobalProperty(fn, forKey: "coded", with: .none)
+    assertFunctionInitCoderBehavior()
+  }
+
+  private func assertFunctionInitCoderBehavior() {
+    let success = evaluateScript("coded(40)")
+    switch consume success {
+    case .value(let value):
+      #expect(value.toNumber() == 42)
+    case .exception:
+      Issue.record("Expected success path to use return coder")
+    }
+
+    let failure = evaluateScript("try { coded(-1) } catch (e) { e }")
+    switch consume failure {
+    case .value(let value):
+      #expect(value.toString() == "bad")
+    case .exception:
+      Issue.record("Expected failure path to use error coder")
     }
   }
 }

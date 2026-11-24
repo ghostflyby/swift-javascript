@@ -134,92 +134,84 @@ private final class DummyJSClassInstance: Sendable {}
 
 private final class MockExportedJSClassInstance: JSClassValueConvertible, Sendable {
   typealias Engine = MockEngine
-  typealias ParentClass = JSClass<MockEngine>
+  typealias ParentClass = MockSurfaceClass
   typealias PropertyNameAccumulator = Never
-  typealias ClassDefinition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>
+  typealias ClassDefinition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>
 
-  static var jsClassDefinition: JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never> {
-    var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  static var jsClassDefinition: JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never> {
+    var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
     definition.className = "ExportedChild"
     definition.parentClass = mockClass("Parent")
     return definition
   }
 
-  static func tryDecode<E: JSValueConversionEngine>(
-    _ value: borrowing JSValue<E>,
-    in context: borrowing JSInstantContext<E>
+  // `MockEngine.InstantContext` is concrete here, so the generic requirement
+  // is witnessed concretely: the protocol's `where C == Engine.InstantContext`
+  // leaves exactly this one window type.
+  static func tryDecode(
+    _ value: borrowing MockSurfaceValue,
+    in context: borrowing MockSurfaceInstantContext
   ) throws(JSValueConversionError) -> MockExportedJSClassInstance {
     _ = value
     _ = context
     return MockExportedJSClassInstance()
   }
 
-  static func tryEncode<E: JSValueConversionEngine>(
+  static func tryEncode(
     _ value: MockExportedJSClassInstance,
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
+    in context: borrowing MockSurfaceInstantContext
+  ) throws(JSValueConversionError) -> MockSurfaceValue {
     _ = value
-    return JSValue<E>(undefinedIn: context)
-  }
-
-  func toJSValue<E: JSValueConversionEngine>(in context: borrowing JSInstantContext<E>) -> JSValue<
-    E
-  > {
-    MockExportedJSClassInstance.encode(self, in: context)
-  }
-
-  func tryEncode<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    try MockExportedJSClassInstance.tryEncode(self, in: context)
+    return context.persist(context.makeUndefined())
   }
 }
 
-private func mockUndefinedValue() -> JSValue<MockEngine> {
+private func mockUndefinedValue() -> MockSurfaceValue {
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  return JSValue<MockEngine>(
-    handleValue: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
-    in: context
+  return MockSurfaceValue(
+    handle: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
+    contextHandle: context
   )
 }
 
-private func mockClass(_ id: String) -> JSClass<MockEngine> {
-  JSClass(handleClass: MockClassHandle(rawClass: MockClass(id: id)))
+private func mockClass(_ id: String) -> MockSurfaceClass {
+  MockSurfaceClass(classHandle: MockClassHandle(rawClass: MockClass(id: id)))
 }
 
-private func mockInstantContext() -> JSInstantContext<MockEngine> {
-  JSInstantContext(handle: MockContextHandle(rawContext: MockContext(runtimeID: "runtime-token")))
+private func mockInstantContext() -> MockSurfaceInstantContext {
+  MockSurfaceInstantContext(
+    handle: MockContextHandle(rawContext: MockContext(runtimeID: "runtime-token")))
 }
 
 private func readStaticValue<D: JSStaticValueDefinition>(
   _ definition: D,
-  in context: borrowing JSInstantContext<D.Engine>,
-  from thisValue: borrowing JSValue<D.Engine>
-) -> JSResult<JSValue<D.Engine>> {
+  in context: borrowing MockSurfaceInstantContext,
+  from thisValue: borrowing MockSurfaceValue
+) -> JSResult<MockSurfaceValue> where D.Engine == MockEngine {
   definition.getProperty(context, thisValue)
 }
 
 private func callStaticFunction<D: JSStaticFunctionDefinition>(
   _ definition: D,
-  in context: borrowing JSInstantContext<D.Engine>,
-  on thisValue: borrowing JSValue<D.Engine>,
-  with arguments: borrowing JSArguments<D.Engine>
-) -> JSResult<JSValue<D.Engine>> {
+  in context: borrowing MockSurfaceInstantContext,
+  on thisValue: borrowing MockSurfaceValue,
+  with arguments: borrowing MockSurfaceArguments
+) -> JSResult<MockSurfaceValue> where D.Engine == MockEngine {
   definition.callAsFunction(context, thisValue, arguments)
 }
 
 @Test func jsClassWrapsEngineSpecificClassHandle() {
   let handle = MockClassHandle(rawClass: MockClass(id: "Widget"))
-  let jsClass = JSClass<MockEngine>(handleClass: handle)
+  let jsClass = MockSurfaceClass(classHandle: handle)
 
   #expect(jsClass.classHandle() == handle)
-  #expect(jsClass == JSClass<MockEngine>(handleClass: handle))
+  #expect(jsClass == MockSurfaceClass(classHandle: handle))
 }
 
 @Test func staticMemberProtocolsSupportGenericConsumption() {
   let context = mockInstantContext()
   let thisValue = mockUndefinedValue()
-  let arguments = JSArguments<MockEngine>(
+  let arguments = MockSurfaceArguments(
     count: 0,
     borrowedValueHandleAt: { _, _ in nil }
   )
@@ -279,15 +271,15 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func jsClassAutoStorageComputesManagedParentAndFinalizeDepth() {
   let parentClass = mockClass("Parent")
 
-  var parent = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var parent = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   parent.className = "Parent"
 
-  var child = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var child = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   child.className = "Child"
   child.parentClass = parentClass
 
   let backing = JSClassAutoNativeClassBacking<
-    JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>,
+    JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>,
     Int,
     Int
   >(definition: child) { jsClass in
@@ -308,7 +300,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func jsClassAutoStorageTypedInstanceAccessIsSafe() {
   let instance = DummyJSClassInstance()
   let storage = JSClassAutoObjectStorage<
-    JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>
+    JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>
   >(
     definition: JSEngineClassDefinition(),
     instance: instance,
@@ -322,7 +314,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func jsClassDefinitionMetadataAndCallbackFlagsKeepShape() {
   let parentClass = mockClass("Parent")
 
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.version = 3
   definition.attributes = JSClassAttributes(rawValue: 0b101)
   definition.className = "Widget"
@@ -384,7 +376,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let grandparentClass = mockClass("Grandparent")
   let parentClass = mockClass("Parent")
 
-  var grandparent = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var grandparent = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   grandparent.className = "Grandparent"
   grandparent.staticValues = [
     JSStaticValue(
@@ -395,7 +387,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
     )
   ]
 
-  var parent = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var parent = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   parent.className = "Parent"
   parent.parentClass = grandparentClass
   parent.staticFunctions = [
@@ -406,11 +398,12 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
     )
   ]
 
-  var child = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var child = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   child.className = "Child"
   child.parentClass = parentClass
 
-  let lookup = JSEngineClassDefinitionLookup<MockEngine, JSClass<MockEngine>, Never> { jsClass in
+  let lookup = JSEngineClassDefinitionLookup<MockEngine, MockSurfaceClass, Never> {
+    jsClass in
     switch jsClass {
     case parentClass:
       parent
@@ -431,7 +424,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func engineClassDefinitionExportsCoreDefinition() {
   let parentClass = mockClass("Parent")
 
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.version = 7
   definition.attributes = JSClassAttributes(rawValue: 0b11)
   definition.className = "Widget"
@@ -463,7 +456,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 }
 
 @Test func engineClassDefinitionSeparatesDefinitionAndBehaviorStorage() {
-  var definition = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   definition.definition.className = "Widget"
   definition.behavior.staticValues = [
     JSStaticValue(
@@ -484,24 +477,24 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let grandparentClass = mockClass("Grandparent")
   let parentClass = mockClass("Parent")
 
-  var grandparent = JSClassDefinitionMetadata<JSClass<MockEngine>>()
+  var grandparent = JSClassDefinitionMetadata<MockSurfaceClass>()
   grandparent.className = "Grandparent"
   grandparent.staticValues = [
     JSClassStaticValueDefinition(name: "grand", attributes: [.readOnly])
   ]
 
-  var parent = JSClassDefinitionMetadata<JSClass<MockEngine>>()
+  var parent = JSClassDefinitionMetadata<MockSurfaceClass>()
   parent.className = "Parent"
   parent.parentClass = grandparentClass
   parent.staticFunctions = [
     JSClassStaticFunctionDefinition(name: "parentFn", attributes: [.dontDelete])
   ]
 
-  var child = JSClassDefinitionMetadata<JSClass<MockEngine>>()
+  var child = JSClassDefinitionMetadata<MockSurfaceClass>()
   child.className = "Child"
   child.parentClass = parentClass
 
-  let lookup = JSClassDefinitionMetadataLookup<JSClass<MockEngine>> { jsClass in
+  let lookup = JSClassDefinitionMetadataLookup<MockSurfaceClass> { jsClass in
     switch jsClass {
     case parentClass:
       parent
@@ -522,16 +515,17 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
 @Test func jsClassValueConverterAutoHelpersUseDefinitionAndLookup() {
   let parentClass = mockClass("Parent")
 
-  var parent = JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>()
+  var parent = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
   parent.className = "Parent"
 
-  let lookup = JSEngineClassDefinitionLookup<MockEngine, JSClass<MockEngine>, Never> { jsClass in
+  let lookup = JSEngineClassDefinitionLookup<MockEngine, MockSurfaceClass, Never> {
+    jsClass in
     jsClass == parentClass ? parent : nil
   }
 
   let backing:
     JSClassAutoNativeClassBacking<
-      JSEngineClassDefinition<MockEngine, JSClass<MockEngine>, Never>,
+      JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>,
       Int,
       Int
     > =

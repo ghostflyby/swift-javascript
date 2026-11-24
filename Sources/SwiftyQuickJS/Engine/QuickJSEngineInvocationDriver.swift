@@ -8,13 +8,13 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QuickJSEngine: JSEngineInvocationDriver {
+extension QJSEngine: JSEngineInvocationDriver {
   public static func callFunctionHandle(
-    _ function: QuickJSValueHandle,
-    this thisValue: QuickJSValueHandle?,
-    arguments: [QuickJSValueHandle],
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    _ function: QJSValueHandle,
+    this thisValue: QJSValueHandle?,
+    arguments: [QJSValueHandle],
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     var rawArguments = arguments.map(\.ref)
     let thisRawValue = thisValue?.ref ?? quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
@@ -30,10 +30,10 @@ extension QuickJSEngine: JSEngineInvocationDriver {
   }
 
   public static func constructHandle(
-    _ constructor: QuickJSValueHandle,
-    arguments: [QuickJSValueHandle],
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    _ constructor: QJSValueHandle,
+    arguments: [QJSValueHandle],
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     var rawArguments = arguments.map(\.ref)
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
       JS_CallConstructor(context.ref, constructor.ref, Int32(buffer.count), buffer.baseAddress)
@@ -42,22 +42,22 @@ extension QuickJSEngine: JSEngineInvocationDriver {
   }
 
   public static func toObjectHandle(
-    _ value: QuickJSValueHandle,
-    in context: QuickJSContextHandle
-  ) -> JSResult<QuickJSValueHandle>? {
+    _ value: QJSValueHandle,
+    in context: QJSContextHandle
+  ) -> JSResult<QJSValueHandle>? {
     quickJSResultHandle(for: JS_ToObject(context.ref, value.ref), in: context.ref)
   }
 
   public static func isArrayHandle(
-    _ value: QuickJSValueHandle,
-    in _: QuickJSContextHandle
+    _ value: QJSValueHandle,
+    in _: QJSContextHandle
   ) -> Bool? {
     JS_IsArray(value.ref)
   }
 
   public static func isDateHandle(
-    _ value: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ value: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     guard JS_IsObject(value.ref) else {
       return false
@@ -74,27 +74,27 @@ extension QuickJSEngine: JSEngineInvocationDriver {
   }
 
   public static func isInstanceOfHandle(
-    _ value: QuickJSValueHandle,
-    constructor: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ value: QJSValueHandle,
+    constructor: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     let result = JS_IsInstanceOf(context.ref, value.ref, constructor.ref)
     return result >= 0 ? result == 1 : nil
   }
 
   public static func looselyEqualsHandle(
-    _ lhs: QuickJSValueHandle,
-    _ rhs: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ lhs: QJSValueHandle,
+    _ rhs: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     let result = JS_IsEqual(context.ref, lhs.ref, rhs.ref)
     return result >= 0 ? result == 1 : nil
   }
 
   public static func strictlyEqualsHandle(
-    _ lhs: QuickJSValueHandle,
-    _ rhs: QuickJSValueHandle,
-    in context: QuickJSContextHandle
+    _ lhs: QJSValueHandle,
+    _ rhs: QJSValueHandle,
+    in context: QJSContextHandle
   ) -> Bool? {
     JS_IsStrictEqual(context.ref, lhs.ref, rhs.ref)
   }
@@ -102,13 +102,13 @@ extension QuickJSEngine: JSEngineInvocationDriver {
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension QuickJSContextHandle: JSContextInvocationDriver {
+extension QJSContextHandle: JSContextInvocationDriver {
   public func callFunctionHandle(
-    _ function: QuickJSValueHandle,
-    this thisValue: QuickJSValueHandle?,
-    arguments: [QuickJSValueHandle]
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.callFunctionHandle(
+    _ function: QJSValueHandle,
+    this thisValue: QJSValueHandle?,
+    arguments: [QJSValueHandle]
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.callFunctionHandle(
       function,
       this: thisValue,
       arguments: arguments,
@@ -117,42 +117,42 @@ extension QuickJSContextHandle: JSContextInvocationDriver {
   }
 
   public func constructHandle(
-    _ constructor: QuickJSValueHandle,
-    arguments: [QuickJSValueHandle]
-  ) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.constructHandle(constructor, arguments: arguments, in: self)
+    _ constructor: QJSValueHandle,
+    arguments: [QJSValueHandle]
+  ) -> JSResult<QJSValueHandle>? {
+    QJSEngine.constructHandle(constructor, arguments: arguments, in: self)
   }
 
-  public func toObjectHandle(_ value: QuickJSValueHandle) -> JSResult<QuickJSValueHandle>? {
-    QuickJSEngine.toObjectHandle(value, in: self)
+  public func toObjectHandle(_ value: QJSValueHandle) -> JSResult<QJSValueHandle>? {
+    QJSEngine.toObjectHandle(value, in: self)
   }
 
-  public func isArrayHandle(_ value: QuickJSValueHandle) -> Bool? {
-    QuickJSEngine.isArrayHandle(value, in: self)
+  public func isArrayHandle(_ value: QJSValueHandle) -> Bool? {
+    QJSEngine.isArrayHandle(value, in: self)
   }
 
-  public func isDateHandle(_ value: QuickJSValueHandle) -> Bool? {
-    QuickJSEngine.isDateHandle(value, in: self)
+  public func isDateHandle(_ value: QJSValueHandle) -> Bool? {
+    QJSEngine.isDateHandle(value, in: self)
   }
 
   public func isInstanceOfHandle(
-    _ value: QuickJSValueHandle,
-    constructor: QuickJSValueHandle
+    _ value: QJSValueHandle,
+    constructor: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
+    QJSEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
   }
 
   public func looselyEqualsHandle(
-    _ lhs: QuickJSValueHandle,
-    _ rhs: QuickJSValueHandle
+    _ lhs: QJSValueHandle,
+    _ rhs: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.looselyEqualsHandle(lhs, rhs, in: self)
+    QJSEngine.looselyEqualsHandle(lhs, rhs, in: self)
   }
 
   public func strictlyEqualsHandle(
-    _ lhs: QuickJSValueHandle,
-    _ rhs: QuickJSValueHandle
+    _ lhs: QJSValueHandle,
+    _ rhs: QJSValueHandle
   ) -> Bool? {
-    QuickJSEngine.strictlyEqualsHandle(lhs, rhs, in: self)
+    QJSEngine.strictlyEqualsHandle(lhs, rhs, in: self)
   }
 }

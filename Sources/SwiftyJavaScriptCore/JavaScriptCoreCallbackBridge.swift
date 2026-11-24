@@ -1,28 +1,35 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
+// MARK: - Surface callback trampoline (S6)
+//
+// The surface entry boxes `JSFunctionCallback<JSCInstantContext>` and uses its own
+// function class. The trampoline reads only `isException` and the borrowed
+// handle of the returned carrier; JSC is GC-managed, so the returned ref needs
+// no reference accounting and the owning arena keeps its explicit root until
+// its own drain unprotects it.
+
+private let javaScriptCoreSurfaceFunctionCallback: JSObjectCallAsFunctionCallback = {
   ctx, function, thisObject, argumentCount, arguments, exception in
   guard let ctx, let function, let thisObject else {
     return JSValueMakeUndefined(ctx)
   }
 
-  let contextHandle = JavaScriptCoreContextHandle(borrowing: ctx)
-  let scope = JSInstantContext<JavaScriptCoreEngine>(handle: contextHandle)
+  let contextHandle = JSCContextHandle(borrowing: ctx)
+  let scope = JSCInstantContext(handle: contextHandle)
 
-  let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(
+  let callback = Unmanaged<Box<JSFunctionCallback<JSCInstantContext>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
 
-  let thisValue = JSCallbackValue<JavaScriptCoreEngine>(
-    handle: JavaScriptCoreValueHandle(ref: thisObject),
-    context: contextHandle
+  let thisValue = JSCCallbackValue(
+    handle: JSCValueHandle(ref: thisObject),
+    contextHandle: contextHandle
   )
 
-  let result = withJavaScriptCoreCallbackArguments(
+  let result = withJavaScriptCoreSurfaceCallbackArguments(
     pointer: arguments,
     count: Int(argumentCount),
-    contextRef: ctx,
   ) { args in
     callback(scope, thisValue, args)
   }
@@ -31,39 +38,35 @@ private let javaScriptCoreFunctionCallback: JSObjectCallAsFunctionCallback = {
     exception?.pointee = result.handle.ref
     return JSValueMakeUndefined(ctx)
   }
-  // §7.2 decision: the handoff carries a borrowed handle whose reference is
-  // owned by a scope arena (persistent values by the context default scope,
-  // which outlives the callback). JSC is GC-managed: the returned ref needs
-  // no reference accounting, and the arena's explicit root stays in place
-  // until its own drain unprotects it.
   return result.handle.ref
 }
 
-func makeJavaScriptCoreFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
+func makeJavaScriptCoreSurfaceFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
   var definition = JavaScriptCore.kJSClassDefinitionEmpty
-  definition.callAsFunction = javaScriptCoreFunctionCallback
+  definition.callAsFunction = javaScriptCoreSurfaceFunctionCallback
   definition.finalize = { function in
     guard let function, let privateData = JSObjectGetPrivate(function) else {
       return
     }
-    let callback = Unmanaged<Box<JSFunctionCallback<JavaScriptCoreEngine>>>.fromOpaque(privateData)
+    let callback = Unmanaged<Box<JSFunctionCallback<JSCInstantContext>>>.fromOpaque(privateData)
       .takeRetainedValue()
     _ = callback.value
   }
   return definition
 }
 
-func withJavaScriptCoreCallbackArguments<R: ~Copyable>(
+/// The call frame's borrowed refs are exposed as the engine's
+/// `JSCCallbackArguments`.
+func withJavaScriptCoreSurfaceCallbackArguments<R: ~Copyable>(
   pointer: UnsafePointer<JSValueRef?>?,
   count: Int,
-  contextRef: JSGlobalContextRef,
-  _ body: (borrowing JSCallbackArguments<JavaScriptCoreEngine>) -> R
+  _ body: (borrowing JSCCallbackArguments) -> R
 ) -> R {
   var ref: JSValueRef? = nil
   return withUnsafePointer(
     to: &ref,
     { empty in
-      let arguments = JSCallbackArguments<JavaScriptCoreEngine>(
+      let arguments = JSCCallbackArguments(
         count: count,
         borrowedValueHandleAt: { index in
           guard
@@ -73,26 +76,28 @@ func withJavaScriptCoreCallbackArguments<R: ~Copyable>(
           else {
             return nil
           }
-          return JavaScriptCoreValueHandle(ref: valueRef)
+          return JSCValueHandle(ref: valueRef)
         }
       )
       return body(arguments)
     })
 }
 
-// Legacy version for JSClass callbacks (uses old JSArguments pattern)
+/// Class-callback counterpart of `withJavaScriptCoreSurfaceCallbackArguments`:
+/// the call frame's borrowed refs are exposed as the surface `JSCArguments`,
+/// the argument view the class definition closures consume (S11).
 func withJavaScriptCoreArguments<R: ~Copyable>(
   _ pointer: UnsafePointer<JSValueRef?>?,
   count: Int,
-  _ body: (borrowing JSArguments<JavaScriptCoreEngine>) -> R
+  _ body: (borrowing JSCArguments) -> R
 ) -> R {
   var ref: JSValueRef? = nil
   return withUnsafePointer(
     to: &ref,
     { empty in
-      let arguments = JSArguments<JavaScriptCoreEngine>(
+      let arguments = JSCArguments(
         count: count,
-        borrowedValueHandleAt: { index, contextHandle in
+        borrowedValueHandleAt: { index, _ in
           guard
             index >= 0,
             index < count,
@@ -100,7 +105,7 @@ func withJavaScriptCoreArguments<R: ~Copyable>(
           else {
             return nil
           }
-          return JavaScriptCoreValueHandle(ref: valueRef)
+          return JSCValueHandle(ref: valueRef)
         }
       )
       return body(arguments)

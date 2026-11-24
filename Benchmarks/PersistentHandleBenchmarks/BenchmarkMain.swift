@@ -5,11 +5,11 @@ import SwiftyQuickJS
 
 // Stage 4 calibration harness (docs/PERSISTENT_HANDLE_DESIGN.md §8.4/§11).
 //
-// Everything below uses the public library surface only: `JSContext`,
-// `withInstantContext`, `withIsolatedGlobalObject`, `JSScope`,
-// `makePersistentHandle`, `resolve`, `invalidate`, and the driver's
-// `toNumberForHandle`. The harness deliberately does not reach into the
-// registry, so the measured numbers are the ones a host actually pays.
+// Everything below uses the public library surface only: the context `C`,
+// `withInstantContext`, `makeScope`, `makePersistentHandle`, `resolve`,
+// `invalidate`, and the driver's `toNumberForHandle`. The harness deliberately
+// does not reach into the registry, so the measured numbers are the ones a
+// host actually pays.
 //
 // Structural choices that matter for reading the numbers:
 // - One VM per engine run; a fresh context per sample. A context's
@@ -17,8 +17,8 @@ import SwiftyQuickJS
 //   waits for it through a FIFO sentinel (`ExecutorBarrier`).
 // - Values are numbers: both engines represent doubles as immediates, so the
 //   measured cost is the wrapper/registry layer, not JS heap allocation.
-// - `JSContext.resolve` and `JSScope.resolve` are the two registry access
-//   paths (direct actor property vs context-data box).
+// - `C.resolve` and `C.Scope.resolve` are the two registry access paths
+//   (direct actor property vs context-data box).
 
 @main
 struct PersistentHandleBenchmarks {
@@ -31,12 +31,12 @@ struct PersistentHandleBenchmarks {
     let syntheticOnly = arguments.contains("--synthetic-only")
     if !syntheticOnly && !arguments.contains("--quickjs-only") {
       await EngineBenchmarks.run(
-        JavaScriptCoreEngine.self, name: "JavaScriptCore",
+        JSCContext.self, name: "JavaScriptCore",
         config: config, reporter: reporter)
     }
     if !syntheticOnly && !arguments.contains("--jsc-only") {
       await EngineBenchmarks.run(
-        QuickJSEngine.self, name: "QuickJS",
+        QJSContext.self, name: "QuickJS",
         config: config, reporter: reporter)
     }
     if !arguments.contains("--no-synthetic") {
@@ -62,7 +62,7 @@ private actor ExecutorBarrier {
   nonisolated let unownedExecutor: UnownedSerialExecutor
   private var pings = 0
 
-  init<E: JSEngineRuntimeDriver>(_ virtualMachine: JSVirtualMachine<E>) {
+  init<VM: JSVirtualMachine>(_ virtualMachine: VM) {
     self.unownedExecutor = virtualMachine.unownedExecutor
   }
 
@@ -75,9 +75,9 @@ private actor ExecutorBarrier {
 
 // MARK: - Sample carriers
 
-private struct MintBatch<E: JSContextEngine>: Sendable {
+private struct MintBatch<C: JSContext>: Sendable {
   let nanos: UInt64
-  let handles: [JSPersistentHandle<E>]
+  let handles: [C.PersistentHandle]
   let checksum: UInt64
 }
 
@@ -105,21 +105,20 @@ private struct ResolveSample: Sendable {
 // MARK: - Engine benchmarks
 
 private enum EngineBenchmarks {
-  static func run<E: JSContextEngine>(
-    _ engine: E.Type,
+  static func run<C: JSContext>(
+    _ context: C.Type,
     name: String,
     config: BenchConfig,
     reporter: Reporter
   ) async {
-    _ = engine
-    let virtualMachine = JSVirtualMachine<E>()
+    _ = context
+    let virtualMachine = C.VirtualMachine()
     let barrier = ExecutorBarrier(virtualMachine)
 
     // A resident context, so every sample context is a second context on a VM
     // that already hosts engine state — the shape hosts create, and the one
     // the §11 numbers were taken with.
-    var bootstrapBox: JSContext<E>? = JSContext<E>(
-      virtualMachine: virtualMachine)
+    var bootstrapBox: C? = C(virtualMachine: virtualMachine)
 
     if BenchDebug.enabled {
       let start = monotonicNanos()
@@ -160,15 +159,16 @@ private enum EngineBenchmarks {
     await barrier.ping()
   }
 
-  /// Create a fresh context. `JSContext.init` routes the engine-side creation
-  /// to the VM thread itself and waits for it, so the call is safe from this
-  /// cooperative thread; `bootstrap` only keeps the resident context alive.
-  private static func makeContext<E: JSContextEngine>(
-    _ virtualMachine: JSVirtualMachine<E>,
-    via bootstrap: JSContext<E>
-  ) async -> JSContext<E> {
+  /// Create a fresh context. The surface `init(virtualMachine:)` routes the
+  /// engine-side creation to the VM thread itself and waits for it, so the call
+  /// is safe from this cooperative thread; `bootstrap` only keeps the resident
+  /// context alive.
+  private static func makeContext<C: JSContext>(
+    _ virtualMachine: C.VirtualMachine,
+    via bootstrap: C
+  ) async -> C {
     _ = bootstrap
-    return JSContext<E>(virtualMachine: virtualMachine)
+    return C(virtualMachine: virtualMachine)
   }
 
   // MARK: Allocation
@@ -177,10 +177,10 @@ private enum EngineBenchmarks {
   /// source value drains with the scope. The baseline is "create the same
   /// value and let the default scope hold it" — creation + explicit root and
   /// no early-release capability.
-  private static func runAllocation<E: JSContextEngine>(
+  private static func runAllocation<C: JSContext>(
     name: String,
-    virtualMachine: JSVirtualMachine<E>,
-    bootstrap: JSContext<E>,
+    virtualMachine: C.VirtualMachine,
+    bootstrap: C,
     barrier: ExecutorBarrier,
     config: BenchConfig,
     reporter: Reporter
@@ -190,7 +190,7 @@ private enum EngineBenchmarks {
     func mintSample() async -> UInt64 {
       let context = await makeContext(virtualMachine, via: bootstrap)
       let batch = await mintBatch(context, count: ops)
-      var contextBox: JSContext<E>? = context
+      var contextBox: C? = context
       contextBox = nil
       await barrier.ping()
       return batch.nanos
@@ -199,7 +199,7 @@ private enum EngineBenchmarks {
     func holdSample() async -> UInt64 {
       let context = await makeContext(virtualMachine, via: bootstrap)
       let nanos = await defaultScopeHold(context, count: ops)
-      var contextBox: JSContext<E>? = context
+      var contextBox: C? = context
       contextBox = nil
       await barrier.ping()
       return nanos
@@ -229,12 +229,12 @@ private enum EngineBenchmarks {
         pair.candidate.median - pair.baseline.median))
   }
 
-  private static func mintBatch<E: JSContextEngine>(
-    _ context: JSContext<E>,
+  private static func mintBatch<C: JSContext>(
+    _ context: C,
     count: Int
-  ) async -> MintBatch<E> {
-    await context.withInstantContext { scope in
-      var handles: [JSPersistentHandle<E>] = []
+  ) async -> MintBatch<C> {
+    return await context.withInstantContext { scope in
+      var handles: [C.PersistentHandle] = []
       handles.reserveCapacity(count)
       var checksum: UInt64 = 0
       let start = monotonicNanos()
@@ -249,21 +249,25 @@ private enum EngineBenchmarks {
     }
   }
 
-  private static func mintHandles<E: JSContextEngine>(
-    _ context: JSContext<E>,
+  private static func mintHandles<C: JSContext>(
+    _ context: C,
     count: Int
-  ) async -> [JSPersistentHandle<E>] {
+  ) async -> [C.PersistentHandle] {
     await mintBatch(context, count: count).handles
   }
 
-  private static func defaultScopeHold<E: JSContextEngine>(
-    _ context: JSContext<E>,
+  /// Baseline: create the same value and let the context default scope hold it
+  /// (creation + explicit root, no early-release capability). `persist` moves
+  /// the window-owned reference into the default scope, which is the surface's
+  /// equivalent of the actor-side `makeNumber`.
+  private static func defaultScopeHold<C: JSContext>(
+    _ context: C,
     count: Int
   ) async -> UInt64 {
-    await context.withIsolatedGlobalObject { isolatedContext, _ in
+    return await context.withInstantContext { scope in
       let start = monotonicNanos()
       for index in 0..<count {
-        _ = isolatedContext.makeNumber(Double(index & 0xFFFF))
+        _ = scope.persist(scope.makeNumber(Double(index & 0xFFFF)))
       }
       return monotonicNanos() - start
     }
@@ -276,10 +280,10 @@ private enum EngineBenchmarks {
   /// direct, actor resolve), then invalidate + settle and measure the two
   /// miss paths. The direct phases are "the view is already in hand": their
   /// only difference from a hit phase is the registry/claim/track work.
-  private static func runResolve<E: JSContextEngine>(
+  private static func runResolve<C: JSContext>(
     name: String,
-    virtualMachine: JSVirtualMachine<E>,
-    bootstrap: JSContext<E>,
+    virtualMachine: C.VirtualMachine,
+    bootstrap: C,
     barrier: ExecutorBarrier,
     config: BenchConfig,
     reporter: Reporter
@@ -291,15 +295,12 @@ private enum EngineBenchmarks {
     let warmup = config.warmup
 
     func sample() async -> ResolveSample {
-      var contextBox: JSContext<E>? = await makeContext(
+      var contextBox: C? = await makeContext(
         virtualMachine, via: bootstrap)
       let handles = await mintHandles(contextBox!, count: handleCount)
 
-      let hit = await contextBox!.withIsolatedGlobalObject {
-        isolatedContext, _ in
-        measureHits(
-          isolatedContext, handles: handles, reps: reps)
-      }
+      let hit = await measureHits(
+        contextBox!, handles: handles, reps: reps)
 
       for handle in handles {
         _ = handle.invalidate()
@@ -307,10 +308,8 @@ private enum EngineBenchmarks {
 
       await barrier.ping()
 
-      let miss = await contextBox!.withIsolatedGlobalObject {
-        isolatedContext, _ in
-        measureMisses(isolatedContext, dead: handles, reps: reps)
-      }
+      let miss = await measureMisses(
+        contextBox!, dead: handles, reps: reps)
 
       contextBox = nil
       await barrier.ping()
@@ -403,13 +402,12 @@ private enum EngineBenchmarks {
           - stats(actorMiss, "actor-miss").median))
   }
 
-  private static func measureHits<E: JSContextEngine>(
-    _ context: isolated JSContext<E>,
-    handles: [JSPersistentHandle<E>],
+  private static func measureHits<C: JSContext>(
+    _ context: isolated C,
+    handles: [C.PersistentHandle],
     reps: Int
   ) -> ResolveHitTimings {
-    var scope = JSScope<E>(handle: context.driverContextHandle)
-    scope.open()
+    let scope = context.makeScope()
     // Default-scope value: the view is in hand for the whole measurement.
     let direct = context.makeNumber(7)
     let ops = reps * handles.count
@@ -459,13 +457,12 @@ private enum EngineBenchmarks {
       checksum: checksum)
   }
 
-  private static func measureMisses<E: JSContextEngine>(
-    _ context: isolated JSContext<E>,
-    dead: [JSPersistentHandle<E>],
+  private static func measureMisses<C: JSContext>(
+    _ context: isolated C,
+    dead: [C.PersistentHandle],
     reps: Int
   ) -> ResolveMissTimings {
-    var scope = JSScope<E>(handle: context.driverContextHandle)
-    scope.open()
+    let scope = context.makeScope()
     var misses = 0
 
     let witnessStart = monotonicNanos()
@@ -515,10 +512,10 @@ private enum EngineBenchmarks {
 
   // MARK: Release
 
-  private static func runRelease<E: JSContextEngine>(
+  private static func runRelease<C: JSContext>(
     name: String,
-    virtualMachine: JSVirtualMachine<E>,
-    bootstrap: JSContext<E>,
+    virtualMachine: C.VirtualMachine,
+    bootstrap: C,
     barrier: ExecutorBarrier,
     config: BenchConfig,
     reporter: Reporter
@@ -526,7 +523,7 @@ private enum EngineBenchmarks {
     let ops = config.releaseOps
 
     func invalidateSample() async -> UInt64 {
-      var contextBox: JSContext<E>? = await makeContext(
+      var contextBox: C? = await makeContext(
         virtualMachine, via: bootstrap)
       let handles = await mintHandles(contextBox!, count: ops)
       let start = monotonicNanos()
@@ -541,9 +538,9 @@ private enum EngineBenchmarks {
     }
 
     func deinitSample() async -> UInt64 {
-      var contextBox: JSContext<E>? = await makeContext(
+      var contextBox: C? = await makeContext(
         virtualMachine, via: bootstrap)
-      var handles: [JSPersistentHandle<E>]? = await mintHandles(
+      var handles: [C.PersistentHandle]? = await mintHandles(
         contextBox!, count: ops)
       let start = monotonicNanos()
       handles = nil
@@ -557,7 +554,7 @@ private enum EngineBenchmarks {
     /// Default-scope settlement, measured as the per-value component of
     /// context teardown: (loaded - empty) / n.
     func defaultScopeSample() async -> UInt64 {
-      var contextBox: JSContext<E>? = await makeContext(
+      var contextBox: C? = await makeContext(
         virtualMachine, via: bootstrap)
       _ = await defaultScopeHold(contextBox!, count: ops)
       let empty = await emptyTeardown(
@@ -572,7 +569,7 @@ private enum EngineBenchmarks {
     /// `close()` at container death, keeping the handles alive so the
     /// bindings are still `live` when the registry closes.
     func closeSample() async -> UInt64 {
-      var contextBox: JSContext<E>? = await makeContext(
+      var contextBox: C? = await makeContext(
         virtualMachine, via: bootstrap)
       let handles = await mintHandles(contextBox!, count: ops)
       let empty = await emptyTeardown(
@@ -645,17 +642,17 @@ private enum EngineBenchmarks {
 
   // MARK: Mass invalidation scaling
 
-  private static func runScale<E: JSContextEngine>(
+  private static func runScale<C: JSContext>(
     name: String,
-    virtualMachine: JSVirtualMachine<E>,
-    bootstrap: JSContext<E>,
+    virtualMachine: C.VirtualMachine,
+    bootstrap: C,
     barrier: ExecutorBarrier,
     config: BenchConfig,
     reporter: Reporter
   ) async {
     for ops in config.scaleOps {
       func invalidateSample() async -> UInt64 {
-        var contextBox: JSContext<E>? = await makeContext(
+        var contextBox: C? = await makeContext(
           virtualMachine, via: bootstrap)
         let handles = await mintHandles(contextBox!, count: ops)
         let start = monotonicNanos()
@@ -670,7 +667,7 @@ private enum EngineBenchmarks {
       }
 
       func closeSample() async -> UInt64 {
-        var contextBox: JSContext<E>? = await makeContext(
+        var contextBox: C? = await makeContext(
           virtualMachine, via: bootstrap)
         let handles = await mintHandles(contextBox!, count: ops)
         let empty = await emptyTeardown(
@@ -684,7 +681,7 @@ private enum EngineBenchmarks {
       }
 
       func defaultScopeSample() async -> UInt64 {
-        var contextBox: JSContext<E>? = await makeContext(
+        var contextBox: C? = await makeContext(
           virtualMachine, via: bootstrap)
         _ = await defaultScopeHold(contextBox!, count: ops)
         let empty = await emptyTeardown(
@@ -739,12 +736,12 @@ private enum EngineBenchmarks {
   /// Empty-context teardown baseline. The FIFO sentinel is included in both
   /// the empty and the loaded measurement and therefore cancels in the
   /// per-value difference.
-  private static func emptyTeardown<E: JSContextEngine>(
-    _ virtualMachine: JSVirtualMachine<E>,
-    bootstrap: JSContext<E>,
+  private static func emptyTeardown<C: JSContext>(
+    _ virtualMachine: C.VirtualMachine,
+    bootstrap: C,
     barrier: ExecutorBarrier
   ) async -> UInt64 {
-    var contextBox: JSContext<E>? = await makeContext(
+    var contextBox: C? = await makeContext(
       virtualMachine, via: bootstrap)
     let start = monotonicNanos()
     contextBox = nil

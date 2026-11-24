@@ -41,7 +41,7 @@ private enum PersistentSlotState: UInt8 {
 
 /// A chunk of owned value handles stored in raw pointer memory.
 ///
-/// Mirrors `ScopeArenaChunk` (`JSInstantContext.swift`): `Array` cannot hold
+/// Mirrors `ScopeArenaChunk` (`ScopeCore.swift`): `Array` cannot hold
 /// `~Copyable` elements and a `~Copyable` stored property of a class cannot be
 /// moved out, so payloads live in `UnsafeMutablePointer` storage where
 /// `move()` is a legal consuming read. Slots are addressed by global slot
@@ -133,7 +133,7 @@ private struct PersistentHandleRegistryState<
 /// Non-generic cleanup target.
 ///
 /// Capturing the generic registry directly in a `@Sendable` closure makes the
-/// compiler capture `E.Type` (the generic metatype), which is not `Sendable`
+/// compiler capture `ContextHandle.Type` (the generic metatype), which is not `Sendable`
 /// under Swift 6.4's sendable-metatypes checking and produces a warning for
 /// every release site. Scheduling through this existential erases the generic
 /// argument; the closure still strongly holds the registry.
@@ -143,27 +143,27 @@ private protocol PersistentPumpTarget: AnyObject, Sendable {
 
 /// Context-side binding registry (design §3).
 ///
-/// Lifetime is owned by `JSContext`; the same object is also published into
+/// Lifetime is owned by the host `JSContext` actor; the same object is also published into
 /// the context data storage box so synchronous scope witnesses can reach it.
 /// The registry holds the driver context handle as a **non-retaining value
 /// copy** (`ScopeFrame.driverContextHandle` has the same discipline); every
 /// engine call is guarded by `closed`, which `close()` sets before the
 /// context's `releaseReference()`.
-package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: PersistentPumpTarget,
-  @unchecked Sendable
+package final class JSPersistentHandleRegistry<ContextHandle: JSContextRuntimeDriver>:
+  PersistentPumpTarget, @unchecked Sendable
 {
   /// Process-wide, never-reused container identity (design §1.3).
   package let id: UInt64
 
   /// Non-retaining value copy; dereferenced by engine-touching paths only
   /// while the registry is not closed (design §3.1).
-  let driverContextHandle: E.ContextHandle
+  let driverContextHandle: ContextHandle
 
   private let scheduler: any JSPersistentCleanupScheduler
-  private let state = Mutex(PersistentHandleRegistryState<E.OwnedValueHandle>())
+  private let state = Mutex(PersistentHandleRegistryState<ContextHandle.OwnedValueHandle>())
 
   package init(
-    contextHandle: E.ContextHandle,
+    contextHandle: ContextHandle,
     scheduler: any JSPersistentCleanupScheduler
   ) {
     self.id = persistentHandleRegistryIDCounter.add(1, ordering: .relaxed).newValue
@@ -172,7 +172,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   }
 
   deinit {
-    // Normal path is exactly one close (JSContext's isolated deinit). The
+    // Normal path is exactly one close (the host `JSContext` actor's isolated deinit). The
     // registry can outlive that body through a late pump closure; the flag
     // below is then already set and this assertion passes.
     assert(
@@ -188,12 +188,11 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   ///
   /// Copy semantics, unlike `persist`'s transfer: the source value stays
   /// usable, and one handle can be resolved any number of times.
-  func makeHandle(_ handle: E.ValueHandle) -> JSPersistentHandle<E> {
-    let identity = mint(handle)
-    return JSPersistentHandle(identity: identity, registry: self)
-  }
-
-  private func mint(_ handle: E.ValueHandle) -> JSPersistentHandle<E>.Identity {
+  ///
+  /// Returns the shared public identity; the caller wraps it in its engine's
+  /// persistent-handle type. This keeps the registry's ownership of the
+  /// binding separate from the handle object's lifetime.
+  package func mintIdentity(_ handle: ContextHandle.ValueHandle) -> JSPersistentHandleIdentity {
     // Every engine entry point checks `closed` under the lock first: after
     // `close()` the registry must never dereference the saved context handle
     // (design §3.1). Mint/close/pump all run on the VM thread, so this check
@@ -222,7 +221,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
     // Only mint/close/pump move payloads and all three run on the VM thread;
     // the slot is not observable by anyone else until the handle is returned.
     slot.chunk.payloads.advanced(by: slot.index).initialize(to: owned)
-    return JSPersistentHandle<E>.Identity(
+    return JSPersistentHandleIdentity(
       registry: id,
       slot: slot.slot,
       generation: slot.generation
@@ -230,7 +229,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   }
 
   private struct AllocatedSlot {
-    let chunk: PersistentHandleSlotChunk<E.OwnedValueHandle>
+    let chunk: PersistentHandleSlotChunk<ContextHandle.OwnedValueHandle>
     let index: Int
     let slot: UInt32
     let generation: UInt32
@@ -269,7 +268,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
       let chunkIndex = Int(slot) / persistentHandleSlotChunkCapacity
       if chunkIndex == state.chunks.count {
         state.chunks.append(
-          PersistentHandleSlotChunk<E.OwnedValueHandle>(
+          PersistentHandleSlotChunk<ContextHandle.OwnedValueHandle>(
             capacity: persistentHandleSlotChunkCapacity)
         )
       }
@@ -296,10 +295,10 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   /// them share the VM thread with this call, so nothing can vacate the slot
   /// between the check and the borrow. `release` from another thread only
   /// changes metadata.
-  func borrowLive(_ identity: JSPersistentHandle<E>.Identity) -> E.ValueHandle? {
+  package func borrowLive(_ identity: JSPersistentHandleIdentity) -> ContextHandle.ValueHandle? {
     guard identity.registry == id else { return nil }
 
-    let located: (chunk: PersistentHandleSlotChunk<E.OwnedValueHandle>, index: Int)? =
+    let located: (chunk: PersistentHandleSlotChunk<ContextHandle.OwnedValueHandle>, index: Int)? =
       state.withLock { state in
         guard !state.closed else { return nil }
         guard let located = state.locate(identity.slot) else { return nil }
@@ -321,7 +320,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   /// binding. Idempotent: a second call, a call after `close()`, and a call
   /// for a mismatched generation all return `false`.
   @discardableResult
-  func release(_ identity: JSPersistentHandle<E>.Identity) -> Bool {
+  package func release(_ identity: JSPersistentHandleIdentity) -> Bool {
     guard identity.registry == id else { return false }
 
     let (killed, needsPump) = state.withLock { state -> (Bool, Bool) in
@@ -365,7 +364,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   private func pump() {
     while true {
       let work = state.withLock {
-        state -> PersistentSettlement<E.OwnedValueHandle>? in
+        state -> PersistentSettlement<ContextHandle.OwnedValueHandle>? in
         if state.closed {
           state.pumpScheduled = false
           return nil
@@ -419,7 +418,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   /// Unroot and release one payload. Engine calls only — never inside the
   /// metadata lock (QuickJS `JS_FreeValue` can synchronously run a user
   /// finalizer that re-enters `release`, and `Mutex` is not recursive).
-  private func settle(_ payload: consuming E.OwnedValueHandle) {
+  private func settle(_ payload: consuming ContextHandle.OwnedValueHandle) {
     driverContextHandle.unrootOwnedValueHandle(payload)
     driverContextHandle.releaseCreatedHandle(payload)
   }
@@ -427,7 +426,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
   // MARK: Close
 
   /// Settle every live binding inline (design §3.5/§4.1). VM thread only;
-  /// called from `JSContext.isolated deinit` before `releaseReference()`.
+  /// called from the host `JSContext` actor's isolated deinit before `releaseReference()`.
   ///
   /// Order is mandatory: set `closed` under the lock **first**, then scan.
   /// A `release` arriving after the flag flip is a no-op, so no
@@ -466,7 +465,7 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
 
     for slot in slots {
       let work = state.withLock {
-        state -> PersistentSettlement<E.OwnedValueHandle>? in
+        state -> PersistentSettlement<ContextHandle.OwnedValueHandle>? in
         guard let located = state.locate(slot),
           located.chunk.states[located.index]
             == PersistentSlotState.settling.rawValue
@@ -496,18 +495,19 @@ package final class JSPersistentHandleRegistry<E: JSEngineRuntimeDriver>: Persis
 ///
 /// The box is the synchronous access path for scope witnesses (callbacks
 /// cannot touch the actor). The registry's lifetime is still owned by
-/// `JSContext`, so an external box clear only removes this access path
+/// the host `JSContext` actor, so an external box clear only removes this access path
 /// (design §3.1).
-package enum JSPersistentHandleRegistryKey<E: JSEngineRuntimeDriver>: JSContextDataKey {
-  package typealias Value = JSPersistentHandleRegistry<E>
+package enum JSPersistentHandleRegistryKey<ContextHandle: JSContextRuntimeDriver>: JSContextDataKey
+{
+  package typealias Value = JSPersistentHandleRegistry<ContextHandle>
 }
 
 /// Registry lookup through the context data storage box.
 extension JSPersistentHandleRegistry {
   package static func registry(
-    for context: E.ContextHandle
-  ) -> JSPersistentHandleRegistry<E>? {
+    for context: ContextHandle
+  ) -> JSPersistentHandleRegistry<ContextHandle>? {
     context.contextDataStorageBox()?.data(
-      for: JSPersistentHandleRegistryKey<E>.self)
+      for: JSPersistentHandleRegistryKey<ContextHandle>.self)
   }
 }

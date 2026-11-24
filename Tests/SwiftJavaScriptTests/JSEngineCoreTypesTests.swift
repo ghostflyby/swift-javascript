@@ -49,7 +49,7 @@ import Testing
 // - 入集合样例(`[MockOwnedValueHandle]`)报
 //   error: type 'MockOwnedValueHandle' does not conform to protocol 'Copyable'。
 
-public struct MockRuntime: Sendable, Equatable {
+public struct MockRuntime: Sendable, Equatable, Hashable {
   let id: String
 }
 
@@ -65,7 +65,47 @@ private func takeReleasedHandles() -> [MockValueHandle] {
   }
 }
 
-public struct MockRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
+/// Read a static-string property through the context driver and adopt the
+/// engine's result on `scope`'s arena (the surface counterpart of the former
+/// `JSValueLegacy.getProperty` convenience).
+private func adoptedStaticProperty<C: JSInstantContext & ~Copyable>(
+  _ key: StaticString,
+  on value: borrowing C.CallbackValue,
+  in scope: borrowing C
+) -> C.Value? {
+  guard
+    let result = scope.driverContextHandle.getStaticStringPropertyHandle(
+      key, on: value.borrowHandle())
+  else {
+    return nil
+  }
+  switch result {
+  case .value(let handle), .exception(let handle):
+    return scope.adoptCreatedHandle(C.ContextHandle.OwnedValueHandle.adopting(handle))
+  }
+}
+
+// MARK: - Shared ArrayBuffer byte helper ledger (S10)
+//
+// `MockDriver` models an engine that copies the host bytes (so the passed
+// deallocator runs once on acceptance). A context whose identity starts with
+// `rejectArrayBuffer` models an engine that refuses the creation instead, so
+// core has to release the bytes once. The counting deallocator below observes
+// both paths.
+
+private let mockArrayBufferDeallocationCount = Mutex(0)
+
+private nonisolated(unsafe) let mockArrayBufferCountingDeallocator:
+  @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void = {
+    bytes,
+    _ in
+    mockArrayBufferDeallocationCount.withLock { $0 += 1 }
+    bytes?.deallocate()
+  }
+
+public struct MockRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable,
+  Hashable
+{
   let rawRuntime: MockRuntime
 
   init(rawRuntime: MockRuntime) {
@@ -356,7 +396,7 @@ public enum MockEngine: JSEngine {
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     _ = scope.makeString("a")
     _ = scope.makeNumber(42)
     _ = scope.makeBoolean(true)
@@ -366,7 +406,7 @@ public enum MockEngine: JSEngine {
   #expect(releaseLog(for: id).count == 3)
 }
 
-/// Stage 3 transfer semantics: with no hosted `JSContext` there is no longer
+/// Stage 3 transfer semantics: with no hosted `JSContextLegacy` there is no longer
 /// default scope to move into, so `persist` targets the receiver's own arena
 /// (take + re-track). The creation reference is therefore still settled once
 /// by the scope drain — no retain, no release, no abandon.
@@ -375,9 +415,9 @@ public enum MockEngine: JSEngine {
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     persisted = scope.persist(scope.makeString("keep"))
   }
 
@@ -391,7 +431,7 @@ public enum MockEngine: JSEngine {
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     _ = scope.return(scope.makeString("temp"))
   }
 
@@ -403,9 +443,9 @@ public enum MockEngine: JSEngine {
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     let a = scope.makeString("abandoned")
     _ = scope.return(scope.makeNumber(1))  // borrowing → stays
     persisted = scope.persist(a)  // no default scope → stays in this arena
@@ -421,7 +461,7 @@ public enum MockEngine: JSEngine {
 // MARK: - Stage 2A owned-element arena tests
 
 /// 与实现侧 chunk 容量保持一致(ScopeArena 每 chunk 32 槽,见
-/// JSInstantContext.swift 的 scopeArenaChunkCapacity)。
+/// JSInstantContextLegacy.swift 的 scopeArenaChunkCapacity)。
 private let stage2AArenaChunkCapacity = 32
 
 /// 跨 chunk 边界的 drain:arena 以 32 槽 chunk 链分块持有 owned 元素,
@@ -433,7 +473,7 @@ private let stage2AArenaChunkCapacity = 32
   let total = stage2AArenaChunkCapacity + 5  // 首块 32 槽 + 次块 5 槽
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     for index in 0..<total {
       _ = scope.makeNumber(Double(index))
     }
@@ -459,9 +499,9 @@ private let stage2AArenaChunkCapacity = 32
   let overflow = stage2AArenaChunkCapacity  // "keep" 之后 32 个:恰好溢出到第二 chunk
 
   let keepHandle: MockValueHandle
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     let keep = scope.makeString("keep")  // 位于最老 chunk 的槽 0
     keepHandle = keep.handle
     for index in 0..<overflow {
@@ -469,7 +509,7 @@ private let stage2AArenaChunkCapacity = 32
     }
     // persist 按身份摘除:removeFirst 匹配到最老 chunk 槽 0,
     // 用 arena 最后一个元素(位于头 chunk)回填,再把创建引用压回目标 arena。
-    persisted = scope.persist(JSCallbackValue(handle: keepHandle, context: context))
+    persisted = scope.persist(MockSurfaceCallbackValue(handle: keepHandle, contextHandle: context))
   }
 
   let released = releaseLog(for: id)
@@ -487,14 +527,15 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   let middleHandle: MockValueHandle
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     _ = scope.makeString("first")
     let middle = scope.makeString("middle")
     middleHandle = middle.handle
     _ = scope.makeString("last")
-    persisted = scope.persist(JSCallbackValue(handle: middleHandle, context: context))
+    persisted = scope.persist(
+      MockSurfaceCallbackValue(handle: middleHandle, contextHandle: context))
   }
 
   let released = releaseLog(for: id)
@@ -516,12 +557,11 @@ private let stage2AArenaChunkCapacity = 32
 
   var resultHandle: MockValueHandle? = nil
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     let base = scope.makeString("base")
-    switch base.getProperty("routed") {
-    case .value(let property):
-      resultHandle = property.handle
-    case .exception:
+    if let property = adoptedStaticProperty("routed", on: base, in: scope) {
+      resultHandle = property.borrowHandle()
+    } else {
       Issue.record("Expected getProperty to succeed")
     }
     #expect(releaseLog(for: id).isEmpty)  // scope 未关,base 与结果都在账上
@@ -542,7 +582,7 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     let key = scope.makePropertyStringKey("key-text")
     let made = scope.makeString(from: key)
     #expect(made.handle.rawValue == MockValue(kind: "string", payload: "\(id):key-text"))
@@ -552,7 +592,7 @@ private let stage2AArenaChunkCapacity = 32
   #expect(releaseLog(for: id).count == 1)
 }
 
-// MARK: - JSScope arena lifecycle tests
+// MARK: - JSScopeLegacy arena lifecycle tests
 
 @Test func jsScopeArenaReleasesAbandonedValuesOnDeinit() {
   let id = "jsScopeArenaReleasesAbandoned"
@@ -560,7 +600,7 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    var scope = JSScope<MockEngine>(handle: context)
+    var scope = MockSurfaceScope(handle: context)
     scope.open()
     _ = scope.makeString("a")
     _ = scope.makeNumber(42)
@@ -568,7 +608,7 @@ private let stage2AArenaChunkCapacity = 32
     #expect(releaseLog(for: id).isEmpty)
   }
 
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 3)
 }
 
@@ -579,14 +619,14 @@ private let stage2AArenaChunkCapacity = 32
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    var scope = JSScope<MockEngine>(handle: context)
+    var scope = MockSurfaceScope(handle: context)
     scope.open()
     persisted = scope.persist(scope.makeString("keep"))
   }
 
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 1)
   _ = persisted
 }
@@ -596,9 +636,9 @@ private let stage2AArenaChunkCapacity = 32
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  var persisted: JSValue<MockEngine>? = nil
+  var persisted: MockSurfaceValue? = nil
   do {
-    var scope = JSScope<MockEngine>(handle: context)
+    var scope = MockSurfaceScope(handle: context)
     scope.open()
     let a = scope.makeString("abandoned")
     persisted = scope.persist(a)  // no default scope → stays in this arena
@@ -615,14 +655,14 @@ private let stage2AArenaChunkCapacity = 32
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   do {
-    let scope = JSScope<MockEngine>(handle: context)
+    let scope = MockSurfaceScope(handle: context)
     #expect(scope.driverContextHandle == context)
-    #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+    #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   }
 
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   #expect(releaseLog(for: id).isEmpty)
 }
 
@@ -632,9 +672,9 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    var scope = JSScope<MockEngine>(handle: context)
+    var scope = MockSurfaceScope(handle: context)
     scope.open()
-    #expect(ScopeStackRegistry<MockEngine>.top(of: context) != nil)
+    #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) != nil)
 
     let string = scope.makeString("hello")
     #expect(string.handle.rawValue == MockValue(kind: "string", payload: "\(id):hello"))
@@ -649,7 +689,7 @@ private let stage2AArenaChunkCapacity = 32
     #expect(releaseLog(for: id).isEmpty)
   }
 
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
   #expect(releaseLog(for: id).count == 2)  // string + object drained
 }
 
@@ -666,35 +706,33 @@ private let stage2AArenaChunkCapacity = 32
   let contextB = MockContextHandle(rawContext: MockContext(runtimeID: idB))
 
   do {
-    let scopeA = JSInstantContext<MockEngine>(handle: contextA)
-    #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) != nil)
+    let scopeA = MockSurfaceInstantContext(handle: contextA)
+    #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextA) != nil)
     let valueFromA = scopeA.makeString("made-in-A")
     // MockDriver 的操作路由在 payload 中带上操作时寻址的 context:
     // getProperty 必须经 valueFromA 自带的 contextHandle 寻址到 A。
-    switch valueFromA.getProperty("routed") {
-    case .value(let property):
+    if let property = adoptedStaticProperty("routed", on: valueFromA, in: scopeA) {
       #expect(property.toString() == "\(idA):\(idA):made-in-A:routed")
-    case .exception:
+    } else {
       Issue.record("Expected getProperty to succeed in scope A")
     }
     _ = scopeA.makeNumber(1)
   }
-  #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextA) == nil)
   #expect(releaseLog(for: idA).count == 3)  // string + getProperty result + number
   #expect(releaseLog(for: idB).isEmpty)
 
   do {
-    let scopeB = JSInstantContext<MockEngine>(handle: contextB)
-    #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) != nil)
+    let scopeB = MockSurfaceInstantContext(handle: contextB)
+    #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextB) != nil)
     let valueFromB = scopeB.makeString("made-in-B")
-    switch valueFromB.getProperty("routed") {
-    case .value(let property):
+    if let property = adoptedStaticProperty("routed", on: valueFromB, in: scopeB) {
       #expect(property.toString() == "\(idB):\(idB):made-in-B:routed")
-    case .exception:
+    } else {
       Issue.record("Expected getProperty to succeed in scope B")
     }
   }
-  #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextB) == nil)
   #expect(releaseLog(for: idA).count == 3)  // A 的账目不受 B 的影响
   #expect(releaseLog(for: idB).count == 2)  // string + getProperty result
 }
@@ -712,25 +750,23 @@ private let stage2AArenaChunkCapacity = 32
   let contextB = MockContextHandle(rawContext: MockContext(runtimeID: idB))
 
   do {
-    let scopeA = JSInstantContext<MockEngine>(handle: contextA)
+    let scopeA = MockSurfaceInstantContext(handle: contextA)
     let valueFromA = scopeA.makeString("still-alive")
 
     do {
-      let scopeB = JSInstantContext<MockEngine>(handle: contextB)
+      let scopeB = MockSurfaceInstantContext(handle: contextB)
       let valueFromB = scopeB.makeString("made-in-B")
 
       // B 的 scope 是同线程上最新开启的,A 的值仍存活、可用,
       // 且 getProperty 经值自带的 contextHandle 寻址到 A 而非栈顶的 B。
-      switch valueFromA.getProperty("routed") {
-      case .value(let property):
+      if let property = adoptedStaticProperty("routed", on: valueFromA, in: scopeA) {
         #expect(property.toString() == "\(idA):\(idA):still-alive:routed")
-      case .exception:
+      } else {
         Issue.record("Expected A's value to stay addressable while B's scope is open")
       }
-      switch valueFromB.getProperty("routed") {
-      case .value(let property):
+      if let property = adoptedStaticProperty("routed", on: valueFromB, in: scopeB) {
         #expect(property.toString() == "\(idB):\(idB):made-in-B:routed")
-      case .exception:
+      } else {
         Issue.record("Expected getProperty to succeed in scope B")
       }
       #expect(releaseLog(for: idA).isEmpty)
@@ -745,8 +781,8 @@ private let stage2AArenaChunkCapacity = 32
 
   #expect(releaseLog(for: idA).count == 2)  // A value + A-routed result
   #expect(releaseLog(for: idB).count == 2)
-  #expect(ScopeStackRegistry<MockEngine>.top(of: contextA) == nil)
-  #expect(ScopeStackRegistry<MockEngine>.top(of: contextB) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextA) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextB) == nil)
 }
 
 /// 同 context 嵌套契约(§3.4):外层 scope 创建的值在内层 scope 打开期间
@@ -758,16 +794,15 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let outer = JSInstantContext<MockEngine>(handle: context)
+    let outer = MockSurfaceInstantContext(handle: context)
     let outerValue = outer.makeString("outer")
     do {
-      let inner = JSInstantContext<MockEngine>(handle: context)
+      let inner = MockSurfaceInstantContext(handle: context)
       #expect(inner.driverContextHandle == context)
-      #expect(ScopeStackRegistry<MockEngine>.top(of: context) != nil)
-      switch outerValue.getProperty("routed") {
-      case .value(let property):
+      #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) != nil)
+      if let property = adoptedStaticProperty("routed", on: outerValue, in: inner) {
         #expect(property.toString() == "\(id):\(id):outer:routed")
-      case .exception:
+      } else {
         Issue.record("Expected outer value to stay usable while inner scope is open")
       }
       #expect(releaseLog(for: id).isEmpty)  // 内层未关,外层值与结果都在账上
@@ -778,12 +813,12 @@ private let stage2AArenaChunkCapacity = 32
   }
 
   #expect(releaseLog(for: id).count == 2)  // 外层值随外层 drain 释放
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: context) == nil)
 }
 
 // MARK: - Stage 3: default scope and explicit rooting (MockEngine)
 
-/// 同步 scope(JSInstantContext/JSScope)维持 implicitStackRoots:arena 只记
+/// 同步 scope(JSInstantContextLegacy/JSScopeLegacy)维持 implicitStackRoots:arena 只记
 /// 账、不取显式根,释放账目与 Stage 2 完全一致(行为零变化的根化面)。
 @Test func synchronousScopesKeepImplicitStackRooting() {
   let id = "syncScopeImplicitRooting"
@@ -792,14 +827,14 @@ private let stage2AArenaChunkCapacity = 32
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
+    let scope = MockSurfaceInstantContext(handle: context)
     _ = scope.makeString("implicit")
     _ = scope.makeNumber(1)
     #expect(rootingLog(for: id).isEmpty)
   }
 
   do {
-    var scope = JSScope<MockEngine>(handle: context)
+    var scope = MockSurfaceScope(handle: context)
     scope.open()
     _ = scope.makeBoolean(true)
     #expect(rootingLog(for: id).isEmpty)
@@ -814,39 +849,39 @@ private let stage2AArenaChunkCapacity = 32
 /// 根(JSC:JSValueProtect;Mock 以事件记录),context deinit 时 drain 配对
 /// unroot 并释放 creation 引用。
 @Test func defaultScopeLivesAtStackBottomAndRootsActorFactoryValues() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let contextHandle = context!.driverContextHandle
   let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
 
-  let bottom = ScopeStackRegistry<MockEngine>.top(of: contextHandle)
+  let bottom = ScopeStackRegistry<MockContextHandle>.top(of: contextHandle)
   #expect(bottom != nil)
 
-  // actor 值工厂必须在隔离域内调用(JSValue 非 Sendable);返回值只带出
+  // actor 值工厂必须在隔离域内调用(JSValueLegacy 非 Sendable);返回值只带出
   // Copyable/Sendable 的身份 token 与日志观察。
   let valueHandle: MockValueHandle = await context!.withIsolatedGlobalObject {
     isolatedContext, _ in
     let value = isolatedContext.makeString("rooted")
-    #expect(ScopeStackRegistry<MockEngine>.top(of: contextHandle) === bottom)
+    #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextHandle) === bottom)
     // arena 加入时一个显式根,内容与工厂产物同身份。
     #expect(rootingLog(for: id) == [MockRootingEvent(handle: value.borrowHandle(), isRoot: true)])
     #expect(releaseLog(for: id).isEmpty)
     return value.borrowHandle()
   }
   // close 后 arena 的 creation 引用仍在账上,直到 context deinit 才结算;
-  // JSValue 的过渡性自有引用不走 Mock 的 creation 释放日志。
+  // JSValueLegacy 的过渡性自有引用不走 Mock 的 creation 释放日志。
   #expect(releaseLog(for: id).isEmpty)
   #expect(rootingLog(for: id).count == 1)
 
   // 同步显式 scope 压在默认帧之上;其关闭只弹出自己,默认帧仍在栈底。
   await context!.withInstantContext { instantContext in
-    let inner = ScopeStackRegistry<MockEngine>.top(of: instantContext.driverContextHandle)
+    let inner = ScopeStackRegistry<MockContextHandle>.top(of: instantContext.driverContextHandle)
     #expect(inner != nil)
     #expect(inner !== bottom)
   }
-  #expect(ScopeStackRegistry<MockEngine>.top(of: contextHandle) === bottom)
+  #expect(ScopeStackRegistry<MockContextHandle>.top(of: contextHandle) === bottom)
 
   context = nil
   await awaitContextTeardown(on: virtualMachine)
@@ -860,7 +895,7 @@ private let stage2AArenaChunkCapacity = 32
 /// evaluateScript)的引擎结果全部落默认 arena:每个产物一个显式根,scope
 /// 关闭与否不影响其有效性,context deinit 时逐一 unroot 并释放 creation。
 @Test func defaultScopeCarriesValueProducingActorOperations() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let contextHandle = context!.driverContextHandle
   let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
@@ -882,13 +917,13 @@ private let stage2AArenaChunkCapacity = 32
       Issue.record("Expected evaluateScript to produce a value")
     }
 
-    // 五个产物各取一个显式根,且尚未 unroot;JSValue 过渡引用尚未结算。
+    // 五个产物各取一个显式根,且尚未 unroot;JSValueLegacy 过渡引用尚未结算。
     #expect(rootingLog(for: id).filter(\.isRoot).count == 5)
     #expect(rootingLog(for: id).filter { !$0.isRoot }.isEmpty)
     #expect(releaseLog(for: id).isEmpty)
   }
 
-  // 五个 JSValue 过渡引用已随作用域退出结算(Mock 不记录该维度的 release
+  // 五个 JSValueLegacy 过渡引用已随作用域退出结算(Mock 不记录该维度的 release
   // 日志);arena 的 creation 引用仍持根,直到 context deinit。
   #expect(releaseLog(for: id).isEmpty)
   #expect(rootingLog(for: id).filter { !$0.isRoot }.isEmpty)
@@ -905,7 +940,7 @@ private let stage2AArenaChunkCapacity = 32
 /// scope arena as an explicit root; closing the synchronous scope settles
 /// nothing, and the context default drain releases/unroots exactly once.
 @Test func persistTransfersOwnedReferenceIntoDefaultScope() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let contextHandle = context!.driverContextHandle
   let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
@@ -938,92 +973,16 @@ private let stage2AArenaChunkCapacity = 32
 }
 
 /// `persist` 转移进默认 scope 后,值的本地视图在创建它的同步 scope 关闭后
-/// 仍然可用(有效性由默认 arena 承担,而不是 JSValue 的所有权)。
+/// 仍然可用(有效性由默认 arena 承担,而不是 JSValueLegacy 的所有权)。
 @Test func persistedValueViewSurvivesCreatingScopeClose() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   await context.withInstantContext { outer in
     do {
-      let inner = JSInstantContext<MockEngine>(handle: outer.driverContextHandle)
+      let inner = MockSurfaceInstantContext(handle: outer.driverContextHandle)
       _ = inner.persist(inner.makeString("survives"))
     }
   }
-}
-
-/// `persist(_:into:)` transfers into an explicitly chosen scope arena; the
-/// target's drain settles the reference, the source scope drains nothing.
-@Test func persistIntoExplicitScopeMovesReferenceToTargetArena() {
-  let id = "persistExplicitTarget"
-  clearReleaseLog(for: id)
-  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
-
-  do {
-    let source = JSInstantContext<MockEngine>(handle: context)
-    let created = source.makeString("moved")
-    do {
-      var target = JSScope<MockEngine>(handle: context)
-      target.open()
-      _ = source.persist(created, into: target)
-      #expect(releaseLog(for: id).isEmpty)
-    }
-    // The target arena owns the transferred reference and settles it once.
-    #expect(releaseLog(for: id).count == 1)
-    #expect(releaseLog(for: id).first == created.handle)
-  }
-
-  // The source arena has nothing left to drain.
-  #expect(releaseLog(for: id).count == 1)
-  #expect(ScopeStackRegistry<MockEngine>.top(of: context) == nil)
-}
-
-/// Simulates the class-object bridge shape: the conversion returns a local
-/// view whose reference is still owned by the synchronous witness scope it was
-/// created in (not promoted by `persist`).
-private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
-  func toJSValue<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) -> JSValue<E> {
-    let created = context.makeString("escaped")
-    return JSValue(handleValue: created.handle, in: context.driverContextHandle)
-  }
-
-  func tryEncode<E: JSValueConversionEngine>(
-    in context: borrowing JSInstantContext<E>
-  ) throws(JSValueConversionError) -> JSValue<E> {
-    toJSValue(in: context)
-  }
-}
-
-/// Regression: the `isolated JSContext` conversion entry points create a
-/// temporary witness scope and return its value to the caller. A value still
-/// anchored in that witness arena must be claimed into the context default
-/// scope before it drains — otherwise the returned `JSValue` dangles on
-/// QuickJS (freed) and has no explicit root on JSC.
-@Test func conversionValueEscapingWitnessScopeIsAnchoredInDefaultScope() async {
-  var context: JSContext<MockEngine>? = JSContext()
-  let contextHandle = context!.driverContextHandle
-  let virtualMachine = context!.virtualMachine
-  let id = contextHandle.rawContext.identity
-  clearReleaseLog(for: id)
-  clearRootingLog(for: id)
-
-  await context!.withIsolatedGlobalObject { isolatedContext, _ in
-    let encoded = WitnessScopeAnchoredEncoder().toJSValue(in: isolatedContext)
-    // The witness scope has already drained its own creation reference; the
-    // default scope holds an explicit anchor for the escaping identity.
-    #expect(
-      rootingLog(for: id) == [MockRootingEvent(handle: encoded.borrowHandle(), isRoot: true)])
-  }
-
-  // The witness scope settled its own creation reference; the default
-  // arena's claimed reference stays until context deinit.
-  #expect(releaseLog(for: id).count == 1)
-  #expect(rootingLog(for: id).filter(\.isRoot).count == 1)
-
-  context = nil
-  await awaitContextTeardown(on: virtualMachine)
-  #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
-  #expect(releaseLog(for: id).count == 2)
 }
 
 /// Regression: a failed global-property read still returns an owning engine
@@ -1031,20 +990,19 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
 /// `undefined`, so the exception reference must be settled at the read site —
 /// dropping the handle leaked one QuickJS reference per failed read.
 @Test func failedGlobalPropertyReadSettlesExceptionReference() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let contextHandle = context!.driverContextHandle
   let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
   clearReleaseLog(for: id)
   clearRootingLog(for: id)
 
-  let kind: String = await context!.withIsolatedGlobalObject { isolatedContext, _ in
-    let value = isolatedContext.getGlobalProperty(forKey: "throwingGlobal")
+  let kind: String = await context!.withInstantContext { scope in
+    let value = scope.getGlobalProperty(forKey: "throwingGlobal")
     // The exception reference is settled immediately; only the `undefined`
-    // substitute is arena-tracked (explicitly rooted on the default scope).
+    // substitute is arena-tracked on the window.
     #expect(releaseLog(for: id).count == 1)
     #expect(releaseLog(for: id).first?.rawValue.kind == "exception")
-    #expect(rootingLog(for: id).filter(\.isRoot).count == 1)
     return value.borrowHandle().rawValue.kind
   }
 
@@ -1054,22 +1012,21 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   await awaitContextTeardown(on: virtualMachine)
   // Exception + the arena-tracked undefined each settle exactly once.
   #expect(releaseLog(for: id).count == 2)
-  #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
 }
 
-/// Stage 3: `JSValue` is a non-owning local view. Its destruction must not
+/// Stage 3: `JSValueLegacy` is a non-owning local view. Its destruction must not
 /// touch the reference count (the arena owns the reference).
 @Test func jsValueDeinitDoesNotReleaseHandle() {
   let counter = MockValueReleaseCounter()
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
 
   do {
-    let value = JSValue<MockEngine>(
-      handleValue: .releaseCounting(
+    let value = MockSurfaceValue(
+      handle: .releaseCounting(
         rawValue: MockValue(kind: "object", payload: "deinit"),
         onRelease: counter.increment
       ),
-      in: context
+      contextHandle: context
     )
     #expect(value.borrowHandle().rawValue.payload == "deinit")
     #expect(counter.releaseReferenceCount == 0)
@@ -1085,16 +1042,17 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
 
   do {
-    let value = JSValue<MockEngine>(
-      handleValue: .releaseCounting(
+    let value = MockSurfaceValue(
+      handle: .releaseCounting(
         rawValue: MockValue(kind: "object", payload: "copied"),
         onRelease: counter.increment
       ),
-      in: context
+      contextHandle: context
     )
 
     do {
-      let copied = JSValue<MockEngine>(copying: value)
+      let copied = MockSurfaceValue(
+        handle: value.borrowHandle(), contextHandle: value.contextHandle)
       #expect(copied.borrowHandle() == value.borrowHandle())
       #expect(copied.contextHandle == value.contextHandle)
     }
@@ -1106,15 +1064,15 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
 }
 
 /// The reference owner is the scope arena: a factory-created value is
-/// released exactly once by the scope drain, not by `JSValue` destruction.
+/// released exactly once by the scope drain, not by `JSValueLegacy` destruction.
 @Test func jsValueReferenceIsSettledByItsScopeArena() {
   let id = "jsValueArenaOwnsReference"
   clearReleaseLog(for: id)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
 
   do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
-    let value = JSValue<MockEngine>(number: 7, in: scope)
+    let scope = MockSurfaceInstantContext(handle: context)
+    let value = scope.persist(scope.makeNumber(7))
     #expect(value.borrowHandle().rawValue == MockValue(kind: "number", payload: "\(id):7.0"))
     #expect(releaseLog(for: id).isEmpty)
   }
@@ -1122,13 +1080,116 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   #expect(releaseLog(for: id).count == 1)
 }
 
-/// Stage 3 §2.5 P1: a `JSValue` view may outlive its context without
+/// S5: every surface value-operation result — value, exception, and the
+/// intermediate method of `invokeMethod` — is adopted onto the scope arena
+/// exactly once, so the drain settles each exactly once and nothing is
+/// released before the drain (no double track, no dropped handle).
+@Test func surfaceValueOperationResultsAreTrackedAndReleasedOnce() {
+  let id = "surfaceValueOperationLedger"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let scope = MockSurfaceInstantContext(handle: context)
+    let object = scope.adoptCreatedHandle(
+      MockOwnedValueHandle(rawValue: MockValue(kind: "object", payload: "ledger"))
+    )
+
+    let property: JSResult<MockSurfaceValue> = object.getProperty("answer", in: scope)
+    let throwing: JSResult<MockSurfaceValue> = object.getProperty(
+      "throwingGlobal",
+      in: scope
+    )
+    let call: JSResult<MockSurfaceValue> = object.call(arguments: [], in: scope)
+    let method: JSResult<MockSurfaceValue> = object.invokeMethod(
+      "answer",
+      arguments: [],
+      in: scope
+    )
+    #expect(releaseLog(for: id).isEmpty)
+
+    switch consume property {
+    case .value(let value):
+      #expect(value.borrowHandle().rawValue.kind == "property")
+    case .exception:
+      Issue.record("mock property read returned an exception")
+    }
+    switch consume throwing {
+    case .value:
+      Issue.record("mock throwing read returned a value")
+    case .exception(let value):
+      #expect(value.borrowHandle().rawValue.kind == "exception")
+    }
+    switch consume call {
+    case .value(let value):
+      #expect(value.borrowHandle().rawValue.kind == "call")
+    case .exception:
+      Issue.record("mock call returned an exception")
+    }
+    switch consume method {
+    case .value(let value):
+      #expect(value.borrowHandle().rawValue.kind == "call")
+    case .exception:
+      Issue.record("mock invokeMethod returned an exception")
+    }
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  // The object, the two property reads (value + exception), the call, the
+  // intermediate method view, and the method-call result each settle once.
+  let released = releaseLog(for: id)
+  #expect(released.count == 6)
+  #expect(Set(released).count == 6)
+}
+
+/// S6: the shared value-operation result bridge adopts the engine result —
+/// value and exception alike — onto the calling scope's arena exactly once,
+/// and the scope drain settles each reference exactly once.
+@Test func surfaceValueResultIsTrackedAndReleasedOnce() {
+  let id = "surfaceValueResultLedger"
+  clearReleaseLog(for: id)
+  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
+
+  do {
+    let scope = MockSurfaceInstantContext(handle: context)
+    let valueHandle = MockValueHandle(
+      rawValue: MockValue(kind: "value", payload: "ledger"))
+    let exceptionHandle = MockValueHandle(
+      rawValue: MockValue(kind: "exception", payload: "ledger"))
+
+    let valueResult: JSResult<MockSurfaceValue> = bridgeSurfaceHandleResult(
+      .value(valueHandle), in: scope)
+    let exceptionResult: JSResult<MockSurfaceValue> = bridgeSurfaceHandleResult(
+      .exception(exceptionHandle), in: scope)
+
+    #expect(releaseLog(for: id).isEmpty)
+
+    switch consume valueResult {
+    case .value(let value):
+      #expect(value.borrowHandle().rawValue.kind == "value")
+    case .exception:
+      Issue.record("result bridge turned a value into an exception")
+    }
+    switch consume exceptionResult {
+    case .value:
+      Issue.record("result bridge turned an exception into a value")
+    case .exception(let value):
+      #expect(value.borrowHandle().rawValue.kind == "exception")
+    }
+
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(releaseLog(for: id).count == 2)
+}
+
+/// Stage 3 §2.5 P1: a `JSValueLegacy` view may outlive its context without
 /// turning context teardown into a dangling release. Context death drains
 /// the default scope and settles the arena's creation reference exactly
 /// once; destroying the now-context-less view afterwards performs no engine
-/// call at all (the former `JSValue.deinit` release path is gone).
+/// call at all (the former `JSValueLegacy.deinit` release path is gone).
 @Test func contextDeathBeforeValueDoesNotDangleDefaultScopeReference() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let contextHandle = context!.driverContextHandle
   let virtualMachine = context!.virtualMachine
   let id = contextHandle.rawContext.identity
@@ -1142,22 +1203,21 @@ private struct WitnessScopeAnchoredEncoder: JSValueEncodable {
   )
 
   // Adopt an engine-created handle into the context default scope exactly
-  // like a value-producing actor operation does.
-  var value: JSValue<MockEngine>? = adoptCreatedValueHandle(handle, in: contextHandle)
-  #expect(value?.borrowHandle() == handle)
+  // like a value-producing actor operation does. The produced view is a
+  // non-owning struct, so it is observed inside the actor window.
+  await context!.withAdoptedValue(handle) { _, value in
+    #expect(value.borrowHandle() == handle)
+  }
   #expect(releaseLog(for: id).isEmpty)
   #expect(rootingLog(for: id) == [MockRootingEvent(handle: handle, isRoot: true)])
 
   // Context dies first: the default-scope drain unroots and settles the
-  // creation reference once.
+  // creation reference once. No view survives to release anything again.
   context = nil
   await awaitContextTeardown(on: virtualMachine)
   #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
   #expect(releaseLog(for: id) == [handle])
 
-  // The surviving view is a plain non-owning struct; dropping it after the
-  // context is gone must not touch the engine or release the handle again.
-  value = nil
   #expect(releaseCounter.releaseReferenceCount == 0)
   #expect(releaseLog(for: id).count == 1)
 }
@@ -1442,7 +1502,7 @@ extension MockDriver {
 
   fileprivate static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<MockEngine>,
+    callback: @escaping JSFunctionCallback<MockSurfaceInstantContext>,
     in context: MockContextHandle
   ) -> MockOwnedValueHandle? {
     _ = callback
@@ -1857,12 +1917,16 @@ extension MockDriver {
     )?,
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> JSValueHandle<MockEngine>? {
-    _ = context
-    _ = bytes
-    _ = byteLength
-    _ = bytesDeallocator
-    _ = deallocatorContext
-    return nil
+    guard !context.rawContext.identity.hasPrefix("rejectArrayBuffer") else {
+      // The engine rejected the buffer and never took the bytes, so it leaves
+      // the deallocator to the caller.
+      return nil
+    }
+    // Model an engine that copies the host bytes: the deallocator runs once on
+    // acceptance and the created value owns nothing beyond its identity.
+    bytesDeallocator?(bytes, deallocatorContext)
+    return MockValueHandle(
+      rawValue: MockValue(kind: "arrayBuffer", payload: "\(byteLength)"))
   }
 
   fileprivate static func arrayBufferByteLengthForHandle(
@@ -2028,7 +2092,7 @@ extension MockEngine {
   @_optimize(none)
   public static func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<MockEngine>,
+    callback: @escaping JSFunctionCallback<MockSurfaceInstantContext>,
     in context: MockContextHandle
   ) -> MockOwnedValueHandle? {
     _ = callback
@@ -2577,7 +2641,7 @@ extension MockEngine {
 @Test func engineValuePreservesHandleAndEngineType() {
   let handle = JSValueHandle<MockEngine>(rawValue: MockValue(kind: "string", payload: "mock-value"))
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  let value = JSValue<MockEngine>(handleValue: handle, in: context)
+  let value = MockSurfaceValue(handle: handle, contextHandle: context)
 
   let storedHandle = value.borrowHandle()
 
@@ -2594,7 +2658,7 @@ extension MockEngine {
   let payload = MockValue(kind: "number", payload: "runtime:7")
   let handle = JSValueHandle<MockEngine>(rawValue: payload)
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  let value = JSValue<MockEngine>(handleValue: handle, in: context)
+  let value = MockSurfaceValue(handle: handle, contextHandle: context)
 
   let roundtrip = value.borrowHandle().rawValue
 
@@ -2607,7 +2671,7 @@ extension MockEngine {
   let handle = JSValueHandle<MockEngine>(
     rawValue: MockValue(kind: "string", payload: "moved-jsvalue"))
   let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  let value = JSValue<MockEngine>(handleValue: handle, in: context)
+  let value = MockSurfaceValue(handle: handle, contextHandle: context)
 
   let roundtripHandle = value.borrowHandle()
   #expect(roundtripHandle.rawValue == MockValue(kind: "string", payload: "moved-jsvalue"))
@@ -2801,18 +2865,18 @@ extension MockEngine {
 }
 
 @Test func genericValueEqualityUsesDriverHooks() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   await context.withInstantContext { context in
-    let oneNumber = JSValue<MockEngine>(number: 1, in: context)
-    let oneString = JSValue<MockEngine>(string: "1.0", in: context)
-    let oneNumberCopy = JSValue<MockEngine>(number: 1, in: context)
-    let twoNumber = JSValue<MockEngine>(number: 2, in: context)
+    let oneNumber = context.persist(context.makeNumber(1))
+    let oneString = context.persist(context.makeString("1.0"))
+    let oneNumberCopy = context.persist(context.makeNumber(1))
+    let twoNumber = context.persist(context.makeNumber(2))
 
-    let looselyEqual = oneNumber.looselyEquals(oneString, in: context)
-    let looselyNotEqual = !oneNumber.looselyEquals(twoNumber, in: context)
-    let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy, in: context)
-    let strictlyNotEqual = !oneNumber.strictlyEquals(oneString, in: context)
+    let looselyEqual = oneNumber.looselyEquals(oneString)
+    let looselyNotEqual = !oneNumber.looselyEquals(twoNumber)
+    let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy)
+    let strictlyNotEqual = !oneNumber.strictlyEquals(oneString)
 
     #expect(looselyEqual)
     #expect(looselyNotEqual)
@@ -2861,7 +2925,7 @@ private actor IsolatedDeinitBarrier {
   nonisolated let unownedExecutor: UnownedSerialExecutor
   private var pings = 0
 
-  init<E: JSEngine>(virtualMachine: JSVirtualMachine<E>) {
+  init(virtualMachine: MockSurfaceVirtualMachine) {
     self.unownedExecutor = virtualMachine.unownedExecutor
   }
 
@@ -2872,7 +2936,7 @@ private actor IsolatedDeinitBarrier {
   func pingCount() -> Int { pings }
 }
 
-private func awaitContextTeardown<E: JSEngine>(on virtualMachine: JSVirtualMachine<E>) async {
+private func awaitContextTeardown(on virtualMachine: MockSurfaceVirtualMachine) async {
   let barrier = IsolatedDeinitBarrier(virtualMachine: virtualMachine)
   await barrier.ping()
   _ = await barrier.pingCount()
@@ -2967,7 +3031,7 @@ private func clearEngineCallLog(for identity: String) {
 
 private func recordEngineCall(on context: MockContextHandle, _ operation: String) {
   let isolated =
-    ScopeStackRegistry<MockEngine>.vmThread(for: context)?.isIsolatingCurrentContext()
+    ScopeStackRegistry<MockContextHandle>.vmThread(for: context)?.isIsolatingCurrentContext()
   contextEngineCallLog.withLock {
     $0[context.rawContext.identity, default: []].append(
       MockEngineCall(operation: operation, isolated: isolated))
@@ -2995,7 +3059,7 @@ private func settlementEngineCalls(for identity: String) -> [MockEngineCall] {
 extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   JSContextInvocationDriver, JSContextTypedArrayDriver, JSContextPreparedScriptDriver
 {
-  public typealias Engine = MockEngine
+  public typealias InstantContext = MockSurfaceInstantContext
   public typealias ValueHandle = MockValueHandle
   public typealias OwnedValueHandle = MockOwnedValueHandle
   public typealias PropertyStringKeyHandle = MockStringHandle
@@ -3007,7 +3071,7 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
 
   public func makeFunctionValueHandle(
     named name: String,
-    callback: @escaping JSFunctionCallback<MockEngine>
+    callback: @escaping JSFunctionCallback<MockSurfaceInstantContext>
   ) -> MockOwnedValueHandle? {
     MockDriver.makeFunctionValueHandle(named: name, callback: callback, in: self)
   }
@@ -3376,12 +3440,12 @@ extension MockContextHandle: JSContextRuntimeDriver, JSContextPropertyDriver,
   }
 }
 
-// MARK: - Value-type constraint narrowing (Stage 2B)
+// MARK: - Handle-surface constraints (S13)
 //
-// `JSValue` and its handle typealiases constrain only `JSEngineValueTypes`
-// (the handle-type surface), not the full `JSEngine` capability composition.
-// This engine deliberately conforms to nothing else: if `JSValue` regains a
-// broader constraint, this section stops compiling.
+// The user-facing types are bound by the context (`MockSurfaceContext`),
+// while the handle aliases stay on the narrow `JSEngineValueTypes` surface.
+// `ValueOnlyEngine` deliberately conforms to the handle surface only: naming
+// `JSValueHandle` / `JSOwnedValueHandle` for it must keep compiling.
 
 private enum ValueOnlyEngine: JSEngineValueTypes {
   typealias ContextHandle = MockContextHandle
@@ -3389,72 +3453,24 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   typealias OwnedValueHandle = MockOwnedValueHandle
 }
 
-@Test func valueOnlyTypesCompileOnHandleSurface() {
-  // One witness per public value type narrowed to `JSEngineValueTypes`;
-  // broadening any of them back to `JSEngine` breaks this test's build.
-  _ = JSValue<ValueOnlyEngine>.self
+@Test func handleTypesCompileOnValueHandleSurface() {
   _ = JSValueHandle<ValueOnlyEngine>.self
   _ = JSOwnedValueHandle<ValueOnlyEngine>.self
-  _ = JSCallbackValue<ValueOnlyEngine>.self
-  _ = JSCallbackArguments<ValueOnlyEngine>.self
-  _ = JSCallbackReturn<ValueOnlyEngine>.self
-  _ = JSArguments<ValueOnlyEngine>.self
+
+  let borrowed: JSValueHandle<ValueOnlyEngine> = MockValueHandle(
+    rawValue: MockValue(kind: "object", payload: "narrow"))
+  let owned: JSOwnedValueHandle<ValueOnlyEngine> = MockOwnedValueHandle.adopting(borrowed)
+  #expect(owned.borrowed() == borrowed)
 }
 
-@Test func jsValueRequiresOnlyValueHandleTypes() {
-  let counter = MockValueReleaseCounter()
-  let context = MockContextHandle(rawContext: MockContext(runtimeID: "value-only"))
-
-  do {
-    let value = JSValue<ValueOnlyEngine>(
-      handleValue: .releaseCounting(
-        rawValue: MockValue(kind: "object", payload: "narrow"),
-        onRelease: counter.increment
-      ),
-      in: context
-    )
-    let borrowed: JSValueHandle<ValueOnlyEngine> = value.borrowHandle()
-    #expect(borrowed.rawValue.payload == "narrow")
-
-    let owned: JSOwnedValueHandle<ValueOnlyEngine> = MockOwnedValueHandle.adopting(borrowed)
-    #expect(owned.borrowed() == borrowed)
-  }
-
-  // Non-owning view: destruction never touches the reference count.
-  #expect(counter.releaseReferenceCount == 0)
-}
-
-/// `bridgeHandleResult` additionally needs the runtime-driver surface
-/// (adoption records the engine result on the default scope's arena, which
-/// requires the release hook). The value types themselves stay narrowed to
-/// `JSEngineValueTypes`, as asserted above.
-@Test func bridgeHandleResultAdoptsIntoDefaultScopeArena() {
-  let id = "value-only-bridge"
-  clearReleaseLog(for: id)
-  let context = MockContextHandle(rawContext: MockContext(runtimeID: id))
-  let handle = MockValueHandle(
-    rawValue: MockValue(kind: "object", payload: "bridged")
-  )
-
-  do {
-    let scope = JSInstantContext<MockEngine>(handle: context)
-    #expect(scope.driverContextHandle == context)
-    // bridgeHandleResult resolves the context default frame (here the only
-    // open scope) and adopts the engine result there.
-    let bridged: JSResult<JSValue<MockEngine>> = bridgeHandleResult(
-      JSResult<JSValueHandle<MockEngine>>.value(handle), in: context)
-    switch consume bridged {
-    case .value(let value):
-      #expect(value.borrowHandle() == handle)
-    case .exception:
-      Issue.record("unexpected exception result")
-    }
-    #expect(releaseLog(for: id).isEmpty)
-  }
-
-  let released = releaseLog(for: id)
-  #expect(released.count == 1)
-  #expect(released.first == handle)
+@Test func mockContextHandleAssociationsAreTheMockTypes() {
+  // The context handle's driver associations are what its value types alias;
+  // the assignments only compile while the two stay the same types.
+  let _: MockContextHandle.ValueHandle.Type = MockValueHandle.self
+  let _: MockContextHandle.OwnedValueHandle.Type = MockOwnedValueHandle.self
+  let _: MockContextHandle.PropertyStringKeyHandle.Type = MockStringHandle.self
+  let _: MockContextHandle.PreparedScriptHandle.Type = MockStringHandle.self
+  let _: MockContextHandle.InstantContext.Type = MockSurfaceInstantContext.self
 }
 
 // MARK: - Persistent handles (Stage 4, docs/PERSISTENT_HANDLE_DESIGN.md)
@@ -3468,14 +3484,14 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// transfer). The last owner's release is metadata-immediate and settles the
 /// engine reference exactly once on the VM executor.
 @Test func persistentHandleMintClaimsRootsAndSettlesOnLastOwnerRelease() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
   clearClaimLog(for: id)
   clearRootingLog(for: id)
   clearReleaseLog(for: id)
 
-  var handle: JSPersistentHandle<MockEngine>? = await context!.withInstantContext { scope in
+  var handle: MockSurfacePersistentHandle? = await context!.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("mint"))
   }
   let claimed = claimLog(for: id)
@@ -3502,7 +3518,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// Resolve is a copy: it claims into the receiving scope's arena, the copy
 /// settles at that scope's drain, and the binding remains resolvable.
 @Test func persistentHandleResolveClaimsIntoReceivingScopeArena() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
 
@@ -3515,7 +3531,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
   _ = await context!.withInstantContext { scope in
     guard let value = scope.resolve(handle) else { return "" }
-    return scope.toString(value)
+    return value.toString()
   }
   #expect(claimLog(for: id).count == 1)
   // Synchronous scope: implicit stack roots, no explicit root event.
@@ -3534,10 +3550,10 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(releaseLog(for: id).count == 3)
 }
 
-/// The manual `JSScope` is the third witness entry: mint and resolve route
+/// The manual `JSScopeLegacy` is the third witness entry: mint and resolve route
 /// through the same registry and anchor on that scope's arena.
 @Test func manualScopeMintsAndResolvesPersistentHandles() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
   clearClaimLog(for: id)
@@ -3545,7 +3561,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   clearReleaseLog(for: id)
 
   _ = await context.withIsolatedGlobalObject { isolatedContext, _ in
-    var scope = JSScope<MockEngine>(handle: isolatedContext.driverContextHandle)
+    var scope = MockSurfaceScope(handle: isolatedContext.driverContextHandle)
     scope.open()
     let handle = scope.makePersistentHandle(scope.makeString("manual"))
     guard let resolved = scope.resolve(handle) else { return "<nil>" }
@@ -3563,7 +3579,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// `invalidate` kills the identity immediately, is idempotent, and settles
 /// the engine reference exactly once after a serial executor turn.
 @Test func persistentHandleInvalidateKillsIdentityAndSettlesOnce() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
 
@@ -3592,11 +3608,11 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// Releasing the last owner without `invalidate` schedules the same cleanup;
 /// the settlement happens exactly once on the executor.
 @Test func persistentHandleDeinitSchedulesSingleSettlement() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
 
-  var handle: JSPersistentHandle<MockEngine>? = await context.withInstantContext { scope in
+  var handle: MockSurfacePersistentHandle? = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeNumber(7))
   }
   clearClaimLog(for: id)
@@ -3614,7 +3630,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// Slot reuse: after settle, reissue increments the generation again, so the
 /// old handle cannot resolve the new binding (ABA safety).
 @Test func persistentHandleSlotReuseRetiresOldGeneration() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let virtualMachine = context.virtualMachine
 
   let first = await context.withInstantContext { scope in
@@ -3645,7 +3661,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// binding exactly once, a surviving handle becomes a dead identity, and a
 /// new context cannot resolve it (registryID mismatch).
 @Test func persistentHandleContainerDeathYieldsDeadIdentity() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
 
@@ -3662,8 +3678,8 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(rootingLog(for: id).map(\.isRoot) == [false])
   #expect(handle.invalidate() == false)
 
-  let other = JSContext<MockEngine>()
-  // Resolution stays inside the actor: JSValue is a non-Sendable local view.
+  let other = MockSurfaceContext()
+  // Resolution stays inside the actor: JSValueLegacy is a non-Sendable local view.
   let resolvedByOther = await other.withIsolatedGlobalObject {
     isolatedContext, _ in
     isolatedContext.resolve(handle) == nil
@@ -3675,7 +3691,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// Close and an external release race: whichever path wins, each binding is
 /// settled exactly once (no missed settlement, no double settlement).
 @Test func persistentHandleConcurrentInvalidateAndCloseSettleOnce() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
 
@@ -3698,7 +3714,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// stays alive (owned by the actor), actor-side resolve keeps working, and
 /// context teardown still settles every binding exactly once.
 @Test func externalBoxClearKeepsRegistryAliveForActorPaths() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
 
@@ -3719,7 +3735,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
   // The registry is owned by the actor, so actor-side resolution still works;
   // its copy is anchored on the default scope (claim + root now, release on
-  // teardown). Resolution stays inside the actor: JSValue is not Sendable.
+  // teardown). Resolution stays inside the actor: JSValueLegacy is not Sendable.
   let actorResolved = await context!.withIsolatedGlobalObject {
     isolatedContext, _ in
     isolatedContext.resolve(handle) != nil
@@ -3739,7 +3755,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// `Sendable` is the reason the handle type exists: it crosses isolation
 /// domains while the local value cannot, and the receiving window resolves it.
 @Test func persistentHandleCrossesIsolationDomains() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
 
   let handle = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("sendable"))
@@ -3756,7 +3772,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// Reentry from settlement (models QuickJS `JS_FreeValue` running a user
 /// finalizer that drops a handle): no deadlock, no second settlement.
 @Test func settlementReentryReleaseIsANoOp() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
 
@@ -3784,10 +3800,10 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// second time. The settling window is entered through the release reentry
 /// hook (the same engine-reentry point as case 9's finalizer simulation).
 @Test func settlingSlotIgnoresReleaseAndResolveAndMovesPayloadOnce() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
-  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+  let registry = JSPersistentHandleRegistry<MockContextHandle>.registry(
     for: context!.driverContextHandle)
 
   let handle = await context!.withInstantContext { scope in
@@ -3830,36 +3846,6 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(releaseLog(for: id).count == 1)
 }
 
-/// Stage 4 design §8.3: every settlement engine call is isolated to the VM
-/// executor. The FIFO sentinel only proves ordering; this asserts isolation
-/// through the claim/root/unroot/release records, across the whole mint →
-/// settle → teardown lifecycle.
-@Test func persistentSettlementEngineCallsAreIsolatedToVMExecutor() async {
-  var context: JSContext<MockEngine>? = JSContext()
-  let id = context!.driverContextHandle.rawContext.identity
-  let virtualMachine = context!.virtualMachine
-  clearEngineCallLog(for: id)
-
-  let handle = await context!.withInstantContext { scope in
-    scope.makePersistentHandle(scope.makeString("threaded"))
-  }
-  #expect(handle.invalidate())
-  await awaitContextTeardown(on: virtualMachine)
-  context = nil
-  await awaitContextTeardown(on: virtualMachine)
-
-  // Every recorded engine call (mint's claim + root, settlement's unroot +
-  // release, teardown's box swap and context release) was isolated to the VM
-  // executor.
-  let calls = engineCallLog(for: id)
-  #expect(!calls.isEmpty)
-  #expect(calls.allSatisfy { $0.isolated == true })
-  // Teardown order (design §3.5/§4.1): the box is cleared while the engine
-  // context is still alive.
-  let teardown = calls.map(\.operation).filter { ["box-swap", "context-release"].contains($0) }
-  #expect(teardown == ["box-swap", "context-release"])
-}
-
 /// Stage 4 design §8.3 (late pump): a cleanup closure queued while
 /// `close()` is executing on the VM thread must run as a pure no-op — zero
 /// engine calls, zero thread records. Deterministic construction: an actor
@@ -3870,10 +3856,10 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// forces the already-queued closure to execute against the closed
 /// registry.
 @Test func latePumpAfterCloseMakesNoEngineCalls() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
-  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+  let registry = JSPersistentHandleRegistry<MockContextHandle>.registry(
     for: context!.driverContextHandle)
 
   let handle = await context!.withInstantContext { scope in
@@ -3932,7 +3918,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// (`ThreadBoundExecutor.isIsolatingCurrentContext()`): false on any other
 /// thread, true inside the context's actor window.
 @Test func vmThreadIsolationCriterionDistinguishesCaller() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let onTestThread = context.virtualMachine.vmThread.isIsolatingCurrentContext()
   let inActorWindow = await context.withInstantContext { _ in
     context.virtualMachine.vmThread.isIsolatingCurrentContext()
@@ -3947,7 +3933,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// the scope-side access path is removed), the actor side keeps working, and
 /// a reinstall restores the scope side.
 @Test func contextDataStorageBoxSwapFromForeignThreadIsIsolatedToVMExecutor() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
 
@@ -3958,7 +3944,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
     scope.driverContextHandle.contextDataStorageBox()
   }
   guard let box else {
-    Issue.record("JSContext did not install a context data storage box")
+    Issue.record("JSContextLegacy did not install a context data storage box")
     return
   }
   clearEngineCallLog(for: id)
@@ -3999,7 +3985,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// A swap issued on the VM thread is inline: its effect is visible to the
 /// very next synchronous read.
 @Test func contextDataStorageBoxSwapOnVMThreadIsInline() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let inline = await context.withInstantContext { scope -> Bool in
     let handle = scope.driverContextHandle
     guard let box = handle.contextDataStorageBox() else { return false }
@@ -4011,23 +3997,23 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(inline)
 }
 
-/// The public construction path for `JSScope`: `makeScope()` returns an
+/// The public construction path for `JSScopeLegacy`: `makeScope()` returns an
 /// opened scope nested on the context's stack, every engine call made
 /// through it is isolated to the VM executor, and the frame is gone once the
 /// scope leaves scope.
 @Test func contextMakeScopeOpensNestedFrameOnVMThread() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   clearEngineCallLog(for: id)
 
   let (defaultFrame, nested) = await context.withIsolatedGlobalObject {
-    isolatedContext, _ -> (ScopeFrame<MockEngine>, Bool) in
+    isolatedContext, _ -> (ScopeFrame<MockContextHandle>, Bool) in
     let contextHandle = isolatedContext.driverContextHandle
-    let defaultFrame = ScopeStackRegistry<MockEngine>.top(of: contextHandle)
+    let defaultFrame = ScopeStackRegistry<MockContextHandle>.top(of: contextHandle)
     let scope = isolatedContext.makeScope()
     let minted = scope.makePersistentHandle(scope.makeString("nested"))
     let resolvedInNestedScope = !(scope.resolve(minted) == nil)
-    let top = ScopeStackRegistry<MockEngine>.top(of: contextHandle)
+    let top = ScopeStackRegistry<MockContextHandle>.top(of: contextHandle)
     return (
       defaultFrame!, resolvedInNestedScope && top === scope.scopeFrame && top !== defaultFrame
     )
@@ -4037,7 +4023,7 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   // The scope left with the closure: its frame popped, the stack bottom is
   // the context default scope again.
   let topIsDefaultAgain =
-    ScopeStackRegistry<MockEngine>.top(
+    ScopeStackRegistry<MockContextHandle>.top(
       of: context.driverContextHandle) === defaultFrame
   #expect(topIsDefaultAgain)
 
@@ -4049,47 +4035,12 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
   #expect(calls.allSatisfy { $0.isolated == true })
 }
 
-/// The self-owning inputs retain the engine context and can die on any
-/// thread. Their release — which may be the context's last reference — is an
-/// engine call and is isolated to the VM executor: inline when they die on
-/// the VM thread, posted to it otherwise.
-@Test func selfOwningInputsReleaseIsolatedToVMExecutor() async {
-  let context = JSContext<MockEngine>()
-  let id = context.driverContextHandle.rawContext.identity
-  let virtualMachine = context.virtualMachine
-  func contextReleases() -> [MockEngineCall] {
-    engineCallLog(for: id).filter { $0.operation == "context-release" }
-  }
-
-  // Dropped inside their creating window: inline.
-  let afterInline = await context.withInstantContext { scope -> Int in
-    do {
-      let local = scope.prepareScript("2")
-      _ = scope.evaluateScript(local)
-    }
-    return contextReleases().count
-  }
-  #expect(afterInline == 1)
-
-  // Dropped on the test thread, after their creating windows closed: posted.
-  do {
-    let script: JSPreparedScript<MockEngine>? = await context.prepareScript("1")
-    let key: JSPropertyStringKey<MockEngine>? = await context.makePropertyStringKey("probe")
-    _ = script
-    _ = key
-  }
-  await awaitContextTeardown(on: virtualMachine)
-  let releases = contextReleases()
-  #expect(releases.count == 3)
-  #expect(releases.allSatisfy { $0.isolated == true })
-}
-
 /// Same runtime, two contexts: each context owns an independent registry,
 /// so handles are context-local in both directions and neither binding is
 /// disturbed by the other's lookups.
 @Test func persistentHandlesDoNotCrossSameRuntimeContexts() async {
-  let first = JSContext<MockEngine>()
-  let second = JSContext<MockEngine>(virtualMachine: first.virtualMachine)
+  let first = MockSurfaceContext()
+  let second = MockSurfaceContext(virtualMachine: first.virtualMachine)
   let firstID = first.driverContextHandle.rawContext.identity
   let secondID = second.driverContextHandle.rawContext.identity
   #expect(firstID != secondID)
@@ -4110,11 +4061,11 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
   _ = await first.withInstantContext { scope -> String in
     guard let value = scope.resolve(firstHandle) else { return "<nil>" }
-    return scope.toString(value)
+    return value.toString()
   }
   _ = await second.withInstantContext { scope -> String in
     guard let value = scope.resolve(secondHandle) else { return "<nil>" }
-    return scope.toString(value)
+    return value.toString()
   }
 
   let firstSeesSecond = await first.withInstantContext { scope in
@@ -4142,13 +4093,13 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// with a bumped generation. This is the Mock-expressible form of "the
 /// released handle leaves nothing rooted" and of slot reclaim.
 @Test func persistentHandleDeinitClearsRegistrySlotOnVMExecutor() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let id = context.driverContextHandle.rawContext.identity
   let virtualMachine = context.virtualMachine
-  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+  let registry = JSPersistentHandleRegistry<MockContextHandle>.registry(
     for: context.driverContextHandle)
 
-  var handle: JSPersistentHandle<MockEngine>? = await context.withInstantContext { scope in
+  var handle: MockSurfacePersistentHandle? = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("deinit-registry"))
   }
   guard let identity = handle?.identity else {
@@ -4183,19 +4134,19 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
 /// Design §8.1 case 7: closing twice must be a no-op the second time — no
 /// double settlement, no crash. A manual `close()` followed by the context
-/// teardown's own `close()` (`JSContext.isolated deinit` runs it) exercises
+/// teardown's own `close()` (`JSContextLegacy.isolated deinit` runs it) exercises
 /// exactly the double-close path.
 @Test func persistentHandleRegistryCloseTwiceSettlesExactlyOnce() async {
-  var context: JSContext<MockEngine>? = JSContext()
+  var context: MockSurfaceContext? = MockSurfaceContext()
   let id = context!.driverContextHandle.rawContext.identity
   let virtualMachine = context!.virtualMachine
-  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+  let registry = JSPersistentHandleRegistry<MockContextHandle>.registry(
     for: context!.driverContextHandle)
 
   // Keep the binding live until the manual close. A discarded handle would
   // already be `pendingRelease`, and its scheduled pump — not the close —
   // would be the one settling it, racing the log resets below.
-  var handle: JSPersistentHandle<MockEngine>? = await context!.withInstantContext { scope in
+  var handle: MockSurfacePersistentHandle? = await context!.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("close-twice"))
   }
   clearRootingLog(for: id)
@@ -4224,9 +4175,9 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 /// resolve 任何 handle 返回 nil(case 6 本体是 context deinit 路径,已由
 /// 引擎契约测试覆盖)。
 @Test func persistentHandleResolveAfterRegistryCloseReturnsNil() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let virtualMachine = context.virtualMachine
-  let registry = JSPersistentHandleRegistry<MockEngine>.registry(
+  let registry = JSPersistentHandleRegistry<MockContextHandle>.registry(
     for: context.driverContextHandle)
 
   let handle = await context.withInstantContext { scope in
@@ -4244,25 +4195,25 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
 // Negative runtime sample (design §8.1 case 11): minting a persistent handle
 // in a bare context — a scope whose context has no context-data storage box
-// (no hosted JSContext, so no registry) — is a programming error and traps
+// (no hosted JSContextLegacy, so no registry) — is a programming error and traps
 // with `preconditionFailure`. The trap is fatal and cannot be asserted inside
 // a Swift Testing process, so it is documented here:
 //
-//     let bareScope = JSInstantContext<MockEngine>(handle: bareHandle)
+//     let bareScope = MockSurfaceInstantContext(handle: bareHandle)
 //     bareScope.makePersistentHandle(bareScope.makeString("x"))
 //     // ✗ runtime trap: the registry lives in the context data box of a
-//     // ✗ hosted JSContext; a bare context has none.
+//     // ✗ hosted JSContextLegacy; a bare context has none.
 
-/// `JSPersistentHandle` is Sendable: it travels between two actors while the
+/// `JSPersistentHandleLegacy` is Sendable: it travels between two actors while the
 /// non-Sendable local value stays behind, and resolves on return.
 @Test func persistentHandleRelaysAcrossIsolationDomains() async {
-  let context = JSContext<MockEngine>()
+  let context = MockSurfaceContext()
   let handle = await context.withInstantContext { scope in
     scope.makePersistentHandle(scope.makeString("relay"))
   }
 
-  let first = PersistentHandleMailbox<MockEngine>()
-  let second = PersistentHandleMailbox<MockEngine>()
+  let first = PersistentHandleMailbox<MockSurfaceContext>()
+  let second = PersistentHandleMailbox<MockSurfaceContext>()
   await first.deposit(handle)
   guard let staged = await first.withdraw() else {
     Issue.record("first mailbox lost the handle")
@@ -4277,18 +4228,283 @@ private enum ValueOnlyEngine: JSEngineValueTypes {
 
   _ = await context.withInstantContext { scope -> String in
     guard let value = scope.resolve(recovered) else { return "<nil>" }
-    return scope.toString(value)
+    return value.toString()
   }
 }
 
-private actor PersistentHandleMailbox<E: JSEngineRuntimeDriver> {
-  private var stored: JSPersistentHandle<E>?
+private actor PersistentHandleMailbox<C: JSContext> {
+  private var stored: C.PersistentHandle?
 
-  func deposit(_ handle: JSPersistentHandle<E>) {
+  func deposit(_ handle: C.PersistentHandle) {
     stored = handle
   }
 
-  func withdraw() -> JSPersistentHandle<E>? {
+  func withdraw() -> C.PersistentHandle? {
     stored
   }
+}
+
+// MARK: - Surface scope ledger (S7)
+//
+// The surface scopes delegate to the same `ScopeCore` handle-level methods
+// as the legacy scopes; these tests pin the accounting contract those
+// methods must keep: adopt tracks once, anchor claims once, persist moves an
+// arena-owned reference without an extra claim, the borrowed fallback claims
+// once, and an explicit-root frame unroots and releases each element exactly
+// once.
+
+@Test func surfaceScopeAdoptTracksOnceAndDrainsOnce() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  guard let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("Expected a mock context handle")
+    return
+  }
+  let id = context.rawContext.identity
+  clearReleaseLog(for: id)
+  clearRootingLog(for: id)
+  clearClaimLog(for: id)
+
+  do {
+    let scope = MockSurfaceInstantContext(handle: context)
+    let value = scope.adoptCreatedHandle(context.makeStringValueHandle("adopted")!)
+    #expect(value.toString().hasSuffix("adopted"))
+    #expect(rootingLog(for: id).isEmpty)
+    #expect(claimLog(for: id).isEmpty)
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(releaseLog(for: id).count == 1)
+  #expect(rootingLog(for: id).isEmpty)
+  #expect(claimLog(for: id).isEmpty)
+}
+
+@Test func surfaceScopeAnchorClaimsOnceAndDrainsOnce() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  guard let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("Expected a mock context handle")
+    return
+  }
+  let id = context.rawContext.identity
+  clearReleaseLog(for: id)
+  clearRootingLog(for: id)
+  clearClaimLog(for: id)
+
+  do {
+    let scope = MockSurfaceInstantContext(handle: context)
+    let global = context.globalObjectValueHandle()!
+    _ = scope.anchorBorrowedHandle(global)
+    #expect(claimLog(for: id).count == 1)
+    #expect(rootingLog(for: id).isEmpty)
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  #expect(claimLog(for: id).count == 1)
+  #expect(releaseLog(for: id).count == 1)
+}
+
+@Test func surfaceScopePersistMovesArenaReferenceWithoutClaim() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  guard let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("Expected a mock context handle")
+    return
+  }
+  let id = context.rawContext.identity
+  clearReleaseLog(for: id)
+  clearRootingLog(for: id)
+  clearClaimLog(for: id)
+
+  func runOuterScope() {
+    var outer = MockSurfaceScope(handle: context)
+    outer.open()
+
+    do {
+      let inner = MockSurfaceInstantContext(handle: context)
+      let created = inner.makeString("moved")
+      let value = inner.persist(created)
+      #expect(value.toString().hasSuffix("moved"))
+      // Arena-owned: the reference moved, so no claim was taken.
+      #expect(claimLog(for: id).isEmpty)
+      #expect(rootingLog(for: id).isEmpty)
+    }
+
+    // The window drained without releasing the moved reference.
+    #expect(releaseLog(for: id).isEmpty)
+  }
+
+  runOuterScope()
+  #expect(releaseLog(for: id).count == 1)
+  #expect(claimLog(for: id).isEmpty)
+}
+
+@Test func surfaceScopePersistBorrowedFallbackClaimsOnce() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  guard let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("Expected a mock context handle")
+    return
+  }
+  let id = context.rawContext.identity
+  clearReleaseLog(for: id)
+  clearRootingLog(for: id)
+  clearClaimLog(for: id)
+
+  func runOuterScope() {
+    var outer = MockSurfaceScope(handle: context)
+    outer.open()
+    let borrowed = outer.makeString("borrowed")
+
+    do {
+      let inner = MockSurfaceInstantContext(handle: context)
+      let value = inner.persist(borrowed)
+      #expect(value.toString().hasSuffix("borrowed"))
+      // The inner arena never owned this handle: the fallback claims once.
+      #expect(claimLog(for: id).count == 1)
+    }
+  }
+
+  runOuterScope()
+  #expect(claimLog(for: id).count == 1)
+  // The original arena element plus the claimed fallback element.
+  #expect(releaseLog(for: id).count == 2)
+}
+
+@Test func explicitRootsDrainUnrootsAndReleasesOnce() {
+  let runtime = MockDriver.makeRuntimeHandle()
+  guard let context = MockDriver.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    Issue.record("Expected a mock context handle")
+    return
+  }
+  let id = context.rawContext.identity
+  clearReleaseLog(for: id)
+  clearRootingLog(for: id)
+  clearClaimLog(for: id)
+  clearEngineCallLog(for: id)
+
+  let core = ScopeCore<MockContextHandle, JSExplicitRoots>(handle: context)
+  core.track(context.makeStringValueHandle("rooted")!)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true])
+  #expect(releaseLog(for: id).isEmpty)
+
+  core.drain()
+  #expect(rootingLog(for: id).map(\.isRoot) == [true, false])
+  #expect(releaseLog(for: id).count == 1)
+  #expect(engineCallLog(for: id).map(\.operation) == ["root", "unroot", "release"])
+}
+
+// MARK: - Surface persistent-binding ledger (S9)
+//
+// The surface path (context/scope mint + resolve, concrete handle) must keep
+// the same ledger as the legacy one: mint claims and roots exactly once,
+// resolve claims exactly once into the receiving arena, and release/settle
+// happens exactly once — inline for an invalidate, closed inline at context
+// teardown.
+
+@Test func surfaceContextMintResolvesAndInvalidatesWithSingleLedgerEvents() async {
+  var context: MockSurfaceContext? = MockSurfaceContext()
+  let id = context!.driverContextHandle.rawContext.identity
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  let handle = await context!.withInstantContext { scope in
+    scope.makePersistentHandle(scope.makeString("surface"))
+  }
+  #expect(claimLog(for: id).count == 1)
+  #expect(rootingLog(for: id).map(\.isRoot) == [true])
+
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  let text = await context!.withInstantContext { scope -> String in
+    guard let value = scope.resolve(handle) else { return "<nil>" }
+    return value.toString()
+  }
+  #expect(text.hasSuffix(":surface"))
+  // One claim for the resolved copy; the synchronous scope stays implicit
+  // rooted, and its drain settles exactly that one copy.
+  #expect(claimLog(for: id).count == 1)
+  #expect(rootingLog(for: id).isEmpty)
+  #expect(releaseLog(for: id).count == 1)
+
+  #expect(handle.invalidate())
+  #expect(handle.invalidate() == false)
+  // The inline scheduler settles the binding at release: one unroot + one
+  // release, never a second.
+  #expect(rootingLog(for: id).map(\.isRoot) == [false])
+  #expect(releaseLog(for: id).count == 2)
+
+  context = nil
+  #expect(releaseLog(for: id).count == 2)
+}
+
+@Test func surfaceContextTeardownClosesLiveBindingsInline() async {
+  var context: MockSurfaceContext? = MockSurfaceContext()
+  let id = context!.driverContextHandle.rawContext.identity
+
+  let handles = await context!.withInstantContext { scope in
+    (0..<3).map { index in
+      scope.makePersistentHandle(scope.makeNumber(Double(index)))
+    }
+  }
+  clearClaimLog(for: id)
+  clearRootingLog(for: id)
+  clearReleaseLog(for: id)
+
+  context = nil
+  // `close()` settles every live binding inline: one unroot + one release each.
+  #expect(rootingLog(for: id).map(\.isRoot) == [false, false, false])
+  #expect(releaseLog(for: id).count == 3)
+  withExtendedLifetime(handles) {}
+}
+
+// MARK: - Shared ArrayBuffer byte helper ledger (S10)
+//
+// The core helper owns the "bytes are released exactly once" rule and the
+// calling window owns the "creation reference is adopted exactly once" rule.
+// The mock engine copies on acceptance and rejects by context identity, so
+// both halves are observable without a real engine. Both scenarios run in one
+// synchronous test because they share the deallocation counter.
+
+@Test func sharedArrayBufferByteHelperLedger() {
+  // Acceptance: the engine copies the bytes and calls the deallocator once;
+  // the window adopts the creation reference exactly once and its drain
+  // releases it exactly once.
+  let acceptanceID = "sharedArrayBufferAdoption"
+  clearReleaseLog(for: acceptanceID)
+  let acceptingContext = MockContextHandle(rawContext: MockContext(runtimeID: acceptanceID))
+  do {
+    let scope = MockSurfaceInstantContext(handle: acceptingContext)
+    mockArrayBufferDeallocationCount.withLock { $0 = 0 }
+    let value = adoptArrayBufferBytesNoCopy(
+      allocateZeroedArrayBufferBytes(byteLength: 4),
+      byteLength: 4,
+      in: scope,
+      bytesDeallocator: mockArrayBufferCountingDeallocator
+    )
+    let accepted = value != nil
+    #expect(accepted)
+    #expect(mockArrayBufferDeallocationCount.withLock { $0 } == 1)
+  }
+  #expect(releaseLog(for: acceptanceID).count == 1)
+  #expect(rootingLog(for: acceptanceID).isEmpty)
+
+  // Rejection: the engine never took the bytes, so core releases them once
+  // and nothing was adopted for the drain to settle.
+  let rejectionID = "rejectArrayBufferRejection"
+  clearReleaseLog(for: rejectionID)
+  let rejectingContext = MockContextHandle(rawContext: MockContext(runtimeID: rejectionID))
+  do {
+    let scope = MockSurfaceInstantContext(handle: rejectingContext)
+    mockArrayBufferDeallocationCount.withLock { $0 = 0 }
+    let value = adoptArrayBufferBytesNoCopy(
+      allocateZeroedArrayBufferBytes(byteLength: 4),
+      byteLength: 4,
+      in: scope,
+      bytesDeallocator: mockArrayBufferCountingDeallocator
+    )
+    let rejected = value == nil
+    #expect(rejected)
+    #expect(mockArrayBufferDeallocationCount.withLock { $0 } == 1)
+  }
+  #expect(releaseLog(for: rejectionID).isEmpty)
 }

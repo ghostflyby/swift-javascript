@@ -1,3 +1,5 @@
+import SwiftyJavaScriptCore
+import SwiftyQuickJS
 import Testing
 
 @testable import SwiftJavaScript
@@ -7,6 +9,16 @@ struct EngineInvocationDriverTests {
   @Test(arguments: ScriptEngine.allCases)
   func makeFunctionReturnsCallableValue(_ engine: ScriptEngine) async {
     await engine.run(MakeFunctionReturnsCallableValue.self)
+  }
+
+  @Test(arguments: ScriptEngine.allCases)
+  func surfaceFunctionCallbackEntryIsCallable(_ engine: ScriptEngine) async {
+    switch engine {
+    case .javaScriptCore:
+      await runSurfaceFunctionCallbackEntry(JSCContext.self)
+    case .quickJS:
+      await runSurfaceFunctionCallbackEntry(QJSContext.self)
+    }
   }
 
   @Test(arguments: ScriptEngine.allCases)
@@ -56,23 +68,20 @@ struct EngineInvocationDriverTests {
 }
 
 private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let function = context.makeFunction(named: "bump") { c, _, arguments in
-        let value: Double = arguments.unpack(
-          types: Double.self,
-          in: c
-        )
-        return JSCallbackReturn(persistent: c.persist(c.makeNumber(value + 1)))
+    await context.withInstantContext { scope in
+      let function = scope.makeFunction(named: "bump") { c, _, arguments in
+        let value: Double = arguments.withValue(at: 0, in: c) { $0.toNumber() }
+        return c.return(c.persist(c.makeNumber(value + 1)))
       }
 
-      let result = function.call(arguments: 41, in: context)
+      let result = function.call(
+        arguments: [scope.makeNumber(41).borrowHandle()], in: scope)
       switch consume result {
       case .value(let value):
-        let resultValue = value.toDouble(in: context)
-        #expect(resultValue == 42)
+        #expect(value.toNumber() == 42)
       case .exception:
         Issue.record("Expected function value to be callable")
       }
@@ -81,22 +90,36 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
 }
 
 private enum JSValueCallSupportsThisAndArguments: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let functionResult = context.evaluateScript("(function(a, b) { return this.base + a + b })")
+    await context.withInstantContext { scope in
+      let functionResult = scope.evaluateScript("(function(a, b) { return this.base + a + b })")
 
       switch consume functionResult {
       case .value(let function):
-        let thisObject = JSValue(objectIn: context)
-        thisObject.setProperty(10, forKey: "base", in: context)
+        let thisObject: C.Value
+        switch scope.makeObject() {
+        case .value(let objectCallback):
+          thisObject = scope.persist(objectCallback)
+        case .exception:
+          Issue.record("Expected makeObject to succeed")
+          return
+        }
+        let base = scope.persist(scope.makeNumber(10))
+        thisObject.setProperty("base", to: base, attributes: .none, in: scope)
 
-        let callResult = function.call(this: thisObject, arguments: 1, 2, in: context)
+        let callResult = function.call(
+          this: thisObject,
+          arguments: [
+            scope.persist(scope.makeNumber(1)).borrowHandle(),
+            scope.persist(scope.makeNumber(2)).borrowHandle(),
+          ],
+          in: scope
+        )
         switch consume callResult {
         case .value(let value):
-          let resultValue = value.toDouble(in: context)
-          #expect(resultValue == 13)
+          #expect(value.toNumber() == 13)
         case .exception:
           Issue.record("Expected function.call to succeed")
         }
@@ -108,25 +131,30 @@ private enum JSValueCallSupportsThisAndArguments: ScriptEngineAssertion {
 }
 
 private enum JSValueConstructCreatesObject: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let constructorResult = context.evaluateScript(
+    await context.withInstantContext { scope in
+      let constructorResult = scope.evaluateScript(
         "(function Person(name) { this.name = name; this.kind = 'person' })"
       )
 
       switch consume constructorResult {
       case .value(let constructor):
-        let constructResult = constructor.construct(arguments: "alice", in: context)
+        let constructResult = constructor.construct(
+          arguments: [scope.makeString("alice").borrowHandle()], in: scope)
         switch consume constructResult {
         case .value(let instance):
-          let isObject = instance.isObject(in: context)
-          let name = instance.getProperty(forKey: "name", in: context).toString(in: context)
-          let kind = instance.getProperty(forKey: "kind", in: context).toString(in: context)
+          let isObject = instance.isObject()
+          let nameResult = instance.getProperty("name", in: scope)
+          let kindResult = instance.getProperty("kind", in: scope)
+          guard case .value(let name) = nameResult, case .value(let kind) = kindResult else {
+            Issue.record("Expected constructor instance properties")
+            return
+          }
           #expect(isObject)
-          #expect(name == "alice")
-          #expect(kind == "person")
+          #expect(name.toString() == "alice")
+          #expect(kind.toString() == "person")
         case .exception:
           Issue.record("Expected constructor.construct to succeed")
         }
@@ -138,102 +166,101 @@ private enum JSValueConstructCreatesObject: ScriptEngineAssertion {
 }
 
 private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let objectResult = context.evaluateScript(
+    await context.withInstantContext { scope in
+      let objectResult = scope.evaluateScript(
         "({ scale: 4, mul(value) { return this.scale * value } })")
 
       switch consume objectResult {
       case .value(let object):
-        let invokeResult = object.invokeMethod(("mul"), arguments: 5, in: context)
+        let invokeResult = object.invokeMethod(
+          "mul", arguments: [scope.makeNumber(5).borrowHandle()], in: scope)
         switch consume invokeResult {
         case .value(let value):
-          let resultValue = value.toDouble(in: context)
-          #expect(resultValue == 20)
+          #expect(value.toNumber() == 20)
         case .exception:
           Issue.record("Expected method invocation to succeed")
         }
 
-        let missingResult = object.invokeMethod(("missing"), in: context)
+        let missingResult = object.invokeMethod("missing", arguments: [], in: scope)
         switch consume missingResult {
         case .value:
           Issue.record("Expected missing method invocation to raise exception")
         case .exception(let exception):
-          let isObject = exception.isObject(in: context)
+          let isObject = exception.isObject()
           #expect(isObject)
         }
       case .exception(let exception):
-        let message = exception.toString(in: context)
-        Issue.record("Expected object literal value, got exception: \(message)")
+        Issue.record("Expected object literal value, got exception: \(exception.toString())")
       }
     }
   }
 }
 
 private enum NativeFunctionNamesAndExceptionsAreObservable: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let function = context.makeFunction(named: "explode") { c, _, _ in
-        return JSCallbackReturn(exception: c.makeString("boom").handle)
+    await context.withInstantContext { scope in
+      let function = scope.makeFunction(named: "explode") { c, _, _ in
+        return c.throw(c.makeString("boom"))
       }
-      context.withGlobalObject { global in
-        global.setProperty(function, forKey: "explode", in: context)
-      }
+      scope.setGlobalProperty(function, forKey: "explode", with: .none)
 
-      let nameResult = context.evaluateScript("explode.name")
+      let nameResult = scope.evaluateScript("explode.name")
       switch consume nameResult {
       case .value(let value):
-        let functionName = value.toString(in: context)
-        #expect(functionName == "explode")
+        #expect(value.toString() == "explode")
       case .exception:
         Issue.record("Expected native function name to be readable")
       }
 
-      let callResult = context.evaluateScript("explode()")
+      let callResult = scope.evaluateScript("explode()")
       switch consume callResult {
       case .value:
         Issue.record("Expected native function exception")
       case .exception(let exception):
-        let exceptionString = exception.toString(in: context)
-        #expect(exceptionString == "boom")
+        #expect(exception.toString() == "boom")
       }
     }
   }
 }
 
 private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let makeObject = context.makeFunction(named: "makeNativeObject") { c, _, _ in
-        let object = c.makePersistentObject()
-        object.setProperty("native", forKey: "kind", in: c)
-        object.setProperty(7, forKey: "count", in: c)
-        return JSCallbackReturn(persistent: object)
+    await context.withInstantContext { scope in
+      let makeObject = scope.makeFunction(named: "makeNativeObject") { c, _, _ in
+        switch c.makeObject() {
+        case .value(let objectCallback):
+          let object = c.persist(objectCallback)
+          object.setProperty("kind", to: c.makeString("native"), attributes: .none, in: c)
+          object.setProperty("count", to: c.makeNumber(7), attributes: .none, in: c)
+          return c.return(object)
+        case .exception:
+          return c.throwUndefined()
+        }
       }
-      let throwObject = context.makeFunction(named: "throwNativeObject") { c, _, _ in
+      let throwObject = scope.makeFunction(named: "throwNativeObject") { c, _, _ in
         let made = c.makeObject()
         switch consume made {
-        case .value(let error):
-          error.setProperty(c.makeString("native-error"), forKey: "kind")
-          error.setProperty(c.makeNumber(13), forKey: "code")
+        case .value(let errorCallback):
+          let error = c.persist(errorCallback)
+          error.setProperty("kind", to: c.makeString("native-error"), attributes: .none, in: c)
+          error.setProperty("code", to: c.makeNumber(13), attributes: .none, in: c)
           return c.throw(error)
         case .exception:
-          return JSCallbackReturn(temporary: c.makeUndefined().handle)
+          return c.throwUndefined()
         }
       }
 
-      context.withGlobalObject { global in
-        global.setProperty(makeObject, forKey: "makeNativeObject", in: context)
-        global.setProperty(throwObject, forKey: "throwNativeObject", in: context)
-      }
+      scope.setGlobalProperty(makeObject, forKey: "makeNativeObject", with: .none)
+      scope.setGlobalProperty(throwObject, forKey: "throwNativeObject", with: .none)
 
-      let objectResult = context.evaluateScript(
+      let objectResult = scope.evaluateScript(
         """
         const nativeObject = makeNativeObject();
         globalThis.savedNativeObject = nativeObject;
@@ -242,13 +269,13 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
       )
       switch consume objectResult {
       case .value(let value):
-        #expect(value.toString(in: context) == "native:7:true")
+        #expect(value.toString() == "native:7:true")
       case .exception(let exception):
         Issue.record(
-          "Expected native object callback result, got \(exception.toString(in: context))")
+          "Expected native object callback result, got \(exception.toString())")
       }
 
-      let exceptionResult = context.evaluateScript(
+      let exceptionResult = scope.evaluateScript(
         """
         try {
           throwNativeObject();
@@ -261,23 +288,23 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
       )
       switch consume exceptionResult {
       case .value(let value):
-        #expect(value.toString(in: context) == "native-error:13:true")
+        #expect(value.toString() == "native-error:13:true")
       case .exception(let exception):
         Issue.record(
-          "Expected native exception callback result, got \(exception.toString(in: context))")
+          "Expected native exception callback result, got \(exception.toString())")
       }
     }
   }
 }
 
 private enum ArrayDateAndInstanceOfPredicates: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let arrayResult = context.evaluateScript("[1, 2, 3]")
-      let dateResult = context.evaluateScript("new Date(0)")
-      let arrayConstructorResult = context.evaluateScript("Array")
+    await context.withInstantContext { scope in
+      let arrayResult = scope.evaluateScript("[1, 2, 3]")
+      let dateResult = scope.evaluateScript("new Date(0)")
+      let arrayConstructorResult = scope.evaluateScript("Array")
 
       switch consume arrayResult {
       case .value(let array):
@@ -285,10 +312,10 @@ private enum ArrayDateAndInstanceOfPredicates: ScriptEngineAssertion {
         case .value(let date):
           switch consume arrayConstructorResult {
           case .value(let arrayConstructor):
-            let arrayIsArray = array.isArray(in: context)
-            let arrayIsDate = array.isDate(in: context)
-            let dateIsDate = date.isDate(in: context)
-            let arrayIsInstance = array.isInstanceOf(arrayConstructor, in: context)
+            let arrayIsArray = array.isArray(in: scope)
+            let arrayIsDate = array.isDate(in: scope)
+            let dateIsDate = date.isDate(in: scope)
+            let arrayIsInstance = array.isInstanceOf(arrayConstructor, in: scope)
 
             #expect(arrayIsArray)
             #expect(!arrayIsDate)
@@ -308,18 +335,20 @@ private enum ArrayDateAndInstanceOfPredicates: ScriptEngineAssertion {
 }
 
 private enum ValueEqualityOperators: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let oneNumber = JSValue(number: 1, in: context)
-      let oneString = JSValue(string: "1", in: context)
-      let oneNumberCopy = JSValue(number: 1, in: context)
+    await context.withInstantContext { scope in
+      let oneNumber = scope.persist(scope.makeNumber(1))
+      let oneString = scope.persist(scope.makeString("1"))
+      let oneNumberCopy = scope.persist(scope.makeNumber(1))
+      let twoNumber = scope.persist(scope.makeNumber(2))
+      _ = scope
 
-      let looselyEqual = oneNumber.looselyEquals(oneString, in: context)
-      let looselyNotEqual = !oneNumber.looselyEquals(JSValue(number: 2, in: context), in: context)
-      let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy, in: context)
-      let strictlyNotEqual = !oneNumber.strictlyEquals(JSValue(number: 2, in: context), in: context)
+      let looselyEqual = oneNumber.looselyEquals(oneString)
+      let looselyNotEqual = !oneNumber.looselyEquals(twoNumber)
+      let strictlyEqual = oneNumber.strictlyEquals(oneNumberCopy)
+      let strictlyNotEqual = !oneNumber.strictlyEquals(twoNumber)
 
       #expect(looselyEqual)
       #expect(looselyNotEqual)
@@ -330,46 +359,103 @@ private enum ValueEqualityOperators: ScriptEngineAssertion {
 }
 
 private enum ValueObjectAndTypeHelpersWork: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let primitive = JSValue(number: 42, in: context)
-      let objectResult = primitive.toObject(in: context)
+    await context.withInstantContext { scope in
+      let primitive = scope.persist(scope.makeNumber(42))
+      let objectResult = primitive.toObject(in: scope)
       switch consume objectResult {
       case .value(let object):
-        let isObject = object.isObject(in: context)
+        let isObject = object.isObject()
         #expect(isObject)
       case .exception:
         Issue.record("Expected toObject to box primitive numbers")
       }
 
-      #expect(primitive.toNumber(in: context) == 42)
+      #expect(primitive.toNumber() == 42)
     }
   }
 }
 
 private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withInstantContext { context in
-      let object = JSValue(objectIn: context)
-      let array = JSValue(arrayIn: context)
-      let objectIsObject = object.isObject(in: context)
-      let arrayIsObject = array.isObject(in: context)
-      let arrayIsArray = array.isArray(in: context)
+    await context.withInstantContext { scope in
+      let objectCallback: C.CallbackValue
+      switch scope.makeObject() {
+      case .value(let made):
+        objectCallback = made
+      case .exception:
+        Issue.record("Expected object creation to succeed")
+        return
+      }
+      let arrayCallback: C.CallbackValue
+      switch scope.makeArray() {
+      case .value(let made):
+        arrayCallback = made
+      case .exception:
+        Issue.record("Expected array creation to succeed")
+        return
+      }
+      let object = scope.persist(objectCallback)
+      let array = scope.persist(arrayCallback)
+      let objectIsObject = object.isObject()
+      let objectIsArray = object.isArray(in: scope)
+      let arrayIsObject = array.isObject()
+      let arrayIsArray = array.isArray(in: scope)
 
       #expect(objectIsObject)
+      #expect(!objectIsArray)
       #expect(arrayIsObject)
       #expect(arrayIsArray)
     }
   }
 }
-extension JSInstantContext {
-  fileprivate func makePersistentObject() -> JSValue<E> {
-    let result = makeObject()
-    guard case .value(let cb) = result else { preconditionFailure("makeObject failed") }
-    return persist(cb)
+
+// MARK: - Surface callback entry (S6)
+//
+// The second `makeFunctionValueHandle` overload takes the surface callback
+// signature; this test drives it end to end and echoes an argument back so the
+// carrier's borrowed-handle contract is exercised without the S7 scope
+// return/throw API.
+
+private final class SurfaceCallbackObservations: @unchecked Sendable {
+  var argumentCount: Int? = nil
+  var thisType: JSType? = nil
+  var firstArgumentText: String? = nil
+}
+
+private func runSurfaceFunctionCallbackEntry<C: JSContext>(
+  _: C.Type
+) async {
+  let observations = SurfaceCallbackObservations()
+  let context = C(virtualMachine: C.VirtualMachine())
+
+  await context.withInstantContext { scope in
+    let callback: JSFunctionCallback<C.InstantContext> = {
+      callbackContext, thisValue, arguments in
+      observations.argumentCount = arguments.count
+      observations.thisType = thisValue.type()
+      return arguments.withValue(at: 0, in: callbackContext) { value in
+        observations.firstArgumentText = value.toString()
+        return callbackContext.return(value)
+      }
+    }
+
+    let function = scope.makeFunction(named: "surfaceEcho", callback: callback)
+
+    let result = function.call(
+      arguments: [scope.makeString("echoed").borrowHandle()], in: scope)
+    switch consume result {
+    case .value(let value):
+      #expect(value.toString() == "echoed")
+    case .exception(let exception):
+      Issue.record("Surface callback entry raised \(exception.toString())")
+    }
   }
+
+  #expect(observations.argumentCount == 1)
+  #expect(observations.firstArgumentText == "echoed")
 }

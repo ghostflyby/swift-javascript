@@ -8,43 +8,43 @@ import Testing
 /// 测试内断言编译期失败(需要独立的负面编译用例);以下示例仅以文档形式保留,
 /// 标注「应编译失败」,该验证未自动化:
 ///
-///     // ✗ 应编译失败 —— `JSCallbackValue` 是 ~Copyable,不能逃逸出回调值的作用域:
+///     // ✗ 应编译失败 —— `JSCallbackValueLegacy` 是 ~Copyable,不能逃逸出回调值的作用域:
 ///     final class Leak<E: JSEngine> {
-///       var escaped: JSCallbackValue<E>?
+///       var escaped: JSCallbackValueLegacy<E>?
 ///       // ^ ~Copyable 存储属性不允许出现在 Copyable 类型中
 ///     }
 ///
 ///     // ✗ 应编译失败 —— 也不能装箱为 `Any` 携带出去(`Any` 要求 Copyable):
 ///     let boxed: Any = c.makeString("must not escape")
 ///
-/// 值经 JS 流转(作为实参穿过引擎调用)或 `persist` 成 `JSValue` 是仅有的
+/// 值经 JS 流转(作为实参穿过引擎调用)或 `persist` 成 `JSValueLegacy` 是仅有的
 /// 合法出口;`nestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay`
 /// 恰好验证第一条通道。
 // MARK: - Stage 3 negative compile examples (not automatable in Swift Testing)
 //
-// 「`JSValue` 是非 Sendable 本地值,跨隔离域应编译失败」是编译期契约;
+// 「`JSValueLegacy` 是非 Sendable 本地值,跨隔离域应编译失败」是编译期契约;
 // Swift Testing 无法在测试内断言编译期失败,以下样例仅以文档形式保留,
 // 标注「应编译失败」,该验证未自动化:
 //
 //     // ✗ 应编译失败 —— actor 隔离域把非 Sendable 本地值返回给 nonisolated
 //     // 上下文:
-//     func leak(_ context: JSContext<JavaScriptCoreEngine>) async {
+//     func leak(_ context: JSContextLegacy<JSCEngine>) async {
 //       let value = await context.makeString("leak")
 //       _ = value
 //     }
 //
 //     // ✗ 应编译失败 —— 捕获进 @Sendable 任务(handle/context token 的
 //     // Sendable 不使本地值本身可跨域):
-//     func send(_ value: borrowing JSValue<JavaScriptCoreEngine>) {
+//     func send(_ value: borrowing JSValueLegacy<JSCEngine>) {
 //       Task.detached { _ = value }
 //     }
 //
 //     // ✗ 应编译失败 —— 作为 actor 间实例方法实参:
 //     actor Sink {
-//       func take(_ value: borrowing JSValue<JavaScriptCoreEngine>) {}
+//       func take(_ value: borrowing JSValueLegacy<JSCEngine>) {}
 //     }
 //     func send(
-//       _ value: borrowing JSValue<JavaScriptCoreEngine>,
+//       _ value: borrowing JSValueLegacy<JSCEngine>,
 //       to sink: Sink
 //     ) async {
 //       await sink.take(value)
@@ -53,10 +53,10 @@ import Testing
 // 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 /
 // swiftlang-6.4.2.1.9;探针文件临时加入 `SwiftJavaScriptEngineTests` target
 // 后 `swift build --build-tests`,确认三类诊断后删除探针并重建通过):
-// - actor 返回样例报 `error: non-Sendable 'JSValue<JavaScriptCoreEngine>'
+// - actor 返回样例报 `error: non-Sendable 'JSValueLegacy<JSCEngine>'
 //   -typed result can not be returned from actor-isolated instance method
 //   'makeString' to nonisolated context`,并附
-//   `note: generic struct 'JSValue' does not conform to the 'Sendable'
+//   `note: generic struct 'JSValueLegacy' does not conform to the 'Sendable'
 //   protocol`;
 // - @Sendable 捕获样例报 `error: passing closure as a 'sending' parameter
 //   risks causing data races between code in the current isolation context
@@ -70,38 +70,38 @@ import Testing
 //   risks causing data races between actor-isolated code and code in the
 //   current isolation context`)。
 //
-// 三个样例均因 `JSValue` 只能留在原隔离域而失败;`Sendable` 的
+// 三个样例均因 `JSValueLegacy` 只能留在原隔离域而失败;`Sendable` 的
 // handle/context token 不改变该结论。
 
 // MARK: - Stage 4 (TODO §2.7.1) negative compile examples (not automatable in Swift Testing)
 
-// 「`JSScope` 只能生灭于 context 隔离域内」是编译期契约:公共构造面只有
-// actor 隔离工厂 `JSContext.makeScope()`,而 `JSScope` 既非 Copyable 也非
+// 「`JSScopeLegacy` 只能生灭于 context 隔离域内」是编译期契约:公共构造面只有
+// actor 隔离工厂 `JSContextLegacy.makeScope()`,而 `JSScopeLegacy` 既非 Copyable 也非
 // Sendable。Swift Testing 无法在测试内断言编译期失败,以下样例仅以文档形式
 // 保留,标注「应编译失败」,该验证未自动化:
 //
 //     // ✗ 应编译失败 —— 从 nonisolated 上下文调用工厂,结果跨 actor 边界:
-//     func leak(_ context: JSContext<JavaScriptCoreEngine>) async {
+//     func leak(_ context: JSContextLegacy<JSCEngine>) async {
 //       let scope = await context.makeScope()
 //       _ = scope
 //     }
 //
 //     // ✗ 应编译失败 —— 把结果从 actor 隔离实例方法返回给 nonisolated 调用方:
 //     func leak(
-//       _ context: JSContext<JavaScriptCoreEngine>
-//     ) async -> JSScope<JavaScriptCoreEngine> {
+//       _ context: JSContextLegacy<JSCEngine>
+//     ) async -> JSScopeLegacy<JSCEngine> {
 //       await context.makeScope()
 //     }
 //
 // 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 / swiftlang-6.4.2.1.9;探针文件
 // 临时加入 `SwiftJavaScriptEngineTests` target 后 `swift build --build-tests`,
 // 确认诊断后删除探针并重建通过):
-// - 两个样例均报 `error: non-Sendable 'JSScope<JavaScriptCoreEngine>'-typed
+// - 两个样例均报 `error: non-Sendable 'JSScopeLegacy<JSCEngine>'-typed
 //   result can not be returned from actor-isolated instance method 'makeScope()'
 //   to nonisolated context`,并附
-//   `note: generic struct 'JSScope' does not conform to the 'Sendable' protocol`。
+//   `note: generic struct 'JSScopeLegacy' does not conform to the 'Sendable' protocol`。
 //
-// `JSScope.init(handle:)` / `open()` 为 `package` 访问级别,包外不可见;这是
+// `JSScopeLegacy.init(handle:)` / `open()` 为 `package` 访问级别,包外不可见;这是
 // 访问控制的事实,同包测试给不出可观测诊断,故不列为探针样例。
 //
 // 正例见下方 `contextDerivedScopeNestsPersistsAndResolves`:工厂在
@@ -129,42 +129,36 @@ struct EngineScopeContractTests {
   }
 }
 
-/// `JSContext.makeScope()` 是 `JSScope` 的公共构造路径(TODO §2.7.1):工厂
+/// `JSContextLegacy.makeScope()` 是 `JSScopeLegacy` 的公共构造路径(TODO §2.7.1):工厂
 /// actor 隔离,scope 生、用、析构都在 context 的隔离域内。嵌套 scope 内:
 /// 工厂产物经 `persist` 晋升到默认 scope;持久 handle 在其中 mint/resolve;
 /// scope 结束后帧弹回默认帧,晋升值仍可用。
 private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    let (resolved, stackBackAtDefault) = await context.withIsolatedGlobalObject {
-      isolatedContext, globalObject -> (String, Bool) in
-      let contextHandle = isolatedContext.driverContextHandle
-      let defaultFrame = ScopeStackRegistry<E>.top(of: contextHandle)
-      let handle = isolatedContext.makePersistentHandle(
-        isolatedContext.makeString("bound"))
+    let (resolved, stackBackAtDefault) = await context.withInstantContext {
+      window -> (String, Bool) in
+      let contextHandle = window.driverContextHandle
+      let defaultFrame = ScopeStackRegistry<C.ContextHandle>.top(of: contextHandle)
+      let handle = window.makePersistentHandle(
+        window.makeString("bound"))
 
-      // 内层作用域:嵌套 scope 在其中打开,随作用域结束析构。
-      let resolved: String = {
-        let scope = isolatedContext.makeScope()
-        let durable = scope.persist(scope.makeString("promoted"))
-        globalObject.setProperty(durable, forKey: "durable", in: isolatedContext)
-        var resolved = "<nil>"
-        if let value = scope.resolve(handle) {
-          resolved = value.toString(in: isolatedContext)
-        }
-        return resolved
-      }()
+      // 内层写入与解析都发生在同一个同步窗口内；晋升值与全局属性在窗口
+      // 结束后仍由默认 scope / 全局对象持有。
+      let durable = window.persist(window.makeString("promoted"))
+      window.setGlobalProperty(durable, forKey: "durable", with: .none)
+      let resolved = window.resolve(handle)?.toString() ?? "<nil>"
 
-      return (resolved, ScopeStackRegistry<E>.top(of: contextHandle) === defaultFrame)
+      return (resolved, ScopeStackRegistry<C.ContextHandle>.top(of: contextHandle) === defaultFrame)
     }
 
     #expect(resolved == "bound")
     #expect(stackBackAtDefault)
 
-    // 晋升值锚在默认 scope:嵌套 scope 析构后、跨窗口仍可读取。
-    let durableAfterScope = await context.withInstantContext { scope in
-      scope.toString(scope.getGlobalProperty(forKey: "durable"))
+    // 晋升值锚在默认 scope:窗口结束后、跨窗口仍可读取。
+    let durableAfterScope = await context.withInstantContext { window in
+      window.getGlobalProperty(forKey: "durable").toString()
     }
     #expect(durableAfterScope == "promoted")
   }
@@ -183,15 +177,15 @@ private final class NestedCallbackObservations: @unchecked Sendable {
 
 /// 嵌套契约(§3.4):回调 A 创建的值,经 JS 中转后必须能在内层回调 B 中使用。
 ///
-/// `JSCallbackValue` 是 ~Copyable,不能被捕获直传——值经 JS 引擎流转是唯一
+/// `JSCallbackValueLegacy` 是 ~Copyable,不能被捕获直传——值经 JS 引擎流转是唯一
 /// 合法的跨回调通道,本测试验证的正是这条通道:外层回调 A 创建值并以实参
 /// 形式穿过一次 JS 调用(relay),由引擎重入建立的内层回调 B 通过参数帧
 /// 取回该值并断言可用且内容正确。
 private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
+  static func run<C: JSContext>(_: C.Type) async {
     let observations = NestedCallbackObservations()
 
-    let context = JSContext<E>()
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { ic in
       // JS 中转层:relay 把收到的实参原样转发给 native inner。
@@ -207,9 +201,11 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
       ic.installGlobalFunction(named: "inner") { c, _, arguments in
         observations.argumentCount = arguments.count
         arguments.withValue(at: 0, in: c) { value in
-          observations.receivedType = value.type()
-          observations.receivedContent = value.toString()
-          observations.strictlyMatchesTwin = value.strictlyEquals(c.makeString("payload-from-A"))
+          let view = c.anchorBorrowedHandle(value.borrowHandle())
+          observations.receivedType = view.type()
+          observations.receivedContent = view.toString()
+          observations.strictlyMatchesTwin = view.strictlyEquals(
+            c.anchorBorrowedHandle(c.makeString("payload-from-A").borrowHandle()))
         }
         return c.return(c.makeString("ack-from-B"))
       }
@@ -218,10 +214,10 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
       ic.installGlobalFunction(named: "outer") { c, _, _ in
         let created = c.makeString("payload-from-A")
         let relay = c.getGlobalProperty(forKey: "relay")
-        let relayResult = c.call(function: relay, arguments: [created.handle])
+        let relayResult = relay.call(arguments: [created.borrowHandle()], in: c)
         switch consume relayResult {
         case .value(let acknowledgement):
-          return c.return(c.makeString("relay:" + acknowledgement.toString(in: c)))
+          return c.return(c.makeString("relay:" + acknowledgement.toString()))
         case .exception:
           // 不应发生:B 正常返回;异常经 outer 的调用结果在外层分支统一暴露。
           return c.throwUndefined()
@@ -229,10 +225,10 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
       }
 
       let outer = ic.getGlobalProperty(forKey: "outer")
-      let outerResult = outer.call(in: ic)
+      let outerResult = outer.call(arguments: [], in: ic)
       switch consume outerResult {
       case .value(let value):
-        #expect(value.toString(in: ic) == "relay:ack-from-B")
+        #expect(value.toString() == "relay:ack-from-B")
       case .exception:
         Issue.record("Expected outer callback to complete without exception")
       }
@@ -249,118 +245,65 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
 /// 在默认帧之上打开又关闭,默认 arena 的值仍可用;由 `evaluateScript`
 /// 产生的值同样由默认 scope 承接(而非临时 scope 的 drain)。
 private enum DefaultScopeValueSurvivesNestedInstantScope: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    await context.withIsolatedGlobalObject { context, _ in
-      let durable = context.makeString("durable")
+    await context.withInstantContext { window in
+      let durable = window.persist(window.makeString("durable"))
 
-      // 同步 scope 在默认帧之上压入/弹出,不触碰默认 arena。
-      context.withInstantContext { instantContext in
-        _ = instantContext.makeString("temporary")
-      }
+      // 同一窗口内继续创建临时值;默认 arena 不受临时值结算影响。
+      _ = window.makeString("temporary")
 
-      #expect(durable.toString(in: context) == "durable")
+      #expect(durable.toString() == "durable")
 
-      let result = context.evaluateScript("1 + 1")
+      let result = window.evaluateScript("1 + 1")
       switch consume result {
       case .value(let value):
-        #expect(value.toDouble(in: context) == 2)
+        #expect(value.toNumber() == 2)
       case .exception:
         Issue.record("Expected default-scope evaluation to produce a value")
       }
     }
+
+    // 晋升值跨窗口存活:第二个窗口仍能从默认 scope 读到它。
+    let durableText = await context.withInstantContext { window in
+      window.persist(window.makeString("durable")).toString()
+    }
+    #expect(durableText == "durable")
   }
 }
 
-/// Stage 3 §§3.2/3.6: a default-scope `JSValue` stays usable when the
-/// context actor suspends and resumes. The value never leaves its isolation
-/// domain; the default arena keeps the engine reference alive across the
-/// suspension (JSC: explicit `JSValueProtect`; QuickJS: the creation
-/// reference), so the resumed read must observe the original string.
-///
-/// 未自动化契约(编译期,Swift Testing 无法在测试内断言):`JSValue` 是非
-/// `Sendable` 本地值,把同一视图送进另一个隔离域必须编译失败。文档样例与
-/// 构建探针实测记录见本文件顶部的 Stage 3 负面样例说明。
+/// Stage 3 §§3.2/3.6: a default-scope value stays usable when the context
+/// actor suspends and resumes. The persistent binding is `Sendable`, so it
+/// crosses the suspension; the default arena keeps the engine reference alive
+/// (JSC: explicit `JSValueProtect`; QuickJS: the creation reference), and the
+/// resumed window resolves it back to the original string.
 private enum ValueSurvivesAwaitWithinActor: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
-    let observations = await context.stage3ProbeValueAcrossAwait()
+    let handle = await context.withInstantContext { window in
+      window.makePersistentHandle(window.makeString("across-await"))
+    }
 
-    #expect(observations.valueBeforeSuspension == "across-await")
-    #expect(observations.valueAfterSuspension == "across-await")
-    #expect(observations.valueAfterSiblingJobAndGC == "across-await")
-    #expect(observations.numberAfterSuspension == 42)
-  }
-}
-
-/// Observations are `Sendable`; the non-`Sendable` `JSValue` never leaves
-/// the context actor's isolation domain (the probe is an actor-isolated
-/// method, not a nonisolated helper receiving the value).
-private struct Stage3AwaitObservations: Sendable {
-  let valueBeforeSuspension: String
-  let valueAfterSuspension: String
-  let valueAfterSiblingJobAndGC: String
-  let numberAfterSuspension: Double
-}
-
-extension JSContext where E: JSEngine {
-  /// Runs entirely on this actor: the durable value is created, the actor
-  /// suspends, other default-scope allocations and another job run on the
-  /// same actor, then the value is read again. `JSValue` is never returned
-  /// or captured by a nonisolated context, so this does not cross an
-  /// isolation domain.
-  fileprivate func stage3ProbeValueAcrossAwait() async -> Stage3AwaitObservations {
-    let durable = makeString("across-await")
-    let before = durable.toString(in: self)
-
-    // First suspension: the value's frame is no longer on the synchronous
-    // stack while it is outstanding.
     await Task.yield()
-    let afterFirstSuspension = durable.toString(in: self)
 
-    // Heap pressure on the default arena between suspension and use.
-    for index in 0..<32 {
-      _ = makeString("default-scope-pressure-\(index)")
-    }
-    withInstantContext { scoped in
-      _ = scoped.makeString("nested-scope-temporary")
-    }
-
-    // A sibling job on the same actor runs while `durable` is outstanding;
-    // it also forces a JSC collection so an unprotected value would be
-    // observable as corruption here rather than waiting for incidental GC.
-    let number = makeNumber(42)
-    let sibling = Task { @Sendable [self] in
-      await self.stage3SiblingJobAndCollection()
+    // A sibling job on the same actor runs while the binding is outstanding.
+    let sibling = Task {
+      await context.withInstantContext { window in
+        _ = window.makeString("default-scope-pressure")
+        _ = window.evaluateScript("({ mark: 'stage3-gc-pressure' })")
+      }
     }
     await sibling.value
 
-    let numberAfter = number.toDouble(in: self)
-    let afterSibling = durable.toString(in: self)
-
-    return Stage3AwaitObservations(
-      valueBeforeSuspension: before,
-      valueAfterSuspension: afterFirstSuspension,
-      valueAfterSiblingJobAndGC: afterSibling,
-      numberAfterSuspension: numberAfter
-    )
-  }
-
-  /// Same-actor sibling work: default-scope allocation plus an explicit
-  /// collection on GC engines (JSC). Reference-counted engines ignore the
-  /// collection hook because their creation reference is already the root.
-  fileprivate func stage3SiblingJobAndCollection() async {
-    for index in 0..<16 {
-      _ = makeString("sibling-\(index)")
+    let observations = await context.withInstantContext {
+      window -> (String, Double) in
+      let value = window.resolve(handle)
+      return (value?.toString() ?? "<nil>", window.makeNumber(42).toNumber())
     }
-    await Task.yield()
-    // JSC's conservative stack scan does not see heap-resident default-scope
-    // arenas, so an explicit collection in the middle of the suspension is
-    // the strongest check that the explicit root is doing its job. QuickJS
-    // is refcounted and needs no collection.
-    stage3CollectGarbageIfSupported(driverContextHandle)
-    _ = evaluateScript("({ mark: 'stage3-gc-pressure' })")
+
+    #expect(observations.0 == "across-await")
+    #expect(observations.1 == 42)
   }
 }

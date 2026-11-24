@@ -31,12 +31,12 @@ struct EngineTypedArrayDriverTests {
 }
 
 private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
-      let buffer = JSArrayBuffer<E>(copying: [10, 20, 30, 40, 50, 60], in: context)
-      let invalidTypedArrayHandle = buffer.withJSValue { bufferValue in
+      let buffer = C.ArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: context)
+      let invalidTypedArrayHandle = buffer.withValue { bufferValue in
         context.driverContextHandle.makeTypedArrayHandle(
           kind: .uint16Array,
           arrayBuffer: bufferValue.borrowHandle(),
@@ -49,13 +49,13 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       let postFailureEvaluation = context.evaluateScript("21 + 21")
       switch consume postFailureEvaluation {
       case .value(let value):
-        let result = value.toInt32(in: context)
+        let result = value.toNumber()
         #expect(result == 42)
       case .exception:
         Issue.record("Expected typed array construction failure to leave evaluation usable")
       }
 
-      let typedArrayHandle = buffer.withJSValue { bufferValue in
+      let typedArrayHandle = buffer.withValue { bufferValue in
         context.driverContextHandle.makeTypedArrayHandle(
           kind: .uint8Array,
           arrayBuffer: bufferValue.borrowHandle(),
@@ -69,11 +69,11 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       }
 
       // Raw driver results carry a new engine reference; adopt it into the
-      // context default scope (JSValue itself owns nothing).
-      let typedArrayValue: JSValue<E> = adoptCreatedValueHandle(
-        typedArrayHandle, in: context.driverContextHandle)
-      guard let typedArray = JSTypedArray<E>(value: typedArrayValue, in: context) else {
-        Issue.record("Expected created value to wrap as JSTypedArray")
+      // context default scope (the value view itself owns nothing).
+      let typedArrayValue = context.adoptCreatedHandle(
+        C.OwnedValueHandle.adopting(typedArrayHandle))
+      guard let typedArray = C.TypedArray(value: typedArrayValue, in: context) else {
+        Issue.record("Expected created value to wrap as a typed array")
         return
       }
 
@@ -97,8 +97,8 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       #expect(typedArrayBufferByteLength == 6)
       #expect(copiedBytes == [30, 40, 50])
 
-      let wholeBufferArray = JSTypedArray<E>(
-        type: .uint8Array,
+      let wholeBufferArray = C.TypedArray(
+        kind: .uint8Array,
         buffer: buffer,
         in: context
       )
@@ -127,11 +127,12 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
         return
       }
 
-      let lengthConstructedValue: JSValue<E> = adoptCreatedValueHandle(
-        lengthConstructedHandle, in: context.driverContextHandle)
-      guard let lengthConstructed = JSTypedArray<E>(value: lengthConstructedValue, in: context)
+      let lengthConstructedValue = context.adoptCreatedHandle(
+        C.OwnedValueHandle.adopting(lengthConstructedHandle))
+      guard
+        let lengthConstructed = C.TypedArray(value: lengthConstructedValue, in: context)
       else {
-        Issue.record("Expected length-created value to wrap as JSTypedArray")
+        Issue.record("Expected length-created value to wrap as a typed array")
         return
       }
 
@@ -146,11 +147,11 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
 }
 
 private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
-      let buffer = JSArrayBuffer<E>(byteLength: 4, in: context)
+      let buffer = C.ArrayBuffer(byteLength: 4, in: context)
       let length = buffer.byteLength
 
       var initialBytes: [UInt8] = []
@@ -164,8 +165,8 @@ private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAss
         bytes[3] = 9
       }
 
-      context.withGlobalObject { global in
-        global.setProperty(buffer, forKey: "buffer", in: context)
+      buffer.withValue { value in
+        context.setGlobalProperty(value, forKey: "buffer", with: .none)
       }
       let result = context.evaluateScript("new Uint8Array(buffer)[0] + new Uint8Array(buffer)[3]")
 
@@ -174,7 +175,7 @@ private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAss
 
       switch consume result {
       case .value(let value):
-        #expect(value.toInt32(in: context) == 16)
+        #expect(value.toNumber() == 16)
       case .exception:
         Issue.record("Expected ArrayBuffer bytes to be visible from JavaScript")
       }
@@ -183,11 +184,11 @@ private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAss
 }
 
 private enum ArrayBufferCanCopyBytesAndWrapExistingJSValue: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
-      let copied = JSArrayBuffer<E>(copying: [1, 2, 3, 4], in: context)
+      let copied = C.ArrayBuffer(copying: [1, 2, 3, 4], in: context)
       var copiedBytes: [UInt8] = []
       copied.withUnsafeBytes { rawBuffer in
         copiedBytes = Array(rawBuffer.bindMemory(to: UInt8.self))
@@ -202,10 +203,10 @@ private enum ArrayBufferCanCopyBytesAndWrapExistingJSValue: ScriptEngineAssertio
       case .value(let value):
         let isArrayBuffer = value.isArrayBuffer(in: context)
         #expect(isArrayBuffer)
-        if let wrapped = JSArrayBuffer<E>(value: value, in: context) {
+        if let wrapped = C.ArrayBuffer(value: value, in: context) {
           #expect(wrapped.byteLength == 3)
         } else {
-          Issue.record("Expected JSValue to wrap as JSArrayBuffer")
+          Issue.record("Expected the value to wrap as an engine array buffer")
         }
       case .exception:
         Issue.record("Expected JavaScript ArrayBuffer value")
@@ -215,11 +216,11 @@ private enum ArrayBufferCanCopyBytesAndWrapExistingJSValue: ScriptEngineAssertio
 }
 
 private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
-      let typedArray = JSTypedArray<E>(type: .uint16Array, length: 4, in: context)
+      let typedArray = C.TypedArray(kind: .uint16Array, length: 4, in: context)
 
       typedArray.withUnsafeMutableBytes { rawBuffer in
         let words = rawBuffer.bindMemory(to: UInt16.self)
@@ -228,8 +229,8 @@ private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
         words[3] = 12
       }
 
-      context.withGlobalObject { global in
-        global.setProperty(typedArray, forKey: "typedArray", in: context)
+      typedArray.withValue { value in
+        context.setGlobalProperty(value, forKey: "typedArray", with: .none)
       }
       let result = context.evaluateScript(
         "typedArray.length + typedArray.byteOffset + typedArray.BYTES_PER_ELEMENT + typedArray[0] + typedArray[1] + typedArray[3]"
@@ -243,7 +244,7 @@ private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
 
       switch consume result {
       case .value(let value):
-        #expect(value.toInt32(in: context) == 32)
+        #expect(value.toNumber() == 32)
       case .exception:
         Issue.record("Expected TypedArray bytes to be visible from JavaScript")
       }
@@ -252,14 +253,14 @@ private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
 }
 
 private enum TypedArrayCanWrapArrayBufferSliceAndExistingJSValue: ScriptEngineAssertion {
-  static func run<E: JSEngine>(_: E.Type) async where E.Engine == E {
-    let context = JSContext<E>()
+  static func run<C: JSContext>(_: C.Type) async {
+    let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { context in
-      let buffer = JSArrayBuffer<E>(
+      let buffer = C.ArrayBuffer(
         copying: [10, 20, 30, 40, 50, 60], in: context)
-      let typedArray = JSTypedArray<E>(
-        type: .uint8Array,
+      let typedArray = C.TypedArray(
+        kind: .uint8Array,
         buffer: buffer,
         byteOffset: 2,
         length: 3,
@@ -284,12 +285,12 @@ private enum TypedArrayCanWrapArrayBufferSliceAndExistingJSValue: ScriptEngineAs
       case .value(let value):
         let isTypedArray = value.isTypedArray(in: context)
         #expect(isTypedArray)
-        if let wrapped = JSTypedArray<E>(value: value, in: context) {
+        if let wrapped = C.TypedArray(value: value, in: context) {
           #expect(wrapped.kind == .uint8Array)
           #expect(wrapped.length == 5)
           #expect(wrapped.byteOffset == 0)
         } else {
-          Issue.record("Expected JSValue to wrap as JSTypedArray")
+          Issue.record("Expected the value to wrap as an engine typed array")
         }
       case .exception:
         Issue.record("Expected JavaScript TypedArray value")

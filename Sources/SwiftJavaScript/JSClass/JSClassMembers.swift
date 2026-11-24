@@ -1,30 +1,28 @@
 public protocol JSStaticValueDefinition: Sendable {
-  associatedtype Engine: JSEngine
+  associatedtype Engine: JSEngineClassBridgeDriver
 
   var name: String { get }
   var attributes: JSPropertyAttributes { get }
   var getProperty:
-    @Sendable (borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>)
-      -> JSResult<JSValue<Engine>>
+    @Sendable (borrowing Engine.InstantContext, borrowing Engine.Value)
+      -> JSResult<Engine.Value>
   { get }
   var setProperty:
     @Sendable (
-      borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>,
-      borrowing JSValue<Engine>
-    ) -> JSResult<JSValue<Engine>>
+      borrowing Engine.InstantContext, borrowing Engine.Value, borrowing Engine.Value
+    ) -> JSResult<Engine.Value>
   { get }
 }
 
 public protocol JSStaticFunctionDefinition: Sendable {
-  associatedtype Engine: JSEngine
+  associatedtype Engine: JSEngineClassBridgeDriver
 
   var name: String { get }
   var attributes: JSPropertyAttributes { get }
   var callAsFunction:
     @Sendable (
-      borrowing JSInstantContext<Engine>, borrowing JSValue<Engine>,
-      borrowing JSArguments<Engine>
-    ) -> JSResult<JSValue<Engine>>
+      borrowing Engine.InstantContext, borrowing Engine.Value, borrowing Engine.Arguments
+    ) -> JSResult<Engine.Value>
   { get }
 }
 
@@ -48,24 +46,26 @@ public struct JSClassStaticFunctionDefinition: Sendable {
   }
 }
 
-public struct JSStaticValue<E: JSEngine>: JSStaticValueDefinition, Sendable {
+public struct JSStaticValue<E: JSEngineClassBridgeDriver>: JSStaticValueDefinition, Sendable {
+  public typealias Engine = E
+
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
-    @Sendable (borrowing JSInstantContext<E>, borrowing JSValue<E>)
-      -> JSResult<JSValue<E>>
+    @Sendable (borrowing E.InstantContext, borrowing E.Value)
+      -> JSResult<E.Value>
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     getProperty:
       @escaping @Sendable (
-        borrowing JSInstantContext<E>, borrowing JSValue<E>
-      ) -> JSResult<JSValue<E>>,
+        borrowing E.InstantContext, borrowing E.Value
+      ) -> JSResult<E.Value>,
     setProperty:
       @escaping @Sendable (
-        borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
-      ) -> JSResult<JSValue<E>>
+        borrowing E.InstantContext, borrowing E.Value, borrowing E.Value
+      ) -> JSResult<E.Value>
   ) {
     self.name = name
     self.attributes = attributes
@@ -74,26 +74,27 @@ public struct JSStaticValue<E: JSEngine>: JSStaticValueDefinition, Sendable {
   }
   public let setProperty:
     @Sendable (
-      borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSValue<E>
-    )
-      -> JSResult<JSValue<E>>
+      borrowing E.InstantContext, borrowing E.Value, borrowing E.Value
+    ) -> JSResult<E.Value>
 }
 
-public struct JSStaticFunction<E: JSEngine>: JSStaticFunctionDefinition, Sendable {
+public struct JSStaticFunction<E: JSEngineClassBridgeDriver>: JSStaticFunctionDefinition, Sendable {
+  public typealias Engine = E
+
   public let name: String
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
     @Sendable (
-      borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
-    ) -> JSResult<JSValue<E>>
+      borrowing E.InstantContext, borrowing E.Value, borrowing E.Arguments
+    ) -> JSResult<E.Value>
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     callAsFunction:
       @escaping @Sendable (
-        borrowing JSInstantContext<E>, borrowing JSValue<E>, borrowing JSArguments<E>
-      ) -> JSResult<JSValue<E>>
+        borrowing E.InstantContext, borrowing E.Value, borrowing E.Arguments
+      ) -> JSResult<E.Value>
   ) {
     self.name = name
     self.attributes = attributes
@@ -107,17 +108,17 @@ extension JSStaticValueDefinition {
   }
 
   package func propertyValue(
-    in context: borrowing JSInstantContext<Engine>,
-    on thisValue: borrowing JSValue<Engine>
-  ) -> JSResult<JSValue<Engine>> {
+    in context: borrowing Engine.InstantContext,
+    on thisValue: borrowing Engine.Value
+  ) -> JSResult<Engine.Value> {
     getProperty(context, thisValue)
   }
 
   package func setPropertyException(
-    in context: borrowing JSInstantContext<Engine>,
-    on thisValue: borrowing JSValue<Engine>,
-    to newValue: borrowing JSValue<Engine>
-  ) -> JSValue<Engine>? {
+    in context: borrowing Engine.InstantContext,
+    on thisValue: borrowing Engine.Value,
+    to newValue: borrowing Engine.Value
+  ) -> Engine.Value? {
     takeExceptionValue(setProperty(context, thisValue, newValue))
   }
 
@@ -140,10 +141,10 @@ extension JSStaticFunctionDefinition {
   }
 
   package func callResult(
-    in context: borrowing JSInstantContext<Engine>,
-    on thisValue: borrowing JSValue<Engine>,
-    with arguments: borrowing JSArguments<Engine>
-  ) -> JSResult<JSValue<Engine>> {
+    in context: borrowing Engine.InstantContext,
+    on thisValue: borrowing Engine.Value,
+    with arguments: borrowing Engine.Arguments
+  ) -> JSResult<Engine.Value> {
     callAsFunction(context, thisValue, arguments)
   }
 

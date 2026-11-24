@@ -1,11 +1,11 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable,
+public struct JSCValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable,
   Hashable
 {
-  public typealias Context = JavaScriptCoreContextHandle
-  public typealias Owned = JavaScriptCoreOwnedValueHandle
+  public typealias Context = JSCContextHandle
+  public typealias Owned = JSCOwnedValueHandle
 
   let ref: JSValueRef
 
@@ -16,11 +16,11 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
     self.ref = ref
   }
 
-  public func retainReference(in context: JavaScriptCoreContextHandle) {
+  public func retainReference(in context: JSCContextHandle) {
     JSValueProtect(context.ref, ref)
   }
 
-  public func releaseReference(in context: JavaScriptCoreContextHandle) {
+  public func releaseReference(in context: JSCContextHandle) {
     JSValueUnprotect(context.ref, ref)
   }
 
@@ -28,13 +28,13 @@ public struct JavaScriptCoreValueHandle: JSValueManualReferenceCountedHandle, @u
 
 /// Ownership carrier for a JavaScriptCore value reference (`~Copyable`).
 /// JSC is GC-managed, so owning vs. borrowing is a type-level distinction
-/// only — releasing is delegated to `JavaScriptCoreValueHandle` and to the
+/// only — releasing is delegated to `JSCValueHandle` and to the
 /// engine driver's no-op `releaseCreatedHandle`.
-public struct JavaScriptCoreOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
+public struct JSCOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
   Equatable, ~Copyable
 {
-  public typealias Context = JavaScriptCoreContextHandle
-  public typealias Borrowed = JavaScriptCoreValueHandle
+  public typealias Context = JSCContextHandle
+  public typealias Borrowed = JSCValueHandle
 
   let ref: JSValueRef
 
@@ -42,11 +42,11 @@ public struct JavaScriptCoreOwnedValueHandle: JSOwnedValueManualReferenceCounted
     self.ref = ref
   }
 
-  public borrowing func borrowed() -> JavaScriptCoreValueHandle {
-    JavaScriptCoreValueHandle(ref: ref)
+  public borrowing func borrowed() -> JSCValueHandle {
+    JSCValueHandle(ref: ref)
   }
 
-  public static func adopting(_ handle: borrowing JavaScriptCoreValueHandle) -> Self {
+  public static func adopting(_ handle: borrowing JSCValueHandle) -> Self {
     Self(ref: handle.ref)
   }
 
