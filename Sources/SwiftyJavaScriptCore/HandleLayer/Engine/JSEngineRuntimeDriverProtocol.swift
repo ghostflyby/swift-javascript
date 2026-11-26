@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// The engine's value-handle type surface.
 ///
 /// This protocol serves the **handle layer only**: the shared arena, registry,

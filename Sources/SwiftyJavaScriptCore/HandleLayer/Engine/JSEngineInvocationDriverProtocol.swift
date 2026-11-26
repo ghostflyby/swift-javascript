@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Context-side invocation operations (Stage 2B decomposition).
 package protocol JSContextInvocationDriver: JSContextRuntimeDriver {
   func callFunctionHandle(

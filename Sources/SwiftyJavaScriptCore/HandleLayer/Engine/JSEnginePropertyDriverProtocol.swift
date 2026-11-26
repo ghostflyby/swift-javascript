@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Context-side property operations (Stage 2B decomposition).
 package protocol JSContextPropertyDriver: JSContextRuntimeDriver {
   associatedtype PropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle

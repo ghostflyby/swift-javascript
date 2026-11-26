@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Capability composition for engines that support the full value surface:
 /// context/runtime value operations, property access, prepared-script
 /// evaluation, invocation, and typed arrays.

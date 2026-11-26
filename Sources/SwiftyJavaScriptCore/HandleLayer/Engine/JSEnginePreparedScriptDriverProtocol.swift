@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Context-side prepared-script operations (Stage 2B decomposition).
 package protocol JSContextPreparedScriptDriver: JSContextRuntimeDriver {
   associatedtype PreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle

@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 // MARK: - Self-owning input release (S9)
 //
 // Property string keys and prepared scripts keep the engine context alive, so

@@ -1,8 +1,8 @@
 /// The engine context actor.
 ///
 /// The concrete type is the engine's context (`JSCContext`, `QJSContext`);
-/// core keeps the shared default-scope/registry/data-box lifecycle in
-/// `JSContextStorage`. The context-level factories, global
+/// each engine keeps the shared default-scope/registry/data-box lifecycle in
+/// its own `JSContextStorage`. The context-level factories, global
 /// access, script evaluation, and data storage are engine requirements: each
 /// one creates or settles engine references on the context default scope, so
 /// only the concrete actor can implement it. Core keeps the value-level

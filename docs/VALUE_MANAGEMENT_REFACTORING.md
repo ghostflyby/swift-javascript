@@ -6,7 +6,8 @@
 
 本文档记录 `SwiftJavaScript` core 的值管理架构重构。最终用户面是
 public `JS*` 协议 + `JSC*`/`QJS*` 具体类型；public 协议不暴露任何引擎 handle
-类型或 handle 级成员，handle 层、落账原语与 driver 协议都在 package 内部。
+类型或 handle 级成员，handle 层、落账原语与 driver 协议都在各引擎模块的
+package 内部（core 不再有 handle 声明，见 `TODO.md` §3.18）。
 下文标注为“迁移前”的分层与 `JSValue<E>` 等泛型名称只表示设计历史，当前 API
 见 `Sources/SwiftJavaScript/Surface/`。
 
@@ -76,8 +77,10 @@ JSInstantContext<E>: ~Copyable    ← 自动 scope:init push TLS,deinit drain + 
 JSScope<E>: ~Copyable             ← 手动 scope(未提交):open() push,deinit drain + 条件 pop
 ```
 
-当前实现见 `Sources/SwiftJavaScript/ScopeCore.swift` 与
-`Sources/SwiftJavaScript/JSScopeWitness.swift`;`ScopeCore` 只保留 handle 级
+当前实现见各引擎模块的 `HandleLayer/ScopeCore.swift` 与
+`HandleLayer/JSScopeWitness.swift`（JSC 在 `Sources/SwiftyJavaScriptCore`,
+QuickJS 在 `Sources/SwiftyQuickJS`,Mock 在
+`Tests/SwiftJavaScriptTests/HandleLayer`）;`ScopeCore` 只保留 handle 级
 package API(值级操作由引擎 scope 直接实现),`JSCInstantContext`/`JSCScope`/
 `QJSInstantContext`/`QJSScope` 是具体类型。
 

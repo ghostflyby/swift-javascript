@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 package protocol JSManualReferenceCountedHandle: Sendable {
   @discardableResult
   func retainReference() -> Bool

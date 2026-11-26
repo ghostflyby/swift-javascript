@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Weak holder for the registry. `@unchecked` covers only this box: the weak
 /// reference is assigned once in `init`, read-only afterwards, and ARC's weak
 /// load/clear is thread-safe. This keeps `JSPersistentHandle` implementations

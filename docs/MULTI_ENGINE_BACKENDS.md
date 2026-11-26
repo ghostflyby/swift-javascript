@@ -181,9 +181,10 @@ protocol graph by giving it exactly one hub:
 - Scopes and value views carry their `Context` and alias its types; their
   same-type aliases keep values from crossing engines.
 - Macros generate the concrete `JSC*` surface, not an additional abstraction.
-- The package-only handle seam (`JSEngineValueTypes`, the context-driver
-  protocols and the engine handles) is deliberately narrower than the user
-  surface; it is not exposed as a user-facing value abstraction.
+- The package-level handle seam inside each engine module (`JSEngineValueTypes`,
+  the context-driver protocols and the engine handles) is deliberately narrower
+  than the user surface; it is not exposed as a user-facing value abstraction,
+  and core declares none of it.
 
 ## Driver Protocols
 
@@ -493,7 +494,7 @@ The implemented combination is:
 
 - Use `JSContext` as the single anchor that names all fifteen user-facing types and states their relationships once.
 - Use public `JS*` protocols with concrete `JSC*`/`QJS*` types, with no public handle association or handle-level member.
-- Keep `JSEngineValueTypes`, the context-driver protocols and all `*Handle` types as package-only low-level seams, not user-facing value abstractions; `JSPersistentHandle` remains the sole public handle-named family.
+- Keep `JSEngineValueTypes`, the context-driver protocols and all `*Handle` types as package-only low-level seams inside each engine module, not user-facing value abstractions, with core declaring none of them; `JSPersistentHandle` remains the sole public handle-named family.
 - Base cross-engine reuse on host module descriptors and host type descriptors.
 - Enforce cross-engine misuse constraints at compile time rather than through runtime checks.
 

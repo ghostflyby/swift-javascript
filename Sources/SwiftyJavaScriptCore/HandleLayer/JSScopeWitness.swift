@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Scope witness capability: the seam between the public scope protocols and
 /// core's shared algorithms. It names the engine context identity the scope's
 /// arena is keyed on, the arena frame the scope pushes, and the one

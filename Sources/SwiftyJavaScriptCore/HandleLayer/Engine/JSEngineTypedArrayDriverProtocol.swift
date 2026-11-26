@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// Context-side TypedArray/ArrayBuffer operations (Stage 2B decomposition).
 package protocol JSContextTypedArrayDriver: JSContextRuntimeDriver {
   func makeArrayBufferWithBytesNoCopyHandle(

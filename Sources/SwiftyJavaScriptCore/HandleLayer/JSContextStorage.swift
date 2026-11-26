@@ -1,3 +1,5 @@
+import SwiftJavaScript
+
 /// The engine-agnostic lifetime state of a concrete context actor.
 ///
 /// The engine actors (`JSCContext`, `QJSContext`) own one of these and keep

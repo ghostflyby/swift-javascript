@@ -42,7 +42,7 @@ extension JSCClass: Hashable {
   }
 }
 
-package struct JSCClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,
+package struct JSCClassHandle: JSClassManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSClassRef

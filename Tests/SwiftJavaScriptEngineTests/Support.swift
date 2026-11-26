@@ -27,6 +27,17 @@ func stage3CollectGarbageIfSupported<C: SwiftJavaScript.JSContext>(_ context: C)
   (context as? JSCContext)?.collectGarbage()
 }
 
+/// The two context-data-box hooks the contract tests drive without an actor
+/// window. The handle layer now lives in each engine module, so this target
+/// names just the surface it needs instead of one engine's runtime driver.
+protocol ContextDataStorageBoxDriver: Sendable {
+  func contextDataStorageBox() -> JSContextDataStorageBox?
+  func installContextDataStorageBox(_ storage: JSContextDataStorageBox?)
+}
+
+extension JSCContextHandle: ContextDataStorageBoxDriver {}
+extension QJSContextHandle: ContextDataStorageBoxDriver {}
+
 /// The concrete engine's runtime driver behind a generic context.
 ///
 /// The driver and its handle-typed members are engine implementation details
@@ -34,12 +45,12 @@ func stage3CollectGarbageIfSupported<C: SwiftJavaScript.JSContext>(_ context: C)
 /// dispatch on the concrete engine instead of widening the protocol surface.
 func engineRuntimeDriver<C: SwiftJavaScript.JSContext>(
   _ context: C
-) -> (any JSContextRuntimeDriver)? {
+) -> (any ContextDataStorageBoxDriver)? {
   if let context = context as? JSCContext {
-    return context.runtimeDriver
+    return context.driverContextHandle
   }
   if let context = context as? QJSContext {
-    return context.runtimeDriver
+    return context.driverContextHandle
   }
   return nil
 }

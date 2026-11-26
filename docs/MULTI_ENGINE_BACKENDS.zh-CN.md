@@ -164,8 +164,8 @@ context 可以补上这一缺口，但会让类型检查不收敛（Swift 6.4.2�
 - scope 与 value view 携带 `Context` 并把它的类型别名过来；same-type 别名
   阻止跨引擎混用。
 - 宏直接生成具体的 `JSC*` surface，不额外增加抽象层。
-- package 内部的 handle 缝（`JSEngineValueTypes`、context driver 协议与引擎
-  handle）刻意窄于用户面，不作为用户值抽象暴露。
+- 每个引擎模块内 package 级别的 handle 缝（`JSEngineValueTypes`、context driver 协议与引擎
+  handle）刻意窄于用户面，不作为用户值抽象暴露；core 内没有 handle 声明。
 
 ## 驱动协议
 
@@ -465,9 +465,9 @@ TypedArray 和外部内存在后续切片中已实现。
 - 以 `JSContext` 为唯一锚点：为十五个用户面类型命名，并把它们的关系各陈述一次。
 - 公共 API 使用 `JS*` 协议 + 具体 `JSC*`/`QJS*` 类型，public 面没有 handle
   关联或 handle 级成员。
-- `JSEngineValueTypes`、context driver 协议与全部 `*Handle` 只作为 package
-  底层缝，不作为用户值抽象；`JSPersistentHandle` 是唯一保留的 public handle
-  命名家族。
+- `JSEngineValueTypes`、context driver 协议与全部 `*Handle` 只作为各引擎模块内
+  package 底层缝，不作为用户值抽象；core 不再声明它们；`JSPersistentHandle` 是唯一
+  保留的 public handle 命名家族。
 - 把跨引擎可复用能力建立在宿主模块描述和宿主类型描述之上。
 - 把跨引擎误用限制在编译期完成，而不是依赖运行时检查。
 
