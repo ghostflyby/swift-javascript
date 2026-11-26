@@ -36,14 +36,12 @@ public protocol JSContext: Actor, Hashable {
   where
     Value.Context == Self,
     Value.InstantContext == InstantContext
-  associatedtype CallbackValue: JSCallbackValue & ~Copyable
-  where CallbackValue.Context == Self
   associatedtype CallbackReturn: JSCallbackReturn & ~Copyable
   where CallbackReturn.Context == Self
   associatedtype CallbackArguments: JSCallbackArguments & ~Copyable
   where
     CallbackArguments.Context == Self,
-    CallbackArguments.Value == CallbackValue,
+    CallbackArguments.Value == Value,
     CallbackArguments.InstantContext == InstantContext
   associatedtype Arguments: JSArguments & ~Copyable
   where
@@ -54,7 +52,6 @@ public protocol JSContext: Actor, Hashable {
   where
     InstantContext.Context == Self,
     InstantContext.Value == Value,
-    InstantContext.CallbackValue == CallbackValue,
     InstantContext.CallbackReturn == CallbackReturn,
     InstantContext.CallbackArguments == CallbackArguments,
     InstantContext.Arguments == Arguments,
@@ -67,7 +64,6 @@ public protocol JSContext: Actor, Hashable {
     Scope.Context == Self,
     Scope.InstantContext == InstantContext,
     Scope.Value == Value,
-    Scope.CallbackValue == CallbackValue,
     Scope.PropertyStringKey == PropertyStringKey,
     Scope.PreparedScript == PreparedScript,
     Scope.PersistentHandle == PersistentHandle
@@ -89,7 +85,7 @@ public protocol JSContext: Actor, Hashable {
     TypedArray.Buffer == ArrayBuffer
   /// The value-level argument token used by this context's call operations.
   /// Deliberately not tied to `Self`/`Value` here: the token is produced by
-  /// `JSValue.asCallArgument()`/`JSCallbackValue.asCallArgument()`, where the
+  /// `JSValue.asCallArgument()`, where the
   /// compiler already knows the context; restating the relation makes type
   /// checking diverge.
   associatedtype CallArgument: JSCallArgument

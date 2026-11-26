@@ -21,7 +21,7 @@ private let javaScriptCoreSurfaceFunctionCallback: JSObjectCallAsFunctionCallbac
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
 
-  let thisValue = JSCCallbackValue(ref: thisObject, contextRef: ctx)
+  let thisValue = JSCValue(ref: thisObject, contextRef: ctx)
 
   let result = withJavaScriptCoreSurfaceCallbackArguments(
     pointer: arguments,

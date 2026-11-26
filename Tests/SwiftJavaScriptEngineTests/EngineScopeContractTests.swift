@@ -8,16 +8,16 @@ import Testing
 /// 测试内断言编译期失败(需要独立的负面编译用例);以下示例仅以文档形式保留,
 /// 标注「应编译失败」,该验证未自动化:
 ///
-///     // ✗ 应编译失败 —— `JSCallbackValueLegacy` 是 ~Copyable,不能逃逸出回调值的作用域:
-///     final class Leak<E: JSEngine> {
-///       var escaped: JSCallbackValueLegacy<E>?
+///     // ✗ 应编译失败 —— `C.Value` 是 ~Copyable,不能逃逸出回调值的作用域:
+///     final class Leak<C: JSContext> {
+///       var escaped: C.Value?
 ///       // ^ ~Copyable 存储属性不允许出现在 Copyable 类型中
 ///     }
 ///
 ///     // ✗ 应编译失败 —— 也不能装箱为 `Any` 携带出去(`Any` 要求 Copyable):
 ///     let boxed: Any = c.makeString("must not escape")
 ///
-/// 值经 JS 流转(作为实参穿过引擎调用)或 `persist` 成 `JSValueLegacy` 是仅有的
+/// 值经 JS 流转(作为实参穿过引擎调用)或 `persist` 到 context 默认作用域是仅有的
 /// 合法出口;`nestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay`
 /// 恰好验证第一条通道。
 // MARK: - Stage 3 negative compile examples (not automatable in Swift Testing)
@@ -173,7 +173,7 @@ private final class NestedCallbackObservations: @unchecked Sendable {
 
 /// 嵌套契约(§3.4):回调 A 创建的值,经 JS 中转后必须能在内层回调 B 中使用。
 ///
-/// `JSCallbackValueLegacy` 是 ~Copyable,不能被捕获直传——值经 JS 引擎流转是唯一
+/// `C.Value` 是 ~Copyable,不能被捕获直传——值经 JS 引擎流转是唯一
 /// 合法的跨回调通道,本测试验证的正是这条通道:外层回调 A 创建值并以实参
 /// 形式穿过一次 JS 调用(relay),由引擎重入建立的内层回调 B 通过参数帧
 /// 取回该值并断言可用且内容正确。

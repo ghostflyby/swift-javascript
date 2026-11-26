@@ -192,7 +192,7 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
       expectTrue(hasAnswer)
       expectTrue(answer == 41)
 
-      let objectCallback: C.CallbackValue
+      let objectCallback: C.Value
       switch scope.makeObject() {
       case .value(let made):
         objectCallback = made

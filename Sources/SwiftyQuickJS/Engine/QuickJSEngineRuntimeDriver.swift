@@ -323,7 +323,7 @@ private func quickJSSurfaceFunctionCallback(
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
-  let thisValue = QJSCallbackValue(value: thisValueRef, contextRef: contextRef)
+  let thisValue = QJSValue(value: thisValueRef, contextRef: contextRef)
 
   let result = withQuickJSArguments(
     arguments, count: Int(argumentCount)

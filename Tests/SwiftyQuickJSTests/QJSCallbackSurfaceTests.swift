@@ -38,9 +38,9 @@ struct QJSCallbackSurfaceTests {
       let twinText = scope.adoptCreated(QJSEngine.makeString("seven", in: context)!)
       let number = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
 
-      let value = QJSCallbackValue(value: text.value, contextRef: context)
-      let twin = QJSCallbackValue(value: twinText.value, contextRef: context)
-      let numeric = QJSCallbackValue(value: number.value, contextRef: context)
+      let value = QJSValue(value: text.value, contextRef: context)
+      let twin = QJSValue(value: twinText.value, contextRef: context)
+      let numeric = QJSValue(value: number.value, contextRef: context)
 
       let valueType = value.type()
       let valueText = value.toString()

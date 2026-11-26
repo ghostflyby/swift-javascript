@@ -56,7 +56,7 @@ extension JSCValue {
   }
 
   private init(
-    persisting value: borrowing JSCCallbackValue, in context: borrowing JSCInstantContext
+    persisting value: borrowing JSCValue, in context: borrowing JSCInstantContext
   ) {
     let persisted = context.persist(value)
     self.init(ref: persisted.ref, contextRef: persisted.contextRef)

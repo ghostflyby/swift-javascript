@@ -28,7 +28,7 @@ private func adoptObject(in scope: borrowing JSCInstantContext) -> JSCValue {
   case .value(let handle):
     return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
-    
+
     preconditionFailure("JSCEngine object creation returned an exception")
   }
 }
@@ -52,7 +52,7 @@ private func adoptEvaluated(
   case .value(let handle):
     return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
-    
+
     preconditionFailure("JSCEngine evaluation of \(source) threw")
   }
 }
@@ -169,7 +169,7 @@ struct JSCValueOperationsTests {
 
       // Callback-window value views only carry an identity; the direct-value
       // surface accepts them by borrowing that identity.
-      let callbackValue = JSCCallbackValue(
+      let callbackValue = JSCValue(
         ref: text.ref,
         contextRef: context
       )
@@ -262,7 +262,7 @@ struct JSCValueOperationsTests {
       #expect(strictSame)
 
       // The callback-value parameter overloads borrow the same identities.
-      let receiverShell = JSCCallbackValue(
+      let receiverShell = JSCValue(
         ref: receiver.ref,
         contextRef: context
       )
@@ -271,7 +271,7 @@ struct JSCValueOperationsTests {
       )
       #expect(callbackThisText == "seven")
 
-      let constructorShell = JSCCallbackValue(
+      let constructorShell = JSCValue(
         ref: constructor.ref,
         contextRef: context
       )

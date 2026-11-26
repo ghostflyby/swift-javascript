@@ -11,38 +11,33 @@ public protocol JSValueScope: ~Copyable {
   associatedtype Context: JSContext
   associatedtype Value: JSValue & ~Copyable
   where Value == Context.Value
-  associatedtype CallbackValue: JSCallbackValue & ~Copyable
-  where CallbackValue == Context.CallbackValue
   associatedtype PropertyStringKey: JSPropertyStringKey & ~Copyable
   where PropertyStringKey == Context.PropertyStringKey
 
   // MARK: Value factories
 
-  func makeString(_ value: String) -> CallbackValue
-  func makeString(from key: borrowing PropertyStringKey) -> CallbackValue
-  func makeNumber(_ value: Double) -> CallbackValue
-  func makeBoolean(_ value: Bool) -> CallbackValue
-  func makeNull() -> CallbackValue
-  func makeUndefined() -> CallbackValue
-  func makeSymbol(_ value: String) -> CallbackValue
-  func makeObject() -> JSResult<CallbackValue>
-  func makeArray() -> JSResult<CallbackValue>
+  func makeString(_ value: String) -> Value
+  func makeString(from key: borrowing PropertyStringKey) -> Value
+  func makeNumber(_ value: Double) -> Value
+  func makeBoolean(_ value: Bool) -> Value
+  func makeNull() -> Value
+  func makeUndefined() -> Value
+  func makeSymbol(_ value: String) -> Value
+  func makeObject() -> JSResult<Value>
+  func makeArray() -> JSResult<Value>
 
   // MARK: Persistence
 
   /// Transfer the value's owned reference into the context default scope and
   /// return a view valid beyond this window.
-  func persist(_ value: borrowing CallbackValue) -> Value
+  func persist(_ value: borrowing Value) -> Value
 
   /// The local value view of a value that is already backed by this window's
   /// arena (a callback argument, or a value this scope's factories produced):
   /// no claim, no ledger entry. The view is only valid while the source arena
-  /// is alive, so it is confined to the synchronous window that produced it;
-  /// the macro templates hand `CallbackValue`s to `JSValueDecodable` through
-  /// it, and core's `setGlobalProperty(CallbackValue:…)` convenience uses it
-  /// too.
+  /// is alive, so it is confined to the synchronous window that produced it.
   @available(*, noasync)
-  func localValue(_ value: borrowing CallbackValue) -> Value
+  func localValue(_ value: borrowing Value) -> Value
 
   // MARK: Value window
 
@@ -58,12 +53,10 @@ public protocol JSValueScope: ~Copyable {
   /// inside `body` and must not escape it. For a `JSInstantContext` the window
   /// is the caller itself — the same arena, valid for as long as the caller
   /// lives. For a `JSScope` the window drains when `body` returns, so any
-  /// `Value` adopted inside the closure is only valid there. A `CallbackValue`
-  /// that must outlive the window has to be `persist`ed to the context default
-  /// scope first; a `Value` (for example the adopted result of `getProperty`)
-  /// has no persist channel, so it must be used inside the closure or moved
-  /// into an independent binding via `makePersistentHandle(_ value: borrowing
-  /// Value)`.
+  /// `Value` adopted inside the closure is only valid there. A `Value` that
+  /// must outlive the window has to be `persist`ed to the context default
+  /// scope first, or moved into an independent binding via
+  /// `makePersistentHandle(_ value: borrowing Value)`.
   func withInstantWindow<R: ~Copyable, Failure: Error>(
     _ body: (borrowing Context.InstantContext) throws(Failure) -> R
   ) throws(Failure) -> R
@@ -74,7 +67,7 @@ public protocol JSValueScope: ~Copyable {
 }
 
 extension JSValueScope where Self: ~Copyable {
-  public func makeNumber(_ value: some BinaryInteger) -> CallbackValue {
+  public func makeNumber(_ value: some BinaryInteger) -> Value {
     makeNumber(Double(value))
   }
 }

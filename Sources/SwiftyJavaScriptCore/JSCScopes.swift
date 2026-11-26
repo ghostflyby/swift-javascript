@@ -11,7 +11,6 @@ import SwiftJavaScript
 public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public typealias Context = JSCContext
   public typealias Value = JSCValue
-  public typealias CallbackValue = JSCCallbackValue
   public typealias CallbackReturn = JSCCallbackReturn
   public typealias CallbackArguments = JSCCallbackArguments
   public typealias Arguments = JSCArguments
@@ -39,36 +38,32 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     JSCValue(ref: core.trackCreatedHandle(ref), contextRef: core.contextRef)
   }
 
-  package func adoptCallbackHandle(_ ref: JSValueRef) -> JSCCallbackValue {
-    JSCCallbackValue(ref: core.trackCreatedHandle(ref), contextRef: core.contextRef)
-  }
-
   package func anchorBorrowedHandle(_ ref: JSValueRef) -> JSCValue {
     JSCValue(ref: core.claimAndTrackHandle(ref), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
-  public func persist(_ value: borrowing JSCCallbackValue) -> JSCValue {
+  public func persist(_ value: borrowing JSCValue) -> JSCValue {
     core.transferToDefaultFrame(value.ref)
     return JSCValue(ref: value.ref, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
-  public func localValue(_ value: borrowing JSCCallbackValue) -> JSCValue {
+  public func localValue(_ value: borrowing JSCValue) -> JSCValue {
     JSCValue(ref: value.ref, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
-  public func makeString(_ value: String) -> JSCCallbackValue {
+  public func makeString(_ value: String) -> JSCValue {
     guard let ref = JSCEngine.makeStringValueHandle(value, core.contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCCallbackValue {
+  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = JSCEngine.makeStringValueHandle(
         fromPropertyStringKey: key.borrowString(in: core.contextRef),
@@ -77,65 +72,65 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeNumber(_ value: Double) -> JSCCallbackValue {
+  public func makeNumber(_ value: Double) -> JSCValue {
     guard let ref = JSCEngine.makeNumberValueHandle(value, core.contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeBoolean(_ value: Bool) -> JSCCallbackValue {
+  public func makeBoolean(_ value: Bool) -> JSCValue {
     guard let ref = JSCEngine.makeBooleanValueHandle(value, core.contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeNull() -> JSCCallbackValue {
+  public func makeNull() -> JSCValue {
     guard let ref = JSCEngine.makeNullValueHandle(core.contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeUndefined() -> JSCCallbackValue {
+  public func makeUndefined() -> JSCValue {
     guard let ref = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeSymbol(_ value: String) -> JSCCallbackValue {
+  public func makeSymbol(_ value: String) -> JSCValue {
     guard let ref = JSCEngine.makeSymbolValueHandle(value, core.contextRef) else {
       preconditionFailure("makeSymbolValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeObject() -> JSResult<JSCCallbackValue> {
+  public func makeObject() -> JSResult<JSCValue> {
     guard let result = JSCEngine.makeObjectResultHandle(core.contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
     case .value(let ref):
-      return .value(adoptCallbackHandle(ref))
+      return .value(adoptCreatedHandle(ref))
     case .exception(let ref):
-      return .exception(adoptCallbackHandle(ref))
+      return .exception(adoptCreatedHandle(ref))
     }
   }
 
-  public func makeArray() -> JSResult<JSCCallbackValue> {
+  public func makeArray() -> JSResult<JSCValue> {
     guard let result = JSCEngine.makeArrayResultHandle(core.contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
     case .value(let ref):
-      return .value(adoptCallbackHandle(ref))
+      return .value(adoptCreatedHandle(ref))
     case .exception(let ref):
-      return .exception(adoptCallbackHandle(ref))
+      return .exception(adoptCreatedHandle(ref))
     }
   }
 
@@ -149,16 +144,8 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Callback exit
 
-  public func `return`(_ value: borrowing JSCCallbackValue) -> JSCCallbackReturn {
-    JSCCallbackReturn(temporary: value.ref)
-  }
-
   public func `return`(_ value: borrowing JSCValue) -> JSCCallbackReturn {
     JSCCallbackReturn(temporary: value.ref)
-  }
-
-  public func `throw`(_ value: borrowing JSCCallbackValue) -> JSCCallbackReturn {
-    JSCCallbackReturn(exception: value.ref)
   }
 
   public func `throw`(_ value: borrowing JSCValue) -> JSCCallbackReturn {
@@ -255,13 +242,8 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   @available(*, noasync)
   public func makePersistentHandle(
-    _ value: borrowing JSCCallbackValue
+    _ value: borrowing JSCValue
   ) -> JSCPersistentHandle {
-    mintPersistentHandle(value.ref, of: core.contextRef)
-  }
-
-  @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing JSCValue) -> JSCPersistentHandle {
     mintPersistentHandle(value.ref, of: core.contextRef)
   }
 
@@ -342,7 +324,6 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   public typealias Context = JSCContext
   public typealias Value = JSCValue
-  public typealias CallbackValue = JSCCallbackValue
   public typealias PropertyStringKey = JSCPropertyStringKey
   public typealias InstantContext = JSCInstantContext
   public typealias PreparedScript = JSCPreparedScript
@@ -378,36 +359,32 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     JSCValue(ref: core.trackCreatedHandle(ref), contextRef: core.contextRef)
   }
 
-  package func adoptCallbackHandle(_ ref: JSValueRef) -> JSCCallbackValue {
-    JSCCallbackValue(ref: core.trackCreatedHandle(ref), contextRef: core.contextRef)
-  }
-
   package func anchorBorrowedHandle(_ ref: JSValueRef) -> JSCValue {
     JSCValue(ref: core.claimAndTrackHandle(ref), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
-  public func persist(_ value: borrowing JSCCallbackValue) -> JSCValue {
+  public func persist(_ value: borrowing JSCValue) -> JSCValue {
     core.transferToDefaultFrame(value.ref)
     return JSCValue(ref: value.ref, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
-  public func localValue(_ value: borrowing JSCCallbackValue) -> JSCValue {
+  public func localValue(_ value: borrowing JSCValue) -> JSCValue {
     JSCValue(ref: value.ref, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
-  public func makeString(_ value: String) -> JSCCallbackValue {
+  public func makeString(_ value: String) -> JSCValue {
     guard let ref = JSCEngine.makeStringValueHandle(value, core.contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCCallbackValue {
+  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = JSCEngine.makeStringValueHandle(
         fromPropertyStringKey: key.borrowString(in: core.contextRef),
@@ -416,65 +393,65 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeNumber(_ value: Double) -> JSCCallbackValue {
+  public func makeNumber(_ value: Double) -> JSCValue {
     guard let ref = JSCEngine.makeNumberValueHandle(value, core.contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeBoolean(_ value: Bool) -> JSCCallbackValue {
+  public func makeBoolean(_ value: Bool) -> JSCValue {
     guard let ref = JSCEngine.makeBooleanValueHandle(value, core.contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeNull() -> JSCCallbackValue {
+  public func makeNull() -> JSCValue {
     guard let ref = JSCEngine.makeNullValueHandle(core.contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeUndefined() -> JSCCallbackValue {
+  public func makeUndefined() -> JSCValue {
     guard let ref = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeSymbol(_ value: String) -> JSCCallbackValue {
+  public func makeSymbol(_ value: String) -> JSCValue {
     guard let ref = JSCEngine.makeSymbolValueHandle(value, core.contextRef) else {
       preconditionFailure("makeSymbolValueHandle failed")
     }
-    return adoptCallbackHandle(ref)
+    return adoptCreatedHandle(ref)
   }
 
-  public func makeObject() -> JSResult<JSCCallbackValue> {
+  public func makeObject() -> JSResult<JSCValue> {
     guard let result = JSCEngine.makeObjectResultHandle(core.contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
     case .value(let ref):
-      return .value(adoptCallbackHandle(ref))
+      return .value(adoptCreatedHandle(ref))
     case .exception(let ref):
-      return .exception(adoptCallbackHandle(ref))
+      return .exception(adoptCreatedHandle(ref))
     }
   }
 
-  public func makeArray() -> JSResult<JSCCallbackValue> {
+  public func makeArray() -> JSResult<JSCValue> {
     guard let result = JSCEngine.makeArrayResultHandle(core.contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
     case .value(let ref):
-      return .value(adoptCallbackHandle(ref))
+      return .value(adoptCreatedHandle(ref))
     case .exception(let ref):
-      return .exception(adoptCallbackHandle(ref))
+      return .exception(adoptCreatedHandle(ref))
     }
   }
 
@@ -569,13 +546,8 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   @available(*, noasync)
   public func makePersistentHandle(
-    _ value: borrowing JSCCallbackValue
+    _ value: borrowing JSCValue
   ) -> JSCPersistentHandle {
-    mintPersistentHandle(value.ref, of: core.contextRef)
-  }
-
-  @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing JSCValue) -> JSCPersistentHandle {
     mintPersistentHandle(value.ref, of: core.contextRef)
   }
 

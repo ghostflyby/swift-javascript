@@ -21,7 +21,6 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias InstantContext = QJSInstantContext
   public typealias Scope = QJSScope
   public typealias Value = QJSValue
-  public typealias CallbackValue = QJSCallbackValue
   public typealias CallbackReturn = QJSCallbackReturn
   public typealias CallbackArguments = QJSCallbackArguments
   public typealias PersistentHandle = QJSPersistentHandle

@@ -15,57 +15,6 @@ import SwiftJavaScript
 // protocol needs: its context, and the rest as aliases of that context's. The
 // scopes are the real structs in `QuickJSScopes.swift`; `Class` is the real
 // `QJSClass` (`QJSClass.swift`).
-
-public struct QJSCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
-  public typealias Context = QJSContext
-
-  package let value: CQuickJSValue
-  package let contextRef: OpaquePointer
-
-  package init(value: CQuickJSValue, contextRef: OpaquePointer) {
-    self.value = value
-    self.contextRef = contextRef
-  }
-
-  @available(*, noasync)
-  public func type() -> JSType {
-    guard let valueType = QJSEngine.valueType(value) else {
-      preconditionFailure("QJSCallbackValue.type() could not query value type")
-    }
-    return valueType
-  }
-
-  // MARK: - Conversion and equality
-  //
-  // The callback window's views are `noasync` on the concrete type: they only
-  // exist inside a synchronous callback window.
-
-  @available(*, noasync)
-  public func toString() -> String {
-    QJSEngine.toString(value, in: contextRef) ?? ""
-  }
-
-  @available(*, noasync)
-  public func toNumber() -> Double {
-    QJSEngine.toNumber(value, in: contextRef)
-  }
-
-  @available(*, noasync)
-  public func toBoolean() -> Bool {
-    QJSEngine.toBoolean(value, in: contextRef)
-  }
-
-  @available(*, noasync)
-  public func looselyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
-    QJSEngine.looselyEquals(value, other.value, in: contextRef) ?? false
-  }
-
-  @available(*, noasync)
-  public func strictlyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
-    QJSEngine.strictlyEquals(value, other.value, in: contextRef) ?? false
-  }
-}
-
 public struct QJSCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = QJSContext
 
@@ -131,7 +80,7 @@ public struct QJSArguments: SwiftJavaScript.JSArguments, ~Copyable {
 
 public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyable {
   public typealias Context = QJSContext
-  public typealias Value = QJSCallbackValue
+  public typealias Value = QJSValue
   public typealias InstantContext = QJSInstantContext
 
   public let count: Int
@@ -149,7 +98,7 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
   public func withValue<R: ~Copyable>(
     at index: Int,
     in context: borrowing QJSInstantContext,
-    _ body: (borrowing QJSCallbackValue) -> R
+    _ body: (borrowing QJSValue) -> R
   ) -> R {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
@@ -158,14 +107,14 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
       fatalError("JSArgument value is unavailable")
     }
     return body(
-      QJSCallbackValue(value: value, contextRef: context.contextRef))
+      QJSValue(value: value, contextRef: context.contextRef))
   }
 
   @available(*, noasync)
   public func withThrowingValue<R: ~Copyable>(
     at index: Int,
     in context: borrowing QJSInstantContext,
-    _ body: (borrowing QJSCallbackValue) throws(JSValueConversionError) -> R
+    _ body: (borrowing QJSValue) throws(JSValueConversionError) -> R
   ) throws(JSValueConversionError) -> R {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
@@ -174,7 +123,7 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
       fatalError("JSArgument value is unavailable")
     }
     return try body(
-      QJSCallbackValue(value: value, contextRef: context.contextRef))
+      QJSValue(value: value, contextRef: context.contextRef))
   }
 }
 

@@ -23,7 +23,6 @@ import SwiftJavaScript
 public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public typealias Context = QJSContext
   public typealias Value = QJSValue
-  public typealias CallbackValue = QJSCallbackValue
   public typealias CallbackReturn = QJSCallbackReturn
   public typealias CallbackArguments = QJSCallbackArguments
   public typealias Arguments = QJSArguments
@@ -51,36 +50,32 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     QJSValue(value: core.trackCreated(value), contextRef: core.contextRef)
   }
 
-  package func adoptCallback(_ value: CQuickJSValue) -> QJSCallbackValue {
-    QJSCallbackValue(value: core.trackCreated(value), contextRef: core.contextRef)
-  }
-
   package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.claimAndTrack(value), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
-  public func persist(_ value: borrowing QJSCallbackValue) -> QJSValue {
+  public func persist(_ value: borrowing QJSValue) -> QJSValue {
     core.transferToDefaultFrame(value.value)
     return QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
-  public func localValue(_ value: borrowing QJSCallbackValue) -> QJSValue {
+  public func localValue(_ value: borrowing QJSValue) -> QJSValue {
     QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
-  public func makeString(_ value: String) -> QJSCallbackValue {
+  public func makeString(_ value: String) -> QJSValue {
     guard let created = QJSEngine.makeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSCallbackValue {
+  public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
       let created = QJSEngine.makeStringValue(
         fromAtom: key.borrowAtom(in: core.contextRef),
@@ -89,65 +84,65 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     else {
       preconditionFailure("makeStringValue failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeNumber(_ value: Double) -> QJSCallbackValue {
+  public func makeNumber(_ value: Double) -> QJSValue {
     guard let created = QJSEngine.makeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeBoolean(_ value: Bool) -> QJSCallbackValue {
+  public func makeBoolean(_ value: Bool) -> QJSValue {
     guard let created = QJSEngine.makeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeNull() -> QJSCallbackValue {
+  public func makeNull() -> QJSValue {
     guard let created = QJSEngine.makeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeUndefined() -> QJSCallbackValue {
+  public func makeUndefined() -> QJSValue {
     guard let created = QJSEngine.makeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeSymbol(_ value: String) -> QJSCallbackValue {
+  public func makeSymbol(_ value: String) -> QJSValue {
     guard let created = QJSEngine.makeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeObject() -> JSResult<QJSCallbackValue> {
+  public func makeObject() -> JSResult<QJSValue> {
     guard let result = QJSEngine.makeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
     case .value(let created):
-      return .value(adoptCallback(created))
+      return .value(adoptCreated(created))
     case .exception(let thrown):
-      return .exception(adoptCallback(thrown))
+      return .exception(adoptCreated(thrown))
     }
   }
 
-  public func makeArray() -> JSResult<QJSCallbackValue> {
+  public func makeArray() -> JSResult<QJSValue> {
     guard let result = QJSEngine.makeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
     case .value(let created):
-      return .value(adoptCallback(created))
+      return .value(adoptCreated(created))
     case .exception(let thrown):
-      return .exception(adoptCallback(thrown))
+      return .exception(adoptCreated(thrown))
     }
   }
 
@@ -161,16 +156,8 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Callback exit
 
-  public func `return`(_ value: borrowing QJSCallbackValue) -> QJSCallbackReturn {
-    QJSCallbackReturn(temporary: value.value)
-  }
-
   public func `return`(_ value: borrowing QJSValue) -> QJSCallbackReturn {
     QJSCallbackReturn(temporary: value.value)
-  }
-
-  public func `throw`(_ value: borrowing QJSCallbackValue) -> QJSCallbackReturn {
-    QJSCallbackReturn(exception: value.value)
   }
 
   public func `throw`(_ value: borrowing QJSValue) -> QJSCallbackReturn {
@@ -268,13 +255,8 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   @available(*, noasync)
   public func makePersistentHandle(
-    _ value: borrowing QJSCallbackValue
+    _ value: borrowing QJSValue
   ) -> QJSPersistentHandle {
-    mintPersistentHandle(value.value, of: value.contextRef, on: core)
-  }
-
-  @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing QJSValue) -> QJSPersistentHandle {
     mintPersistentHandle(value.value, of: value.contextRef, on: core)
   }
 
@@ -346,7 +328,6 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   public typealias Context = QJSContext
   public typealias Value = QJSValue
-  public typealias CallbackValue = QJSCallbackValue
   public typealias PropertyStringKey = QJSPropertyStringKey
   public typealias InstantContext = QJSInstantContext
   public typealias PreparedScript = QJSPreparedScript
@@ -380,36 +361,32 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     QJSValue(value: core.trackCreated(value), contextRef: core.contextRef)
   }
 
-  package func adoptCallback(_ value: CQuickJSValue) -> QJSCallbackValue {
-    QJSCallbackValue(value: core.trackCreated(value), contextRef: core.contextRef)
-  }
-
   package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.claimAndTrack(value), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
-  public func persist(_ value: borrowing QJSCallbackValue) -> QJSValue {
+  public func persist(_ value: borrowing QJSValue) -> QJSValue {
     core.transferToDefaultFrame(value.value)
     return QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
-  public func localValue(_ value: borrowing QJSCallbackValue) -> QJSValue {
+  public func localValue(_ value: borrowing QJSValue) -> QJSValue {
     QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
-  public func makeString(_ value: String) -> QJSCallbackValue {
+  public func makeString(_ value: String) -> QJSValue {
     guard let created = QJSEngine.makeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSCallbackValue {
+  public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
       let created = QJSEngine.makeStringValue(
         fromAtom: key.borrowAtom(in: core.contextRef),
@@ -418,65 +395,65 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     else {
       preconditionFailure("makeStringValue failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeNumber(_ value: Double) -> QJSCallbackValue {
+  public func makeNumber(_ value: Double) -> QJSValue {
     guard let created = QJSEngine.makeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeBoolean(_ value: Bool) -> QJSCallbackValue {
+  public func makeBoolean(_ value: Bool) -> QJSValue {
     guard let created = QJSEngine.makeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeNull() -> QJSCallbackValue {
+  public func makeNull() -> QJSValue {
     guard let created = QJSEngine.makeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeUndefined() -> QJSCallbackValue {
+  public func makeUndefined() -> QJSValue {
     guard let created = QJSEngine.makeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeSymbol(_ value: String) -> QJSCallbackValue {
+  public func makeSymbol(_ value: String) -> QJSValue {
     guard let created = QJSEngine.makeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
     }
-    return adoptCallback(created)
+    return adoptCreated(created)
   }
 
-  public func makeObject() -> JSResult<QJSCallbackValue> {
+  public func makeObject() -> JSResult<QJSValue> {
     guard let result = QJSEngine.makeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
     case .value(let created):
-      return .value(adoptCallback(created))
+      return .value(adoptCreated(created))
     case .exception(let thrown):
-      return .exception(adoptCallback(thrown))
+      return .exception(adoptCreated(thrown))
     }
   }
 
-  public func makeArray() -> JSResult<QJSCallbackValue> {
+  public func makeArray() -> JSResult<QJSValue> {
     guard let result = QJSEngine.makeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
     case .value(let created):
-      return .value(adoptCallback(created))
+      return .value(adoptCreated(created))
     case .exception(let thrown):
-      return .exception(adoptCallback(thrown))
+      return .exception(adoptCreated(thrown))
     }
   }
 
@@ -572,13 +549,8 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   @available(*, noasync)
   public func makePersistentHandle(
-    _ value: borrowing QJSCallbackValue
+    _ value: borrowing QJSValue
   ) -> QJSPersistentHandle {
-    mintPersistentHandle(value.value, of: value.contextRef, on: core)
-  }
-
-  @available(*, noasync)
-  public func makePersistentHandle(_ value: borrowing QJSValue) -> QJSPersistentHandle {
     mintPersistentHandle(value.value, of: value.contextRef, on: core)
   }
 

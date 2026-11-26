@@ -247,7 +247,7 @@ private func withAutoDynamicPropertyCallbackInput<R>(
   }
 }
 
-private func autoDynamicGetPropertyCallbackValue(
+private func autoDynamicGetPropertyValue(
   definition: JSCAutoClassDefinition,
   context: borrowing JSCInstantContext,
   thisValue: borrowing JSCValue,
@@ -454,7 +454,7 @@ private func installAutoDynamicCallbacks(
         object: object,
         propertyName: propertyName
       ) { definition, context, thisValue, key in
-        autoDynamicGetPropertyCallbackValue(
+        autoDynamicGetPropertyValue(
           definition: definition,
           context: context,
           thisValue: thisValue,

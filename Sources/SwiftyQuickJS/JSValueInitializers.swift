@@ -56,7 +56,7 @@ extension QJSValue {
   }
 
   private init(
-    persisting value: borrowing QJSCallbackValue, in context: borrowing QJSInstantContext
+    persisting value: borrowing QJSValue, in context: borrowing QJSInstantContext
   ) {
     let persisted = context.persist(value)
     self.init(

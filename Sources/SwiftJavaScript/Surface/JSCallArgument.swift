@@ -2,8 +2,8 @@
 ///
 /// A value view is `~Copyable`, so an array cannot carry value views directly.
 /// Each engine declares one `Copyable` conforming structure that stores only a
-/// borrowed engine handle, and `JSValue.asCallArgument()` /
-/// `JSCallbackValue.asCallArgument()` produce it from a value. This protocol
+/// borrowed engine handle, and `JSValue.asCallArgument()` produces it from a
+/// value. This protocol
 /// deliberately declares no members: generic code never inspects a token, it
 /// only forwards tokens back to the engine that produced them.
 ///

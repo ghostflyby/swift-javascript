@@ -383,7 +383,7 @@ private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertio
     let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { scope in
-      let objectCallback: C.CallbackValue
+      let objectCallback: C.Value
       switch scope.makeObject() {
       case .value(let made):
         objectCallback = made
@@ -391,7 +391,7 @@ private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertio
         Issue.record("Expected object creation to succeed")
         return
       }
-      let arrayCallback: C.CallbackValue
+      let arrayCallback: C.Value
       switch scope.makeArray() {
       case .value(let made):
         arrayCallback = made

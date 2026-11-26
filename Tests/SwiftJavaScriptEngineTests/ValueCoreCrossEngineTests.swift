@@ -50,7 +50,7 @@ private func predicateRow<V: SwiftJavaScript.JSValue & ~Copyable>(
 /// read (`persist` moves its reference to the context default scope).
 private func promoted<C: JSContext>(
   _ contextType: C.Type,
-  _ value: borrowing C.CallbackValue,
+  _ value: borrowing C.Value,
   in scope: borrowing C.InstantContext
 ) -> C.Value {
   _ = contextType

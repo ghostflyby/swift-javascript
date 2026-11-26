@@ -170,7 +170,7 @@ struct QJSValueOperationsTests {
 
       // Callback-window value views only carry an identity; the direct-value
       // surface accepts them by borrowing that identity.
-      let callbackValue = QJSCallbackValue(
+      let callbackValue = QJSValue(
         value: text.value,
         contextRef: context
       )
@@ -263,7 +263,7 @@ struct QJSValueOperationsTests {
       #expect(strictSame)
 
       // The callback-value parameter overloads borrow the same identities.
-      let receiverShell = QJSCallbackValue(
+      let receiverShell = QJSValue(
         value: receiver.value,
         contextRef: context
       )
@@ -272,7 +272,7 @@ struct QJSValueOperationsTests {
       )
       #expect(callbackThisText == "seven")
 
-      let constructorShell = QJSCallbackValue(
+      let constructorShell = QJSValue(
         value: constructor.value,
         contextRef: context
       )

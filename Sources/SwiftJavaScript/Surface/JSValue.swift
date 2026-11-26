@@ -162,38 +162,6 @@ public protocol JSValue: ~Copyable {
   func isArrayBuffer(in context: borrowing InstantContext) -> Bool
 
   func isTypedArray(in context: borrowing InstantContext) -> Bool
-
-  // MARK: - Callback-window arguments
-  //
-  // A callback window's value view is only an identity, so the operations that
-  // consume an argument value accept it directly and borrow its handle. These
-  // are requirements rather than defaults: the default would need a
-  // `CallbackValue -> Self` conversion that the core protocol cannot state.
-
-  func setProperty(
-    _ key: StaticString,
-    to value: borrowing InstantContext.CallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing InstantContext
-  ) -> Bool
-
-  func setProperty(
-    _ key: borrowing InstantContext.PropertyStringKey,
-    to value: borrowing InstantContext.CallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing InstantContext
-  ) -> Bool
-
-  func call(
-    this thisValue: borrowing InstantContext.CallbackValue,
-    arguments: [Context.CallArgument],
-    in context: borrowing InstantContext
-  ) -> JSResult<Context.Value>
-
-  func isInstanceOf(
-    _ constructor: borrowing InstantContext.CallbackValue,
-    in context: borrowing InstantContext
-  ) -> Bool
 }
 
 // The predicates are expressed in terms of `type()`, so an engine that

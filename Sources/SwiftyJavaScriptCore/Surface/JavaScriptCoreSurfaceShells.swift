@@ -6,56 +6,6 @@ import SwiftJavaScript
 // `JSCValue` is the value view (`JSValue.swift`); the types below are the
 // callback-exit and argument views. Each type names only the members its
 // protocol needs: its context, and the rest as aliases of that context's.
-public struct JSCCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
-  public typealias Context = JSCContext
-
-  package let ref: JSValueRef
-  package let contextRef: JSGlobalContextRef
-
-  package init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
-    self.ref = ref
-    self.contextRef = contextRef
-  }
-
-  @available(*, noasync)
-  public func type() -> SwiftJavaScript.JSType {
-    guard let valueType = JSCEngine.valueTypeForHandle(ref, in: contextRef) else {
-      preconditionFailure("JSCCallbackValue.type() could not query value type")
-    }
-    return valueType
-  }
-
-  // MARK: - Conversion and equality
-  //
-  // The callback window's views are `noasync` on the concrete type: they only
-  // exist inside a synchronous callback window.
-
-  @available(*, noasync)
-  public func toString() -> String {
-    JSCEngine.toStringForHandle(ref, in: contextRef) ?? ""
-  }
-
-  @available(*, noasync)
-  public func toNumber() -> Double {
-    JSCEngine.toNumberForHandle(ref, in: contextRef)
-  }
-
-  @available(*, noasync)
-  public func toBoolean() -> Bool {
-    JSCEngine.toBooleanForHandle(ref, in: contextRef)
-  }
-
-  @available(*, noasync)
-  public func looselyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
-    JSCEngine.looselyEqualsHandle(ref, other.ref, in: contextRef) ?? false
-  }
-
-  @available(*, noasync)
-  public func strictlyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
-    JSCEngine.strictlyEqualsHandle(ref, other.ref, in: contextRef) ?? false
-  }
-}
-
 public struct JSCCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = JSCContext
 
@@ -122,7 +72,7 @@ public struct JSCArguments: SwiftJavaScript.JSArguments, ~Copyable {
 
 public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyable {
   public typealias Context = JSCContext
-  public typealias Value = JSCCallbackValue
+  public typealias Value = JSCValue
   public typealias InstantContext = JSCInstantContext
 
   public let count: Int
@@ -140,7 +90,7 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
   public func withValue<R: ~Copyable>(
     at index: Int,
     in context: borrowing JSCInstantContext,
-    _ body: (borrowing JSCCallbackValue) -> R
+    _ body: (borrowing JSCValue) -> R
   ) -> R {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
@@ -148,14 +98,14 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard let ref = borrowedValueRefAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    return body(JSCCallbackValue(ref: ref, contextRef: context.contextRef))
+    return body(JSCValue(ref: ref, contextRef: context.contextRef))
   }
 
   @available(*, noasync)
   public func withThrowingValue<R: ~Copyable>(
     at index: Int,
     in context: borrowing JSCInstantContext,
-    _ body: (borrowing JSCCallbackValue) throws(JSValueConversionError) -> R
+    _ body: (borrowing JSCValue) throws(JSValueConversionError) -> R
   ) throws(JSValueConversionError) -> R {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
@@ -163,7 +113,7 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard let ref = borrowedValueRefAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    return try body(JSCCallbackValue(ref: ref, contextRef: context.contextRef))
+    return try body(JSCValue(ref: ref, contextRef: context.contextRef))
   }
 }
 

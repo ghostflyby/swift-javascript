@@ -30,8 +30,7 @@ extension JSCValue {
     return bridgeJSCValueResult(
       JSCEngine.getPropertyStringKeyHandle(
         key.borrowString(in: contextRef),
-        on: ref
-      , in: contextRef),
+        on: ref, in: contextRef),
       in: context
     )
   }
@@ -85,8 +84,7 @@ extension JSCValue {
     JSCEngine.setIndexPropertyHandle(
       at: UInt32(index),
       on: ref,
-      to: value.ref
-    , in: context.contextRef)
+      to: value.ref, in: context.contextRef)
   }
 
   // MARK: Property removal and existence
@@ -105,8 +103,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return JSCEngine.deletePropertyStringKeyHandle(
       key.borrowString(in: contextRef),
-      on: ref
-    , in: contextRef)
+      on: ref, in: contextRef)
   }
 
   public func hasProperty(
@@ -123,8 +120,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return JSCEngine.hasPropertyStringKeyHandle(
       key.borrowString(in: contextRef),
-      on: ref
-    , in: contextRef) ?? false
+      on: ref, in: contextRef) ?? false
   }
 
   public func propertyNames(in context: borrowing JSCInstantContext) -> [String] {
@@ -141,8 +137,7 @@ extension JSCValue {
       JSCEngine.callFunctionHandle(
         ref,
         this: nil,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
+        argumentHandles: arguments.map(\.ref), in: context.contextRef),
       in: context
     )
   }
@@ -156,23 +151,7 @@ extension JSCValue {
       JSCEngine.callFunctionHandle(
         ref,
         this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
-      in: context
-    )
-  }
-
-  public func call(
-    this thisValue: borrowing JSCCallbackValue,
-    arguments: [JSCCallArgument],
-    in context: borrowing JSCInstantContext
-  ) -> JSResult<JSCValue> {
-    bridgeJSCValueResult(
-      JSCEngine.callFunctionHandle(
-        ref,
-        this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
+        argumentHandles: arguments.map(\.ref), in: context.contextRef),
       in: context
     )
   }
@@ -238,8 +217,7 @@ extension JSCValue {
   ) -> Bool {
     JSCEngine.isInstanceOfHandle(
       ref,
-      constructor: constructor.ref
-    , in: context.contextRef) ?? false
+      constructor: constructor.ref, in: context.contextRef) ?? false
   }
 
   public func isArrayBuffer(in context: borrowing JSCInstantContext) -> Bool {
@@ -248,50 +226,6 @@ extension JSCValue {
 
   public func isTypedArray(in context: borrowing JSCInstantContext) -> Bool {
     JSCEngine.typedArrayKindForHandle(ref, in: context.contextRef) != nil
-  }
-
-  // MARK: Callback-value parameters
-  //
-  // A callback window's value view is only an identity, so the operations that
-  // consume an argument value accept it directly and borrow its ref.
-
-  public func setProperty(
-    _ key: StaticString,
-    to value: borrowing JSCCallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing JSCInstantContext
-  ) -> Bool {
-    JSCEngine.setStaticStringPropertyHandle(
-      key,
-      on: ref,
-      to: value.ref,
-      in: context.contextRef, attributes: attributes
-    )
-  }
-
-  public func setProperty(
-    _ key: borrowing JSCPropertyStringKey,
-    to value: borrowing JSCCallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing JSCInstantContext
-  ) -> Bool {
-    let contextRef = context.contextRef
-    return JSCEngine.setPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
-      on: ref,
-      to: value.ref,
-      in: contextRef, attributes: attributes
-    )
-  }
-
-  public func isInstanceOf(
-    _ constructor: borrowing JSCCallbackValue,
-    in context: borrowing JSCInstantContext
-  ) -> Bool {
-    JSCEngine.isInstanceOfHandle(
-      ref,
-      constructor: constructor.ref
-    , in: context.contextRef) ?? false
   }
 }
 
@@ -324,8 +258,7 @@ extension JSCValue {
     return bridgeJSCValueResult(
       JSCEngine.getPropertyStringKeyHandle(
         key.borrowString(in: contextRef),
-        on: ref
-      , in: contextRef),
+        on: ref, in: contextRef),
       in: context
     )
   }
@@ -379,8 +312,7 @@ extension JSCValue {
     JSCEngine.setIndexPropertyHandle(
       at: UInt32(index),
       on: ref,
-      to: value.ref
-    , in: context.contextRef)
+      to: value.ref, in: context.contextRef)
   }
 
   // MARK: Property removal and existence
@@ -399,8 +331,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return JSCEngine.deletePropertyStringKeyHandle(
       key.borrowString(in: contextRef),
-      on: ref
-    , in: contextRef)
+      on: ref, in: contextRef)
   }
 
   public func hasProperty(
@@ -417,8 +348,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return JSCEngine.hasPropertyStringKeyHandle(
       key.borrowString(in: contextRef),
-      on: ref
-    , in: contextRef) ?? false
+      on: ref, in: contextRef) ?? false
   }
 
   public func propertyNames(in context: isolated JSCContext = #isolation) -> [String] {
@@ -448,8 +378,7 @@ extension JSCValue {
   ) -> Bool {
     JSCEngine.isInstanceOfHandle(
       ref,
-      constructor: constructor.ref
-    , in: context.contextRef) ?? false
+      constructor: constructor.ref, in: context.contextRef) ?? false
   }
 
   public func isArrayBuffer(in context: isolated JSCContext = #isolation) -> Bool {
@@ -458,47 +387,6 @@ extension JSCValue {
 
   public func isTypedArray(in context: isolated JSCContext = #isolation) -> Bool {
     JSCEngine.typedArrayKindForHandle(ref, in: context.contextRef) != nil
-  }
-
-  // MARK: Callback-value parameters
-
-  public func setProperty(
-    _ key: StaticString,
-    to value: borrowing JSCCallbackValue,
-    attributes: JSHostMemberAttributes = .none,
-    in context: isolated JSCContext = #isolation
-  ) -> Bool {
-    JSCEngine.setStaticStringPropertyHandle(
-      key,
-      on: ref,
-      to: value.ref,
-      in: context.contextRef, attributes: attributes
-    )
-  }
-
-  public func setProperty(
-    _ key: borrowing JSCPropertyStringKey,
-    to value: borrowing JSCCallbackValue,
-    attributes: JSHostMemberAttributes = .none,
-    in context: isolated JSCContext = #isolation
-  ) -> Bool {
-    let contextRef = context.contextRef
-    return JSCEngine.setPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
-      on: ref,
-      to: value.ref,
-      in: contextRef, attributes: attributes
-    )
-  }
-
-  public func isInstanceOf(
-    _ constructor: borrowing JSCCallbackValue,
-    in context: isolated JSCContext = #isolation
-  ) -> Bool {
-    JSCEngine.isInstanceOfHandle(
-      ref,
-      constructor: constructor.ref
-    , in: context.contextRef) ?? false
   }
 }
 
@@ -517,8 +405,7 @@ extension JSCValue {
       JSCEngine.callFunctionHandle(
         ref,
         this: nil,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
+        argumentHandles: arguments.map(\.ref), in: context.contextRef),
       in: context
     )
   }
@@ -532,23 +419,7 @@ extension JSCValue {
       JSCEngine.callFunctionHandle(
         ref,
         this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
-      in: context
-    )
-  }
-
-  public func call(
-    this thisValue: borrowing JSCCallbackValue,
-    arguments: [JSCCallArgument] = [],
-    in context: isolated JSCContext = #isolation
-  ) -> JSResult<JSCValue> {
-    bridgeJSCValueResult(
-      JSCEngine.callFunctionHandle(
-        ref,
-        this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref)
-      , in: context.contextRef),
+        argumentHandles: arguments.map(\.ref), in: context.contextRef),
       in: context
     )
   }
@@ -579,8 +450,7 @@ extension JSCValue {
         JSCEngine.callFunctionHandle(
           method.ref,
           this: ref,
-          argumentHandles: arguments.map(\.ref)
-        , in: context.contextRef),
+          argumentHandles: arguments.map(\.ref), in: context.contextRef),
         in: context
       )
     }
@@ -594,8 +464,7 @@ extension JSCValue {
     switch bridgeJSCValueResult(
       JSCEngine.getPropertyStringKeyHandle(
         name.borrowString(in: context.contextRef),
-        on: ref
-      , in: context.contextRef),
+        on: ref, in: context.contextRef),
       in: context
     ) {
     case .exception(let exception):
@@ -605,8 +474,7 @@ extension JSCValue {
         JSCEngine.callFunctionHandle(
           method.ref,
           this: ref,
-          argumentHandles: arguments.map(\.ref)
-        , in: context.contextRef),
+          argumentHandles: arguments.map(\.ref), in: context.contextRef),
         in: context
       )
     }

@@ -15,7 +15,6 @@ import Testing
 private func checkSurface<C: SwiftJavaScript.JSContext>(
   _: C.Type,
   value: C.Value.Type,
-  callbackValue: C.CallbackValue.Type,
   callbackReturn: C.CallbackReturn.Type,
   arguments: C.Arguments.Type,
   callbackArguments: C.CallbackArguments.Type,
@@ -35,7 +34,7 @@ private func checkSurface<C: SwiftJavaScript.JSContext>(
   // the context's. The call below compiles only while `JSContext` and the
   // member protocols still state these relationships.
   checkBelongsToContext(
-    C.self, value: value, callbackValue: callbackValue, callbackReturn: callbackReturn,
+    C.self, value: value, callbackReturn: callbackReturn,
     arguments: arguments, callbackArguments: callbackArguments, instantContext: instantContext,
     scope: scope, virtualMachine: virtualMachine, propertyStringKey: propertyStringKey,
     preparedScript: preparedScript, arrayBuffer: arrayBuffer, typedArray: typedArray,
@@ -48,7 +47,6 @@ private func checkSurface<C: SwiftJavaScript.JSContext>(
 private func checkBelongsToContext<C: SwiftJavaScript.JSContext>(
   _: C.Type,
   value: C.Value.Type,
-  callbackValue: C.CallbackValue.Type,
   callbackReturn: C.CallbackReturn.Type,
   arguments: C.Arguments.Type,
   callbackArguments: C.CallbackArguments.Type,
@@ -63,19 +61,17 @@ private func checkBelongsToContext<C: SwiftJavaScript.JSContext>(
 )
 where
   C.Value.Context == C,
-  C.CallbackValue.Context == C,
   C.CallbackReturn.Context == C,
   C.Arguments.Context == C,
   C.Arguments.Value == C.Value,
   C.CallbackArguments.Context == C,
-  C.CallbackArguments.Value == C.CallbackValue,
+  C.CallbackArguments.Value == C.Value,
   C.InstantContext.Context == C,
   C.InstantContext.PropertyStringKey == C.PropertyStringKey,
   C.InstantContext.Arguments == C.Arguments,
   C.Scope.Context == C,
   C.Scope.InstantContext == C.InstantContext,
   C.Scope.Value == C.Value,
-  C.Scope.CallbackValue == C.CallbackValue,
   C.VirtualMachine.Context == C,
   C.PropertyStringKey.Context == C,
   C.PreparedScript.Context == C,
@@ -90,7 +86,6 @@ where
   checkSurface(
     JSCContext.self,
     value: JSCValue.self,
-    callbackValue: JSCCallbackValue.self,
     callbackReturn: JSCCallbackReturn.self,
     arguments: JSCArguments.self,
     callbackArguments: JSCCallbackArguments.self,
@@ -111,7 +106,6 @@ where
   checkSurface(
     QJSContext.self,
     value: QJSValue.self,
-    callbackValue: QJSCallbackValue.self,
     callbackReturn: QJSCallbackReturn.self,
     arguments: QJSArguments.self,
     callbackArguments: QJSCallbackArguments.self,

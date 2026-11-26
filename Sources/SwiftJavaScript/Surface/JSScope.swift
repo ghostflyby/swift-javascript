@@ -40,12 +40,6 @@ public protocol JSScope: JSValueScope, ~Copyable {
   /// Mint a persistent binding from a value created in this scope.
   @available(*, noasync)
   func makePersistentHandle(
-    _ value: borrowing CallbackValue
-  ) -> PersistentHandle
-
-  /// Mint a persistent binding from a value already owned by an arena.
-  @available(*, noasync)
-  func makePersistentHandle(
     _ value: borrowing Value
   ) -> PersistentHandle
 
@@ -79,23 +73,6 @@ public protocol JSScope: JSValueScope, ~Copyable {
 extension JSScope where Self: ~Copyable {
   /// Write a value by name with the default attributes.
   public func setGlobalProperty(_ value: borrowing Value, forKey key: StaticString) {
-    setGlobalProperty(value, forKey: key, with: .none)
-  }
-
-  /// Write a value created in this scope without an explicit `persist`; the
-  /// scope's arena keeps it alive at least until its drain.
-  @available(*, noasync)
-  public func setGlobalProperty(
-    _ value: borrowing CallbackValue,
-    forKey key: StaticString,
-    with attributes: JSHostMemberAttributes
-  ) {
-    setGlobalProperty(localValue(value), forKey: key, with: attributes)
-  }
-
-  /// Write a value created in this scope by name with the default attributes.
-  @available(*, noasync)
-  public func setGlobalProperty(_ value: borrowing CallbackValue, forKey key: StaticString) {
     setGlobalProperty(value, forKey: key, with: .none)
   }
 

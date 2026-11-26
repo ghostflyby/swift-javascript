@@ -21,10 +21,6 @@ public struct QJSCallArgument: SwiftJavaScript.JSCallArgument {
     self.value = value.value
   }
 
-  public init(_ value: borrowing QJSCallbackValue) {
-    self.value = value.value
-  }
-
   package init(value: CQuickJSValue) {
     self.value = value
   }
@@ -89,10 +85,4 @@ public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
 
 extension QJSContext {
   public typealias CallArgument = QJSCallArgument
-}
-
-extension QJSCallbackValue {
-  public func asCallArgument() -> QJSCallArgument {
-    QJSCallArgument(value: value)
-  }
 }

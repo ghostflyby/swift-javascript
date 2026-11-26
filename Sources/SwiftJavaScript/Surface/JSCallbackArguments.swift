@@ -1,13 +1,12 @@
 /// Borrowed JavaScript callback arguments, viewed as callback-scoped values.
 ///
-/// The element view type is the engine's `CallbackValue`; the concrete
-/// argument type decides how the engine exposes the call frame's borrowed
-/// handles.
+/// The element view type is the engine's `Value`; the concrete argument type
+/// decides how the engine exposes the call frame's borrowed handles.
 public protocol JSCallbackArguments: ~Copyable {
   /// The context this argument view belongs to.
   associatedtype Context: JSContext
-  associatedtype Value: JSCallbackValue & ~Copyable
-  where Value == Context.CallbackValue
+  associatedtype Value: JSValue & ~Copyable
+  where Value == Context.Value
   /// The callback window whose argument frame backs these values.
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext

@@ -6,7 +6,7 @@ import Testing
 
 // MARK: - Surface callback views (S6)
 //
-// `JSCCallbackValue`/`JSCCallbackArguments` are the concrete callback-window
+// `JSCValue`/`JSCCallbackArguments` are the concrete callback-window
 // views handed to `JSFunctionCallback<JSCEngine>`. These tests construct them
 // directly from arena-backed handles and exercise classification/conversion,
 // equality, and indexed argument access. Callback return/throw semantics belong
@@ -32,9 +32,9 @@ struct JSCCallbackSurfaceTests {
       let twinText = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("seven", context)!)
       let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
 
-      let value = JSCCallbackValue(ref: text.ref, contextRef: context)
-      let twin = JSCCallbackValue(ref: twinText.ref, contextRef: context)
-      let numeric = JSCCallbackValue(ref: number.ref, contextRef: context)
+      let value = JSCValue(ref: text.ref, contextRef: context)
+      let twin = JSCValue(ref: twinText.ref, contextRef: context)
+      let numeric = JSCValue(ref: number.ref, contextRef: context)
 
       let valueType = value.type()
       let valueText = value.toString()

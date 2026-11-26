@@ -13,10 +13,6 @@ public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
     self.ref = value.ref
   }
 
-  public init(_ value: borrowing JSCCallbackValue) {
-    self.ref = value.ref
-  }
-
   package init(ref: JSValueRef) {
     self.ref = ref
   }
@@ -84,10 +80,4 @@ public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
 
 extension JSCContext {
   public typealias CallArgument = JSCCallArgument
-}
-
-extension JSCCallbackValue {
-  public func asCallArgument() -> JSCCallArgument {
-    JSCCallArgument(ref: ref)
-  }
 }

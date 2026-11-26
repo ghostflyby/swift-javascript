@@ -168,22 +168,6 @@ extension QJSValue {
     )
   }
 
-  public func call(
-    this thisValue: borrowing QJSCallbackValue,
-    arguments: [QJSCallArgument],
-    in context: borrowing QJSInstantContext
-  ) -> JSResult<QJSValue> {
-    bridgeQJSValueResult(
-      QJSEngine.callFunction(
-        value,
-        this: thisValue.value,
-        arguments: arguments.map(\.value),
-        in: context.contextRef
-      ),
-      in: context
-    )
-  }
-
   public func construct(
     arguments: [QJSCallArgument],
     in context: borrowing QJSInstantContext
@@ -260,52 +244,6 @@ extension QJSValue {
 
   public func isTypedArray(in context: borrowing QJSInstantContext) -> Bool {
     QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
-  }
-
-  // MARK: Callback-value parameters
-  //
-  // A callback window's value view is only an identity, so the operations that
-  // consume an argument value accept it directly and borrow its value.
-
-  public func setProperty(
-    _ key: StaticString,
-    to value: borrowing QJSCallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing QJSInstantContext
-  ) -> Bool {
-    QJSEngine.setStaticStringProperty(
-      key,
-      on: self.value,
-      to: value.value,
-      in: context.contextRef,
-      attributes: attributes
-    )
-  }
-
-  public func setProperty(
-    _ key: borrowing QJSPropertyStringKey,
-    to value: borrowing QJSCallbackValue,
-    attributes: JSHostMemberAttributes,
-    in context: borrowing QJSInstantContext
-  ) -> Bool {
-    QJSEngine.setProperty(
-      atom: key.borrowAtom(in: context.contextRef),
-      on: self.value,
-      to: value.value,
-      in: context.contextRef,
-      attributes: attributes
-    )
-  }
-
-  public func isInstanceOf(
-    _ constructor: borrowing QJSCallbackValue,
-    in context: borrowing QJSInstantContext
-  ) -> Bool {
-    QJSEngine.isInstanceOf(
-      value,
-      constructor: constructor.value,
-      in: context.contextRef
-    ) ?? false
   }
 }
 
@@ -476,49 +414,6 @@ extension QJSValue {
   public func isTypedArray(in context: isolated QJSContext = #isolation) -> Bool {
     QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
   }
-
-  // MARK: Callback-value parameters
-
-  public func setProperty(
-    _ key: StaticString,
-    to value: borrowing QJSCallbackValue,
-    attributes: JSHostMemberAttributes = .none,
-    in context: isolated QJSContext = #isolation
-  ) -> Bool {
-    QJSEngine.setStaticStringProperty(
-      key,
-      on: self.value,
-      to: value.value,
-      in: context.contextRef,
-      attributes: attributes
-    )
-  }
-
-  public func setProperty(
-    _ key: borrowing QJSPropertyStringKey,
-    to value: borrowing QJSCallbackValue,
-    attributes: JSHostMemberAttributes = .none,
-    in context: isolated QJSContext = #isolation
-  ) -> Bool {
-    QJSEngine.setProperty(
-      atom: key.borrowAtom(in: context.contextRef),
-      on: self.value,
-      to: value.value,
-      in: context.contextRef,
-      attributes: attributes
-    )
-  }
-
-  public func isInstanceOf(
-    _ constructor: borrowing QJSCallbackValue,
-    in context: isolated QJSContext = #isolation
-  ) -> Bool {
-    QJSEngine.isInstanceOf(
-      value,
-      constructor: constructor.value,
-      in: context.contextRef
-    ) ?? false
-  }
 }
 
 // MARK: - `#isolation` call conveniences
@@ -545,22 +440,6 @@ extension QJSValue {
 
   public func call(
     this thisValue: borrowing QJSValue,
-    arguments: [QJSCallArgument] = [],
-    in context: isolated QJSContext = #isolation
-  ) -> JSResult<QJSValue> {
-    bridgeQJSValueResult(
-      QJSEngine.callFunction(
-        value,
-        this: thisValue.value,
-        arguments: arguments.map(\.value),
-        in: context.contextRef
-      ),
-      in: context
-    )
-  }
-
-  public func call(
-    this thisValue: borrowing QJSCallbackValue,
     arguments: [QJSCallArgument] = [],
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {

@@ -15,7 +15,6 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   public typealias InstantContext = JSCInstantContext
   public typealias Scope = JSCScope
   public typealias Value = JSCValue
-  public typealias CallbackValue = JSCCallbackValue
   public typealias CallbackReturn = JSCCallbackReturn
   public typealias CallbackArguments = JSCCallbackArguments
   public typealias PersistentHandle = JSCPersistentHandle
