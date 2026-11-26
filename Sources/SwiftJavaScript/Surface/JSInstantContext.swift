@@ -103,14 +103,75 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
     startingLineNumber: Int32
   ) -> JSResult<Value>
 
-  func evaluateScript(
-    _ script: String,
-    sourceURL: String?,
-    startingLineNumber: Int32
-  ) -> JSResult<Value>
-
   // MARK: - Context data
 
   func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type)
   func data<K: JSContextDataKey>(for key: K.Type) -> K.Value?
+}
+
+// MARK: - Value-level composition
+//
+// These defaults only combine value-level requirements: no handle, no adopt.
+// What each engine implements itself is exactly the operations that create and
+// adopt a new value (factories, global reads, script results, data access,
+// function/key/script construction), because the target arena of the adoption
+// belongs to the engine.
+
+extension JSInstantContext where Self: ~Copyable {
+  /// Write a value by name with the default attributes.
+  public func setGlobalProperty(_ value: borrowing Value, forKey key: StaticString) {
+    setGlobalProperty(value, forKey: key, with: .none)
+  }
+
+  /// Write a value created in this window without an explicit `persist`; the
+  /// window's arena keeps it alive at least until its drain.
+  @available(*, noasync)
+  public func setGlobalProperty(
+    _ value: borrowing CallbackValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    setGlobalProperty(localValue(value), forKey: key, with: attributes)
+  }
+
+  /// Write a value created in this window by name with the default attributes.
+  @available(*, noasync)
+  public func setGlobalProperty(_ value: borrowing CallbackValue, forKey key: StaticString) {
+    setGlobalProperty(value, forKey: key, with: .none)
+  }
+
+  /// Install a named function as a global property.
+  public func installGlobalFunction(
+    named name: String,
+    with attributes: JSHostMemberAttributes,
+    callback: @escaping JSFunctionCallback<Self>
+  ) {
+    let function = makeFunction(named: name, callback: callback)
+    let key = makePropertyStringKey(name)
+    withInstantWindow { window throws(Never) in
+      let global = window.globalObjectValue()
+      _ = global.setProperty(key, to: function, attributes: attributes, in: window)
+    }
+  }
+
+  /// Install a named function as a global property with the default attributes.
+  public func installGlobalFunction(
+    named name: String,
+    callback: @escaping JSFunctionCallback<Self>
+  ) {
+    installGlobalFunction(named: name, with: .none, callback: callback)
+  }
+
+  /// Evaluate `script` through a prepared script wrapped in this window.
+  public func evaluateScript(
+    _ script: String,
+    sourceURL: String? = nil,
+    startingLineNumber: Int32 = 1
+  ) -> JSResult<Value> {
+    evaluateScript(
+      prepareScript(script),
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber
+    )
+  }
 }

@@ -176,7 +176,7 @@ public struct JSClassParentDescriptor<
       JSClassParentDescriptor<E, PropertyNameAccumulator>,
       PropertyNameAccumulator
     >
-  private let classProvider: @Sendable (E.RuntimeHandle) -> E.Class
+  private let classProvider: @Sendable (borrowing E.InstantContext) -> E.Class
 
   package init(
     typeID: ObjectIdentifier,
@@ -186,7 +186,7 @@ public struct JSClassParentDescriptor<
         JSClassParentDescriptor<E, PropertyNameAccumulator>,
         PropertyNameAccumulator
       >,
-    classProvider: @escaping @Sendable (E.RuntimeHandle) -> E.Class
+    classProvider: @escaping @Sendable (borrowing E.InstantContext) -> E.Class
   ) {
     self.typeID = typeID
     self.definitionProvider = definitionProvider
@@ -209,8 +209,8 @@ public struct JSClassParentDescriptor<
     definitionProvider()
   }
 
-  public func jsClass(in runtime: E.RuntimeHandle) -> E.Class {
-    classProvider(runtime)
+  public func jsClass(in context: borrowing E.InstantContext) -> E.Class {
+    classProvider(context)
   }
 }
 

@@ -8,8 +8,8 @@ import SwiftJavaScript
 /// `releasePreparedInput` in core.
 public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
-  public typealias Handle = JSCPropertyStringKeyHandle
+  package typealias ContextHandle = JSCContextHandle
+  package typealias Handle = JSCPropertyStringKeyHandle
 
   package let handle: JSCPropertyStringKeyHandle
   private let contextHandle: JSCContextHandle
@@ -26,7 +26,11 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
     _ = contextHandle.retainReference()
   }
 
-  public borrowing func borrowHandle(
+  /// The engine key handle, validated against the context that created it.
+  /// Package-internal: the protocol surface no longer names engine handles,
+  /// but the compatibility precondition stays on every engine-internal use
+  /// (do not replace it with a field read).
+  package borrowing func borrowHandle(
     in contextHandle: JSCContextHandle
   ) -> JSCPropertyStringKeyHandle {
     precondition(
@@ -51,8 +55,8 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
 /// reference and a context reference, exactly like `JSCPropertyStringKey`.
 public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Copyable {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
-  public typealias Handle = JSCPreparedScriptHandle
+  package typealias ContextHandle = JSCContextHandle
+  package typealias Handle = JSCPreparedScriptHandle
 
   package let handle: JSCPreparedScriptHandle
   private let contextHandle: JSCContextHandle
@@ -69,7 +73,11 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
     _ = contextHandle.retainReference()
   }
 
-  public borrowing func borrowHandle(
+  /// The engine script handle, validated against the context that compiled
+  /// it. Package-internal: the protocol surface no longer names engine
+  /// handles, but the compatibility precondition stays on every
+  /// engine-internal use (do not replace it with a field read).
+  package borrowing func borrowHandle(
     in contextHandle: JSCContextHandle
   ) -> JSCPreparedScriptHandle {
     precondition(

@@ -217,7 +217,7 @@ struct JSCValueOperationsTests {
       let methodText = describe(methodObject.invokeMethod("double", arguments: [], in: scope))
       let argument = scope.adoptCreatedHandle(context.makeNumberValueHandle(21)!)
       let withArgumentText = describe(
-        methodObject.invokeMethod("plus", arguments: [argument.borrowHandle()], in: scope)
+        methodObject.invokeMethod("plus", arguments: [argument.asCallArgument()], in: scope)
       )
       #expect(methodText == "42")
       #expect(withArgumentText == "42")

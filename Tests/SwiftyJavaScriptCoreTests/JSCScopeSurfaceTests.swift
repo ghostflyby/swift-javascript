@@ -135,6 +135,33 @@ struct JSCScopeSurfaceTests {
   }
 
   @Test
+  func withInstantWindowUsesTheCallerForInstantAndANestedWindowForScope() {
+    let (runtime, context) = makeContext()
+    _ = runtime
+
+    let window = JSCInstantContext(handle: context)
+    let windowIsCaller = window.withInstantWindow { inner in
+      inner.driverContextHandle == window.driverContextHandle
+    }
+    #expect(windowIsCaller)
+
+    var scope = JSCScope(handle: context)
+    scope.open()
+
+    let (innerNumber, innerText) = scope.withInstantWindow { inner -> (Double, String) in
+      let number = inner.makeNumber(9).toNumber()
+      let promoted = inner.persist(inner.makeString("promoted"))
+      return (number, promoted.toString())
+    }
+    #expect(innerNumber == 9)
+    #expect(innerText == "promoted")
+
+    // The nested window drained; the manual scope's own arena is still usable.
+    let afterText = scope.makeString("after").toString()
+    #expect(afterText == "after")
+  }
+
+  @Test
   func returnAndThrowCarryTheExpectedFlags() {
     let (runtime, context) = makeContext()
     _ = runtime
@@ -329,6 +356,50 @@ struct JSCScopeSurfaceTests {
   }
 
   @Test
+  func codableConverterRunsInsideManualScopeWindow() throws {
+    let (runtime, context) = makeContext()
+    _ = runtime
+
+    var scope = JSCScope(handle: context)
+    scope.open()
+
+    let payload = JSCScopePayload(
+      name: "manual",
+      count: 5,
+      items: [0.5, 1.5],
+      nested: .init(flag: false)
+    )
+
+    let encodedHandle = try scope.withInstantWindow {
+      window throws(JSValueConversionError) -> JSCValueHandle in
+      let encoded = try JSCodableValueConverter<JSCScopePayload>.tryEncode(
+        payload,
+        in: window
+      )
+      return encoded.borrowHandle()
+    }
+
+    // `tryEncode` persists its object graph into the context default scope, so
+    // the encoded object is still readable after the nested window drained.
+    let persisted = JSCValue(handle: encodedHandle, contextHandle: context)
+    let decoded = try scope.withInstantWindow {
+      window throws(JSValueConversionError) -> JSCScopePayload in
+      let name = persisted.getProperty("name", in: window)
+      switch consume name {
+      case .value(let value):
+        #expect(value.toString() == "manual")
+      case .exception:
+        Issue.record("persisted object lost its name property")
+      }
+      return try JSCodableValueConverter<JSCScopePayload>.tryDecode(
+        persisted,
+        in: window
+      )
+    }
+    #expect(decoded == payload)
+  }
+
+  @Test
   func simpleValueInitializersPersistIntoTheDefaultScope() {
     let (runtime, context) = makeContext()
     _ = runtime
@@ -368,5 +439,216 @@ struct JSCScopeSurfaceTests {
     scope.setData(nil, for: JSCScopeDataKey.self)
     let cleared = scope.data(for: JSCScopeDataKey.self)
     #expect(cleared == nil)
+  }
+
+  // MARK: - Concrete seams moved out of the generic engine tests
+  //
+  // The public scope protocol no longer names the context handle, so the
+  // assertions that need it live on the concrete engine here (and in
+  // `QJSScopeSurfaceTests`).
+
+  /// A synchronous window pushes its own arena frame and pops it on drain, so
+  /// the default scope is the stack top again afterwards.
+  @Test
+  func instantWindowRestoresTheDefaultScopeFrame() async {
+    let context = JSCContext()
+    let defaultFrame = ScopeStackRegistry<JSCContextHandle>.top(
+      of: context.driverContextHandle)
+
+    await context.withInstantContext { scope in
+      let windowTop = ScopeStackRegistry<JSCContextHandle>.top(
+        of: context.driverContextHandle)
+      #expect(windowTop !== defaultFrame)
+      _ = scope.makeString("windowed")
+    }
+
+    // The window drained; the context default frame is back on top.
+    let restored = ScopeStackRegistry<JSCContextHandle>.top(
+      of: context.driverContextHandle)
+    #expect(restored === defaultFrame)
+  }
+
+  /// The invalid-slice failure path is only reachable through the raw
+  /// typed-array driver (the public initializer traps on rejection); the
+  /// engine must stay usable afterwards.
+  @Test
+  func invalidTypedArraySliceLeavesTheEngineUsable() async {
+    let context = JSCContext()
+    await context.withInstantContext { scope in
+      let buffer = JSCArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
+      let rejected = scope.driverContextHandle.makeTypedArrayHandle(
+        kind: .uint16Array,
+        arrayBuffer: buffer.withValue { $0.borrowHandle() },
+        byteOffset: 1,
+        length: 1
+      )
+      #expect(rejected == nil)
+
+      let postFailureEvaluation = scope.evaluateScript("21 + 21")
+      switch consume postFailureEvaluation {
+      case .value(let value):
+        let sum = value.toNumber()
+        #expect(sum == 42)
+      case .exception:
+        Issue.record("Expected typed array construction failure to leave evaluation usable")
+      }
+    }
+  }
+
+  /// A JavaScript string value used as a property key has no value-level
+  /// surface, so its read/write/has/delete contract is asserted on the driver.
+  @Test
+  func valueKeyDriverReadsWritesHasAndDeletes() async {
+    let context = JSCContext()
+    await context.withInstantContext { scope in
+      let object: JSCValue
+      switch scope.makeObject() {
+      case .value(let made):
+        object = scope.persist(made)
+      case .exception:
+        Issue.record("makeObject returned an exception")
+        return
+      }
+
+      let key = scope.persist(scope.makeString("valueKey"))
+      let stored = scope.persist(scope.makeString("abc"))
+      let contextHandle = scope.driverContextHandle
+
+      let wrote = contextHandle.setValuePropertyHandle(
+        key.borrowHandle(),
+        on: object.borrowHandle(),
+        to: stored.borrowHandle(),
+        attributes: .none
+      )
+      let has =
+        contextHandle.hasValuePropertyHandle(
+          key.borrowHandle(), on: object.borrowHandle()) ?? false
+      let readIsString: Bool
+      if let result = contextHandle.getValuePropertyHandle(
+        key.borrowHandle(), on: object.borrowHandle())
+      {
+        switch consume result {
+        case .value(let handle):
+          readIsString =
+            scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)).isString()
+        case .exception(let handle):
+          _ = scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+          readIsString = false
+        }
+      } else {
+        readIsString = false
+      }
+      let deleted = contextHandle.deleteValuePropertyHandle(
+        key.borrowHandle(), on: object.borrowHandle())
+      let hasAfterDelete =
+        contextHandle.hasValuePropertyHandle(
+          key.borrowHandle(), on: object.borrowHandle()) ?? true
+
+      #expect(wrote)
+      #expect(has)
+      #expect(readIsString)
+      #expect(deleted)
+      #expect(!hasAfterDelete)
+    }
+  }
+
+  /// `readOnly`/`dontEnum`/`dontDelete` on the value-key driver path, moved
+  /// down from the generic property tests.
+  @Test
+  func valueKeyDriverRespectsPropertyAttributes() async {
+    let context = JSCContext()
+    await context.withInstantContext { scope in
+      let object: JSCValue
+      switch scope.makeObject() {
+      case .value(let made):
+        object = scope.persist(made)
+      case .exception:
+        Issue.record("makeObject returned an exception")
+        return
+      }
+
+      let contextHandle = scope.driverContextHandle
+      let lockedKey = scope.persist(scope.makeString("locked"))
+      let seven = scope.persist(scope.makeNumber(7))
+      let nine = scope.persist(scope.makeNumber(9))
+      _ = contextHandle.setValuePropertyHandle(
+        lockedKey.borrowHandle(),
+        on: object.borrowHandle(),
+        to: seven.borrowHandle(),
+        attributes: .readOnly
+      )
+      _ = contextHandle.setValuePropertyHandle(
+        lockedKey.borrowHandle(),
+        on: object.borrowHandle(),
+        to: nine.borrowHandle(),
+        attributes: .none
+      )
+
+      let hiddenKey = scope.persist(scope.makeString("hidden"))
+      let hiddenValue = scope.persist(scope.makeNumber(1))
+      _ = contextHandle.setValuePropertyHandle(
+        hiddenKey.borrowHandle(),
+        on: object.borrowHandle(),
+        to: hiddenValue.borrowHandle(),
+        attributes: .dontEnum
+      )
+
+      let pinnedKey = scope.persist(scope.makeString("pinned"))
+      let pinnedValue = scope.persist(scope.makeNumber(2))
+      _ = contextHandle.setValuePropertyHandle(
+        pinnedKey.borrowHandle(),
+        on: object.borrowHandle(),
+        to: pinnedValue.borrowHandle(),
+        attributes: .dontDelete
+      )
+
+      let lockedNumber: Double?
+      if let result = contextHandle.getValuePropertyHandle(
+        lockedKey.borrowHandle(), on: object.borrowHandle())
+      {
+        switch consume result {
+        case .value(let handle):
+          lockedNumber =
+            scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)).toNumber()
+        case .exception(let handle):
+          _ = scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+          lockedNumber = nil
+        }
+      } else {
+        lockedNumber = nil
+      }
+
+      scope.setGlobalProperty(object, forKey: "attributeObject", with: .none)
+      let hiddenEnumerated = scope.evaluateScript(
+        "Object.keys(attributeObject).includes('hidden')")
+      let pinnedDeleted = scope.evaluateScript("delete attributeObject.pinned")
+      let pinnedStillPresent = scope.evaluateScript("'pinned' in attributeObject")
+
+      #expect(lockedNumber == 7)
+
+      switch consume hiddenEnumerated {
+      case .value(let value):
+        let isEnumerated = value.toBoolean()
+        #expect(!isEnumerated)
+      case .exception:
+        Issue.record("Expected Object.keys check for hidden value-key property")
+      }
+
+      switch consume pinnedDeleted {
+      case .value(let value):
+        let isDeleted = value.toBoolean()
+        #expect(!isDeleted)
+      case .exception:
+        Issue.record("Expected delete check for pinned value-key property")
+      }
+
+      switch consume pinnedStillPresent {
+      case .value(let value):
+        let isPresent = value.toBoolean()
+        #expect(isPresent)
+      case .exception:
+        Issue.record("Expected membership check for pinned value-key property")
+      }
+    }
   }
 }

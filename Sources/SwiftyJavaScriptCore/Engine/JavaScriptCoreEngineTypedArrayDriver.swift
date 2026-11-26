@@ -2,7 +2,7 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JSCEngine: JSEngineTypedArrayDriver {
-  public static func makeArrayBufferWithBytesNoCopyHandle(
+  package static func makeArrayBufferWithBytesNoCopyHandle(
     in context: JSCContextHandle,
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
@@ -26,7 +26,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     return JSCValueHandle(ref: objectRef)
   }
 
-  public static func arrayBufferByteLengthForHandle(
+  package static func arrayBufferByteLengthForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Int? {
@@ -38,7 +38,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func arrayBufferBytesPtrForHandle(
+  package static func arrayBufferBytesPtrForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
@@ -50,7 +50,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func makeTypedArrayHandle(
+  package static func makeTypedArrayHandle(
     in context: JSCContextHandle,
     kind: JSTypedArrayKind,
     length: Int
@@ -68,7 +68,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     return JSCValueHandle(ref: objectRef)
   }
 
-  public static func makeTypedArrayHandle(
+  package static func makeTypedArrayHandle(
     in context: JSCContextHandle,
     kind: JSTypedArrayKind,
     arrayBuffer: JSValueHandle<JSCEngine>
@@ -91,7 +91,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func makeTypedArrayHandle(
+  package static func makeTypedArrayHandle(
     in context: JSCContextHandle,
     kind: JSTypedArrayKind,
     arrayBuffer: JSValueHandle<JSCEngine>,
@@ -118,7 +118,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func typedArrayLengthForHandle(
+  package static func typedArrayLengthForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Int? {
@@ -130,7 +130,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func typedArrayByteLengthForHandle(
+  package static func typedArrayByteLengthForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Int? {
@@ -142,7 +142,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func typedArrayByteOffsetForHandle(
+  package static func typedArrayByteOffsetForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Int? {
@@ -154,7 +154,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func typedArrayBufferForHandle(
+  package static func typedArrayBufferForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> JSValueHandle<JSCEngine>? {
@@ -170,7 +170,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func typedArrayBytesPtrForHandle(
+  package static func typedArrayBytesPtrForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
@@ -182,7 +182,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     }
   }
 
-  public static func isArrayBufferHandle(
+  package static func isArrayBufferHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Bool {
@@ -195,7 +195,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
     return type == kJSTypedArrayTypeArrayBuffer
   }
 
-  public static func typedArrayKindForHandle(
+  package static func typedArrayKindForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> JSTypedArrayKind? {
@@ -212,7 +212,7 @@ extension JSCEngine: JSEngineTypedArrayDriver {
 // MARK: - Context-side driver conformance (Stage 2B)
 
 extension JSCContextHandle: JSContextTypedArrayDriver {
-  public func makeArrayBufferWithBytesNoCopyHandle(
+  package func makeArrayBufferWithBytesNoCopyHandle(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
     bytesDeallocator: (
@@ -229,31 +229,31 @@ extension JSCContextHandle: JSContextTypedArrayDriver {
     )
   }
 
-  public func arrayBufferByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
+  package func arrayBufferByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
     JSCEngine.arrayBufferByteLengthForHandle(value, in: self)
   }
 
-  public func arrayBufferBytesPtrForHandle(
+  package func arrayBufferBytesPtrForHandle(
     _ value: JSCValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     JSCEngine.arrayBufferBytesPtrForHandle(value, in: self)
   }
 
-  public func makeTypedArrayHandle(
+  package func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
     length: Int
   ) -> JSCValueHandle? {
     JSCEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
   }
 
-  public func makeTypedArrayHandle(
+  package func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
     arrayBuffer: JSCValueHandle
   ) -> JSCValueHandle? {
     JSCEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
   }
 
-  public func makeTypedArrayHandle(
+  package func makeTypedArrayHandle(
     kind: JSTypedArrayKind,
     arrayBuffer: JSCValueHandle,
     byteOffset: Int,
@@ -268,35 +268,35 @@ extension JSCContextHandle: JSContextTypedArrayDriver {
     )
   }
 
-  public func typedArrayLengthForHandle(_ value: JSCValueHandle) -> Int? {
+  package func typedArrayLengthForHandle(_ value: JSCValueHandle) -> Int? {
     JSCEngine.typedArrayLengthForHandle(value, in: self)
   }
 
-  public func typedArrayByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
+  package func typedArrayByteLengthForHandle(_ value: JSCValueHandle) -> Int? {
     JSCEngine.typedArrayByteLengthForHandle(value, in: self)
   }
 
-  public func typedArrayByteOffsetForHandle(_ value: JSCValueHandle) -> Int? {
+  package func typedArrayByteOffsetForHandle(_ value: JSCValueHandle) -> Int? {
     JSCEngine.typedArrayByteOffsetForHandle(value, in: self)
   }
 
-  public func typedArrayBufferForHandle(_ value: JSCValueHandle)
+  package func typedArrayBufferForHandle(_ value: JSCValueHandle)
     -> JSCValueHandle?
   {
     JSCEngine.typedArrayBufferForHandle(value, in: self)
   }
 
-  public func typedArrayBytesPtrForHandle(
+  package func typedArrayBytesPtrForHandle(
     _ value: JSCValueHandle
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
     JSCEngine.typedArrayBytesPtrForHandle(value, in: self)
   }
 
-  public func isArrayBufferHandle(_ value: JSCValueHandle) -> Bool {
+  package func isArrayBufferHandle(_ value: JSCValueHandle) -> Bool {
     JSCEngine.isArrayBufferHandle(value, in: self)
   }
 
-  public func typedArrayKindForHandle(
+  package func typedArrayKindForHandle(
     _ value: JSCValueHandle
   ) -> JSTypedArrayKind? {
     JSCEngine.typedArrayKindForHandle(value, in: self)

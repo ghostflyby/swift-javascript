@@ -25,11 +25,57 @@ public struct MockSurfaceValue: SwiftJavaScript.JSValue, ~Copyable {
     handle
   }
 
+  public func asCallArgument() -> MockSurfaceCallArgument {
+    MockSurfaceCallArgument(handle: handle)
+  }
+
   public func type() -> JSType {
     guard let valueType = contextHandle.valueTypeForHandle(handle) else {
       preconditionFailure("MockSurfaceValue.type() could not query value type")
     }
     return valueType
+  }
+
+  // MARK: - Conversion and equality
+
+  public func toString() -> String {
+    contextHandle.toStringForHandle(handle) ?? ""
+  }
+
+  public func toNumber() -> Double {
+    contextHandle.toNumberForHandle(handle)
+  }
+
+  public func toBoolean() -> Bool {
+    contextHandle.toBooleanForHandle(handle)
+  }
+
+  public func looselyEquals(_ other: borrowing MockSurfaceValue) -> Bool {
+    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+
+  public func strictlyEquals(_ other: borrowing MockSurfaceValue) -> Bool {
+    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+}
+
+/// The mock call-argument token.
+///
+/// Borrows the value handle: the source value's arena must stay alive for the
+/// immediate synchronous call the token is passed to.
+public struct MockSurfaceCallArgument: SwiftJavaScript.JSCallArgument {
+  let handle: MockValueHandle
+
+  init(handle: MockValueHandle) {
+    self.handle = handle
+  }
+
+  init(_ value: borrowing MockSurfaceValue) {
+    self.handle = value.handle
+  }
+
+  init(_ value: borrowing MockSurfaceCallbackValue) {
+    self.handle = value.handle
   }
 }
 
@@ -50,12 +96,46 @@ public struct MockSurfaceCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyab
     handle
   }
 
+  public func asCallArgument() -> MockSurfaceCallArgument {
+    MockSurfaceCallArgument(handle: handle)
+  }
+
   @available(*, noasync)
   public func type() -> JSType {
     guard let valueType = contextHandle.valueTypeForHandle(handle) else {
       preconditionFailure("MockSurfaceCallbackValue.type() could not query value type")
     }
     return valueType
+  }
+
+  // MARK: - Conversion and equality
+  //
+  // The callback window's views are `noasync` on the concrete type: they only
+  // exist inside a synchronous callback window.
+
+  @available(*, noasync)
+  public func toString() -> String {
+    contextHandle.toStringForHandle(handle) ?? ""
+  }
+
+  @available(*, noasync)
+  public func toNumber() -> Double {
+    contextHandle.toNumberForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func toBoolean() -> Bool {
+    contextHandle.toBooleanForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func looselyEquals(_ other: borrowing MockSurfaceCallbackValue) -> Bool {
+    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+
+  @available(*, noasync)
+  public func strictlyEquals(_ other: borrowing MockSurfaceCallbackValue) -> Bool {
+    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
   }
 }
 
@@ -273,11 +353,14 @@ extension MockSurfaceScope: JSScopeWitness {
 
 // MARK: - Scope operations (S7)
 //
-// The value factories, global reads and script evaluation are the scope
-// protocol defaults, which ride on the ledger primitives above and the same
-// handle-level `ScopeCore` the production engines use; the ledger assertions
-// therefore exercise the shared code. What remains here is the mock's part:
-// the callback exits, the wrappers around handles, and function creation.
+// The value factories, global reads, script evaluation and data access are
+// engine-implemented from slice 3 of the dehandle migration: each rides on the
+// same handle-level `ScopeCore` the production engines use and adopts every
+// engine-created handle on this scope's arena exactly once, so the ledger
+// assertions exercise the same shape as the engines. What stays in core is the
+// value-level composition (`installGlobalFunction`, the `CallbackValue` global
+// write). What remains here is the mock's part: the callback exits, the
+// wrappers around handles, and function creation.
 
 extension MockSurfaceInstantContext {
   public func persist(
@@ -285,6 +368,101 @@ extension MockSurfaceInstantContext {
   ) -> MockSurfaceValue {
     core.transferToDefaultFrame(value.borrowHandle())
     return MockSurfaceValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  @available(*, noasync)
+  public func localValue(_ value: borrowing MockSurfaceCallbackValue) -> MockSurfaceValue {
+    MockSurfaceValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ value: String) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeStringValueHandle(value) else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeString(
+    from key: borrowing MockSurfacePropertyStringKey
+  ) -> MockSurfaceCallbackValue {
+    let contextHandle = core.driverContextHandle
+    guard
+      let handle = contextHandle.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: contextHandle)
+      )
+    else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNumber(_ value: Double) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeNumberValueHandle(value) else {
+      preconditionFailure("makeNumberValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeBoolean(_ value: Bool) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeBooleanValueHandle(value) else {
+      preconditionFailure("makeBooleanValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNull() -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeNullValueHandle() else {
+      preconditionFailure("makeNullValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeUndefined() -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeUndefinedValueHandle() else {
+      preconditionFailure("makeUndefinedValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeSymbol(_ value: String) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeSymbolValueHandle(value) else {
+      preconditionFailure("makeSymbolValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeObject() -> JSResult<MockSurfaceCallbackValue> {
+    guard let result = core.driverContextHandle.makeObjectResultHandle() else {
+      preconditionFailure("makeObjectResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  public func makeArray() -> JSResult<MockSurfaceCallbackValue> {
+    guard let result = core.driverContextHandle.makeArrayResultHandle() else {
+      preconditionFailure("makeArrayResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  // MARK: - Instant window
+
+  public func withInstantWindow<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing MockSurfaceInstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    try body(self)
   }
 
   public func `return`(
@@ -323,6 +501,53 @@ extension MockSurfaceInstantContext {
     return MockSurfaceValue(handle: handle, contextHandle: core.driverContextHandle)
   }
 
+  public func getGlobalProperty(forKey key: StaticString) -> MockSurfaceValue {
+    let contextHandle = core.driverContextHandle
+    guard let global = contextHandle.globalObjectValueHandle() else {
+      preconditionFailure(
+        "MockSurfaceInstantContext.getGlobalProperty could not get global object")
+    }
+    guard let result = contextHandle.getStaticStringPropertyHandle(key, on: global) else {
+      preconditionFailure("MockSurfaceInstantContext.getGlobalProperty returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(MockOwnedValueHandle.adopting(handle))
+    case .exception(let handle):
+      contextHandle.releaseCreatedHandle(MockOwnedValueHandle.adopting(handle))
+      guard let undefined = contextHandle.makeUndefinedValueHandle() else {
+        preconditionFailure("MockSurfaceInstantContext could not create an undefined handle")
+      }
+      return adoptCreatedHandle(undefined)
+    }
+  }
+
+  public func setGlobalProperty(
+    _ value: borrowing MockSurfaceValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: global,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func deleteGlobalProperty(forKey key: StaticString) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+  }
+
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else {
+      return false
+    }
+    return core.driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
+  }
+
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<MockSurfaceInstantContext>
@@ -369,6 +594,41 @@ extension MockSurfaceInstantContext {
       preconditionFailure("makePreparedScriptHandle could not create handle")
     }
     return MockSurfacePreparedScript(handle: handle)
+  }
+
+  // MARK: - Scripts
+
+  public func evaluateScript(
+    _ script: borrowing MockSurfacePreparedScript,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = core.driverContextHandle
+    guard
+      let result = contextHandle.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: contextHandle),
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    else {
+      preconditionFailure("MockSurfaceInstantContext.evaluateScript unexpectedly returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    case .exception(let handle):
+      return .exception(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    }
+  }
+
+  // MARK: - Context data
+
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
+    core.driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
+    core.driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
   }
 }
 
@@ -380,11 +640,153 @@ extension MockSurfaceScope {
     return MockSurfaceValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
   }
 
+  @available(*, noasync)
+  public func localValue(_ value: borrowing MockSurfaceCallbackValue) -> MockSurfaceValue {
+    MockSurfaceValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ value: String) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeStringValueHandle(value) else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeString(
+    from key: borrowing MockSurfacePropertyStringKey
+  ) -> MockSurfaceCallbackValue {
+    let contextHandle = core.driverContextHandle
+    guard
+      let handle = contextHandle.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: contextHandle)
+      )
+    else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNumber(_ value: Double) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeNumberValueHandle(value) else {
+      preconditionFailure("makeNumberValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeBoolean(_ value: Bool) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeBooleanValueHandle(value) else {
+      preconditionFailure("makeBooleanValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNull() -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeNullValueHandle() else {
+      preconditionFailure("makeNullValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeUndefined() -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeUndefinedValueHandle() else {
+      preconditionFailure("makeUndefinedValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeSymbol(_ value: String) -> MockSurfaceCallbackValue {
+    guard let handle = core.driverContextHandle.makeSymbolValueHandle(value) else {
+      preconditionFailure("makeSymbolValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeObject() -> JSResult<MockSurfaceCallbackValue> {
+    guard let result = core.driverContextHandle.makeObjectResultHandle() else {
+      preconditionFailure("makeObjectResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  public func makeArray() -> JSResult<MockSurfaceCallbackValue> {
+    guard let result = core.driverContextHandle.makeArrayResultHandle() else {
+      preconditionFailure("makeArrayResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  // MARK: - Instant window
+
+  public func withInstantWindow<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing MockSurfaceInstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    let window = MockSurfaceInstantContext(handle: core.driverContextHandle)
+    return try body(window)
+  }
+
   public func globalObjectValue() -> MockSurfaceValue {
     guard let handle = core.driverContextHandle.globalObjectValueHandle() else {
       preconditionFailure("MockSurfaceScope.globalObjectValue could not get global object")
     }
     return MockSurfaceValue(handle: handle, contextHandle: core.driverContextHandle)
+  }
+
+  public func getGlobalProperty(forKey key: StaticString) -> MockSurfaceValue {
+    let contextHandle = core.driverContextHandle
+    guard let global = contextHandle.globalObjectValueHandle() else {
+      preconditionFailure("MockSurfaceScope.getGlobalProperty could not get global object")
+    }
+    guard let result = contextHandle.getStaticStringPropertyHandle(key, on: global) else {
+      preconditionFailure("MockSurfaceScope.getGlobalProperty returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(MockOwnedValueHandle.adopting(handle))
+    case .exception(let handle):
+      contextHandle.releaseCreatedHandle(MockOwnedValueHandle.adopting(handle))
+      guard let undefined = contextHandle.makeUndefinedValueHandle() else {
+        preconditionFailure("MockSurfaceScope could not create an undefined handle")
+      }
+      return adoptCreatedHandle(undefined)
+    }
+  }
+
+  public func setGlobalProperty(
+    _ value: borrowing MockSurfaceValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: global,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func deleteGlobalProperty(forKey key: StaticString) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+  }
+
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else {
+      return false
+    }
+    return core.driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
   }
 
   public func makeFunction(
@@ -433,6 +835,678 @@ extension MockSurfaceScope {
       preconditionFailure("makePreparedScriptHandle could not create handle")
     }
     return MockSurfacePreparedScript(handle: handle)
+  }
+
+  // MARK: - Scripts
+
+  public func evaluateScript(
+    _ script: borrowing MockSurfacePreparedScript,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = core.driverContextHandle
+    guard
+      let result = contextHandle.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: contextHandle),
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    else {
+      preconditionFailure("MockSurfaceScope.evaluateScript unexpectedly returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    case .exception(let handle):
+      return .exception(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    }
+  }
+
+  // MARK: - Context data
+
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
+    core.driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
+    core.driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
+  }
+}
+
+// MARK: - Property, object, and classification operations
+//
+// Engine-implemented from slice 2 of the dehandle migration: every operation
+// drives `MockContextHandle` directly and adopts each engine-returned handle
+// on the addressed arena exactly once — the exception path included — so the
+// scope-drain ledger matches the production engines.
+
+extension MockSurfaceValue {
+  // MARK: Property reads
+
+  public func getProperty(
+    _ key: StaticString,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.getStaticStringPropertyHandle(key, on: handle),
+      in: context
+    )
+  }
+
+  public func getProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = context.driverContextHandle
+    return bridgeSurfaceHandleResult(
+      contextHandle.getPropertyStringKeyHandle(
+        key.borrowHandle(in: contextHandle),
+        on: handle
+      ),
+      in: context
+    )
+  }
+
+  public func getProperty(
+    at index: Int,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.getIndexPropertyHandle(at: UInt32(index), on: handle),
+      in: context
+    )
+  }
+
+  // MARK: Property writes
+
+  public func setProperty(
+    _ key: StaticString,
+    to value: borrowing MockSurfaceValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    to value: borrowing MockSurfaceValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.setPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    at index: Int,
+    to value: borrowing MockSurfaceValue,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.setIndexPropertyHandle(
+      at: UInt32(index),
+      on: handle,
+      to: value.borrowHandle()
+    )
+  }
+
+  // MARK: Property removal and existence
+
+  public func deleteProperty(
+    _ key: StaticString,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.deleteStaticStringPropertyHandle(key, on: handle)
+  }
+
+  public func deleteProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.deletePropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle
+    )
+  }
+
+  public func hasProperty(
+    _ key: StaticString,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.hasStaticStringPropertyHandle(key, on: handle) ?? false
+  }
+
+  public func hasProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.hasPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle
+    ) ?? false
+  }
+
+  public func propertyNames(in context: borrowing MockSurfaceInstantContext) -> [String] {
+    context.driverContextHandle.propertyNamesForHandle(on: handle) ?? []
+  }
+
+  // MARK: Object conversion and classification
+
+  public func toObject(
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.toObjectHandle(handle),
+      in: context
+    )
+  }
+
+  public func isArray(in context: borrowing MockSurfaceInstantContext) -> Bool {
+    context.driverContextHandle.isArrayHandle(handle) ?? false
+  }
+
+  public func isDate(in context: borrowing MockSurfaceInstantContext) -> Bool {
+    context.driverContextHandle.isDateHandle(handle) ?? false
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing MockSurfaceValue,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.isInstanceOfHandle(
+      handle,
+      constructor: constructor.borrowHandle()
+    ) ?? false
+  }
+
+  public func isArrayBuffer(in context: borrowing MockSurfaceInstantContext) -> Bool {
+    context.driverContextHandle.isArrayBufferHandle(handle)
+  }
+
+  public func isTypedArray(in context: borrowing MockSurfaceInstantContext) -> Bool {
+    context.driverContextHandle.typedArrayKindForHandle(handle) != nil
+  }
+
+  // MARK: Callback-value parameters
+
+  public func setProperty(
+    _ key: StaticString,
+    to value: borrowing MockSurfaceCallbackValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    to value: borrowing MockSurfaceCallbackValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.setPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing MockSurfaceCallbackValue,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> Bool {
+    context.driverContextHandle.isInstanceOfHandle(
+      handle,
+      constructor: constructor.borrowHandle()
+    ) ?? false
+  }
+}
+
+// MARK: - Invocation operations
+//
+// The five call operations are engine-implemented from slice 1 of the
+// dehandle migration: each token maps back to its borrowed handle, and every
+// engine result — value and exception alike — is adopted through the shared
+// bridge exactly once, so the scope-drain ledger matches the other value
+// operations.
+
+extension MockSurfaceValue {
+  public func call(
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: nil,
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func call(
+    this thisValue: borrowing MockSurfaceValue,
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: thisValue.borrowHandle(),
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func call(
+    this thisValue: borrowing MockSurfaceCallbackValue,
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: thisValue.borrowHandle(),
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func construct(
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.constructHandle(handle, argumentHandles: arguments.map(\.handle)),
+      in: context
+    )
+  }
+
+  public func invokeMethod(
+    _ name: StaticString,
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    switch bridgeSurfaceHandleResult(
+      context.driverContextHandle.getStaticStringPropertyHandle(name, on: handle),
+      in: context
+    ) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return bridgeSurfaceHandleResult(
+        context.driverContextHandle.callFunctionHandle(
+          method.borrowHandle(),
+          this: handle,
+          argumentHandles: arguments.map(\.handle)
+        ),
+        in: context
+      )
+    }
+  }
+
+  public func invokeMethod(
+    _ name: borrowing MockSurfacePropertyStringKey,
+    arguments: [MockSurfaceCallArgument],
+    in context: borrowing MockSurfaceInstantContext
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = context.driverContextHandle
+    switch bridgeSurfaceHandleResult(
+      contextHandle.getPropertyStringKeyHandle(
+        name.borrowHandle(in: contextHandle),
+        on: handle
+      ),
+      in: context
+    ) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return bridgeSurfaceHandleResult(
+        context.driverContextHandle.callFunctionHandle(
+          method.borrowHandle(),
+          this: handle,
+          argumentHandles: arguments.map(\.handle)
+        ),
+        in: context
+      )
+    }
+  }
+}
+
+// MARK: - `#isolation` value conveniences
+//
+// The same operations addressed through the context actor. A requirement
+// cannot carry a default argument, so these same-name overloads keep
+// `value.getProperty("x")` callable; their results are adopted onto the
+// context default scope exactly once (exception included), so they outlive the
+// synchronous call instead of draining with a window.
+
+extension MockSurfaceValue {
+  // MARK: Property reads
+
+  public func getProperty(
+    _ key: StaticString,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.getStaticStringPropertyHandle(key, on: handle),
+      in: context
+    )
+  }
+
+  public func getProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = context.driverContextHandle
+    return bridgeSurfaceHandleResult(
+      contextHandle.getPropertyStringKeyHandle(
+        key.borrowHandle(in: contextHandle),
+        on: handle
+      ),
+      in: context
+    )
+  }
+
+  public func getProperty(
+    at index: Int,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.getIndexPropertyHandle(at: UInt32(index), on: handle),
+      in: context
+    )
+  }
+
+  // MARK: Property writes
+
+  public func setProperty(
+    _ key: StaticString,
+    to value: borrowing MockSurfaceValue,
+    attributes: JSHostMemberAttributes = .none,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    to value: borrowing MockSurfaceValue,
+    attributes: JSHostMemberAttributes = .none,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.setPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    at index: Int,
+    to value: borrowing MockSurfaceValue,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.setIndexPropertyHandle(
+      at: UInt32(index),
+      on: handle,
+      to: value.borrowHandle()
+    )
+  }
+
+  // MARK: Property removal and existence
+
+  public func deleteProperty(
+    _ key: StaticString,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.deleteStaticStringPropertyHandle(key, on: handle)
+  }
+
+  public func deleteProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.deletePropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle
+    )
+  }
+
+  public func hasProperty(
+    _ key: StaticString,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.hasStaticStringPropertyHandle(key, on: handle) ?? false
+  }
+
+  public func hasProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.hasPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle
+    ) ?? false
+  }
+
+  public func propertyNames(in context: isolated MockSurfaceContext = #isolation) -> [String] {
+    context.driverContextHandle.propertyNamesForHandle(on: handle) ?? []
+  }
+
+  // MARK: Object conversion and classification
+
+  public func toObject(
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.toObjectHandle(handle),
+      in: context
+    )
+  }
+
+  public func isArray(in context: isolated MockSurfaceContext = #isolation) -> Bool {
+    context.driverContextHandle.isArrayHandle(handle) ?? false
+  }
+
+  public func isDate(in context: isolated MockSurfaceContext = #isolation) -> Bool {
+    context.driverContextHandle.isDateHandle(handle) ?? false
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing MockSurfaceValue,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.isInstanceOfHandle(
+      handle,
+      constructor: constructor.borrowHandle()
+    ) ?? false
+  }
+
+  public func isArrayBuffer(in context: isolated MockSurfaceContext = #isolation) -> Bool {
+    context.driverContextHandle.isArrayBufferHandle(handle)
+  }
+
+  public func isTypedArray(in context: isolated MockSurfaceContext = #isolation) -> Bool {
+    context.driverContextHandle.typedArrayKindForHandle(handle) != nil
+  }
+
+  // MARK: Callback-value parameters
+
+  public func setProperty(
+    _ key: StaticString,
+    to value: borrowing MockSurfaceCallbackValue,
+    attributes: JSHostMemberAttributes = .none,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func setProperty(
+    _ key: borrowing MockSurfacePropertyStringKey,
+    to value: borrowing MockSurfaceCallbackValue,
+    attributes: JSHostMemberAttributes = .none,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    let contextHandle = context.driverContextHandle
+    return contextHandle.setPropertyStringKeyHandle(
+      key.borrowHandle(in: contextHandle),
+      on: handle,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func isInstanceOf(
+    _ constructor: borrowing MockSurfaceCallbackValue,
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> Bool {
+    context.driverContextHandle.isInstanceOfHandle(
+      handle,
+      constructor: constructor.borrowHandle()
+    ) ?? false
+  }
+
+  // MARK: Invocation
+
+  public func call(
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: nil,
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func call(
+    this thisValue: borrowing MockSurfaceValue,
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: thisValue.borrowHandle(),
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func call(
+    this thisValue: borrowing MockSurfaceCallbackValue,
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.callFunctionHandle(
+        handle,
+        this: thisValue.borrowHandle(),
+        argumentHandles: arguments.map(\.handle)
+      ),
+      in: context
+    )
+  }
+
+  public func construct(
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    bridgeSurfaceHandleResult(
+      context.driverContextHandle.constructHandle(handle, argumentHandles: arguments.map(\.handle)),
+      in: context
+    )
+  }
+
+  public func invokeMethod(
+    _ name: StaticString,
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    switch bridgeSurfaceHandleResult(
+      context.driverContextHandle.getStaticStringPropertyHandle(name, on: handle),
+      in: context
+    ) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return bridgeSurfaceHandleResult(
+        context.driverContextHandle.callFunctionHandle(
+          method.borrowHandle(),
+          this: handle,
+          argumentHandles: arguments.map(\.handle)
+        ),
+        in: context
+      )
+    }
+  }
+
+  public func invokeMethod(
+    _ name: borrowing MockSurfacePropertyStringKey,
+    arguments: [MockSurfaceCallArgument] = [],
+    in context: isolated MockSurfaceContext = #isolation
+  ) -> JSResult<MockSurfaceValue> {
+    let contextHandle = context.driverContextHandle
+    switch bridgeSurfaceHandleResult(
+      contextHandle.getPropertyStringKeyHandle(
+        name.borrowHandle(in: contextHandle),
+        on: handle
+      ),
+      in: context
+    ) {
+    case .exception(let exception):
+      return .exception(exception)
+    case .value(let method):
+      return bridgeSurfaceHandleResult(
+        context.driverContextHandle.callFunctionHandle(
+          method.borrowHandle(),
+          this: handle,
+          argumentHandles: arguments.map(\.handle)
+        ),
+        in: context
+      )
+    }
   }
 }
 
@@ -461,9 +1535,6 @@ private func mintPersistentHandle(
 }
 
 public actor MockSurfaceContext {
-  public typealias ContextHandle = MockContextHandle
-  public typealias ValueHandle = MockValueHandle
-  public typealias OwnedValueHandle = MockOwnedValueHandle
   public typealias VirtualMachine = MockSurfaceVirtualMachine
   public typealias InstantContext = MockSurfaceInstantContext
   public typealias Scope = MockSurfaceScope
@@ -475,8 +1546,8 @@ public actor MockSurfaceContext {
   public typealias Arguments = MockSurfaceArguments
   public typealias ArrayBuffer = MockSurfaceArrayBuffer
   public typealias TypedArray = MockSurfaceTypedArray
-  public typealias ClassHandle = MockClassHandle
   public typealias Class = MockSurfaceClass
+  public typealias CallArgument = MockSurfaceCallArgument
   public typealias PropertyStringKey = MockSurfacePropertyStringKey
   public typealias PreparedScript = MockSurfacePreparedScript
 
@@ -557,6 +1628,9 @@ public actor MockSurfaceContext {
   }
 
   // MARK: - Ledger primitives
+  //
+  // Engine internals: every context-level operation below creates or settles
+  // an engine reference on the context default scope through these two.
 
   public func adoptCreatedHandle(
     _ handle: consuming MockOwnedValueHandle
@@ -568,6 +1642,94 @@ public actor MockSurfaceContext {
   public func anchorBorrowedHandle(_ handle: MockValueHandle) -> MockSurfaceValue {
     MockSurfaceValue(
       handle: defaultScope.claimAndTrackHandle(handle), contextHandle: driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ value: String) -> MockSurfaceValue {
+    guard let handle = driverContextHandle.makeStringValueHandle(value) else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeString(
+    from key: borrowing MockSurfacePropertyStringKey
+  ) -> MockSurfaceValue {
+    guard
+      let handle = driverContextHandle.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: driverContextHandle)
+      )
+    else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeNumber(_ value: Double) -> MockSurfaceValue {
+    guard let handle = driverContextHandle.makeNumberValueHandle(value) else {
+      preconditionFailure("makeNumberValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeBoolean(_ value: Bool) -> MockSurfaceValue {
+    guard let handle = driverContextHandle.makeBooleanValueHandle(value) else {
+      preconditionFailure("makeBooleanValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeNull() -> MockSurfaceValue {
+    guard let handle = driverContextHandle.makeNullValueHandle() else {
+      preconditionFailure("makeNullValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeUndefined() -> MockSurfaceValue {
+    guard let handle = driverContextHandle.makeUndefinedValueHandle() else {
+      preconditionFailure("makeUndefinedValueHandle failed")
+    }
+    return adoptCreatedHandle(handle)
+  }
+
+  public func makeObject() -> MockSurfaceValue {
+    guard let result = driverContextHandle.makeObjectResultHandle() else {
+      preconditionFailure("makeObjectResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(handle)
+    case .exception:
+      preconditionFailure("MockSurfaceContext.makeObject failed")
+    }
+  }
+
+  public func makeArray() -> MockSurfaceValue {
+    guard let result = driverContextHandle.makeArrayResultHandle() else {
+      preconditionFailure("makeArrayResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(handle)
+    case .exception:
+      preconditionFailure("MockSurfaceContext.makeArray failed")
+    }
+  }
+
+  /// The creation reference is adopted by the context default scope, so the
+  /// function outlives any single window.
+  public func makeFunction(
+    named name: String,
+    callback: @escaping JSFunctionCallback<MockSurfaceInstantContext>
+  ) -> MockSurfaceValue {
+    guard
+      let handle = driverContextHandle.makeFunctionValueHandle(named: name, callback: callback)
+    else {
+      preconditionFailure("makeFunctionValueHandle could not create handle")
+    }
+    return adoptCreatedHandle(handle)
   }
 
   // MARK: - Persistent bindings
@@ -616,6 +1778,87 @@ public actor MockSurfaceContext {
       preconditionFailure("MockSurfaceContext.globalObjectValue could not get global object")
     }
     return MockSurfaceValue(handle: handle, contextHandle: driverContextHandle)
+  }
+
+  /// Read a global property. A failed read is reported as `undefined`: the
+  /// engine's exception reference is settled instead of being dropped.
+  public func getGlobalProperty(forKey key: StaticString) -> MockSurfaceValue {
+    guard let global = driverContextHandle.globalObjectValueHandle() else {
+      preconditionFailure("MockSurfaceContext.getGlobalProperty could not get global object")
+    }
+    guard let result = driverContextHandle.getStaticStringPropertyHandle(key, on: global) else {
+      preconditionFailure("MockSurfaceContext.getGlobalProperty returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(MockOwnedValueHandle.adopting(handle))
+    case .exception(let handle):
+      driverContextHandle.releaseCreatedHandle(MockOwnedValueHandle.adopting(handle))
+      guard let undefined = driverContextHandle.makeUndefinedValueHandle() else {
+        preconditionFailure("MockSurfaceContext could not create an undefined handle")
+      }
+      return adoptCreatedHandle(undefined)
+    }
+  }
+
+  public func setGlobalProperty(
+    _ value: borrowing MockSurfaceValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
+    _ = driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: global,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func deleteGlobalProperty(forKey key: StaticString) {
+    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
+    _ = driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+  }
+
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+    guard let global = driverContextHandle.globalObjectValueHandle() else {
+      return false
+    }
+    return driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
+  }
+
+  // MARK: - Scripts
+
+  public func evaluateScript(
+    _ script: borrowing MockSurfacePreparedScript,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<MockSurfaceValue> {
+    guard
+      let result = driverContextHandle.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: driverContextHandle),
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    else {
+      preconditionFailure("MockSurfaceContext.evaluateScript unexpectedly returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    case .exception(let handle):
+      return .exception(adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+    }
+  }
+
+  // MARK: - Context data
+
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
+    driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
+    driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
   }
 
   // MARK: - Identity
@@ -798,7 +2041,6 @@ public struct MockSurfacePreparedScript: SwiftJavaScript.JSPreparedScript, Senda
 
 public struct MockSurfaceArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
   public typealias Context = MockSurfaceContext
-  public typealias ContextHandle = MockContextHandle
   public typealias Value = MockSurfaceValue
   public typealias InstantContext = MockSurfaceInstantContext
 
@@ -806,12 +2048,6 @@ public struct MockSurfaceArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
 
   init(value: consuming MockSurfaceValue) {
     self.value = value
-  }
-
-  public var contextHandle: MockContextHandle { value.contextHandle }
-
-  public borrowing func borrowHandle() -> MockValueHandle {
-    value.borrowHandle()
   }
 
   public borrowing func withValue<R: ~Copyable>(
@@ -872,11 +2108,49 @@ public struct MockSurfaceArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     }
     self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
   }
+
+  // MARK: - Bytes
+
+  public var byteLength: Int {
+    guard
+      let length = value.contextHandle.arrayBufferByteLengthForHandle(
+        value.borrowHandle()
+      )
+    else {
+      preconditionFailure("Failed to read ArrayBuffer byteLength")
+    }
+    return length
+  }
+
+  public var bytes: [UInt8] {
+    withUnsafeBytes { Array($0) }
+  }
+
+  public borrowing func withUnsafeBytes<R: ~Copyable>(
+    _ body: (UnsafeRawBufferPointer) -> R
+  ) -> R {
+    let byteLength = self.byteLength
+    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    guard !access.hadException else {
+      preconditionFailure("Failed to access ArrayBuffer bytes")
+    }
+    return body(UnsafeRawBufferPointer(start: access.bytes, count: byteLength))
+  }
+
+  public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
+    _ body: (UnsafeMutableRawBufferPointer) -> R
+  ) -> R {
+    let byteLength = self.byteLength
+    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    guard !access.hadException else {
+      preconditionFailure("Failed to access mutable ArrayBuffer bytes")
+    }
+    return body(UnsafeMutableRawBufferPointer(start: access.bytes, count: byteLength))
+  }
 }
 
 public struct MockSurfaceTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
   public typealias Context = MockSurfaceContext
-  public typealias ContextHandle = MockContextHandle
   public typealias Value = MockSurfaceValue
   public typealias InstantContext = MockSurfaceInstantContext
   public typealias Buffer = MockSurfaceArrayBuffer
@@ -885,12 +2159,6 @@ public struct MockSurfaceTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   init(value: consuming MockSurfaceValue) {
     self.value = value
-  }
-
-  public var contextHandle: MockContextHandle { value.contextHandle }
-
-  public borrowing func borrowHandle() -> MockValueHandle {
-    value.borrowHandle()
   }
 
   public borrowing func withValue<R: ~Copyable>(
@@ -929,7 +2197,7 @@ public struct MockSurfaceTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
       precondition(length >= 0, "TypedArray length must be non-negative")
     }
 
-    let bufferHandle = buffer.borrowHandle()
+    let bufferHandle = buffer.value.borrowHandle()
     let handle: MockValueHandle?
     if let length {
       handle = context.driverContextHandle.makeTypedArrayHandle(
@@ -971,7 +2239,48 @@ public struct MockSurfaceTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
   }
 
+  // MARK: - Shape
+
+  public var kind: JSTypedArrayKind {
+    guard
+      let kind = value.contextHandle.typedArrayKindForHandle(value.borrowHandle())
+    else {
+      preconditionFailure("Wrapped value is not a TypedArray")
+    }
+    return kind
+  }
+
+  public var length: Int {
+    guard
+      let length = value.contextHandle.typedArrayLengthForHandle(value.borrowHandle())
+    else {
+      preconditionFailure("Failed to read TypedArray length")
+    }
+    return length
+  }
+
+  public var byteLength: Int {
+    guard
+      let byteLength = value.contextHandle.typedArrayByteLengthForHandle(
+        value.borrowHandle())
+    else {
+      preconditionFailure("Failed to read TypedArray byteLength")
+    }
+    return byteLength
+  }
+
+  public var byteOffset: Int {
+    guard
+      let byteOffset = value.contextHandle.typedArrayByteOffsetForHandle(
+        value.borrowHandle())
+    else {
+      preconditionFailure("Failed to read TypedArray byteOffset")
+    }
+    return byteOffset
+  }
+
   public var buffer: MockSurfaceArrayBuffer {
+    let contextHandle = value.contextHandle
     guard
       let bufferHandle = contextHandle.typedArrayBufferForHandle(value.borrowHandle()),
       let target = ScopeStackRegistry<MockContextHandle>.defaultFrame(for: contextHandle)
@@ -982,22 +2291,71 @@ public struct MockSurfaceTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     return MockSurfaceArrayBuffer(
       value: MockSurfaceValue(handle: bufferHandle, contextHandle: contextHandle))
   }
+
+  // MARK: - Bytes
+
+  public var bytes: [UInt8] {
+    withUnsafeBytes { Array($0) }
+  }
+
+  public borrowing func withUnsafeBytes<R: ~Copyable>(
+    _ body: (UnsafeRawBufferPointer) -> R
+  ) -> R {
+    let byteLength = self.byteLength
+    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    guard !access.hadException else {
+      preconditionFailure("Failed to access TypedArray bytes")
+    }
+    let start = access.bytes?.advanced(by: byteOffset)
+    return body(UnsafeRawBufferPointer(start: start, count: byteLength))
+  }
+
+  public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
+    _ body: (UnsafeMutableRawBufferPointer) -> R
+  ) -> R {
+    let byteLength = self.byteLength
+    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    guard !access.hadException else {
+      preconditionFailure("Failed to access mutable TypedArray bytes")
+    }
+    let start = access.bytes?.advanced(by: byteOffset)
+    return body(UnsafeMutableRawBufferPointer(start: start, count: byteLength))
+  }
+}
+
+extension MockSurfaceInstantContext: JSArrayBufferHostScope {
+  package func adoptArrayBufferBytesNoCopy(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator:
+      @convention(c) (
+        UnsafeMutableRawPointer?, UnsafeMutableRawPointer?
+      ) -> Void,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> MockSurfaceValue? {
+    guard
+      let handle = driverContextHandle.makeArrayBufferWithBytesNoCopyHandle(
+        bytes: bytes,
+        byteLength: byteLength,
+        bytesDeallocator: bytesDeallocator,
+        deallocatorContext: deallocatorContext
+      )
+    else {
+      return nil
+    }
+    return adoptCreatedHandle(MockOwnedValueHandle.adopting(handle))
+  }
 }
 
 /// The mock context's class. `MockClass` is the raw value model, so the
 /// class gets its own name and wraps the existing class handle.
 public final class MockSurfaceClass: SwiftJavaScript.JSClass, @unchecked Sendable {
   public typealias Context = MockSurfaceContext
-  public typealias ClassHandle = MockClassHandle
 
   let rawHandle: MockClassHandle
 
   init(classHandle: MockClassHandle) {
     self.rawHandle = classHandle
-  }
-
-  public func classHandle() -> MockClassHandle {
-    rawHandle
   }
 }
 
@@ -1032,30 +2390,33 @@ extension MockEngine: JSEngineRuntimeDriver, JSEngineClassBridgeDriver {
     definition: JSEngineClassDefinition<
       MockEngine, JSClassParentDescriptor<MockEngine, Never>, Never
     >,
-    in runtime: MockRuntimeHandle
+    identity: ObjectIdentifier,
+    in context: borrowing MockSurfaceInstantContext
   ) -> MockSurfaceClass {
-    _ = runtime
+    _ = identity
+    _ = context
     return MockSurfaceClass(
       classHandle: MockClassHandle(rawClass: MockClass(id: definition.className ?? "")))
   }
 
-  public static func runtimeHandle(for context: MockContextHandle) -> MockRuntimeHandle? {
-    MockRuntimeHandle(rawRuntime: MockRuntime(id: context.rawContext.runtimeID))
-  }
-
-  public static func makeClassObjectResultHandle(
+  public static func makeHostObject(
     of jsClass: MockSurfaceClass,
     privateData: UnsafeMutableRawPointer,
-    in context: MockContextHandle
-  ) -> JSResult<MockValueHandle>? {
-    nil
+    in context: borrowing MockSurfaceInstantContext
+  ) -> MockSurfaceValue? {
+    _ = jsClass
+    _ = privateData
+    _ = context
+    return nil
   }
 
-  public static func classObjectPrivateData(
-    from value: MockValueHandle,
-    in context: MockContextHandle
-  ) -> JSResult<UnsafeMutableRawPointer?>? {
-    nil
+  public static func hostObjectPrivateData(
+    of value: borrowing MockSurfaceValue,
+    in context: borrowing MockSurfaceInstantContext
+  ) -> UnsafeMutableRawPointer? {
+    _ = value
+    _ = context
+    return nil
   }
 }
 
@@ -1066,9 +2427,6 @@ extension MockEngine: JSEngineRuntimeDriver, JSEngineClassBridgeDriver {
 /// `SurfaceConformanceTests` in the cross-engine target for the same shape).
 private func checkContextAssociations<C: SwiftJavaScript.JSContext>(
   _: C.Type,
-  contextHandle: C.ContextHandle.Type,
-  valueHandle: C.ValueHandle.Type,
-  ownedValueHandle: C.OwnedValueHandle.Type,
   value: C.Value.Type,
   callbackValue: C.CallbackValue.Type,
   callbackReturn: C.CallbackReturn.Type,
@@ -1082,16 +2440,13 @@ private func checkContextAssociations<C: SwiftJavaScript.JSContext>(
   preparedScript: C.PreparedScript.Type,
   arrayBuffer: C.ArrayBuffer.Type,
   typedArray: C.TypedArray.Type,
-  classHandle: C.ClassHandle.Type,
+  callArgument: C.CallArgument.Type,
   jsClass: C.Class.Type
 ) {}
 
 @Test func mockSurfaceSatisfiesContextEquations() {
   checkContextAssociations(
     MockSurfaceContext.self,
-    contextHandle: MockContextHandle.self,
-    valueHandle: MockValueHandle.self,
-    ownedValueHandle: MockOwnedValueHandle.self,
     value: MockSurfaceValue.self,
     callbackValue: MockSurfaceCallbackValue.self,
     callbackReturn: MockSurfaceCallbackReturn.self,
@@ -1105,7 +2460,43 @@ private func checkContextAssociations<C: SwiftJavaScript.JSContext>(
     preparedScript: MockSurfacePreparedScript.self,
     arrayBuffer: MockSurfaceArrayBuffer.self,
     typedArray: MockSurfaceTypedArray.self,
-    classHandle: MockClassHandle.self,
+    callArgument: MockSurfaceCallArgument.self,
     jsClass: MockSurfaceClass.self
   )
+}
+
+// MARK: - Engine-local result bridging
+//
+// The core bridge was deleted with the value-level Codable rewrite; the mock
+// keeps the same shape on its own arena, so every operation result is adopted
+// exactly once (value and exception alike).
+
+private func bridgeSurfaceHandleResult(
+  _ result: JSResult<MockValueHandle>?,
+  in context: borrowing MockSurfaceInstantContext
+) -> JSResult<MockSurfaceValue> {
+  guard let result else {
+    preconditionFailure("JSValue operation unexpectedly returned nil")
+  }
+  switch consume result {
+  case .value(let handle):
+    return .value(context.adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+  case .exception(let handle):
+    return .exception(context.adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+  }
+}
+
+private func bridgeSurfaceHandleResult(
+  _ result: JSResult<MockValueHandle>?,
+  in context: isolated MockSurfaceContext
+) -> JSResult<MockSurfaceValue> {
+  guard let result else {
+    preconditionFailure("JSValue operation unexpectedly returned nil")
+  }
+  switch consume result {
+  case .value(let handle):
+    return .value(context.adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+  case .exception(let handle):
+    return .exception(context.adoptCreatedHandle(MockOwnedValueHandle.adopting(handle)))
+  }
 }

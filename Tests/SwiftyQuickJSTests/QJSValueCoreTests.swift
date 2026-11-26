@@ -319,4 +319,61 @@ struct QJSValueCoreTests {
     _ = context.releaseReference()
     _ = runtime.releaseReference()
   }
+
+  /// Slice 2: indexed access is a value-level requirement implemented by the
+  /// engine value against `getIndexPropertyHandle`/`setIndexPropertyHandle`.
+  @Test
+  func readsAndWritesIndexedProperties() {
+    let (runtime, context) = makeContext()
+    do {
+      let scope = QJSInstantContext(handle: context)
+      let object = makeObject(in: context, on: scope)
+
+      let missing = object.getProperty(at: 0, in: scope)
+      switch consume missing {
+      case .value(let value):
+        let isUndefined = value.isUndefined()
+        #expect(isUndefined)
+      case .exception:
+        Issue.record("index read of a fresh object returned an exception")
+      }
+
+      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(9)!)
+      let didSet = object.setProperty(at: 1, to: number, in: scope)
+      let read = object.getProperty(at: 1, in: scope)
+      let hasIndex = object.hasProperty("1", in: scope)
+      #expect(didSet)
+      #expect(hasIndex)
+      switch consume read {
+      case .value(let value):
+        let numberValue = value.toNumber()
+        #expect(numberValue == 9)
+      case .exception:
+        Issue.record("index read returned an exception")
+      }
+
+      #expect(scope.driverContextHandle == context)
+    }
+    _ = context.releaseReference()
+    _ = runtime.releaseReference()
+  }
+
+  /// Slice 2: `localValue` hands back the view of an arena-backed callback
+  /// value without claiming or tracking anything.
+  @Test
+  func exposesLocalValueViewsWithoutClaiming() {
+    let (runtime, context) = makeContext()
+    do {
+      let scope = QJSInstantContext(handle: context)
+      let callback = scope.makeString("local")
+      let local = scope.localValue(callback)
+      let localText = local.toString()
+      let matchesCallbackText = localText == callback.toString()
+      #expect(localText == "local")
+      #expect(matchesCallbackText)
+      #expect(scope.driverContextHandle == context)
+    }
+    _ = context.releaseReference()
+    _ = runtime.releaseReference()
+  }
 }

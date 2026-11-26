@@ -7,9 +7,15 @@ import SwiftyQuickJS
 //
 // Everything below uses the public library surface only: the context `C`,
 // `withInstantContext`, `makeScope`, `makePersistentHandle`, `resolve`,
-// `invalidate`, and the driver's `toNumberForHandle`. The harness deliberately
-// does not reach into the registry, so the measured numbers are the ones a
-// host actually pays.
+// `invalidate`, and the value's `toNumber()`. The harness deliberately does
+// not reach into the registry, so the measured numbers are the ones a host
+// actually pays.
+//
+// The dehandle migration retired the "witness conversion vs actor conversion"
+// comparison: both phases now read a value through `toNumber()`, and the raw
+// driver round-trip is no longer part of any public protocol. What remains is
+// the resolve/mint/invalidate ledger comparison between the scope witness path
+// and the context actor path.
 //
 // Structural choices that matter for reading the numbers:
 // - One VM per engine run; a fresh context per sample. A context's
@@ -84,7 +90,6 @@ private struct MintBatch<C: JSContext>: Sendable {
 private struct ResolveHitTimings: Sendable {
   let witnessDirect: UInt64
   let witnessHit: UInt64
-  let actorDirect: UInt64
   let actorHit: UInt64
   let checksum: Double
 }
@@ -318,7 +323,6 @@ private enum EngineBenchmarks {
 
     var witnessDirect: [Double] = []
     var witnessHit: [Double] = []
-    var actorDirect: [Double] = []
     var actorHit: [Double] = []
     var witnessMiss: [Double] = []
     var actorMiss: [Double] = []
@@ -328,7 +332,6 @@ private enum EngineBenchmarks {
       guard sampleIndex >= warmup else { continue }
       witnessDirect.append(Double(result.hit.witnessDirect) / Double(ops))
       witnessHit.append(Double(result.hit.witnessHit) / Double(ops))
-      actorDirect.append(Double(result.hit.actorDirect) / Double(ops))
       actorHit.append(Double(result.hit.actorHit) / Double(ops))
       witnessMiss.append(Double(result.miss.witnessMiss) / Double(ops))
       actorMiss.append(Double(result.miss.actorMiss) / Double(ops))
@@ -365,11 +368,6 @@ private enum EngineBenchmarks {
       unit: "ns/op", opsPerSample: ops,
       stats: stats(actorHit, "actor-hit"),
       note: "property access + lookup + claim + default-scope root + toNumber")
-    reporter.add(
-      engine: name, group: "resolve", metric: "direct read (actor phase)",
-      unit: "ns/op", opsPerSample: ops,
-      stats: stats(actorDirect, "direct-actor"),
-      note: "drift check; same loop as the witness direct baseline")
     reporter.add(
       engine: name, group: "registry lookup",
       metric: "resolve miss (witness)",
@@ -415,8 +413,7 @@ private enum EngineBenchmarks {
 
     let witnessDirectStart = monotonicNanos()
     for _ in 0..<ops {
-      checksum += scope.driverContextHandle.toNumberForHandle(
-        direct.borrowHandle())
+      checksum += direct.toNumber()
     }
     let witnessDirect = monotonicNanos() - witnessDirectStart
 
@@ -424,26 +421,17 @@ private enum EngineBenchmarks {
     for _ in 0..<reps {
       for handle in handles {
         if let value = scope.resolve(handle) {
-          checksum += scope.driverContextHandle.toNumberForHandle(
-            value.borrowHandle())
+          checksum += value.toNumber()
         }
       }
     }
     let witnessHit = monotonicNanos() - witnessHitStart
 
-    let actorDirectStart = monotonicNanos()
-    for _ in 0..<ops {
-      checksum += scope.driverContextHandle.toNumberForHandle(
-        direct.borrowHandle())
-    }
-    let actorDirect = monotonicNanos() - actorDirectStart
-
     let actorHitStart = monotonicNanos()
     for _ in 0..<reps {
       for handle in handles {
         if let value = context.resolve(handle) {
-          checksum += scope.driverContextHandle.toNumberForHandle(
-            value.borrowHandle())
+          checksum += value.toNumber()
         }
       }
     }
@@ -452,7 +440,6 @@ private enum EngineBenchmarks {
     return ResolveHitTimings(
       witnessDirect: witnessDirect,
       witnessHit: witnessHit,
-      actorDirect: actorDirect,
       actorHit: actorHit,
       checksum: checksum)
   }

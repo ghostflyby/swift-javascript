@@ -204,7 +204,7 @@ private func callStaticFunction<D: JSStaticFunctionDefinition>(
   let handle = MockClassHandle(rawClass: MockClass(id: "Widget"))
   let jsClass = MockSurfaceClass(classHandle: handle)
 
-  #expect(jsClass.classHandle() == handle)
+  #expect(jsClass.rawHandle == handle)
   #expect(jsClass == MockSurfaceClass(classHandle: handle))
 }
 

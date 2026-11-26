@@ -101,22 +101,16 @@ private func assertSurfaceScopeDefaults<S: JSInstantContext & ~Copyable>(
   #expect(decodedPayload == payload)
 }
 
-@Test func javaScriptCoreSurfaceScopeProtocolDefaults() {
-  let runtime = JSCEngine.makeRuntimeHandle()
-  guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
-    return
+@Test func javaScriptCoreSurfaceScopeProtocolDefaults() async {
+  let context = JSCContext()
+  await context.withInstantContext { scope in
+    assertSurfaceScopeDefaults(scope)
   }
-  let scope = JSCInstantContext(handle: context)
-  assertSurfaceScopeDefaults(scope)
 }
 
-@Test func quickJSSurfaceScopeProtocolDefaults() {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("QJSEngine could not create a context handle")
-    return
+@Test func quickJSSurfaceScopeProtocolDefaults() async {
+  let context = QJSContext()
+  await context.withInstantContext { scope in
+    assertSurfaceScopeDefaults(scope)
   }
-  let scope = QJSInstantContext(handle: context)
-  assertSurfaceScopeDefaults(scope)
 }

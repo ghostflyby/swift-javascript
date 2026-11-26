@@ -3,10 +3,12 @@ import Foundation
 // MARK: - `JSCodableValueConverter` over the surface scopes
 //
 // This extension walks the engine's local value view through any
-// `JSInstantContext` window: every property read is adopted by the window's
-// arena (one track per result), every created value is promoted with
-// `persist`, and object/array assembly uses the driver's string-key and index
-// writers. `JSCodableNode` is the shared intermediate tree.
+// `JSInstantContext` window using only value-level requirements: `isArray`,
+// `propertyNames`, the string-key/index readers and writers, `persist` and
+// `withInstantWindow`. Every property read is adopted by the window's arena
+// (one track per result), every created value is promoted with `persist`, and
+// object/array assembly runs inside the window opened by `withInstantWindow`.
+// `JSCodableNode` is the shared intermediate tree.
 
 extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
   public static func decode<C: JSInstantContext & ~Copyable>(
@@ -24,7 +26,10 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     _ value: borrowing C.Value,
     in context: borrowing C
   ) throws(JSValueConversionError) -> T {
-    let node = try nodeFromSurfaceValue(value, in: context)
+    let node = try context.withInstantWindow {
+      window throws(JSValueConversionError) in
+      try nodeFromSurfaceValue(C.self, value, in: window)
+    }
 
     let data: Data
     do {
@@ -76,15 +81,20 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
 
     let node = try JSCodableNode.fromJSONObject(jsonObject)
-    return try jsValueFromSurfaceNode(node, in: context)
+    return try context.withInstantWindow {
+      window throws(JSValueConversionError) in
+      try jsValueFromSurfaceNode(node, in: context, window: window)
+    }
   }
 
   // MARK: - Value to node
 
-  private static func nodeFromSurfaceValue<C: JSValueScope & ~Copyable>(
+  private static func nodeFromSurfaceValue<C: JSInstantContext & ~Copyable>(
+    _ contextType: C.Type,
     _ value: borrowing C.Value,
-    in context: borrowing C
+    in window: borrowing C.Context.InstantContext
   ) throws(JSValueConversionError) -> JSCodableNode {
+    _ = contextType
     if value.isUndefined() || value.isNull() {
       return .null
     }
@@ -102,14 +112,12 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
 
     if value.isObject() {
-      let valueHandle = value.borrowHandle()
-      let driver = context.driverContextHandle
-
-      if driver.isArrayHandle(valueHandle) == true {
+      if value.isArray(in: window) {
         let lengthValue = try readSurfaceStringProperty(
+          C.self,
           "length",
-          on: valueHandle,
-          in: context
+          on: value,
+          in: window
         )
         if lengthValue.isUndefined() {
           throw .codable("array length missing")
@@ -126,23 +134,29 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
 
         for index in 0..<count {
           let element = try readSurfaceIndexProperty(
-            UInt32(index),
-            on: valueHandle,
-            in: context
+            C.self,
+            index,
+            on: value,
+            in: window
           )
-          nodes.append(try nodeFromSurfaceValue(element, in: context))
+          nodes.append(try nodeFromSurfaceValue(C.self, element, in: window))
         }
 
         return .array(nodes)
       }
 
-      let names = driver.propertyNamesForHandle(on: valueHandle) ?? []
+      let names = value.propertyNames(in: window)
       var object: [String: JSCodableNode] = [:]
       object.reserveCapacity(names.count)
 
       for key in names {
-        let property = try readSurfaceStringProperty(key, on: valueHandle, in: context)
-        object[key] = try nodeFromSurfaceValue(property, in: context)
+        let property = try readSurfaceStringProperty(
+          C.self,
+          key,
+          on: value,
+          in: window
+        )
+        object[key] = try nodeFromSurfaceValue(C.self, property, in: window)
       }
 
       return .object(object)
@@ -158,7 +172,8 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
 
   private static func jsValueFromSurfaceNode<C: JSValueScope & ~Copyable>(
     _ node: JSCodableNode,
-    in context: borrowing C
+    in context: borrowing C,
+    window: borrowing C.Context.InstantContext
   ) throws(JSValueConversionError) -> C.Value {
     switch node {
     case .null:
@@ -179,14 +194,12 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
       }
       let arrayValue = context.persist(arrayCallback)
       for (index, item) in array.enumerated() {
-        let encoded = try jsValueFromSurfaceNode(item, in: context)
-        guard
-          context.driverContextHandle.setIndexPropertyHandle(
-            at: UInt32(index),
-            on: arrayValue.borrowHandle(),
-            to: encoded.borrowHandle()
-          )
-        else {
+        let encoded = try jsValueFromSurfaceNode(
+          item,
+          in: context,
+          window: window
+        )
+        guard arrayValue.setProperty(at: index, to: encoded, in: window) else {
           throw .codable("array element write failed at index \(index)")
         }
       }
@@ -198,14 +211,18 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
       }
       let objectValue = context.persist(objectCallback)
       for (key, value) in object {
-        let encoded = try jsValueFromSurfaceNode(value, in: context)
-        let propertyStringKey = context.makePropertyStringKey(key)
+        let encoded = try jsValueFromSurfaceNode(
+          value,
+          in: context,
+          window: window
+        )
+        let propertyStringKey = window.makePropertyStringKey(key)
         guard
-          context.driverContextHandle.setPropertyStringKeyHandle(
-            propertyStringKey.borrowHandle(in: context.driverContextHandle),
-            on: objectValue.borrowHandle(),
-            to: encoded.borrowHandle(),
-            attributes: .none
+          objectValue.setProperty(
+            propertyStringKey,
+            to: encoded,
+            attributes: .none,
+            in: window
           )
         else {
           throw .codable("object property write failed for key \(key)")
@@ -217,23 +234,15 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
 
   // MARK: - Property reads
 
-  private static func readSurfaceStringProperty<C: JSValueScope & ~Copyable>(
+  private static func readSurfaceStringProperty<C: JSInstantContext & ~Copyable>(
+    _ contextType: C.Type,
     _ key: String,
-    on object: C.ContextHandle.ValueHandle,
-    in context: borrowing C
+    on object: borrowing C.Value,
+    in window: borrowing C.Context.InstantContext
   ) throws(JSValueConversionError) -> C.Value {
-    guard
-      let keyHandle = context.driverContextHandle.makePropertyStringKeyHandle(key)
-    else {
-      throw .codable("property key creation failed for key \(key)")
-    }
-    defer { _ = keyHandle.releaseReference() }
-
-    let result: JSResult<C.Value> = bridgeSurfaceHandleResult(
-      context.driverContextHandle.getPropertyStringKeyHandle(keyHandle, on: object),
-      in: context
-    )
-
+    _ = contextType
+    let propertyKey = window.makePropertyStringKey(key)
+    let result = object.getProperty(propertyKey, in: window)
     switch consume result {
     case .value(let value):
       return value
@@ -242,16 +251,14 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
   }
 
-  private static func readSurfaceIndexProperty<C: JSValueScope & ~Copyable>(
-    _ index: UInt32,
-    on object: C.ContextHandle.ValueHandle,
-    in context: borrowing C
+  private static func readSurfaceIndexProperty<C: JSInstantContext & ~Copyable>(
+    _ contextType: C.Type,
+    _ index: Int,
+    on object: borrowing C.Value,
+    in window: borrowing C.Context.InstantContext
   ) throws(JSValueConversionError) -> C.Value {
-    let result: JSResult<C.Value> = bridgeSurfaceHandleResult(
-      context.driverContextHandle.getIndexPropertyHandle(at: index, on: object),
-      in: context
-    )
-
+    _ = contextType
+    let result = object.getProperty(at: index, in: window)
     switch consume result {
     case .value(let value):
       return value

@@ -1,4 +1,4 @@
-public protocol JSManualReferenceCountedHandle: Sendable {
+package protocol JSManualReferenceCountedHandle: Sendable {
   @discardableResult
   func retainReference() -> Bool
 
@@ -6,9 +6,9 @@ public protocol JSManualReferenceCountedHandle: Sendable {
   func releaseReference() -> Bool
 }
 
-public protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+package protocol JSRuntimeManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle, Hashable {}
+package protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedHandle, Hashable {}
 
 /// Copyable borrow token for an engine value handle.
 ///
@@ -16,7 +16,7 @@ public protocol JSContextManualReferenceCountedHandle: JSManualReferenceCountedH
 /// engine reference (when the engine is reference-counted) is owned
 /// elsewhere — by a scope arena, by the context default scope, or by the
 /// engine itself.
-public protocol JSValueManualReferenceCountedHandle: Hashable {
+package protocol JSValueManualReferenceCountedHandle: Hashable {
 
   associatedtype Context: JSContextManualReferenceCountedHandle
 
@@ -39,7 +39,7 @@ public protocol JSValueManualReferenceCountedHandle: Hashable {
 /// changing the reference count. `Equatable` (SE-0499) supports arena
 /// identity checks; `Hashable` is deliberately not required because
 /// noncopyable values cannot be collection elements.
-public protocol JSOwnedValueManualReferenceCountedHandle: Equatable, ~Copyable {
+package protocol JSOwnedValueManualReferenceCountedHandle: Equatable, ~Copyable {
 
   associatedtype Context: JSContextManualReferenceCountedHandle
 
@@ -57,8 +57,8 @@ public protocol JSOwnedValueManualReferenceCountedHandle: Equatable, ~Copyable {
   static func adopting(_ handle: borrowing Borrowed) -> Self
 }
 
-public protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+package protocol JSClassManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSPropertyStringKeyManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+package protocol JSPropertyStringKeyManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
 
-public protocol JSPreparedScriptManualReferenceCountedHandle: JSManualReferenceCountedHandle {}
+package protocol JSPreparedScriptManualReferenceCountedHandle: JSManualReferenceCountedHandle {}

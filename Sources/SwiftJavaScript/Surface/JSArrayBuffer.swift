@@ -3,26 +3,18 @@
 /// The concrete type is the engine's buffer (`JSCArrayBuffer`,
 /// `QJSArrayBuffer`); core keeps the shared byte allocation/copy helpers
 /// (`JSArrayBufferBytes.swift`) and the byte arithmetic below. Value-producing
-/// operations return the engine's `Value` view.
+/// operations return the engine's `Value` view. The engine implements the byte
+/// access directly: only its own value type can turn the buffer into the
+/// engine's byte pointer.
 public protocol JSArrayBuffer: ~Copyable {
   /// The context this buffer belongs to.
   associatedtype Context: JSContext
-  /// The context identity every operation of this buffer is addressed
-  /// through. Byte access needs the typed-array driver on top of the scope
-  /// capabilities.
-  associatedtype ContextHandle: JSScopeContextHandle & JSContextTypedArrayDriver
-  where ContextHandle == Context.ContextHandle
   /// The value view `withValue` borrows.
   associatedtype Value: JSValue & ~Copyable
   where Value == Context.Value
   /// The scope buffers of this engine are created in.
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext
-
-  var contextHandle: ContextHandle { get }
-
-  /// The engine value handle behind this buffer.
-  borrowing func borrowHandle() -> ContextHandle.ValueHandle
 
   /// Borrow the underlying value view. The buffer's arena keeps the reference
   /// alive, so `body` must not let the view outlive the call.
@@ -59,46 +51,13 @@ public protocol JSArrayBuffer: ~Copyable {
   ) -> R
 }
 
-// MARK: - Shared byte access
+// MARK: - Shared byte arithmetic
 //
-// Both engines address the same C-shaped driver, so the read/write surface is
-// engine-independent. The engine only implements the construction inits and
-// the identity accessors above.
+// Byte access itself lives on the engine buffer (only the engine can reach its
+// own byte pointer); core keeps the engine-independent arithmetic the engines
+// share.
 
 extension JSArrayBuffer where Self: ~Copyable {
-  public var byteLength: Int {
-    guard let length = contextHandle.arrayBufferByteLengthForHandle(borrowHandle()) else {
-      preconditionFailure("Failed to read ArrayBuffer byteLength")
-    }
-    return length
-  }
-
-  public var bytes: [UInt8] {
-    withUnsafeBytes { Array($0) }
-  }
-
-  public borrowing func withUnsafeBytes<R: ~Copyable>(
-    _ body: (UnsafeRawBufferPointer) -> R
-  ) -> R {
-    let byteLength = self.byteLength
-    let access = contextHandle.arrayBufferBytesPtrForHandle(borrowHandle())
-    guard !access.hadException else {
-      preconditionFailure("Failed to access ArrayBuffer bytes")
-    }
-    return body(UnsafeRawBufferPointer(start: access.bytes, count: byteLength))
-  }
-
-  public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
-    _ body: (UnsafeMutableRawBufferPointer) -> R
-  ) -> R {
-    let byteLength = self.byteLength
-    let access = contextHandle.arrayBufferBytesPtrForHandle(borrowHandle())
-    guard !access.hadException else {
-      preconditionFailure("Failed to access mutable ArrayBuffer bytes")
-    }
-    return body(UnsafeMutableRawBufferPointer(start: access.bytes, count: byteLength))
-  }
-
   /// The number of `kind` elements that fit from `byteOffset` to the end of
   /// this buffer. Shared so both engines derive the same open-ended
   /// typed-array slice.

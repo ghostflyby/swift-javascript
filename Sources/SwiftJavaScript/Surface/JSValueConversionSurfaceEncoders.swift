@@ -88,6 +88,71 @@ public enum JSDefaultConverter<T: JSValueDecodable & JSValueEncodable>:
   }
 }
 
+// MARK: - Global object composition
+//
+// Value-level conveniences shared by both scope kinds: they only forward to
+// the scope's own global-object and global-property requirements.
+
+extension JSInstantContext where Self: ~Copyable {
+  public func withGlobalObject<R: ~Copyable>(
+    _ body: (borrowing Value) -> R
+  ) -> R {
+    body(globalObjectValue())
+  }
+
+  /// Encode a Swift value through the surface witnesses and write it as a
+  /// global property.
+  public func setGlobalProperty<Value_: JSValueEncodable & ~Copyable>(
+    _ value: borrowing Value_,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes = .none
+  ) {
+    let encoded = value.toSurfaceValue(in: self)
+    setGlobalProperty(encoded, forKey: key, with: attributes)
+  }
+
+  public func setGlobalProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: StaticString,
+    using converter: C.Type,
+    with attributes: JSHostMemberAttributes = .none
+  ) {
+    _ = converter
+    let encoded = C.encode(value, in: self)
+    setGlobalProperty(encoded, forKey: key, with: attributes)
+  }
+}
+
+extension JSScope where Self: ~Copyable {
+  public func withGlobalObject<R: ~Copyable>(
+    _ body: (borrowing Value) -> R
+  ) -> R {
+    body(globalObjectValue())
+  }
+
+  /// Encode a Swift value through the surface witnesses and write it as a
+  /// global property.
+  public func setGlobalProperty<Value_: JSValueEncodable & ~Copyable>(
+    _ value: borrowing Value_,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes = .none
+  ) {
+    let encoded = value.toSurfaceValue(in: self)
+    setGlobalProperty(encoded, forKey: key, with: attributes)
+  }
+
+  public func setGlobalProperty<C: JSValueEncoder>(
+    _ value: C.SwiftType,
+    forKey key: StaticString,
+    using converter: C.Type,
+    with attributes: JSHostMemberAttributes = .none
+  ) {
+    _ = converter
+    let encoded = C.encode(value, in: self)
+    setGlobalProperty(encoded, forKey: key, with: attributes)
+  }
+}
+
 // MARK: - Built-in witnesses
 
 extension Bool: JSValueEncodable {

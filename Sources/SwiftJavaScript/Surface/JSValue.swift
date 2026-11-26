@@ -2,34 +2,21 @@
 ///
 /// The concrete type is the engine's own value wrapper (`JSCValue`,
 /// `QJSValue`); core keeps only the identity contract shared code needs: the
-/// context it belongs to, the context identity the view is addressed through,
-/// and the borrowed value-handle token.
+/// context it belongs to and the synchronous scope it is addressed in.
 ///
 /// A `JSValue` owns nothing. The engine reference is owned by the scope arena
 /// the value was created in or promoted to, so copying a view is a pure
 /// identity copy and dropping it performs no release.
 ///
 /// The protocol names only what a value needs — the context it belongs to and
-/// its two handle tokens and scope, each an alias of the context's. A value's
-/// operations return the context's value type.
+/// its scope, each an alias of the context's. A value's operations return the
+/// context's value type.
 public protocol JSValue: ~Copyable {
   /// The context this value belongs to.
   associatedtype Context: JSContext
-  /// The context identity this view is addressed through. Its driver also
-  /// classifies, converts and compares values.
-  associatedtype ContextHandle: JSContextRuntimeDriver & JSContextInvocationDriver
-  where ContextHandle == Context.ContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == Context.ValueHandle
   /// The synchronous scope this value is addressed in.
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext
-
-  /// The borrowed engine handle token backing this view.
-  borrowing func borrowHandle() -> ValueHandle
-
-  /// The context identity this view is addressed through.
-  var contextHandle: ContextHandle { get }
 
   /// The engine's classification of this value (`JSValueGetType`/`JS_TypeOfValue`).
   func type() -> JSType
@@ -58,6 +45,13 @@ public protocol JSValue: ~Copyable {
   /// `===` in JavaScript (engine `IsStrictEqual`).
   func strictlyEquals(_ other: borrowing Self) -> Bool
 
+  /// Pack this value into a single call-argument token.
+  ///
+  /// The token borrows this value's engine handle; it is valid only while this
+  /// value's arena is alive and only for the immediate synchronous call it is
+  /// passed to.
+  func asCallArgument() -> Context.CallArgument
+
   // MARK: - Property access (S5)
 
   func getProperty(
@@ -67,6 +61,12 @@ public protocol JSValue: ~Copyable {
 
   func getProperty(
     _ key: borrowing InstantContext.PropertyStringKey,
+    in context: borrowing InstantContext
+  ) -> JSResult<Context.Value>
+
+  /// Read the element at `index` (engine `getIndexPropertyHandle`).
+  func getProperty(
+    at index: Int,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
@@ -81,6 +81,13 @@ public protocol JSValue: ~Copyable {
     _ key: borrowing InstantContext.PropertyStringKey,
     to value: borrowing Self,
     attributes: JSHostMemberAttributes,
+    in context: borrowing InstantContext
+  ) -> Bool
+
+  /// Write the element at `index` (engine `setIndexPropertyHandle`).
+  func setProperty(
+    at index: Int,
+    to value: borrowing Self,
     in context: borrowing InstantContext
   ) -> Bool
 
@@ -110,33 +117,34 @@ public protocol JSValue: ~Copyable {
 
   // MARK: - Invocation (S5)
 
-  /// Call the value as a function. Arguments are passed as borrowed handles;
-  /// the caller keeps their arenas alive across the synchronous call.
+  /// Call the value as a function. Arguments are value-level tokens
+  /// (`asCallArgument()`); the caller keeps their source arenas alive across
+  /// the synchronous call.
   func call(
-    arguments: [ValueHandle],
+    arguments: [Context.CallArgument],
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
   func call(
     this thisValue: borrowing Self,
-    arguments: [ValueHandle],
+    arguments: [Context.CallArgument],
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
   func construct(
-    arguments: [ValueHandle],
+    arguments: [Context.CallArgument],
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
   func invokeMethod(
     _ name: StaticString,
-    arguments: [ValueHandle],
+    arguments: [Context.CallArgument],
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
   func invokeMethod(
     _ name: borrowing InstantContext.PropertyStringKey,
-    arguments: [ValueHandle],
+    arguments: [Context.CallArgument],
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
@@ -154,24 +162,44 @@ public protocol JSValue: ~Copyable {
   func isArrayBuffer(in context: borrowing InstantContext) -> Bool
 
   func isTypedArray(in context: borrowing InstantContext) -> Bool
+
+  // MARK: - Callback-window arguments
+  //
+  // A callback window's value view is only an identity, so the operations that
+  // consume an argument value accept it directly and borrow its handle. These
+  // are requirements rather than defaults: the default would need a
+  // `CallbackValue -> Self` conversion that the core protocol cannot state.
+
+  func setProperty(
+    _ key: StaticString,
+    to value: borrowing InstantContext.CallbackValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing InstantContext
+  ) -> Bool
+
+  func setProperty(
+    _ key: borrowing InstantContext.PropertyStringKey,
+    to value: borrowing InstantContext.CallbackValue,
+    attributes: JSHostMemberAttributes,
+    in context: borrowing InstantContext
+  ) -> Bool
+
+  func call(
+    this thisValue: borrowing InstantContext.CallbackValue,
+    arguments: [Context.CallArgument],
+    in context: borrowing InstantContext
+  ) -> JSResult<Context.Value>
+
+  func isInstanceOf(
+    _ constructor: borrowing InstantContext.CallbackValue,
+    in context: borrowing InstantContext
+  ) -> Bool
 }
 
-// Every base operation except `type()` has a default that routes through the
-// view's context driver. The predicates are expressed in terms of `type()`, so
-// an engine that classifies values correctly gets all eight for free.
+// The predicates are expressed in terms of `type()`, so an engine that
+// classifies values correctly gets all eight for free. Every other operation
+// is implemented by the engine's value type against its own context driver.
 extension JSValue where Self: ~Copyable {
-  public func toString() -> String {
-    contextHandle.toStringForHandle(borrowHandle()) ?? ""
-  }
-
-  public func toNumber() -> Double {
-    contextHandle.toNumberForHandle(borrowHandle())
-  }
-
-  public func toBoolean() -> Bool {
-    contextHandle.toBooleanForHandle(borrowHandle())
-  }
-
   public func isUndefined() -> Bool { type() == .undefined }
   public func isNull() -> Bool { type() == .null }
   public func isBoolean() -> Bool { type() == .boolean }
@@ -180,12 +208,4 @@ extension JSValue where Self: ~Copyable {
   public func isSymbol() -> Bool { type() == .symbol }
   public func isObject() -> Bool { type() == .object }
   public func isBigInt() -> Bool { type() == .bigInt }
-
-  public func looselyEquals(_ other: borrowing Self) -> Bool {
-    contextHandle.looselyEqualsHandle(borrowHandle(), other.borrowHandle()) ?? false
-  }
-
-  public func strictlyEquals(_ other: borrowing Self) -> Bool {
-    contextHandle.strictlyEqualsHandle(borrowHandle(), other.borrowHandle()) ?? false
-  }
 }

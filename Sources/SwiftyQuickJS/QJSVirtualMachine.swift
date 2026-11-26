@@ -20,11 +20,14 @@ public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   @unchecked Sendable
 {
   public typealias Context = QJSContext
-  public typealias ContextHandle = QJSContextHandle
-  public typealias RuntimeHandle = QJSRuntimeHandle
+  package typealias ContextHandle = QJSContextHandle
+  package typealias RuntimeHandle = QJSRuntimeHandle
 
-  public let driverRuntimeHandle: QJSRuntimeHandle
   public let unownedExecutor: UnownedSerialExecutor
+
+  /// The runtime identity of this VM. Package-internal: it is a handle, so it
+  /// must not appear in a public signature; `==`/`hash` still use it.
+  package let driverRuntimeHandle: QJSRuntimeHandle
 
   private let owner: VMThread.Owner
   /// Retained so registry cleanup jobs can be scheduled without retaining the
@@ -47,8 +50,9 @@ public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
 
   /// The engine context for a new `QJSContext`, created on the VM thread:
   /// creating a context mutates the shared runtime, which that thread may be
-  /// using for the VM's other contexts.
-  public func makeContextHandle() -> QJSContextHandle? {
+  /// using for the VM's other contexts. Package-internal: only
+  /// `QJSContext.init(virtualMachine:)` and same-package tests call it.
+  package func makeContextHandle() -> QJSContextHandle? {
     let runtimeHandle = driverRuntimeHandle
     return thread.runAndWait {
       QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)

@@ -75,20 +75,20 @@ private enum SetGetHasDeletePropertyWithValueKey: ScriptEngineAssertion {
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
-      let key = scope.persist(scope.makeString("valueKey"))
-      _ = setValueProperty(
-        key, on: object, to: scope.persist(scope.makeString("abc")), attributes: .none, in: scope)
+      let key = scope.makePropertyStringKey("valueKey")
+      _ = object.setProperty(
+        key, to: scope.persist(scope.makeString("abc")), attributes: .none, in: scope)
 
-      let hasBeforeDelete = hasValueProperty(key, on: object, in: scope)
-      guard let read = valueOrNil(getValueProperty(key, on: object, in: scope)) else {
+      let hasBeforeDelete = object.hasProperty(key, in: scope)
+      guard let read = valueOrNil(object.getProperty(key, in: scope)) else {
         Issue.record("Expected property read to succeed")
         return
       }
       expectTrue(hasBeforeDelete)
       expectTrue(read.isString())
 
-      _ = deleteValueProperty(key, on: object, in: scope)
-      let hasAfterDelete = hasValueProperty(key, on: object, in: scope)
+      _ = object.deleteProperty(key, in: scope)
+      let hasAfterDelete = object.hasProperty(key, in: scope)
       expectTrue(!hasAfterDelete)
     }
   }
@@ -100,8 +100,9 @@ private enum SetGetPropertyAtIndex: ScriptEngineAssertion {
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
-      _ = setIndexProperty(2, on: object, to: scope.persist(scope.makeBoolean(true)), in: scope)
-      guard let read = valueOrNil(getIndexProperty(2, on: object, in: scope)) else {
+      _ = object.setProperty(
+        at: 2, to: scope.persist(scope.makeBoolean(true)), in: scope)
+      guard let read = valueOrNil(object.getProperty(at: 2, in: scope)) else {
         Issue.record("Expected index property read to succeed")
         return
       }
@@ -130,25 +131,25 @@ private enum PropertyAttributesAreRespected: ScriptEngineAssertion {
       _ = object.setProperty(
         "stringPinned", to: scope.makeNumber(19), attributes: .dontDelete, in: scope)
 
-      let lockedKey = scope.persist(scope.makeString("locked"))
-      _ = setValueProperty(
-        lockedKey, on: object, to: scope.persist(scope.makeNumber(7)),
+      let lockedKey = scope.makePropertyStringKey("locked")
+      _ = object.setProperty(
+        lockedKey, to: scope.persist(scope.makeNumber(7)),
         attributes: .readOnly, in: scope)
-      _ = setValueProperty(
-        lockedKey, on: object, to: scope.persist(scope.makeNumber(9)),
+      _ = object.setProperty(
+        lockedKey, to: scope.persist(scope.makeNumber(9)),
         attributes: .none, in: scope)
       let lockedValue = numberValue(
-        getValueProperty(lockedKey, on: object, in: scope))
+        object.getProperty(lockedKey, in: scope))
       expectTrue(lockedValue == 7)
 
-      let hiddenKey = scope.persist(scope.makeString("hidden"))
-      _ = setValueProperty(
-        hiddenKey, on: object, to: scope.persist(scope.makeNumber(1)),
+      let hiddenKey = scope.makePropertyStringKey("hidden")
+      _ = object.setProperty(
+        hiddenKey, to: scope.persist(scope.makeNumber(1)),
         attributes: .dontEnum, in: scope)
 
-      let pinnedKey = scope.persist(scope.makeString("pinned"))
-      _ = setValueProperty(
-        pinnedKey, on: object, to: scope.persist(scope.makeNumber(2)),
+      let pinnedKey = scope.makePropertyStringKey("pinned")
+      _ = object.setProperty(
+        pinnedKey, to: scope.persist(scope.makeNumber(2)),
         attributes: .dontDelete, in: scope)
 
       scope.setGlobalProperty(object, forKey: "attributeObject", with: .none)
@@ -230,8 +231,7 @@ private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAss
       switch consume objectResult {
       case .value(let object):
         _ = scope.evaluateScript("Object.keys = () => ['patched']")
-        let names =
-          scope.driverContextHandle.propertyNamesForHandle(on: object.borrowHandle()) ?? []
+        let names = object.propertyNames(in: scope)
         expectTrue(names == ["3", "visible"])
       case .exception:
         Issue.record("Expected propertyNames fixture object")
@@ -397,11 +397,12 @@ private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
   }
 }
 
-// MARK: - Value-key and index property helpers
+// MARK: - Shared value helpers
 //
-// The surface value API covers static-string keys; value-key and numeric
-// index access stay on the context driver and adopt their results on the
-// calling window's arena.
+// The whole surface property API is value-level; the only helper left is the
+// persistent object every property test writes to. The raw value-key driver
+// path (a JS string value used as the property key) has no public value-level
+// equivalent, so that coverage lives in the two concrete engine targets.
 
 private func makePersistentObject<C: JSInstantContext & ~Copyable>(
   in context: borrowing C
@@ -410,73 +411,6 @@ private func makePersistentObject<C: JSInstantContext & ~Copyable>(
     preconditionFailure("makeObject failed")
   }
   return context.persist(object)
-}
-
-private func getValueProperty<C: JSInstantContext & ~Copyable>(
-  _ key: borrowing C.Value,
-  on object: borrowing C.Value,
-  in context: borrowing C
-) -> JSResult<C.Value> {
-  bridgeSurfaceHandleResult(
-    context.driverContextHandle.getValuePropertyHandle(
-      key.borrowHandle(), on: object.borrowHandle()),
-    in: context
-  )
-}
-
-private func setValueProperty<C: JSInstantContext & ~Copyable>(
-  _ key: borrowing C.Value,
-  on object: borrowing C.Value,
-  to value: borrowing C.Value,
-  attributes: JSHostMemberAttributes,
-  in context: borrowing C
-) -> Bool {
-  context.driverContextHandle.setValuePropertyHandle(
-    key.borrowHandle(),
-    on: object.borrowHandle(),
-    to: value.borrowHandle(),
-    attributes: attributes
-  )
-}
-
-private func hasValueProperty<C: JSInstantContext & ~Copyable>(
-  _ key: borrowing C.Value,
-  on object: borrowing C.Value,
-  in context: borrowing C
-) -> Bool {
-  context.driverContextHandle.hasValuePropertyHandle(
-    key.borrowHandle(), on: object.borrowHandle()) ?? false
-}
-
-private func deleteValueProperty<C: JSInstantContext & ~Copyable>(
-  _ key: borrowing C.Value,
-  on object: borrowing C.Value,
-  in context: borrowing C
-) -> Bool {
-  context.driverContextHandle.deleteValuePropertyHandle(
-    key.borrowHandle(), on: object.borrowHandle())
-}
-
-private func getIndexProperty<C: JSInstantContext & ~Copyable>(
-  _ index: UInt32,
-  on object: borrowing C.Value,
-  in context: borrowing C
-) -> JSResult<C.Value> {
-  bridgeSurfaceHandleResult(
-    context.driverContextHandle.getIndexPropertyHandle(
-      at: index, on: object.borrowHandle()),
-    in: context
-  )
-}
-
-private func setIndexProperty<C: JSInstantContext & ~Copyable>(
-  _ index: UInt32,
-  on object: borrowing C.Value,
-  to value: borrowing C.Value,
-  in context: borrowing C
-) -> Bool {
-  context.driverContextHandle.setIndexPropertyHandle(
-    at: index, on: object.borrowHandle(), to: value.borrowHandle())
 }
 
 // MARK: - Result readers

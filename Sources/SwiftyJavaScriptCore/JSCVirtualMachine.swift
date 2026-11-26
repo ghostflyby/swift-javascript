@@ -11,11 +11,14 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   @unchecked Sendable
 {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
-  public typealias RuntimeHandle = JSCRuntimeHandle
+  package typealias ContextHandle = JSCContextHandle
+  package typealias RuntimeHandle = JSCRuntimeHandle
 
-  public let driverRuntimeHandle: JSCRuntimeHandle
   public let unownedExecutor: UnownedSerialExecutor
+
+  /// The runtime identity of this VM. Package-internal: it is a handle, so it
+  /// must not appear in a public signature; `==`/`hash` still use it.
+  package let driverRuntimeHandle: JSCRuntimeHandle
 
   private let owner: VMThread.Owner
   /// Retained so registry cleanup jobs can be scheduled without retaining the
@@ -38,8 +41,9 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
 
   /// The engine context for a new `JSCContext`, created on the VM thread:
   /// creating a context mutates the shared runtime, which that thread may be
-  /// using for the VM's other contexts.
-  public func makeContextHandle() -> JSCContextHandle? {
+  /// using for the VM's other contexts. Package-internal: only
+  /// `JSCContext.init(virtualMachine:)` and same-package tests call it.
+  package func makeContextHandle() -> JSCContextHandle? {
     let runtimeHandle = driverRuntimeHandle
     return thread.runAndWait {
       JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)

@@ -9,13 +9,13 @@ import SwiftJavaScript
 #endif
 
 extension QJSEngine: JSEngineInvocationDriver {
-  public static func callFunctionHandle(
+  package static func callFunctionHandle(
     _ function: QJSValueHandle,
     this thisValue: QJSValueHandle?,
-    arguments: [QJSValueHandle],
+    argumentHandles: [QJSValueHandle],
     in context: QJSContextHandle
   ) -> JSResult<QJSValueHandle>? {
-    var rawArguments = arguments.map(\.ref)
+    var rawArguments = argumentHandles.map(\.ref)
     let thisRawValue = thisValue?.ref ?? quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
       JS_Call(
@@ -29,33 +29,33 @@ extension QJSEngine: JSEngineInvocationDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func constructHandle(
+  package static func constructHandle(
     _ constructor: QJSValueHandle,
-    arguments: [QJSValueHandle],
+    argumentHandles: [QJSValueHandle],
     in context: QJSContextHandle
   ) -> JSResult<QJSValueHandle>? {
-    var rawArguments = arguments.map(\.ref)
+    var rawArguments = argumentHandles.map(\.ref)
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
       JS_CallConstructor(context.ref, constructor.ref, Int32(buffer.count), buffer.baseAddress)
     }
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func toObjectHandle(
+  package static func toObjectHandle(
     _ value: QJSValueHandle,
     in context: QJSContextHandle
   ) -> JSResult<QJSValueHandle>? {
     quickJSResultHandle(for: JS_ToObject(context.ref, value.ref), in: context.ref)
   }
 
-  public static func isArrayHandle(
+  package static func isArrayHandle(
     _ value: QJSValueHandle,
     in _: QJSContextHandle
   ) -> Bool? {
     JS_IsArray(value.ref)
   }
 
-  public static func isDateHandle(
+  package static func isDateHandle(
     _ value: QJSValueHandle,
     in context: QJSContextHandle
   ) -> Bool? {
@@ -73,7 +73,7 @@ extension QJSEngine: JSEngineInvocationDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func isInstanceOfHandle(
+  package static func isInstanceOfHandle(
     _ value: QJSValueHandle,
     constructor: QJSValueHandle,
     in context: QJSContextHandle
@@ -82,7 +82,7 @@ extension QJSEngine: JSEngineInvocationDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func looselyEqualsHandle(
+  package static func looselyEqualsHandle(
     _ lhs: QJSValueHandle,
     _ rhs: QJSValueHandle,
     in context: QJSContextHandle
@@ -91,7 +91,7 @@ extension QJSEngine: JSEngineInvocationDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func strictlyEqualsHandle(
+  package static func strictlyEqualsHandle(
     _ lhs: QJSValueHandle,
     _ rhs: QJSValueHandle,
     in context: QJSContextHandle
@@ -103,53 +103,53 @@ extension QJSEngine: JSEngineInvocationDriver {
 // MARK: - Context-side driver conformance (Stage 2B)
 
 extension QJSContextHandle: JSContextInvocationDriver {
-  public func callFunctionHandle(
+  package func callFunctionHandle(
     _ function: QJSValueHandle,
     this thisValue: QJSValueHandle?,
-    arguments: [QJSValueHandle]
+    argumentHandles: [QJSValueHandle]
   ) -> JSResult<QJSValueHandle>? {
     QJSEngine.callFunctionHandle(
       function,
       this: thisValue,
-      arguments: arguments,
+      argumentHandles: argumentHandles,
       in: self
     )
   }
 
-  public func constructHandle(
+  package func constructHandle(
     _ constructor: QJSValueHandle,
-    arguments: [QJSValueHandle]
+    argumentHandles: [QJSValueHandle]
   ) -> JSResult<QJSValueHandle>? {
-    QJSEngine.constructHandle(constructor, arguments: arguments, in: self)
+    QJSEngine.constructHandle(constructor, argumentHandles: argumentHandles, in: self)
   }
 
-  public func toObjectHandle(_ value: QJSValueHandle) -> JSResult<QJSValueHandle>? {
+  package func toObjectHandle(_ value: QJSValueHandle) -> JSResult<QJSValueHandle>? {
     QJSEngine.toObjectHandle(value, in: self)
   }
 
-  public func isArrayHandle(_ value: QJSValueHandle) -> Bool? {
+  package func isArrayHandle(_ value: QJSValueHandle) -> Bool? {
     QJSEngine.isArrayHandle(value, in: self)
   }
 
-  public func isDateHandle(_ value: QJSValueHandle) -> Bool? {
+  package func isDateHandle(_ value: QJSValueHandle) -> Bool? {
     QJSEngine.isDateHandle(value, in: self)
   }
 
-  public func isInstanceOfHandle(
+  package func isInstanceOfHandle(
     _ value: QJSValueHandle,
     constructor: QJSValueHandle
   ) -> Bool? {
     QJSEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
   }
 
-  public func looselyEqualsHandle(
+  package func looselyEqualsHandle(
     _ lhs: QJSValueHandle,
     _ rhs: QJSValueHandle
   ) -> Bool? {
     QJSEngine.looselyEqualsHandle(lhs, rhs, in: self)
   }
 
-  public func strictlyEqualsHandle(
+  package func strictlyEqualsHandle(
     _ lhs: QJSValueHandle,
     _ rhs: QJSValueHandle
   ) -> Bool? {

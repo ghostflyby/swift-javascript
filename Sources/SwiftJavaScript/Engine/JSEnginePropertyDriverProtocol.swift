@@ -1,5 +1,5 @@
 /// Context-side property operations (Stage 2B decomposition).
-public protocol JSContextPropertyDriver: JSContextRuntimeDriver {
+package protocol JSContextPropertyDriver: JSContextRuntimeDriver {
   associatedtype PropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle
 
   func makePropertyStringKeyHandle(_ value: String) -> PropertyStringKeyHandle?
@@ -94,7 +94,7 @@ public protocol JSContextPropertyDriver: JSContextRuntimeDriver {
 }
 
 extension JSContextPropertyDriver {
-  public func getStaticStringPropertyHandle(
+  package func getStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle
   ) -> JSResult<ValueHandle>? {
@@ -105,7 +105,7 @@ extension JSContextPropertyDriver {
     return getPropertyStringKeyHandle(keyHandle, on: object)
   }
 
-  public func setStaticStringPropertyHandle(
+  package func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle,
     to value: ValueHandle,
@@ -123,7 +123,7 @@ extension JSContextPropertyDriver {
     )
   }
 
-  public func hasStaticStringPropertyHandle(
+  package func hasStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle
   ) -> Bool? {
@@ -134,7 +134,7 @@ extension JSContextPropertyDriver {
     return hasPropertyStringKeyHandle(keyHandle, on: object)
   }
 
-  public func deleteStaticStringPropertyHandle(
+  package func deleteStaticStringPropertyHandle(
     _ key: StaticString,
     on object: ValueHandle
   ) -> Bool {
@@ -148,7 +148,7 @@ extension JSContextPropertyDriver {
 
 /// Engine-side descriptor. Property requirements now live on
 /// `JSContextPropertyDriver`, implemented by `ContextHandle`.
-public protocol JSEnginePropertyDriver: JSEngineRuntimeDriver
+package protocol JSEnginePropertyDriver: JSEngineRuntimeDriver
 where
   ContextHandle: JSContextPropertyDriver,
   ContextHandle.PropertyStringKeyHandle == PropertyStringKeyHandle

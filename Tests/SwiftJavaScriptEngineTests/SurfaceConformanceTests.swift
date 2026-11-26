@@ -14,9 +14,6 @@ import Testing
 
 private func checkSurface<C: SwiftJavaScript.JSContext>(
   _: C.Type,
-  contextHandle: C.ContextHandle.Type,
-  valueHandle: C.ValueHandle.Type,
-  ownedValueHandle: C.OwnedValueHandle.Type,
   value: C.Value.Type,
   callbackValue: C.CallbackValue.Type,
   callbackReturn: C.CallbackReturn.Type,
@@ -30,7 +27,7 @@ private func checkSurface<C: SwiftJavaScript.JSContext>(
   preparedScript: C.PreparedScript.Type,
   arrayBuffer: C.ArrayBuffer.Type,
   typedArray: C.TypedArray.Type,
-  classHandle: C.ClassHandle.Type,
+  callArgument: C.CallArgument.Type,
   jsClass: C.Class.Type
 ) {
   // The member types reach each other only through the context: each one's
@@ -66,17 +63,13 @@ private func checkBelongsToContext<C: SwiftJavaScript.JSContext>(
 )
 where
   C.Value.Context == C,
-  C.Value.ContextHandle == C.ContextHandle,
-  C.Value.ValueHandle == C.ValueHandle,
   C.CallbackValue.Context == C,
-  C.CallbackValue.ContextHandle == C.ContextHandle,
   C.CallbackReturn.Context == C,
   C.Arguments.Context == C,
   C.Arguments.Value == C.Value,
   C.CallbackArguments.Context == C,
   C.CallbackArguments.Value == C.CallbackValue,
   C.InstantContext.Context == C,
-  C.InstantContext.ContextHandle == C.ContextHandle,
   C.InstantContext.PropertyStringKey == C.PropertyStringKey,
   C.InstantContext.Arguments == C.Arguments,
   C.Scope.Context == C,
@@ -84,25 +77,18 @@ where
   C.Scope.Value == C.Value,
   C.Scope.CallbackValue == C.CallbackValue,
   C.VirtualMachine.Context == C,
-  C.VirtualMachine.ContextHandle == C.ContextHandle,
   C.PropertyStringKey.Context == C,
-  C.PropertyStringKey.Handle == C.ContextHandle.PropertyStringKeyHandle,
   C.PreparedScript.Context == C,
-  C.PreparedScript.Handle == C.ContextHandle.PreparedScriptHandle,
   C.ArrayBuffer.Context == C,
   C.ArrayBuffer.Value == C.Value,
   C.TypedArray.Context == C,
   C.TypedArray.Buffer == C.ArrayBuffer,
-  C.Class.Context == C,
-  C.Class.ClassHandle == C.ClassHandle
+  C.Class.Context == C
 {}
 
 @Test func javaScriptCoreSurfaceSatisfiesAllEquations() {
   checkSurface(
     JSCContext.self,
-    contextHandle: JSCContextHandle.self,
-    valueHandle: JSCValueHandle.self,
-    ownedValueHandle: JSCOwnedValueHandle.self,
     value: JSCValue.self,
     callbackValue: JSCCallbackValue.self,
     callbackReturn: JSCCallbackReturn.self,
@@ -116,7 +102,7 @@ where
     preparedScript: JSCPreparedScript.self,
     arrayBuffer: JSCArrayBuffer.self,
     typedArray: JSCTypedArray.self,
-    classHandle: JSCClassHandle.self,
+    callArgument: JSCCallArgument.self,
     jsClass: JSCClass.self
   )
 }
@@ -124,9 +110,6 @@ where
 @Test func quickJSSurfaceSatisfiesAllEquations() {
   checkSurface(
     QJSContext.self,
-    contextHandle: QJSContextHandle.self,
-    valueHandle: QJSValueHandle.self,
-    ownedValueHandle: QJSOwnedValueHandle.self,
     value: QJSValue.self,
     callbackValue: QJSCallbackValue.self,
     callbackReturn: QJSCallbackReturn.self,
@@ -140,7 +123,7 @@ where
     preparedScript: QJSPreparedScript.self,
     arrayBuffer: QJSArrayBuffer.self,
     typedArray: QJSTypedArray.self,
-    classHandle: QJSClassHandle.self,
+    callArgument: QJSCallArgument.self,
     jsClass: QJSClass.self
   )
 }

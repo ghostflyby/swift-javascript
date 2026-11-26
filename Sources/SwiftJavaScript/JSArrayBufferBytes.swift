@@ -3,7 +3,8 @@
 // Both engines hand externally allocated, zero-filled or copied bytes to their
 // no-copy ArrayBuffer constructor. Allocating, copying, and releasing that
 // storage is engine-independent, so it lives in core; each engine only calls
-// its own constructor through `adoptArrayBufferBytesNoCopy`.
+// its own constructor through the `JSArrayBufferHostScope` requirement, and
+// the core helper keeps the "rejected bytes are released exactly once" rule.
 
 /// The C deallocator both engines pass to their no-copy buffer constructor.
 /// The allocation is a plain `UnsafeMutableRawPointer.allocate`, so the
@@ -64,15 +65,34 @@ package func allocateArrayBufferBytes(
   return pointer
 }
 
+/// The synchronous window operation the no-copy ArrayBuffer helper needs from
+/// an instant context: hand the bytes to the engine's buffer constructor and
+/// adopt the engine's creation reference onto the window arena exactly once.
+///
+/// `nil` means the engine rejected the creation and never took the bytes; the
+/// core helper then releases them. Implementations must not call the
+/// deallocator on the rejection path — that would release the bytes twice.
+package protocol JSArrayBufferHostScope: JSInstantContext, ~Copyable {
+  func adoptArrayBufferBytesNoCopy(
+    bytes: UnsafeMutableRawPointer?,
+    byteLength: Int,
+    bytesDeallocator:
+      @convention(c) (
+        UnsafeMutableRawPointer?, UnsafeMutableRawPointer?
+      ) -> Void,
+    deallocatorContext: UnsafeMutableRawPointer?
+  ) -> Value?
+}
+
 /// Hand `bytes` to the engine as a no-copy ArrayBuffer and adopt the creation
 /// reference into `context`.
 ///
 /// The engine either takes ownership of the bytes (and calls `bytesDeallocator`
 /// when the buffer dies) or rejects the creation. On rejection the engine never
 /// took the bytes, so this releases the allocation here — exactly once — and
-/// returns `nil`; the caller reports the failure. On success the handle is
-/// adopted exactly once by the calling window's arena.
-package func adoptArrayBufferBytesNoCopy<C: JSInstantContext & ~Copyable>(
+/// returns `nil`; the caller reports the failure. On success the engine adopts
+/// the creation reference exactly once on the calling window's arena.
+package func adoptArrayBufferBytesNoCopy<C: JSArrayBufferHostScope & ~Copyable>(
   _ bytes: UnsafeMutableRawPointer?,
   byteLength: Int,
   in context: borrowing C,
@@ -80,9 +100,9 @@ package func adoptArrayBufferBytesNoCopy<C: JSInstantContext & ~Copyable>(
     @convention(c) (
       UnsafeMutableRawPointer?, UnsafeMutableRawPointer?
     ) -> Void = jsArrayBufferBytesDeallocator
-) -> C.Value? where C.ContextHandle: JSContextTypedArrayDriver {
+) -> C.Value? {
   guard
-    let handle = context.driverContextHandle.makeArrayBufferWithBytesNoCopyHandle(
+    let value = context.adoptArrayBufferBytesNoCopy(
       bytes: bytes,
       byteLength: byteLength,
       bytesDeallocator: bytesDeallocator,
@@ -93,5 +113,5 @@ package func adoptArrayBufferBytesNoCopy<C: JSInstantContext & ~Copyable>(
     return nil
   }
 
-  return context.adoptCreatedHandle(C.ContextHandle.OwnedValueHandle.adopting(handle))
+  return value
 }

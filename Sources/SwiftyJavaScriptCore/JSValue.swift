@@ -1,5 +1,26 @@
 import SwiftJavaScript
 
+/// The JavaScriptCore call-argument token.
+///
+/// Value views are `~Copyable`, so arguments travel as this `Copyable` token
+/// instead. It borrows the value handle: keep the source value's arena alive
+/// and use the token only for the immediate synchronous call it is passed to.
+public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
+  package let handle: JSCValueHandle
+
+  public init(_ value: borrowing JSCValue) {
+    self.handle = value.handle
+  }
+
+  public init(_ value: borrowing JSCCallbackValue) {
+    self.handle = value.handle
+  }
+
+  package init(handle: JSCValueHandle) {
+    self.handle = handle
+  }
+}
+
 /// The JavaScriptCore user-facing value view (S4).
 ///
 /// `JSCValue` is a local value in the V8 `Local<T>` sense: it stores the
@@ -13,21 +34,25 @@ import SwiftJavaScript
 /// `JSCContextHandle` driver; the property/invocation/typed-array surface is
 /// added by S5.
 public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
-  public typealias ContextHandle = JSCContextHandle
-  public typealias ValueHandle = JSCValueHandle
+  package typealias ContextHandle = JSCContextHandle
+  package typealias ValueHandle = JSCValueHandle
   public typealias Context = JSCContext
   public typealias InstantContext = JSCInstantContext
 
   package let handle: JSCValueHandle
-  public let contextHandle: JSCContextHandle
+  package let contextHandle: JSCContextHandle
 
   package init(handle: JSCValueHandle, contextHandle: JSCContextHandle) {
     self.handle = handle
     self.contextHandle = contextHandle
   }
 
-  public borrowing func borrowHandle() -> JSCValueHandle {
+  package borrowing func borrowHandle() -> JSCValueHandle {
     handle
+  }
+
+  public func asCallArgument() -> JSCCallArgument {
+    JSCCallArgument(handle: handle)
   }
 
   // MARK: - Classification and conversion
@@ -59,5 +84,15 @@ public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
 
   public func strictlyEquals(_ other: borrowing JSCValue) -> Bool {
     contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+}
+
+extension JSCContext {
+  public typealias CallArgument = JSCCallArgument
+}
+
+extension JSCCallbackValue {
+  public func asCallArgument() -> JSCCallArgument {
+    JSCCallArgument(handle: handle)
   }
 }

@@ -6,39 +6,15 @@
 /// (`JSValueEncodable`, `JSValueEncoder`) and the shared
 /// defaults are written against this face so neither scope kind has to be
 /// special-cased.
-/// The context-handle capabilities a synchronous scope needs: value
-/// factories, property access, function invocation and prepared scripts.
-public typealias JSScopeContextHandle = JSContextRuntimeDriver & JSContextPropertyDriver
-  & JSContextInvocationDriver & JSContextPreparedScriptDriver
-
 public protocol JSValueScope: ~Copyable {
   /// The context this scope belongs to.
   associatedtype Context: JSContext
-  associatedtype ContextHandle: JSScopeContextHandle
-  where ContextHandle == Context.ContextHandle
   associatedtype Value: JSValue & ~Copyable
   where Value == Context.Value
   associatedtype CallbackValue: JSCallbackValue & ~Copyable
   where CallbackValue == Context.CallbackValue
   associatedtype PropertyStringKey: JSPropertyStringKey & ~Copyable
   where PropertyStringKey == Context.PropertyStringKey
-
-  /// The context identity every operation of this window is addressed through.
-  var driverContextHandle: ContextHandle { get }
-
-  /// Adopt an engine-created owning handle into this window's arena and
-  /// return the local view. The handle is tracked exactly once, so the
-  /// window's drain settles the creation reference.
-  func adoptCreatedHandle(_ handle: consuming ContextHandle.OwnedValueHandle) -> Value
-
-  /// Adopt an engine-created owning handle into this window's arena and
-  /// return the callback-window view of it. Same ledger as
-  /// `adoptCreatedHandle`; every value factory below is built on it.
-  func adoptCallbackHandle(_ handle: consuming ContextHandle.OwnedValueHandle) -> CallbackValue
-
-  /// Claim an owned reference for a borrowed handle that no arena owns yet,
-  /// track it exactly once on this window's arena, and return the local view.
-  func anchorBorrowedHandle(_ handle: ContextHandle.ValueHandle) -> Value
 
   // MARK: Value factories
 
@@ -57,6 +33,40 @@ public protocol JSValueScope: ~Copyable {
   /// Transfer the value's owned reference into the context default scope and
   /// return a view valid beyond this window.
   func persist(_ value: borrowing CallbackValue) -> Value
+
+  /// The local value view of a value that is already backed by this window's
+  /// arena (a callback argument, or a value this scope's factories produced):
+  /// no claim, no ledger entry. The view is only valid while the source arena
+  /// is alive, so it is confined to the synchronous window that produced it;
+  /// the macro templates hand `CallbackValue`s to `JSValueDecodable` through
+  /// it, and core's `setGlobalProperty(CallbackValue:…)` convenience uses it
+  /// too.
+  @available(*, noasync)
+  func localValue(_ value: borrowing CallbackValue) -> Value
+
+  // MARK: Value window
+
+  /// Run `body` in a synchronous value-operation window on this scope's arena.
+  ///
+  /// `JSInstantContext` returns itself; a manual `JSScope` opens a nested
+  /// synchronous window whose arena drains when `body` returns. This is the
+  /// only channel through which generic scope code reaches value operations:
+  /// the repository deliberately does not pin `Context.InstantContext == Self`
+  /// (doing so makes type checking fail to terminate, see TODO §3.16).
+  ///
+  /// **Hard constraint**: values produced by window arithmetic are only valid
+  /// inside `body` and must not escape it. For a `JSInstantContext` the window
+  /// is the caller itself — the same arena, valid for as long as the caller
+  /// lives. For a `JSScope` the window drains when `body` returns, so any
+  /// `Value` adopted inside the closure is only valid there. A `CallbackValue`
+  /// that must outlive the window has to be `persist`ed to the context default
+  /// scope first; a `Value` (for example the adopted result of `getProperty`)
+  /// has no persist channel, so it must be used inside the closure or moved
+  /// into an independent binding via `makePersistentHandle(_ value: borrowing
+  /// Value)`.
+  func withInstantWindow<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing Context.InstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R
 
   // MARK: Self-owning inputs
 

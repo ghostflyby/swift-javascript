@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JSCPropertyStringKeyHandle:
+package struct JSCPropertyStringKeyHandle:
   JSPropertyStringKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
@@ -12,19 +12,19 @@ public struct JSCPropertyStringKeyHandle:
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     JSStringRetain(ref)
     return true
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     JSStringRelease(ref)
     return true
   }
 }
 
-public struct JSCPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
+package struct JSCPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSStringRef
@@ -34,13 +34,13 @@ public struct JSCPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHan
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     JSStringRetain(ref)
     return true
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     JSStringRelease(ref)
     return true
   }

@@ -1,5 +1,5 @@
 /// Context-side prepared-script operations (Stage 2B decomposition).
-public protocol JSContextPreparedScriptDriver: JSContextRuntimeDriver {
+package protocol JSContextPreparedScriptDriver: JSContextRuntimeDriver {
   associatedtype PreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle
 
   func makePreparedScriptHandle(_ source: String) -> PreparedScriptHandle?
@@ -15,7 +15,7 @@ public protocol JSContextPreparedScriptDriver: JSContextRuntimeDriver {
 
 /// Engine-side descriptor. Prepared-script requirements now live on
 /// `JSContextPreparedScriptDriver`, implemented by `ContextHandle`.
-public protocol JSEnginePreparedScriptDriver: JSEngineRuntimeDriver
+package protocol JSEnginePreparedScriptDriver: JSEngineRuntimeDriver
 where
   ContextHandle: JSContextPreparedScriptDriver,
   ContextHandle.PreparedScriptHandle == PreparedScriptHandle

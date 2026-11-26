@@ -90,7 +90,7 @@
 
 原则：
 
-- [ ] 新的 QuickJS 引擎实现模块只依赖 `SwiftJavaScript` 的 `public` API；不调用 `package` API，不复制 `SwiftyJavaScriptCore` 私有 helper（S15 复核：本轮未满足。QJS 仍经 `package` 的 `JSScopeWitness`/`JSSurfaceFactory`/`ScopeCore` 缝接线；保留为后续独立收口项，不在本片改写可见性。）
+- [ ] 新的 QuickJS 引擎实现模块只依赖 `SwiftJavaScript` 的 `public` API；不调用 `package` API，不复制 `SwiftyJavaScriptCore` 私有 helper（S15 复核：本轮未满足。QJS 仍经 `package` 的 `JSScopeWitness`/`ScopeCore` 缝接线；`JSSurfaceFactory` 已在 §3.16 删除。保留为后续独立收口项，不在本片改写可见性。）
 - [ ] 将后续“是否应继续迁移到 core”的判断切换为：QuickJS 最小桥接是否被迫需要新的 `public` API；若需要，再重构接线边界，而不是继续只按 JSC 形状推断
 - [ ] 当 QuickJS 实现受阻时，只允许两类修正：提升真正通用的 `public` core API，或回退不合理抽象；不为 QuickJS 添加第二套私有兼容层
 
@@ -167,47 +167,130 @@
 
 ### 3.16 去掉 `JSEngineSurface`：`JSContext` 作锚点，成员协议只做别名（已完成）
 
+> 3.17 已进一步删除本节所述 public 协议上的全部 handle 关联与成员，并把 handle 层降为 package。
+> 本节保留 3.16 当时的记录；下列句柄级表述已按收口后现状就地注明。
+
 背景：3.3 引入的 `JSEngineSurface` 继承全部 5 个 driver 协议，用约 45 条同型等式把 15 个用户面类型钉在一起，约 20 个 `JS*` 协议靠 `associatedtype Engine: JSEngineSurface` 挂在它上面。本轮把它拆掉。
 
 **约束结构的结论（Swift 6.4.2 实测）**
 
 - “每个协议把自己的成员钉回 `Self`、成员之间互相钉”的写法不可用：分布式的 `== Self` 等式让类型检查不收敛（>60s）；在多个协议里重述 value↔scope 等式会让编译器栈溢出崩溃（`While checking generic signature <τ_0_0 where τ_0_0 : JSContext>`）。
-- 可用的结构：`JSContext` 是唯一锚点，所有关系在这里各陈述一次、单向（context → 成员）；成员协议只声明 `associatedtype Context: JSContext`，并把自己用到的成员类型别名过去（`ValueHandle == Context.ValueHandle`、`Value == Context.Value` …），不陈述任何自己的关系。
+- 可用的结构：`JSContext` 是唯一锚点，所有关系在这里各陈述一次、单向（context → 成员）；成员协议只声明 `associatedtype Context: JSContext`，并只把非 handle 的成员类型别名过去（`Value == Context.Value`、`InstantContext == Context.InstantContext` …）。`ValueHandle`/`ContextHandle`/`OwnedValueHandle`/`ClassHandle` 等 handle 别名已由 §3.17 从成员协议删除。
 - 给窗口加反向等式（`JSInstantContext` 的 `Context.InstantContext == Self`）同样让全量类型检查 150s 不收敛，所以没有加。后果写成规则（`JSContext.swift` 顶部注释）：涉及值的泛型代码以 `C: JSContext` 为根，窗口类型用 `C.InstantContext`/`C.Scope`；裸窗口类型（`S: JSInstantContext`）只能用自己的操作（工厂、global、脚本），不能把 `S.Value` 传给需要 `InstantContext` 的值操作。
 - 解码签名因此改为以 scope 为单根：`init<C: JSInstantContext & ~Copyable>(value: borrowing C.Value, in context: borrowing C)`。原来的双根形式 `where V.InstantContext == C` 要求窗口被双向钉回 context，`JSDefaultConverter.decode<C>` 才能调用它。
 - 编译器的顺序依赖：actor 在声明处内联写 `: JSContext` 时，如果同模块里排序靠前的文件先构造它（SwiftPM 的 module-emit 阶段会先检查那些函数体），`init(virtualMachine:)` 会被误报 `'nonisolated' on an actor's synchronous initializer is invalid`；把 conformance 放进 extension 则两种顺序都通过。`MockSurfaceContext` 用 extension 形式；`JSCContext`/`QJSContext` 所在模块内没有更早的文件触达它们的构造器，暂保持内联写法，遇到同样报错时照此改。
 
-- [x] 句柄层机制改按 ContextHandle 泛型：`ScopeStack`/`ScopeStackRegistry`/`ScopeFrame`/`ScopeCore`/`JSPersistentHandleRegistry`（及其 Key）/`PersistentRegistryReference`/`JSContextStorage` 的类型参数由引擎 `E: JSEngineRuntimeDriver` 改为 `CH: JSContextRuntimeDriver`；`E.ContextHandle` → `CH`，`E.ValueHandle` → `CH.ValueHandle`，`E.OwnedValueHandle` → `CH.OwnedValueHandle`。`ScopeCore` 删除值级方法，只留 `trackCreatedHandle`/`claimAndTrackHandle`/`transferToDefaultFrame`/`trackOnDefaultFrame`；`JSContextStorage` 删除值级扩展。
+- [x] 句柄层机制改按 ContextHandle 泛型：`ScopeStack`/`ScopeStackRegistry`/`ScopeFrame`/`ScopeCore`/`JSPersistentHandleRegistry`（及其 Key）/`PersistentRegistryReference`/`JSContextStorage` 的类型参数由引擎 `E: JSEngineRuntimeDriver` 改为 `CH: JSContextRuntimeDriver`；`E.ContextHandle` → `CH`，`E.ValueHandle` → `CH.ValueHandle`，`E.OwnedValueHandle` → `CH.OwnedValueHandle`。`ScopeCore` 删除值级方法，只留 `trackCreatedHandle`/`claimAndTrackHandle`/`transferToDefaultFrame`/`trackOnDefaultFrame`；`JSContextStorage` 删除值级扩展。3.17 后这些类型与成员全部保持 package 可见。
 - [x] `JSContextRuntimeDriver` 去掉 `associatedtype Engine: JSEngineSurface`，改为 `associatedtype InstantContext: JSInstantContext & ~Copyable`（不回钉 Self）；`makeFunctionValueHandle` 收 `JSFunctionCallback<InstantContext>`；`JSFunctionCallback<C: JSInstantContext & ~Copyable>` 按 InstantContext 泛型。
-- [x] 成员协议只声明 `Context` 并别名：
-  - `JSValue`：`ContextHandle`、`ValueHandle`、`InstantContext`；操作返回 `JSResult<Context.Value>`
-  - `JSCallbackValue`：`ContextHandle`、`ValueHandle`；`JSCallbackReturn`：`ValueHandle`；`JSPersistentHandle`：无关联类型；`JSClass`：`ClassHandle`
+- [x] 成员协议只声明 `Context` 并做非 handle 别名；3.17 后 handle 别名已全部删除：
+  - `JSValue`：`InstantContext`；操作返回 `JSResult<Context.Value>`，调用实参为 `[Context.CallArgument]`
+  - `JSCallbackValue`/`JSCallbackReturn`/`JSPersistentHandle`/`JSClass`：只声明 `Context`（`JSPersistentHandle` 无关联类型）
   - `JSArguments`：`Value`、`InstantContext`；`JSCallbackArguments`：`Value`、`InstantContext`
-  - `JSPropertyStringKey`/`JSPreparedScript`：`ContextHandle`、`Handle == ContextHandle.PropertyStringKeyHandle`（resp. `PreparedScriptHandle`）
-  - `JSArrayBuffer`：`ContextHandle`、`Value`、`InstantContext`；`JSTypedArray` 加 `Buffer`
-- [x] scope 协议：`JSValueScope` 声明 `ContextHandle`/`Value`/`CallbackValue`/`PropertyStringKey` 并新增落账原语 `adoptCallbackHandle`；`JSInstantContext` 声明 `CallbackReturn`/`CallbackArguments`/`Arguments`/`PreparedScript`/`PersistentHandle`；`JSScope` 声明 `InstantContext`/`PreparedScript`/`PersistentHandle`。值工厂、global 读写、脚本执行、data、encoder 版 `setGlobalProperty` 改为 core 的协议扩展默认实现（`JSScopeSurfaceDefaults.swift`），引擎 scope 只留落账原语、回调出口、`makeFunction`、持久绑定与 key/script 包装。
-- [x] `JSContext` 成为锚协议：声明 `ContextHandle`/`ValueHandle`/`OwnedValueHandle`/`VirtualMachine`/`Value`/`CallbackValue`/`CallbackReturn`/`CallbackArguments`/`Arguments`/`InstantContext`/`Scope`/`PersistentHandle`/`PropertyStringKey`/`PreparedScript`/`ArrayBuffer`/`TypedArray`/`ClassHandle`/`Class` 并单向钉住，不再继承任何 driver 协议；值工厂、`makeFunction`、global、脚本、data 的默认实现建在 `adoptCreatedHandle` 与 driver 操作上。`JSVirtualMachine` 声明 `Context`/`ContextHandle`/`RuntimeHandle: Hashable`。
+  - `JSPropertyStringKey`/`JSPreparedScript`：只声明 `Context`（`Handle` 关联与 `borrowHandle(in:)` 已移除）
+  - `JSArrayBuffer`：`Value`、`InstantContext`；`JSTypedArray` 加 `Buffer`
+- [x] scope 协议：3.16 时 `JSValueScope` 声明过 `ContextHandle`/`Value`/`CallbackValue`/`PropertyStringKey` 与落账原语 `adoptCallbackHandle`；3.17 删除 handle 成员后，`JSValueScope` 只声明 `Context`/`Value`/`CallbackValue`/`PropertyStringKey`，并新增值级 `localValue`/`withInstantWindow`。`JSInstantContext` 声明 `CallbackReturn`/`CallbackArguments`/`Arguments`/`PreparedScript`/`PersistentHandle`；`JSScope` 声明 `InstantContext`/`PreparedScript`/`PersistentHandle`。`JSScopeSurfaceDefaults.swift` 已删除；会新建并 adopt 值的操作由 JSC/QJS/Mock scope 直接实现，core 只保留值级组合（`installGlobalFunction`、`setGlobalProperty(CallbackValue:)`、`evaluateScript(String)` 与省略 attributes 的便利）。
+- [x] `JSContext` 成为锚协议：3.16 时声明 `ContextHandle`/`ValueHandle`/`OwnedValueHandle`/`VirtualMachine`/`Value`/`CallbackValue`/`CallbackReturn`/`CallbackArguments`/`Arguments`/`InstantContext`/`Scope`/`PersistentHandle`/`PropertyStringKey`/`PreparedScript`/`ArrayBuffer`/`TypedArray`/`ClassHandle`/`Class` 并单向钉住，不再继承任何 driver 协议；值工厂、`makeFunction`、global、脚本、data 的默认实现建在 `adoptCreatedHandle` 与 driver 操作上。3.17 删除了 `ContextHandle`/`ValueHandle`/`OwnedValueHandle`/`ClassHandle` 关联与相应等式，新增裸 `CallArgument`；这些默认实现已下沉引擎，core 只保留值级组合。`JSVirtualMachine` 只声明 `Context` 与 `init()`/`unownedExecutor`（`ContextHandle`/`RuntimeHandle` 已移除）。
 - [x] 删除 `JSEngineSurface`、`JSSurfaceFactory` 与 `ScopeCoreHandleSurface.swift`：值视图的构造留在引擎模块（scope/context 实现落账原语时直接构造）。
-- [x] 转换协议与 class 层：`JSValueDecodable`/`JSValueDecoder`/`JSValueEncoder`/`JSValueEncodable` 统一以 scope 为单根；`JSEngineClassBridgeDriver` 改为 `Context: JSContext` + `Value`/`InstantContext`/`Arguments`/`Class` 别名（仍是引擎标记上的 package 缝，`JSCEngine`/`QJSEngine`/Mock 遵循）；`JSClassValueConvertible.decode`/`tryDecode` 与 `JSClassValueConverter` 的 where 改为 `C == T.Engine.InstantContext`；删除无调用方的 `bridgeSurfaceCallbackResult`。
+- [x] 转换协议与 class 层：`JSValueDecodable`/`JSValueDecoder`/`JSValueEncoder`/`JSValueEncodable` 统一以 scope 为单根；`JSEngineClassBridgeDriver` 保持 public，改为 `Context: JSContext` + `Value`/`InstantContext`/`Arguments`/`Class` 别名（`JSCEngine`/`QJSEngine`/Mock 遵循）；3.17 又把它收敛为值级 statics `makeClass`/`makeHostObject`/`hostObjectPrivateData`，不再有 `ClassHandle` 或句柄级 statics。`JSClassValueConvertible.decode`/`tryDecode` 与 `JSClassValueConverter` 的 where 改为 `C == T.Engine.InstantContext`；删除无调用方的 `bridgeSurfaceCallbackResult`。
 - [x] 引擎模块：JSC/QJS 的每个具体类型去掉 `typealias Engine`，声明 `Context` 与所需别名；`JSCEngine`/`QJSEngine` 不再遵循 surface；scope/context 改为实现落账原语（`ScopeCore<JSCContextHandle, …>`/`ScopeCore<QJSContextHandle, …>`、`JSContextStorage<…ContextHandle>`、`JSFunctionCallback<…InstantContext>`）；持久 handle 的 mint 在两个 scope 间共用文件内私有函数。
-- [x] 宏插件：`@JSValueAutoSerialization` 模板改用 `C.Value`/`C.ContextHandle.ValueHandle`/`C.ContextHandle.OwnedValueHandle`，`init`/`tryDecode` 改为单根签名，显式转换器分支不再需要先把值 anchor 成本引擎视图。
+- [x] 宏插件：`@JSValueAutoSerialization` 模板改用 `C.Value`/`C.CallbackValue` 与 `context.localValue`/`withInstantWindow`，`init`/`tryDecode` 改为单根签名，显式转换器分支不再需要先把值 anchor 成本引擎视图；3.17.6 已删除模板中最后一批 `C.ContextHandle.ValueHandle`/`OwnedValueHandle` 引用。
 - [x] 测试与基准：`run<E: JSEngineSurface>` → `run<C: JSContext>`（`ScriptEngineAssertion`、benchmark、全部 suite），仅作类型标记的 `engine` 形参改名 `contextType`；Mock 改为以 `MockSurfaceContext` 为锚点（`MockEngine: JSEngineRuntimeDriver, JSEngineClassBridgeDriver` 作 class 桥）；conformance 检查改为“把引擎的具体类型传到 context 关联类型位置”的调用点 sink；`PackageSeamTests` 的值级 seam 改经 scope 协议默认实现；`bridgeSurfaceCallbackResult` 账本用例改为 `bridgeSurfaceHandleResult` 用例；手写 `JSValueDecodable`/`JSValueDecoder` 见证同步。
 - [x] 文档：`docs/MULTI_ENGINE_BACKENDS.md`、`docs/MULTI_ENGINE_BACKENDS.zh-CN.md`、`docs/VALUE_MANAGEMENT_REFACTORING.md`、`docs/PERSISTENT_HANDLE_DESIGN.md` 的 `JSEngineSurface` 与 `Engine.` 参数化片段改为 context 锚点模型。
 - [x] 验证（本会话实际运行）：`swift build`、`swift build --build-tests` Build complete；`swift test` 293 个用例全部通过（SwiftyQuickJSTests 44、SwiftyJavaScriptCoreTests 67、SwiftJavaScriptTests 106、SwiftJavaScriptEngineTests 76），`swift format --in-place` 之后重跑仍全部通过；改动的 `.swift` 已 `swift format --in-place`；`rg 'JSEngineSurface|JSSurfaceFactory' Sources Tests Benchmarks` 零命中。未处理：`JSClassDefinition.swift` 的 4 条 “capture of non-Sendable type … in an isolated closure” 警告来自 class 层既有的泛型元类型捕获，本轮未动。
+
+### 3.17 协议面清除全部 Handle 类型（已完成）
+
+背景：分支 `refactor/context-anchor` 的基线 `6637146` 上，public 协议面仍直接暴露引擎 handle。
+`JSContext`/`JSValue`/`JSCallbackValue`/`JSValueScope`/`JSVirtualMachine`/`JSPropertyStringKey`/
+`JSPreparedScript`/`JSArrayBuffer`/`JSTypedArray`/`JSClass` 声明 `ContextHandle`/`ValueHandle`/
+`OwnedValueHandle`/`ClassHandle`/`RuntimeHandle`/`Handle` 关联类型，或暴露 `borrowHandle()`/
+`contextHandle`/`driverContextHandle`/`driverRuntimeHandle`/`classHandle()`/`adoptCreatedHandle`/
+`anchorBorrowedHandle`/`adoptCallbackHandle`，`call`/`construct`/`invokeMethod` 收 `[ValueHandle]`；
+core 还有约 130 个建在 driver handle 上的 public 默认实现。目标：public 协议面不再出现任何引擎 handle
+类型或 handle 级成员，唯一例外是 `JSPersistentHandle`（持久绑定身份，不是引擎句柄）；JSC/QJS/Mock 在
+自己的具体类型上直接实现协议操作；handle 协议与 context driver 协议降为 package 或更窄；宏模板、
+Codable 对象/数组遍历与 class 层三处依赖方同步改造；账本（值/异常各落账一次、persist 转移、函数值挂
+默认 scope）、`~Copyable`、线程隔离与“以 `JSContext` 为锚点”的泛型约定不得回退。完整设计见
+`.build/dehandle/design.md`。
+
+**被覆盖的旧决策**
+
+- §3.15.1「public 落账原语只有 scope/context 上的 `adoptCreatedHandle` 与 `anchorBorrowedHandle`」作废：
+  这两个成员从 public 协议删除，改为引擎具体类型上的 `package` 内部方法；`JSScopeWitness` 的
+  `scopeFrame`/`makeValue` 等 package 缝保留。
+- §3.15.1「handle 层 requirement 一律无默认实现」的适用范围缩到 package handle 层；public 面不再有
+  handle requirement，因而不存在 public handle 默认实现。
+- §3.16 中「scope 只留落账原语，值工厂/global 读写/脚本/data 由 core 协议扩展默认实现」「context 的
+  工厂/global/脚本/data 默认实现建在 `adoptCreatedHandle` 与 driver 操作上」作废：这些实现下沉到
+  引擎，core 只保留经值级 requirement 组合的算法（设计文档 §3.1）。
+- §3.16「`JSEngineClassBridgeDriver` 的 `Context`/`Value`/`InstantContext`/`Arguments`/`Class` 别名 +
+  句柄级 statics」的句柄级部分作废：statics 改为值级 `makeClass(definition:identity:in:)`/
+  `makeHostObject`/`hostObjectPrivateData`，`JSClass` 不再有 `ClassHandle`。
+- §3.16「`JSContext` 的默认实现建在 `adoptCreatedHandle` 与 driver 操作上」作废；`JSContext` 的同型
+  等式集合相应缩减（去掉 Handle 类等式），`CallArgument` 只作为裸关联类型新增，不引入回钉。
+
+**方案要点**（细节以 `.build/dehandle/design.md` 为准）
+
+- 值视图去 handle。调用实参改为值级 token：`JSCallArgument` 标记协议 + `JSContext.CallArgument` +
+  `JSValue.asCallArgument()` + `JSCallbackValue.asCallArgument()`（`JSValueScope.makeNumber/makeString`
+  返回 CallbackValue，回调窗口新建的值必须能直接当实参）；token 只存 borrowed handle，只在源 arena
+  存活且用于紧接着的同步调用时有效。
+- 新增 `JSValueScope.withInstantWindow` 与 `localValue`：泛型 scope 代码（Codable encode、宏 encode）
+  经窗口拿值操作，不引入 `Context.InstantContext == Self` 回钉；窗口算术产物不得逃逸，CallbackValue
+  需跨窗口先 `persist`，Value 产物只能在闭包内用完或 `makePersistentHandle`。
+- `installGlobalFunction` 与 `setGlobalProperty(CallbackValue:)` 留在 core 做值级组合
+  （`makeFunction` + `makePropertyStringKey` + 窗口内 `globalObjectValue().setProperty`；以及
+  `setGlobalProperty(localValue(value), …)`）；只有会新建并 adopt 值的操作（工厂、global 读、脚本结果、
+  persistent、data、`makeFunction`、key/script）由引擎直接实现。
+- `JSEngineClassBridgeDriver` 保持 public 但值级化，class 泛型锚（`E`）不换；`JSClass`/`JSContext`
+  去掉 `ClassHandle`，class 缓存按 `(ObjectIdentifier, 引擎内 runtime)` 下沉引擎并保留 Mutex +
+  “首建者定义获胜”；QJS 的 `makeClass` 只分配 classID/写记录/写缓存，`JS_NewClass`/`JS_SetClassProto`/
+  父类 prototype/initialize/static members/context record 仍留在 `makeHostObject`。
+- `adoptArrayBufferBytesNoCopy` 保留为 core 的 `package` helper + `JSArrayBufferHostScope`，“拒绝时字节
+  只释放一次”仍由 core 保证，`sharedArrayBufferByteHelperLedger` 继续可测。
+- handle 协议（`JSManualReferenceCountedHandle` 及子协议）、`JSScopeContextHandle`、5 个 context
+  driver 协议、`JSEngine*` 驱动协议、`JSValueHandle` 别名与全部 `JSC*/QJS*Handle` 降为 `package`；
+  `JSCEngine`/`QJSEngine` 的 handle 别名保留为 `package typealias`（`JSEngineRuntimeDriver` 仍要求
+  witness）；测试 target 的 Mock handle 保持 public。public 面只剩 `JSPersistentHandle` 家族这一种
+  handle 命名类型。
+- 每片结束时 `swift build`（含 `--build-tests`）与 `swift test` 必须通过；全量 `swift test`、文档同步
+  与最终 `swift format` 由脚本收口。
+
+**完成记录（收口）**
+
+- 3.17.1–3.17.7：按设计文档 §9 的片序完成“实现下沉 + core 默认实现删除”。调用实参换成 `JSCallArgument` 值级 token；`JSValue`/`JSCallbackValue`、两个 scope、`JSContext`、buffer 的字节/形状访问、Codable 遍历与宏模板、class 层的值级 statics 全部改由 JSC/QJS/Mock 直接实现；`withInstantWindow`/`localValue` 落位，`JSScopeSurfaceDefaults.swift`、`JSValueOperations.swift` 等 core 默认实现删除。逐项明细见下方 3.17.1–3.17.7 条目。
+- 3.17.8：删除 public 协议上的全部 handle 关联类型、成员与等式；`JSScopeWitness` 接管 `ContextHandle`/`driverContextHandle`/`scopeFrame`/`makeValue`，并注明 `ContextHandle` 只剩约定；引擎具体类型的 `driverContextHandle`、`adoptCreatedHandle`、`adoptCallbackHandle`、`anchorBorrowedHandle`、`borrowHandle(in:)`（含 precondition）与 `CallbackReturn.borrowHandle()` 全部降为 package。`SwiftJavaScriptEngineTests` 改为值级配方，raw driver 用例下沉引擎 target。
+- 3.17.9：handle 协议、5 个 context driver 协议、`JSEngine*` 驱动协议、`JSValueHandle`/`JSOwnedValueHandle` 别名与全部 `JSC*/QJS*Handle` 降为 package；`JSCEngine`/`QJSEngine` 的 handle 别名保留为 `package typealias`，测试 target 的 Mock handle 保持 public。
+- 收口后的 public 面：`JSContext` 只声明值级关联类型（新增裸 `CallArgument`）；`JSValue`/`JSCallbackValue`/`JSValueScope`/`JSVirtualMachine`/`JSPropertyStringKey`/`JSPreparedScript`/`JSArrayBuffer`/`JSTypedArray`/`JSClass` 不再有 handle 关联或 handle 级成员；public 面唯一保留的 “handle” 命名类型是 `JSPersistentHandle` 家族（身份例外）。
+- 验证：代码改动完成后 `swift build` 与 `swift test` 已通过（任务说明提供，本次文档同步未重跑）。本会话实际运行 `git diff HEAD --stat` 核对改动范围，并复跑设计文档 §8.3 的 S1–S8 搜索：S1–S5、S7、S8 零命中，S6 只有 6 处 `public typealias PersistentHandle`（§8.3 第 4 条的显式例外）。
+
+**分片记录**
+
+- [x] 3.17.1 调用参数换值级载体：`JSContext.CallArgument`、`JSValue`/`JSCallbackValue.asCallArgument()`、5 个 `call`/`construct`/`invokeMethod` 形参改 `[Context.CallArgument]`；core 删除调用类默认实现，JSC/QJS/Mock 直接实现；测试实参改 `.asCallArgument()`（含 CallbackValue 与 `scope.persist(...)` 两类）；`SurfaceValueDefaultsTests` 的两个私有 conformer 补 6 个临时 witness（片 2 替换为真实实现）。
+- [x] 3.17.2 值操作下沉引擎：`JSValue`/`JSCallbackValue` 的转换、相等、属性/索引读写、调用、`#isolation` 形式全部由引擎/Mock 直接实现；新增 `getProperty(at:)`/`setProperty(at:)`、`JSValueScope.localValue`；四个 callback-value 重载升级为要求；core 只留 `type()` 派生的 8 个谓词默认与 `bridgeSurfaceHandleResult`（片 6 删）；协议上的 handle 成员本片保留。
+- [x] 3.17.3 scope 操作下沉引擎：删除 `JSScopeSurfaceDefaults.swift`；JSC/QJS/Mock 实现会新建并 adopt 值的要求；`installGlobalFunction`、`setGlobalProperty(CallbackValue:)` 留在 core；新增 `withInstantWindow`；`evaluateScript(String)` 降为扩展便利；补省略 attributes 的便利重载。
+- [x] 3.17.4 context 操作下沉引擎：删除 `JSContext` 扩展的工厂/global/脚本/data 默认；`installGlobalFunction` 保留为要求 + core 值级默认；`evaluateScript(String)` 降为扩展便利；JSC/QJS/Mock context 实现值生产类要求。
+- [x] 3.17.5 buffer 下沉并去 handle：引擎/Mock 直接实现 `byteLength`/`bytes`/`withUnsafe*` 与 typed-array 形状访问；删 `JSArrayBuffer`/`JSTypedArray` 的 `ContextHandle`/`contextHandle`/`borrowHandle()` 与 `JSContext.swift:104,110` 两条等式；`adoptArrayBufferBytesNoCopy` 改写为 core package helper + `JSArrayBufferHostScope`，保留失败账本用例。
+- [x] 3.17.6 Codable 与宏改值级：`JSCodableValueConverterSurface` 改用 `isArray`/`propertyNames`/`getProperty(at:)`/PropertyStringKey 读写与 `withInstantWindow`；宏模板按出口区分参数解码、8 处属性/索引 helper 改值级但保留 `from:` 标签（`JSValueConversionMacros.swift` 的 6 组 `named(...)` 不动）；删 `bridgeSurfaceHandleResult`；新增 `JSScope` 上的 Codable 用例与 core mock 的窗口结算账本用例。
+- [x] 3.17.7 class 层改值级：`JSClass` 去 `ClassHandle`/`classHandle()`，`JSContext` 去 `ClassHandle` 关联与等式；`JSClassParentDescriptor`/`JSClassValueConvertible.jsClass(in:)` 改收 `InstantContext`（`@Sendable`+`borrowing`）；JSC 三层创建链穿透；QJS 缓存键 `(identity, runtime)` 与记录键 `(runtime, classID)` 分开，注册/prototype/初始化留在 `makeHostObject`；`JSCClass.ref`/`init(ref:)` 降为 package（不删除）；同步 `JSMovedCoreTypesTests`、`JavaScriptCoreBackendDriverTests` 等。
+- [x] 3.17.8 删除协议 handle 面：在 core 已无 `value.borrowHandle()` 调用点后，删除 `JSContext`/`JSValue`/`JSCallbackValue`/`JSCallbackReturn`/`JSValueScope`/`JSVirtualMachine`/keys/scripts 的 handle 关联与成员及对应等式；`JSScopeWitness` 接管 handle 成员（并注明只剩约定）；引擎具体类型把 ledger、`borrowHandle(in:)`（含 precondition）、CallbackReturn handle 降为 package；按设计文档 §8.4.1 改写 `SwiftJavaScriptEngineTests` 七个泛型文件（具体引擎分叉 + 值级改写 + driver 用例下沉引擎 target）。已完成：`JSContext`/`JSValue`/`JSCallbackValue`/`JSCallbackReturn`/`JSValueScope`/`JSVirtualMachine`/`JSPropertyStringKey`/`JSPreparedScript` 的 `ContextHandle`/`ValueHandle`/`OwnedValueHandle`/`RuntimeHandle`/`Handle` 关联类型与 `driverContextHandle`/`adoptCreatedHandle`/`adoptCallbackHandle`/`anchorBorrowedHandle`/`borrowHandle()`/`contextHandle`/`driverRuntimeHandle`/`makeContextHandle` 成员及全部钉住它们的等式删除；`JSScopeContextHandle` 组合别名随最后一个使用者一起删除。`JSScopeWitness` 自持 `ContextHandle`/`driverContextHandle`/`scopeFrame`/`makeValue`，并在注释里写明 `ContextHandle` 此后只是约定（实现必须用 `Context` 自己的 handle 类型）。JSC/QJS 的 `driverContextHandle`（含新增 `runtimeDriver` 包内访问器）、`adoptCreatedHandle`/`adoptCallbackHandle`/`anchorBorrowedHandle`、`JSC/QJSPropertyStringKey`/`PreparedScript.borrowHandle(in:)`（precondition 保留）与 `JSC/QJSCallbackReturn.borrowHandle()` 降为 package，并删除 context 上的三个 public handle typealias；QJS trampoline 改读 `result.handle.ref`。`SwiftJavaScriptEngineTests` 七个泛型文件按 §8.4.1 改为值级配方（`persist`/`makeObject`/`evaluateScript`/`localValue`/`PropertyStringKey`/索引 API）并把只能经 raw driver 表达的用例（跨 context 值、value-key 驱动、typed-array 非法切片、栈顶身份）下沉到 JSC/QJS target 的具体测试；`Support.swift` 的驱动分叉改为 `engineRuntimeDriver` + 具体 context 的 `collectGarbage()`，以避免测试面重新出现 handle 类型名。`MockSurfaceTypes` 的 conformance sink 去掉三个 handle 参数、`MockSurfaceContext` 去掉同名 typealias。基准删去 witness/actor 两条 driver 转换路径对比，保留 resolve/mint/invalidate 计时并改读 `value.toNumber()`。验证（本会话实际运行）：四个库 target 的 `swift build`（宏插件因同名 target 由整体 `swift build` 覆盖）、`swift build --build-tests`、`swift build --product PersistentHandleBenchmarks` 均 Build complete；`swift test --filter "SurfaceConformanceTests|JSCContextSurfaceTests|QJSContextSurfaceTests|JSCScopeSurfaceTests|QJSScopeSurfaceTests|PackageSeamTests|PersistentHandleContractTests|JSEngineCoreTypesTests|EngineScopeContractTests|EngineValueConversionTests|EngineTypedArrayDriverTests|EnginePropertyDriverTests|EngineRuntimeDriverTests|ValueCoreCrossEngineTests|ValueOperationsCrossEngineTests"`（四个 test target 27/26/75/53 个用例）与额外 `EngineInvocationDriverTests|SurfaceScopeCrossEngineTests`、`JSCValueOperationsTests|QJSValueOperationsTests|JSCValueCoreTests|QJSValueCoreTests|SurfaceValueDefaultsTests|JSMovedCoreTypesTests|JSClassTests|QuickJSContextTests|JavaScriptCoreBackendDriverTests|JSValueAutoConvertibleMacroTests|EnginePreparedInputTests` 全部通过；§8.4 收口搜索（core Surface 的 handle 名、`associatedtype ...Handle`、`Tests/SwiftJavaScriptEngineTests`、QJS trampoline、Benchmarks）全部零命中；改动文件已 `swift format --in-place`。偏差：`JSScopeContextHandle` 是删除而非降级（已无使用者）；`Support.swift` 的引擎分叉与 GC 助手签名相对 §8.4.1 做了改名/改形，以满足“测试 target 零 handle 名”的验收搜索；`EngineRuntimeDriverTests` 的跨 context 用例按 §8.4.1 的兜底下沉到两个引擎 target。
+- [x] 3.17.9 handle 可见性收口：handle 协议、driver 协议、`JSEngine*`、`JSValueHandle` 别名与全部引擎 `*Handle` 降为 package，类型降级时成员修饰符一并改写；`JSCEngine`/`QJSEngine` 别名保留为 package typealias；测试 target 的 Mock handle 保持 public；按设计文档 §8.3 的 8 条搜索清零（`PersistentHandle` 显式例外，`adoptArrayBufferBytesNoCopy` 为预期保留）。已完成：core 的 8 个 `JS*ManualReferenceCountedHandle`、`JSEngineValueTypes`/`JSContextRuntimeDriver`/`JSEngineRuntimeDriver`/`JSContextPropertyDriver`/`JSEnginePropertyDriver`/`JSContextInvocationDriver`/`JSEngineInvocationDriver`/`JSContextPreparedScriptDriver`/`JSEnginePreparedScriptDriver`/`JSContextTypedArrayDriver`/`JSEngineTypedArrayDriver`、`JSValueHandle`/`JSOwnedValueHandle` 别名与 `JSContextEngine`/`JSEngine` 别名降为 package；`JSCEngine`/`QJSEngine` 的 7 个 handle 别名改为 `package typealias`（保留 `JSEngineRuntimeDriver` witness），引擎与 context-handle 的 driver 扩展成员（含 `capabilities`、`makeRuntimeHandle`、prepared-script/typed-array/property/invocation witness）一并改为 package；JSC/QJS 全部 `*Handle` 结构体（`Context`/`Value`/`OwnedValue`/`Runtime`/`Class`/`PropertyStringKey`/`PreparedScript`）及其 `retainReference`/`releaseReference`/`==`/`hash`/`borrowed`/`adopting`/`Context`/`Owned`/`Borrowed`/`engineType` 降为 package；`JSCValue`/`QJSValue`/`JSC/QJSCallbackValue` 的 `ContextHandle`/`ValueHandle` typealias、`contextHandle`、`borrowHandle()`，`JSC/QJSInstantContext`/`Scope` 的 `ContextHandle`，VM 的 `ContextHandle`/`RuntimeHandle`，keys/scripts 的 `ContextHandle`/`Handle` 全部降为 package；`JSCEngine.runtimeHandle(for:)`、`QJSEngine.runtimeHandle(for:)`、`QJSEngine.classDefinition(for:in:)` 降为 package。为使 §8.3 第 3 条（`arguments: [.*ValueHandle]`）在保留 package driver 协议的前提下可清零，把 invocation driver 的 handle 数组形参从 `arguments:` 改名为 `argumentHandles:`（core 协议、JSC/QJS 引擎与 context witness、Mock witness、JSC/QJS/Mock 的 44 处调用点同步；值级 `call(arguments:)` 不变）。测试适配：`JSEngineCoreTypesTests` 的 132 处 `JSValueHandle<MockEngine>` 改写为等价的 `MockValueHandle`，以便 Mock 的 public witness 不再引用 package 别名；Mock handle 类型与 `MockEngine`/`MockSurface*` 的 public typealias 保持 public。验证（本会话实际运行）：`swift build`（覆盖宏插件；单 target 构建因同名 target 报错，与片 8 相同）、`swift build --build-tests`、`swift build --product PersistentHandleBenchmarks` 均 Build complete；`swift test --filter "SurfaceConformanceTests|PackageSeamTests|JSEngineCoreTypesTests|PersistentHandleContractTests|JSCContextSurfaceTests|QJSContextSurfaceTests|JSCScopeSurfaceTests|QJSScopeSurfaceTests|EngineScopeContractTests|EngineValueConversionTests|EngineTypedArrayDriverTests|EnginePropertyDriverTests|EngineRuntimeDriverTests|ValueCoreCrossEngineTests|ValueOperationsCrossEngineTests|EngineInvocationDriverTests|SurfaceScopeCrossEngineTests|JSCValueOperationsTests|QJSValueOperationsTests|JSCValueCoreTests|QJSValueCoreTests|SurfaceValueDefaultsTests|JSMovedCoreTypesTests|JSClassTests|QuickJSContextTests|JavaScriptCoreBackendDriverTests"` 四个 test target 50/51/97/66 个用例全部通过；§8.3 八条搜索 S1–S5、S7、S8 零命中，S6 仅剩 6 处 `public typealias PersistentHandle`（public 协议 `JSContext`/`JSInstantContext`/`JSScope` 的关联类型 witness，属任务显式例外，同 §8.3 第 4 条过滤口径）；`^public protocol JS(...)` 零命中且对应 `^package protocol` 命中；`package typealias` 的五个 engine handle 别名在 `Engine` 目录命中 14 处（别名是 enum 成员，带缩进，故任务给的 `^package typealias` 锚定写法命中 0，改用去锚定命令核验）；Mock 侧的 public `*Handle` 与 handle typealias 仅剩 Mock 类型；改动文件已 `swift format --in-place`。
+
 ### 3.15.1 S15 收口决策、source breaks 与账本复核
 
-> 3.16 起 `JSEngineSurface` 已删除，用户面类型改由 `JSContext` 锚定；本节保留作 3.15 当时的记录，现状以 §3.16 为准。
+> 3.16 删除了 `JSEngineSurface`，用户面类型改由 `JSContext` 锚定；3.17 又删除了 public 协议上的全部
+> handle 关联与成员。本节保留作 3.15 当时的记录；下列与现状冲突处已就地注明，现状以 §3.16/§3.17 为准。
 
 **协议分层定稿**
 
 - `JSEngineValueTypes` 只描述共享 arena/registry/转换所需的 `(ContextHandle, ValueHandle, OwnedValueHandle)` 三元组，不承载任何用户面值类型。
-- `JSEngineSurface` 钉住 15 个用户面关联类型（Value/CallbackValue/CallbackReturn/Arguments/CallbackArguments/InstantContext/Scope/Context/VirtualMachine/PersistentHandle/PropertyStringKey/PreparedScript/ArrayBuffer/TypedArray/Class）到同一引擎；用户面类型是 public 协议，`JSCValue`/`QJSValue`、`JSCContext`/`QJSContext` 等是引擎具体类型。
-- handle 层 requirement 一律无默认实现；值层的 `~Copyable` 默认实现全部写成 `extension … where Self: ~Copyable`，Copyable 的 `JSContext` actor 扩展不需要该约束。
+- `JSEngineSurface` 已于 §3.16 删除。当前由 `JSContext` 锚定同一引擎的 15 个用户面关联类型（Value/CallbackValue/CallbackReturn/Arguments/CallbackArguments/InstantContext/Scope/VirtualMachine/PersistentHandle/PropertyStringKey/PreparedScript/ArrayBuffer/TypedArray/Class/CallArgument）；用户面类型是 public 协议，`JSCValue`/`QJSValue`、`JSCContext`/`QJSContext` 等是引擎具体类型。
+- package handle 层 requirement 一律无默认实现（`JSContextRuntimeDriver` 及其 driver 协议）；3.17 后 public 协议面没有 handle requirement，因而也没有对应的 public handle 默认实现。值层的 `~Copyable` 默认实现全部写成 `extension … where Self: ~Copyable`，Copyable 的 `JSContext` actor 扩展不需要该约束。
 
-**public 落账原语与 package 缝**
+**落账原语与 package 缝（3.15 记录；3.17 已全部降为 package）**
 
-- public 落账原语只有 scope/context 上的 `adoptCreatedHandle`（转移引擎新建引用，track 一次）与 `anchorBorrowedHandle`（claim 后 track 一次）；不存在 public `makeValue(handle:)`。
-- `JSSurfaceFactory.makeValue`、`JSScopeWitness.makeValue`、`ScopeCore`/`ScopeFrame`/`ScopeStack`、`JSPersistentHandleRegistry`、`VMThread` 等构造/调度成员是 `package` 内部缝；引擎模块经 public 协议 + 这些 package 缝接线。`JSPersistentHandleIdentity` 是唯一 public 的 registry 身份类型。
+- 3.17 后不存在 public 落账原语：`adoptCreatedHandle`（转移引擎新建引用，track 一次）与 `anchorBorrowedHandle`（claim 后 track 一次）是引擎具体 scope/context 上的 `package` 方法，只在引擎模块内部与 package 测试可见；public 协议只暴露会新建并 adopt 值的值级操作。不存在 public `makeValue(handle:)`。
+- `JSScopeWitness.makeValue`、`ScopeCore`/`ScopeFrame`/`ScopeStack`、`JSPersistentHandleRegistry`、`VMThread` 等构造/调度成员是 `package` 内部缝；`JSSurfaceFactory` 已随 §3.16 删除。引擎模块经 public 协议 + 这些 package 缝接线。`JSPersistentHandleIdentity` 是唯一 public 的 registry 身份类型。
 - `JSCClassParentDescriptor`/`JSCStaticValue`/`JSCStaticFunction`/`JSCAutoClassDefinition` 保留为 facade 薄别名；`QJSClassDefinition` 与 `QJSVirtualMachine.gc()` 保留为 QJS 专属公开面。
 
 **Source breaks（相对迁移前）**
@@ -216,13 +299,13 @@
 - 引擎标记改名 `JavaScriptCoreEngine` → `JSCEngine`、`QuickJSEngine` → `QJSEngine`；handle 全部改为 `JSC*`/`QJS*`，`*Legacy` 类型与 `JSValueConversionEngine` 已删除。
 - `JSClass` 现为 core 协议，`JSCClass`/`QJSClass` 是具体类；buffer/class legacy 包装与 `JSCClassLegacy`/`JSCFunctionCallback` 过渡别名不再存在。
 - 转换协议最终名为 `JSValueDecodable`/`JSValueEncodable`/`JSValueDecoder`/`JSValueEncoder`/`JSValueCodable`/`JSDefaultConverter`/`JSValueConverter`；临时 `*Surface` 协议名已无声明。
-- 值构造入口不再由 public factory 暴露；值视图只能由 scope/context 的落账原语产生。
+- 值构造入口不再由 public factory 暴露；引擎在具体 scope/context 内用 package 落账原语构造值视图，public 入口是值与 scope/context 的值级操作。
 
 **lifecycle 账本复核（唯一调用点）**
 
-- persist transfer：`ScopeCoreHandleSurface.persistHandle` 的 `ScopeFrame.takeFirst` + `target.track`。
-- anchor：`ScopeCore.anchorBorrowedHandle` 的 `claimOwnedValueHandle` + `track`。
-- adopt：`ScopeCore.adoptCreatedHandle` 的 `track`（消费 owned handle）。
+- persist transfer：`ScopeCore.transferToDefaultFrame` 的 `takeFirst` + `track`，由 JSC/QJS scope 的 `persist` 调用。
+- anchor：引擎 scope/context 的 package `anchorBorrowedHandle` → `ScopeCore.claimAndTrackHandle` 的 `claimOwnedValueHandle` + `track`。
+- adopt：引擎 scope/context 的 package `adoptCreatedHandle` → `ScopeCore.trackCreatedHandle` 的 `track`（消费 owned handle）。
 - registry claim/root：`JSPersistentHandleRegistry.mintIdentity` 成对调用 `claimOwnedValueHandle` + `rootOwnedValueHandle`。
 - settle：`JSPersistentHandleRegistry.settle` 成对 `unrootOwnedValueHandle` + `releaseCreatedHandle`，只由 pump 与 `close()` 调用。
 

@@ -10,18 +10,16 @@ import SwiftJavaScript
 
 public struct QJSCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
   public typealias Context = QJSContext
-  public typealias ContextHandle = QJSContextHandle
-  public typealias ValueHandle = QJSValueHandle
 
   package let handle: QJSValueHandle
-  public let contextHandle: QJSContextHandle
+  package let contextHandle: QJSContextHandle
 
   package init(handle: QJSValueHandle, contextHandle: QJSContextHandle) {
     self.handle = handle
     self.contextHandle = contextHandle
   }
 
-  public borrowing func borrowHandle() -> QJSValueHandle {
+  package borrowing func borrowHandle() -> QJSValueHandle {
     handle
   }
 
@@ -32,12 +30,43 @@ public struct QJSCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
     }
     return valueType
   }
+
+  // MARK: - Conversion and equality
+  //
+  // The callback window's views are `noasync` on the concrete type: they only
+  // exist inside a synchronous callback window.
+
+  @available(*, noasync)
+  public func toString() -> String {
+    contextHandle.toStringForHandle(handle) ?? ""
+  }
+
+  @available(*, noasync)
+  public func toNumber() -> Double {
+    contextHandle.toNumberForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func toBoolean() -> Bool {
+    contextHandle.toBooleanForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func looselyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
+    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+
+  @available(*, noasync)
+  public func strictlyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
+    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
 }
 
 public struct QJSCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = QJSContext
-  public typealias ValueHandle = QJSValueHandle
 
+  /// The borrowed engine handle carried by this handoff. Package-internal:
+  /// the trampoline and the same-package tests are the only readers.
   package let handle: QJSValueHandle
   public let isException: Bool
 
@@ -61,7 +90,7 @@ public struct QJSCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
     self.isException = true
   }
 
-  public borrowing func borrowHandle() -> QJSValueHandle {
+  package borrowing func borrowHandle() -> QJSValueHandle {
     handle
   }
 }

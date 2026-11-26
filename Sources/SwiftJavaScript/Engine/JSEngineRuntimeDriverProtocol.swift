@@ -11,7 +11,7 @@
 /// that declares and pins only its own members; code generic over an engine
 /// anchors on `JSContext`. `JSEngineValueTypes` is an implementation seam for
 /// the handle layer and is not referenced by any of those protocols.
-public protocol JSEngineValueTypes {
+package protocol JSEngineValueTypes {
   associatedtype ContextHandle: JSContextManualReferenceCountedHandle
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
   where ValueHandle.Context == ContextHandle
@@ -28,7 +28,7 @@ public protocol JSEngineValueTypes {
 /// as `context.foo(handle)` instead of the former engine-static
 /// `E.foo(handle, in: context)`. Each engine's `ContextHandle` type conforms;
 /// the engine type keeps only lifecycle/capability requirements.
-public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
+package protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   /// The synchronous scope type callbacks on this context run in. The
   /// callback entry hands the engine its own callback views, so the context
   /// names the scope type they belong to.
@@ -126,7 +126,7 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 /// Engine-side descriptor: associated types, capabilities, and runtime/context
 /// lifecycle. Value operations moved to `JSContextRuntimeDriver`, implemented
 /// by `ContextHandle`.
-public protocol JSEngineRuntimeDriver: JSEngineValueTypes
+package protocol JSEngineRuntimeDriver: JSEngineValueTypes
 where
   ContextHandle: JSContextRuntimeDriver,
   ContextHandle.ValueHandle == ValueHandle,

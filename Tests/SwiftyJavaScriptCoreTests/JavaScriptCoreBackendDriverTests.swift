@@ -63,8 +63,21 @@ import Testing
     Issue.record("expected runtime handle to create context handle")
     return
   }
-  let madeClass: JSCClass = JSCEngine.makeClass(definition: definition, in: runtime)
-  #expect(madeClass.classHandle().ref == madeClass.ref)
+  do {
+    let context = JSCInstantContext(handle: contextHandle)
+    let identity = ObjectIdentifier(JSCAutoClassDefinition.self)
+    let madeClass = JSCEngine.makeClass(
+      definition: definition,
+      identity: identity,
+      in: context
+    )
+    let cachedClass: JSCClass = JSCEngine.makeClass(
+      definition: definition,
+      identity: identity,
+      in: context
+    )
+    #expect(madeClass == cachedClass)
+  }
 
   let undefinedHandle = JSCValueHandle(ref: JSValueMakeUndefined(contextHandle.ref))
   let madeValue: JSCValue = JSCValue(

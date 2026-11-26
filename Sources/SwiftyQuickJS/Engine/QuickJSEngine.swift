@@ -12,13 +12,13 @@ import SwiftJavaScript
 #endif
 
 public enum QJSEngine: Sendable {
-  public typealias RuntimeHandle = QJSRuntimeHandle
-  public typealias ContextHandle = QJSContextHandle
-  public typealias ValueHandle = QJSValueHandle
-  public typealias OwnedValueHandle = QJSOwnedValueHandle
-  public typealias ClassHandle = QJSClassHandle
-  public typealias PropertyStringKeyHandle = QJSPropertyStringKeyHandle
-  public typealias PreparedScriptHandle = QJSPreparedScriptHandle
+  package typealias RuntimeHandle = QJSRuntimeHandle
+  package typealias ContextHandle = QJSContextHandle
+  package typealias ValueHandle = QJSValueHandle
+  package typealias OwnedValueHandle = QJSOwnedValueHandle
+  package typealias ClassHandle = QJSClassHandle
+  package typealias PropertyStringKeyHandle = QJSPropertyStringKeyHandle
+  package typealias PreparedScriptHandle = QJSPreparedScriptHandle
 }
 
 func quickJSResultHandle(

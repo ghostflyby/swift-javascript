@@ -4,7 +4,7 @@
 ///
 /// This alias only names the driver capabilities. An engine's user-facing
 /// types are bound by its context (`JSContext`), not by its engine type.
-public typealias JSContextEngine = JSEnginePropertyDriver & JSEnginePreparedScriptDriver
+package typealias JSContextEngine = JSEnginePropertyDriver & JSEnginePreparedScriptDriver
 
-public typealias JSEngine = Sendable & JSContextEngine
+package typealias JSEngine = Sendable & JSContextEngine
   & JSEngineInvocationDriver & JSEngineTypedArrayDriver

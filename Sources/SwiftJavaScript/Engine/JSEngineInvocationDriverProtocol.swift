@@ -1,14 +1,14 @@
 /// Context-side invocation operations (Stage 2B decomposition).
-public protocol JSContextInvocationDriver: JSContextRuntimeDriver {
+package protocol JSContextInvocationDriver: JSContextRuntimeDriver {
   func callFunctionHandle(
     _ function: ValueHandle,
     this thisValue: ValueHandle?,
-    arguments: [ValueHandle]
+    argumentHandles: [ValueHandle]
   ) -> JSResult<ValueHandle>?
 
   func constructHandle(
     _ constructor: ValueHandle,
-    arguments: [ValueHandle]
+    argumentHandles: [ValueHandle]
   ) -> JSResult<ValueHandle>?
 
   func toObjectHandle(_ value: ValueHandle) -> JSResult<ValueHandle>?
@@ -35,5 +35,5 @@ public protocol JSContextInvocationDriver: JSContextRuntimeDriver {
 
 /// Engine-side descriptor. Invocation requirements now live on
 /// `JSContextInvocationDriver`, implemented by `ContextHandle`.
-public protocol JSEngineInvocationDriver: JSEngineRuntimeDriver
+package protocol JSEngineInvocationDriver: JSEngineRuntimeDriver
 where ContextHandle: JSContextInvocationDriver {}

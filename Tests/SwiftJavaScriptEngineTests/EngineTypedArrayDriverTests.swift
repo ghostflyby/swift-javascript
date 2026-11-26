@@ -1,3 +1,5 @@
+import SwiftyJavaScriptCore
+import SwiftyQuickJS
 import Testing
 
 @testable import SwiftJavaScript
@@ -36,46 +38,14 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
 
     await context.withInstantContext { context in
       let buffer = C.ArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: context)
-      let invalidTypedArrayHandle = buffer.withValue { bufferValue in
-        context.driverContextHandle.makeTypedArrayHandle(
-          kind: .uint16Array,
-          arrayBuffer: bufferValue.borrowHandle(),
-          byteOffset: 1,
-          length: 1
-        )
-      }
-      #expect(invalidTypedArrayHandle == nil)
 
-      let postFailureEvaluation = context.evaluateScript("21 + 21")
-      switch consume postFailureEvaluation {
-      case .value(let value):
-        let result = value.toNumber()
-        #expect(result == 42)
-      case .exception:
-        Issue.record("Expected typed array construction failure to leave evaluation usable")
-      }
-
-      let typedArrayHandle = buffer.withValue { bufferValue in
-        context.driverContextHandle.makeTypedArrayHandle(
-          kind: .uint8Array,
-          arrayBuffer: bufferValue.borrowHandle(),
-          byteOffset: 2,
-          length: 3
-        )
-      }
-      guard let typedArrayHandle else {
-        Issue.record("Expected engine to create typed array with ArrayBuffer slice")
-        return
-      }
-
-      // Raw driver results carry a new engine reference; adopt it into the
-      // context default scope (the value view itself owns nothing).
-      let typedArrayValue = context.adoptCreatedHandle(
-        C.OwnedValueHandle.adopting(typedArrayHandle))
-      guard let typedArray = C.TypedArray(value: typedArrayValue, in: context) else {
-        Issue.record("Expected created value to wrap as a typed array")
-        return
-      }
+      let typedArray = C.TypedArray(
+        kind: .uint8Array,
+        buffer: buffer,
+        byteOffset: 2,
+        length: 3,
+        in: context
+      )
 
       var copiedBytes: [UInt8] = []
       typedArray.withUnsafeBytes { rawBuffer in
@@ -117,25 +87,11 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
       #expect(wholeBufferArrayByteLength == 6)
       #expect(wholeBufferBytes == [10, 20, 30, 40, 50, 60])
 
-      guard
-        let lengthConstructedHandle = context.driverContextHandle.makeTypedArrayHandle(
-          kind: .uint16Array,
-          length: 4
-        )
-      else {
-        Issue.record("Expected engine to create typed array by length")
-        return
-      }
-
-      let lengthConstructedValue = context.adoptCreatedHandle(
-        C.OwnedValueHandle.adopting(lengthConstructedHandle))
-      guard
-        let lengthConstructed = C.TypedArray(value: lengthConstructedValue, in: context)
-      else {
-        Issue.record("Expected length-created value to wrap as a typed array")
-        return
-      }
-
+      let lengthConstructed = C.TypedArray(
+        kind: .uint16Array,
+        length: 4,
+        in: context
+      )
       let lengthConstructedKind = lengthConstructed.kind
       let lengthConstructedLength = lengthConstructed.length
       let lengthConstructedByteLength = lengthConstructed.byteLength
@@ -145,6 +101,14 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
     }
   }
 }
+
+// MARK: - Raw driver rejection
+//
+// The invalid-slice failure path is only reachable through the engine's raw
+// typed-array driver (the public initializers trap on engine rejection), and
+// the public protocols no longer name that driver. The coverage lives in the
+// two concrete engine targets (`JSCScopeSurfaceTests`/`QJSScopeSurfaceTests`):
+// an invalid slice is rejected with `nil` and the engine stays usable.
 
 private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {

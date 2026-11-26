@@ -2,7 +2,7 @@ import JavaScriptCore
 import SwiftJavaScript
 
 extension JSCEngine: JSEnginePropertyDriver {
-  public static func makePropertyStringKeyHandle(
+  package static func makePropertyStringKeyHandle(
     _ value: String,
     in context: JSCContextHandle
   ) -> JSCPropertyStringKeyHandle? {
@@ -11,7 +11,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     return JSCPropertyStringKeyHandle(ref: keyRef)
   }
 
-  public static func makePropertyStringKeyHandle(
+  package static func makePropertyStringKeyHandle(
     _ value: StaticString,
     in context: JSCContextHandle
   ) -> JSCPropertyStringKeyHandle? {
@@ -22,7 +22,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     return JSCPropertyStringKeyHandle(ref: keyRef)
   }
 
-  public static func isPropertyStringKeyHandleCompatibleWithContext(
+  package static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: JSCPropertyStringKeyHandle,
     in context: JSCContextHandle
   ) -> Bool {
@@ -31,7 +31,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     return true
   }
 
-  public static func makeStringValueHandle(
+  package static func makeStringValueHandle(
     fromPropertyStringKey key: JSCPropertyStringKeyHandle,
     in context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
@@ -40,14 +40,14 @@ extension JSCEngine: JSEnginePropertyDriver {
     )
   }
 
-  public static func propertyNamesForHandle(
+  package static func propertyNamesForHandle(
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> [String]? {
     propertyNames(on: object, in: context)
   }
 
-  public static func getStaticStringPropertyHandle(
+  package static func getStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -57,7 +57,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getPropertyStringKeyHandle(
+  package static func getPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -65,7 +65,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     getProperty(key.ref, on: object, in: context)
   }
 
-  public static func setStaticStringPropertyHandle(
+  package static func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSValueHandle<JSCEngine>,
     to value: JSValueHandle<JSCEngine>,
@@ -82,7 +82,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func setPropertyStringKeyHandle(
+  package static func setPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSValueHandle<JSCEngine>,
     to value: JSValueHandle<JSCEngine>,
@@ -97,7 +97,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getValuePropertyHandle(
+  package static func getValuePropertyHandle(
     _ key: JSValueHandle<JSCEngine>,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -105,7 +105,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     getProperty(key, on: object, in: context)
   }
 
-  public static func getIndexPropertyHandle(
+  package static func getIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -113,7 +113,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     getProperty(at: index, on: object, in: context)
   }
 
-  public static func setValuePropertyHandle(
+  package static func setValuePropertyHandle(
     _ key: JSValueHandle<JSCEngine>,
     on object: JSValueHandle<JSCEngine>,
     to value: JSValueHandle<JSCEngine>,
@@ -128,7 +128,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func setIndexPropertyHandle(
+  package static func setIndexPropertyHandle(
     at index: UInt32,
     on object: JSValueHandle<JSCEngine>,
     to value: JSValueHandle<JSCEngine>,
@@ -142,7 +142,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func hasPropertyStringKeyHandle(
+  package static func hasPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -150,7 +150,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     hasProperty(key.ref, on: object, in: context)
   }
 
-  public static func hasStaticStringPropertyHandle(
+  package static func hasStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -160,7 +160,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func hasValuePropertyHandle(
+  package static func hasValuePropertyHandle(
     _ key: JSValueHandle<JSCEngine>,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -168,7 +168,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     hasProperty(key, on: object, in: context)
   }
 
-  public static func deletePropertyStringKeyHandle(
+  package static func deletePropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -181,7 +181,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func deleteStaticStringPropertyHandle(
+  package static func deleteStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -196,7 +196,7 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func deleteValuePropertyHandle(
+  package static func deleteValuePropertyHandle(
     _ key: JSValueHandle<JSCEngine>,
     on object: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
@@ -466,44 +466,44 @@ extension JSCEngine: JSEnginePropertyDriver {
 // MARK: - Context-side driver conformance (Stage 2B)
 
 extension JSCContextHandle: JSContextPropertyDriver {
-  public typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
+  package typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
 
-  public func makePropertyStringKeyHandle(_ value: String)
+  package func makePropertyStringKeyHandle(_ value: String)
     -> JSCPropertyStringKeyHandle?
   {
     JSCEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
-  public func makePropertyStringKeyHandle(_ value: StaticString)
+  package func makePropertyStringKeyHandle(_ value: StaticString)
     -> JSCPropertyStringKeyHandle?
   {
     JSCEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
-  public func isPropertyStringKeyHandleCompatibleWithContext(
+  package func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: JSCPropertyStringKeyHandle
   ) -> Bool {
     JSCEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
   }
 
-  public func makeStringValueHandle(
+  package func makeStringValueHandle(
     fromPropertyStringKey key: JSCPropertyStringKeyHandle
   ) -> JSCOwnedValueHandle? {
     JSCEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
   }
 
-  public func propertyNamesForHandle(on object: JSCValueHandle) -> [String]? {
+  package func propertyNamesForHandle(on object: JSCValueHandle) -> [String]? {
     JSCEngine.propertyNamesForHandle(on: object, in: self)
   }
 
-  public func getStaticStringPropertyHandle(
+  package func getStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSCValueHandle
   ) -> JSResult<JSCValueHandle>? {
     JSCEngine.getStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func setStaticStringPropertyHandle(
+  package func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSCValueHandle,
     to value: JSCValueHandle,
@@ -518,14 +518,14 @@ extension JSCContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func getPropertyStringKeyHandle(
+  package func getPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSCValueHandle
   ) -> JSResult<JSCValueHandle>? {
     JSCEngine.getPropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func setPropertyStringKeyHandle(
+  package func setPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSCValueHandle,
     to value: JSCValueHandle,
@@ -540,21 +540,21 @@ extension JSCContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func getValuePropertyHandle(
+  package func getValuePropertyHandle(
     _ key: JSCValueHandle,
     on object: JSCValueHandle
   ) -> JSResult<JSCValueHandle>? {
     JSCEngine.getValuePropertyHandle(key, on: object, in: self)
   }
 
-  public func getIndexPropertyHandle(
+  package func getIndexPropertyHandle(
     at index: UInt32,
     on object: JSCValueHandle
   ) -> JSResult<JSCValueHandle>? {
     JSCEngine.getIndexPropertyHandle(at: index, on: object, in: self)
   }
 
-  public func setValuePropertyHandle(
+  package func setValuePropertyHandle(
     _ key: JSCValueHandle,
     on object: JSCValueHandle,
     to value: JSCValueHandle,
@@ -569,7 +569,7 @@ extension JSCContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func setIndexPropertyHandle(
+  package func setIndexPropertyHandle(
     at index: UInt32,
     on object: JSCValueHandle,
     to value: JSCValueHandle
@@ -577,42 +577,42 @@ extension JSCContextHandle: JSContextPropertyDriver {
     JSCEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
   }
 
-  public func hasStaticStringPropertyHandle(
+  package func hasStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSCValueHandle
   ) -> Bool? {
     JSCEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func hasPropertyStringKeyHandle(
+  package func hasPropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSCValueHandle
   ) -> Bool? {
     JSCEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func hasValuePropertyHandle(
+  package func hasValuePropertyHandle(
     _ key: JSCValueHandle,
     on object: JSCValueHandle
   ) -> Bool? {
     JSCEngine.hasValuePropertyHandle(key, on: object, in: self)
   }
 
-  public func deleteStaticStringPropertyHandle(
+  package func deleteStaticStringPropertyHandle(
     _ key: StaticString,
     on object: JSCValueHandle
   ) -> Bool {
     JSCEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func deletePropertyStringKeyHandle(
+  package func deletePropertyStringKeyHandle(
     _ key: JSCPropertyStringKeyHandle,
     on object: JSCValueHandle
   ) -> Bool {
     JSCEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func deleteValuePropertyHandle(
+  package func deleteValuePropertyHandle(
     _ key: JSCValueHandle,
     on object: JSCValueHandle
   ) -> Bool {

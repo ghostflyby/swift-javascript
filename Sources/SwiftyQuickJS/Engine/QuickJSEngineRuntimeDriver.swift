@@ -14,7 +14,7 @@ private enum QuickJSFunctionCallbackStorage {
 
 extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
 
-  public static let capabilities = JSEngineCapabilities(
+  package static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
     supportsExternalArrayBuffer: true,
@@ -23,14 +23,14 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     supportsPromiseJobQueueControl: false
   )
 
-  public static func makeRuntimeHandle() -> QJSRuntimeHandle {
+  package static func makeRuntimeHandle() -> QJSRuntimeHandle {
     guard let runtime = JS_NewRuntime() else {
       preconditionFailure("QuickJS could not create runtime")
     }
     return QJSRuntimeHandle(ref: runtime)
   }
 
-  public static func makeBorrowedContextHandleFromRuntime(in runtime: QJSRuntimeHandle)
+  package static func makeBorrowedContextHandleFromRuntime(in runtime: QJSRuntimeHandle)
     -> QJSContextHandle?
   {
     guard let context = JS_NewContext(runtime.ref) else {
@@ -39,7 +39,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSContextHandle(ref: context)
   }
 
-  public static func globalObjectValueHandle(_ context: QJSContextHandle) -> QJSValueHandle? {
+  package static func globalObjectValueHandle(_ context: QJSContextHandle) -> QJSValueHandle? {
     // `JS_GetGlobalObject` returns a new reference; the context owns its
     // global object for its lifetime, so return a borrowed identity and
     // settle the duplicate immediately. Callers wrap it in a non-owning
@@ -49,7 +49,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSValueHandle(ref: global)
   }
 
-  public static func contextDataStorageBox(in context: QJSContextHandle)
+  package static func contextDataStorageBox(in context: QJSContextHandle)
     -> JSContextDataStorageBox?
   {
     guard let opaque = JS_GetContextOpaque(context.ref) else {
@@ -58,7 +58,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return Unmanaged<JSContextDataStorageBox>.fromOpaque(opaque).takeUnretainedValue()
   }
 
-  public static func installContextDataStorageBox(
+  package static func installContextDataStorageBox(
     _ storage: JSContextDataStorageBox?,
     in context: QJSContextHandle
   ) {
@@ -71,7 +71,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func makeFunctionValueHandle(
+  package static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>,
     in context: QJSContextHandle
@@ -96,21 +96,21 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSOwnedValueHandle(ref: function)
   }
 
-  public static func makePreparedScriptHandle(
+  package static func makePreparedScriptHandle(
     _ source: String,
     in context: QJSContextHandle
   ) -> QJSPreparedScriptHandle? {
     QJSPreparedScriptHandle(source: source, contextRef: context.ref)
   }
 
-  public static func isPreparedScriptHandleCompatibleWithContext(
+  package static func isPreparedScriptHandleCompatibleWithContext(
     _ script: QJSPreparedScriptHandle,
     in context: QJSContextHandle
   ) -> Bool {
     script.contextRef == context.ref
   }
 
-  public static func evaluatePreparedScriptResultHandle(
+  package static func evaluatePreparedScriptResultHandle(
     _ script: QJSPreparedScriptHandle,
     _ context: QJSContextHandle,
     sourceURL: String?,
@@ -132,7 +132,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func valueTypeForHandle(
+  package static func valueTypeForHandle(
     _ value: QJSValueHandle,
     in _: QJSContextHandle
   ) -> JSType? {
@@ -158,14 +158,14 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func toBooleanForHandle(
+  package static func toBooleanForHandle(
     _ value: QJSValueHandle,
     in context: QJSContextHandle
   ) -> Bool {
     JS_ToBool(context.ref, value.ref) == 1
   }
 
-  public static func toNumberForHandle(
+  package static func toNumberForHandle(
     _ value: QJSValueHandle,
     in context: QJSContextHandle
   ) -> Double {
@@ -174,14 +174,14 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return status == 0 ? result : .nan
   }
 
-  public static func toStringForHandle(
+  package static func toStringForHandle(
     _ value: QJSValueHandle,
     in context: QJSContextHandle
   ) -> String? {
     quickJSString(value.ref, in: context.ref)
   }
 
-  public static func makeStringValueHandle(
+  package static func makeStringValueHandle(
     _ value: String,
     _ context: QJSContextHandle
   ) -> QJSOwnedValueHandle? {
@@ -189,7 +189,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSOwnedValueHandle(ref: rawValue)
   }
 
-  public static func makeSymbolValueHandle(
+  package static func makeSymbolValueHandle(
     _ value: String,
     _ context: QJSContextHandle
   ) -> QJSOwnedValueHandle? {
@@ -197,14 +197,14 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSOwnedValueHandle(ref: rawValue)
   }
 
-  public static func makeNumberValueHandle(
+  package static func makeNumberValueHandle(
     _ value: Double,
     _ context: QJSContextHandle
   ) -> QJSOwnedValueHandle? {
     QJSOwnedValueHandle(ref: JS_NewFloat64(context.ref, value))
   }
 
-  public static func makeBooleanValueHandle(
+  package static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: QJSContextHandle
   ) -> QJSOwnedValueHandle? {
@@ -212,7 +212,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return QJSOwnedValueHandle(ref: ref)
   }
 
-  public static func makeNullValueHandle(_ context: QJSContextHandle)
+  package static func makeNullValueHandle(_ context: QJSContextHandle)
     -> QJSOwnedValueHandle?
   {
     QJSOwnedValueHandle(
@@ -220,7 +220,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     )
   }
 
-  public static func makeUndefinedValueHandle(_ context: QJSContextHandle)
+  package static func makeUndefinedValueHandle(_ context: QJSContextHandle)
     -> QJSOwnedValueHandle?
   {
     QJSOwnedValueHandle(
@@ -228,7 +228,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     )
   }
 
-  public static func makeObjectResultHandle(
+  package static func makeObjectResultHandle(
     _ context: QJSContextHandle
   ) -> JSResult<QJSOwnedValueHandle>? {
     switch quickJSResultHandle(for: JS_NewObject(context.ref), in: context.ref) {
@@ -239,7 +239,7 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func makeArrayResultHandle(
+  package static func makeArrayResultHandle(
     _ context: QJSContextHandle
   ) -> JSResult<QJSOwnedValueHandle>? {
     switch quickJSResultHandle(for: JS_NewArray(context.ref), in: context.ref) {
@@ -250,14 +250,14 @@ extension QJSEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func isContextCompatibleWith(
+  package static func isContextCompatibleWith(
     _ this: QJSContextHandle,
     _ that: QJSContextHandle
   ) -> Bool {
     JS_GetRuntime(this.ref) == JS_GetRuntime(that.ref)
   }
 
-  public static func releaseCreatedHandle(
+  package static func releaseCreatedHandle(
     _ handle: consuming QJSOwnedValueHandle, in context: QJSContextHandle
   ) {
     JS_FreeValue(context.ref, handle.rawRef)
@@ -338,9 +338,9 @@ private func quickJSSurfaceFunctionCallback(
   }
 
   if result.isException {
-    return JS_Throw(contextRef, JS_DupValue(contextRef, result.borrowHandle().ref))
+    return JS_Throw(contextRef, JS_DupValue(contextRef, result.handle.ref))
   }
-  return JS_DupValue(contextRef, result.borrowHandle().ref)
+  return JS_DupValue(contextRef, result.handle.ref)
 }
 
 private func quickJSFunctionCallbackFinalizer(_ opaque: UnsafeMutableRawPointer?) {
@@ -381,94 +381,94 @@ private func quickJSString(_ value: CQuickJSValue, in contextRef: OpaquePointer)
 }
 
 extension QJSContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
-  public typealias InstantContext = QJSInstantContext
-  public typealias ValueHandle = QJSValueHandle
-  public typealias OwnedValueHandle = QJSOwnedValueHandle
-  public typealias PreparedScriptHandle = QJSPreparedScriptHandle
+  package typealias InstantContext = QJSInstantContext
+  package typealias ValueHandle = QJSValueHandle
+  package typealias OwnedValueHandle = QJSOwnedValueHandle
+  package typealias PreparedScriptHandle = QJSPreparedScriptHandle
 
-  public func globalObjectValueHandle() -> QJSValueHandle? {
+  package func globalObjectValueHandle() -> QJSValueHandle? {
     QJSEngine.globalObjectValueHandle(self)
   }
 
-  public func makeFunctionValueHandle(
+  package func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>
   ) -> QJSOwnedValueHandle? {
     QJSEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
   }
 
-  public func valueTypeForHandle(_ value: QJSValueHandle) -> JSType? {
+  package func valueTypeForHandle(_ value: QJSValueHandle) -> JSType? {
     QJSEngine.valueTypeForHandle(value, in: self)
   }
 
-  public func toBooleanForHandle(_ value: QJSValueHandle) -> Bool {
+  package func toBooleanForHandle(_ value: QJSValueHandle) -> Bool {
     QJSEngine.toBooleanForHandle(value, in: self)
   }
 
-  public func toNumberForHandle(_ value: QJSValueHandle) -> Double {
+  package func toNumberForHandle(_ value: QJSValueHandle) -> Double {
     QJSEngine.toNumberForHandle(value, in: self)
   }
 
-  public func toStringForHandle(_ value: QJSValueHandle) -> String? {
+  package func toStringForHandle(_ value: QJSValueHandle) -> String? {
     QJSEngine.toStringForHandle(value, in: self)
   }
 
-  public func makeStringValueHandle(_ value: String) -> QJSOwnedValueHandle? {
+  package func makeStringValueHandle(_ value: String) -> QJSOwnedValueHandle? {
     QJSEngine.makeStringValueHandle(value, self)
   }
 
-  public func makeSymbolValueHandle(_ value: String) -> QJSOwnedValueHandle? {
+  package func makeSymbolValueHandle(_ value: String) -> QJSOwnedValueHandle? {
     QJSEngine.makeSymbolValueHandle(value, self)
   }
 
-  public func makeNumberValueHandle(_ value: Double) -> QJSOwnedValueHandle? {
+  package func makeNumberValueHandle(_ value: Double) -> QJSOwnedValueHandle? {
     QJSEngine.makeNumberValueHandle(value, self)
   }
 
-  public func makeBooleanValueHandle(_ value: Bool) -> QJSOwnedValueHandle? {
+  package func makeBooleanValueHandle(_ value: Bool) -> QJSOwnedValueHandle? {
     QJSEngine.makeBooleanValueHandle(value, self)
   }
 
-  public func makeNullValueHandle() -> QJSOwnedValueHandle? {
+  package func makeNullValueHandle() -> QJSOwnedValueHandle? {
     QJSEngine.makeNullValueHandle(self)
   }
 
-  public func makeUndefinedValueHandle() -> QJSOwnedValueHandle? {
+  package func makeUndefinedValueHandle() -> QJSOwnedValueHandle? {
     QJSEngine.makeUndefinedValueHandle(self)
   }
 
-  public func makeObjectResultHandle() -> JSResult<QJSOwnedValueHandle>? {
+  package func makeObjectResultHandle() -> JSResult<QJSOwnedValueHandle>? {
     QJSEngine.makeObjectResultHandle(self)
   }
 
-  public func makeArrayResultHandle() -> JSResult<QJSOwnedValueHandle>? {
+  package func makeArrayResultHandle() -> JSResult<QJSOwnedValueHandle>? {
     QJSEngine.makeArrayResultHandle(self)
   }
 
-  public func isContextCompatibleWith(_ other: QJSContextHandle) -> Bool {
+  package func isContextCompatibleWith(_ other: QJSContextHandle) -> Bool {
     QJSEngine.isContextCompatibleWith(self, other)
   }
 
-  public func contextDataStorageBox() -> JSContextDataStorageBox? {
+  package func contextDataStorageBox() -> JSContextDataStorageBox? {
     QJSEngine.contextDataStorageBox(in: self)
   }
 
   /// The engine-side swap runs on the context's VM thread: inline when the
   /// caller is isolated to it, otherwise queued on it.
-  public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+  package func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
     QJSEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
       QJSEngine.installContextDataStorageBox(storage, in: context)
     }
   }
 
-  public func releaseCreatedHandle(_ handle: consuming QJSOwnedValueHandle) {
+  package func releaseCreatedHandle(_ handle: consuming QJSOwnedValueHandle) {
     QJSEngine.releaseCreatedHandle(handle, in: self)
   }
 
   /// QuickJS is reference-counted: a borrowed identity from an engine call
   /// frame carries no reference of its own, so claiming duplicates it before
   /// the arena adopts the result.
-  public func claimOwnedValueHandle(
+  package func claimOwnedValueHandle(
     _ handle: QJSValueHandle
   ) -> QJSOwnedValueHandle {
     QJSOwnedValueHandle.adopting(
@@ -479,22 +479,22 @@ extension QJSContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDrive
   /// root, so entering an explicit root is an identity operation (design
   /// §3.7). Drain still frees the creation reference via
   /// `releaseCreatedHandle`.
-  public func rootOwnedValueHandle(_ handle: borrowing QJSOwnedValueHandle) {}
+  package func rootOwnedValueHandle(_ handle: borrowing QJSOwnedValueHandle) {}
 
   /// Identity counterpart of `rootOwnedValueHandle` (§3.7).
-  public func unrootOwnedValueHandle(_ handle: borrowing QJSOwnedValueHandle) {}
+  package func unrootOwnedValueHandle(_ handle: borrowing QJSOwnedValueHandle) {}
 
-  public func makePreparedScriptHandle(_ source: String) -> QJSPreparedScriptHandle? {
+  package func makePreparedScriptHandle(_ source: String) -> QJSPreparedScriptHandle? {
     QJSEngine.makePreparedScriptHandle(source, in: self)
   }
 
-  public func isPreparedScriptHandleCompatibleWithContext(
+  package func isPreparedScriptHandleCompatibleWithContext(
     _ script: QJSPreparedScriptHandle
   ) -> Bool {
     QJSEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
   }
 
-  public func evaluatePreparedScriptResultHandle(
+  package func evaluatePreparedScriptResultHandle(
     _ script: QJSPreparedScriptHandle,
     sourceURL: String?,
     startingLineNumber: Int32

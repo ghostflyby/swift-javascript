@@ -9,7 +9,7 @@ import SwiftJavaScript
 #endif
 
 extension QJSEngine: JSEnginePropertyDriver {
-  public static func makePropertyStringKeyHandle(
+  package static func makePropertyStringKeyHandle(
     _ value: String,
     in context: QJSContextHandle
   ) -> QJSPropertyStringKeyHandle? {
@@ -20,7 +20,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return QJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
-  public static func makePropertyStringKeyHandle(
+  package static func makePropertyStringKeyHandle(
     _ value: StaticString,
     in context: QJSContextHandle
   ) -> QJSPropertyStringKeyHandle? {
@@ -31,14 +31,14 @@ extension QJSEngine: JSEnginePropertyDriver {
     return QJSPropertyStringKeyHandle(atom: atom, contextRef: context.ref)
   }
 
-  public static func isPropertyStringKeyHandleCompatibleWithContext(
+  package static func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: QJSPropertyStringKeyHandle,
     in context: QJSContextHandle
   ) -> Bool {
     key.contextRef == context.ref
   }
 
-  public static func makeStringValueHandle(
+  package static func makeStringValueHandle(
     fromPropertyStringKey key: QJSPropertyStringKeyHandle,
     in context: QJSContextHandle
   ) -> QJSOwnedValueHandle? {
@@ -46,7 +46,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return QJSOwnedValueHandle(ref: value)
   }
 
-  public static func propertyNamesForHandle(
+  package static func propertyNamesForHandle(
     on object: QJSValueHandle,
     in context: QJSContextHandle
   ) -> [String]? {
@@ -75,7 +75,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getStaticStringPropertyHandle(
+  package static func getStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -85,7 +85,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     }
   }
 
-  public static func getPropertyStringKeyHandle(
+  package static func getPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -94,7 +94,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: result, in: context.ref)
   }
 
-  public static func setStaticStringPropertyHandle(
+  package static func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -106,7 +106,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     } ?? false
   }
 
-  public static func setPropertyStringKeyHandle(
+  package static func setPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -116,7 +116,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     setProperty(key.atom, on: object, to: value, in: context, attributes: attributes)
   }
 
-  public static func getValuePropertyHandle(
+  package static func getValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -129,7 +129,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return quickJSResultHandle(for: JS_GetProperty(context.ref, object.ref, atom), in: context.ref)
   }
 
-  public static func getIndexPropertyHandle(
+  package static func getIndexPropertyHandle(
     at index: UInt32,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -140,7 +140,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     )
   }
 
-  public static func setValuePropertyHandle(
+  package static func setValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -165,7 +165,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     ) == 1
   }
 
-  public static func setIndexPropertyHandle(
+  package static func setIndexPropertyHandle(
     at index: UInt32,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -175,7 +175,7 @@ extension QJSEngine: JSEnginePropertyDriver {
       == 1
   }
 
-  public static func hasPropertyStringKeyHandle(
+  package static func hasPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -184,7 +184,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func hasStaticStringPropertyHandle(
+  package static func hasStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -202,7 +202,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return result
   }
 
-  public static func hasValuePropertyHandle(
+  package static func hasValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -216,7 +216,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return result >= 0 ? result == 1 : nil
   }
 
-  public static func deletePropertyStringKeyHandle(
+  package static func deletePropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -224,7 +224,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     return JS_DeleteProperty(context.ref, object.ref, key.atom, Int32(JS_PROP_THROW)) == 1
   }
 
-  public static func deleteStaticStringPropertyHandle(
+  package static func deleteStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -234,7 +234,7 @@ extension QJSEngine: JSEnginePropertyDriver {
     } ?? false
   }
 
-  public static func deleteValuePropertyHandle(
+  package static func deleteValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle,
     in context: QJSContextHandle
@@ -344,44 +344,44 @@ private func propertyFlags(for attributes: JSHostMemberAttributes) -> Int32 {
 // MARK: - Context-side driver conformance (Stage 2B)
 
 extension QJSContextHandle: JSContextPropertyDriver {
-  public typealias PropertyStringKeyHandle = QJSPropertyStringKeyHandle
+  package typealias PropertyStringKeyHandle = QJSPropertyStringKeyHandle
 
-  public func makePropertyStringKeyHandle(_ value: String)
+  package func makePropertyStringKeyHandle(_ value: String)
     -> QJSPropertyStringKeyHandle?
   {
     QJSEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
-  public func makePropertyStringKeyHandle(_ value: StaticString)
+  package func makePropertyStringKeyHandle(_ value: StaticString)
     -> QJSPropertyStringKeyHandle?
   {
     QJSEngine.makePropertyStringKeyHandle(value, in: self)
   }
 
-  public func isPropertyStringKeyHandleCompatibleWithContext(
+  package func isPropertyStringKeyHandleCompatibleWithContext(
     _ key: QJSPropertyStringKeyHandle
   ) -> Bool {
     QJSEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
   }
 
-  public func makeStringValueHandle(
+  package func makeStringValueHandle(
     fromPropertyStringKey key: QJSPropertyStringKeyHandle
   ) -> QJSOwnedValueHandle? {
     QJSEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
   }
 
-  public func propertyNamesForHandle(on object: QJSValueHandle) -> [String]? {
+  package func propertyNamesForHandle(on object: QJSValueHandle) -> [String]? {
     QJSEngine.propertyNamesForHandle(on: object, in: self)
   }
 
-  public func getStaticStringPropertyHandle(
+  package func getStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle
   ) -> JSResult<QJSValueHandle>? {
     QJSEngine.getStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func setStaticStringPropertyHandle(
+  package func setStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -396,14 +396,14 @@ extension QJSContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func getPropertyStringKeyHandle(
+  package func getPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle
   ) -> JSResult<QJSValueHandle>? {
     QJSEngine.getPropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func setPropertyStringKeyHandle(
+  package func setPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -418,21 +418,21 @@ extension QJSContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func getValuePropertyHandle(
+  package func getValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle
   ) -> JSResult<QJSValueHandle>? {
     QJSEngine.getValuePropertyHandle(key, on: object, in: self)
   }
 
-  public func getIndexPropertyHandle(
+  package func getIndexPropertyHandle(
     at index: UInt32,
     on object: QJSValueHandle
   ) -> JSResult<QJSValueHandle>? {
     QJSEngine.getIndexPropertyHandle(at: index, on: object, in: self)
   }
 
-  public func setValuePropertyHandle(
+  package func setValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle,
     to value: QJSValueHandle,
@@ -447,7 +447,7 @@ extension QJSContextHandle: JSContextPropertyDriver {
     )
   }
 
-  public func setIndexPropertyHandle(
+  package func setIndexPropertyHandle(
     at index: UInt32,
     on object: QJSValueHandle,
     to value: QJSValueHandle
@@ -455,42 +455,42 @@ extension QJSContextHandle: JSContextPropertyDriver {
     QJSEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
   }
 
-  public func hasStaticStringPropertyHandle(
+  package func hasStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle
   ) -> Bool? {
     QJSEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func hasPropertyStringKeyHandle(
+  package func hasPropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle
   ) -> Bool? {
     QJSEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func hasValuePropertyHandle(
+  package func hasValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle
   ) -> Bool? {
     QJSEngine.hasValuePropertyHandle(key, on: object, in: self)
   }
 
-  public func deleteStaticStringPropertyHandle(
+  package func deleteStaticStringPropertyHandle(
     _ key: StaticString,
     on object: QJSValueHandle
   ) -> Bool {
     QJSEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
   }
 
-  public func deletePropertyStringKeyHandle(
+  package func deletePropertyStringKeyHandle(
     _ key: QJSPropertyStringKeyHandle,
     on object: QJSValueHandle
   ) -> Bool {
     QJSEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
   }
 
-  public func deleteValuePropertyHandle(
+  package func deleteValuePropertyHandle(
     _ key: QJSValueHandle,
     on object: QJSValueHandle
   ) -> Bool {

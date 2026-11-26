@@ -78,7 +78,7 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
       }
 
       let result = function.call(
-        arguments: [scope.makeNumber(41).borrowHandle()], in: scope)
+        arguments: [scope.makeNumber(41).asCallArgument()], in: scope)
       switch consume result {
       case .value(let value):
         #expect(value.toNumber() == 42)
@@ -112,8 +112,8 @@ private enum JSValueCallSupportsThisAndArguments: ScriptEngineAssertion {
         let callResult = function.call(
           this: thisObject,
           arguments: [
-            scope.persist(scope.makeNumber(1)).borrowHandle(),
-            scope.persist(scope.makeNumber(2)).borrowHandle(),
+            scope.persist(scope.makeNumber(1)).asCallArgument(),
+            scope.persist(scope.makeNumber(2)).asCallArgument(),
           ],
           in: scope
         )
@@ -142,7 +142,7 @@ private enum JSValueConstructCreatesObject: ScriptEngineAssertion {
       switch consume constructorResult {
       case .value(let constructor):
         let constructResult = constructor.construct(
-          arguments: [scope.makeString("alice").borrowHandle()], in: scope)
+          arguments: [scope.makeString("alice").asCallArgument()], in: scope)
         switch consume constructResult {
         case .value(let instance):
           let isObject = instance.isObject()
@@ -176,7 +176,7 @@ private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAsser
       switch consume objectResult {
       case .value(let object):
         let invokeResult = object.invokeMethod(
-          "mul", arguments: [scope.makeNumber(5).borrowHandle()], in: scope)
+          "mul", arguments: [scope.makeNumber(5).asCallArgument()], in: scope)
         switch consume invokeResult {
         case .value(let value):
           #expect(value.toNumber() == 20)
@@ -416,10 +416,9 @@ private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertio
 
 // MARK: - Surface callback entry (S6)
 //
-// The second `makeFunctionValueHandle` overload takes the surface callback
-// signature; this test drives it end to end and echoes an argument back so the
-// carrier's borrowed-handle contract is exercised without the S7 scope
-// return/throw API.
+// The engine-level function factory takes the surface callback signature; this
+// test drives it end to end and echoes an argument back so the value-level
+// carrier contract is exercised through the public callback faces.
 
 private final class SurfaceCallbackObservations: @unchecked Sendable {
   var argumentCount: Int? = nil
@@ -447,7 +446,7 @@ private func runSurfaceFunctionCallbackEntry<C: JSContext>(
     let function = scope.makeFunction(named: "surfaceEcho", callback: callback)
 
     let result = function.call(
-      arguments: [scope.makeString("echoed").borrowHandle()], in: scope)
+      arguments: [scope.makeString("echoed").asCallArgument()], in: scope)
     switch consume result {
     case .value(let value):
       #expect(value.toString() == "echoed")

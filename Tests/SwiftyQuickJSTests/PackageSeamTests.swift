@@ -161,7 +161,5 @@ import Testing
   definition.className = "QuickJSSeamClass"
   #expect(acceptCoreDefinition(definition) == "QuickJSSeamClass")
 
-  let classType: QJSClass.Type = QJSClass.self
   #expect(ObjectIdentifier(QJSClass.Context.self) == ObjectIdentifier(QJSContext.self))
-  #expect(ObjectIdentifier(classType.ClassHandle.self) == ObjectIdentifier(QJSClassHandle.self))
 }

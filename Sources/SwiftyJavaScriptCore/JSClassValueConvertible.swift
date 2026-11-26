@@ -34,8 +34,14 @@ public typealias JSCAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinitio
   JSPropertyNameAccumulatorRef
 >
 
-private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<ObjectIdentifier, JSCClass>()
-private let javaScriptCoreCompatibilityClassRuntime = JSCRuntimeHandle()
+private struct JavaScriptCoreClassCacheKey: Hashable, Sendable {
+  let identity: ObjectIdentifier
+  let runtime: JSCRuntimeHandle
+}
+
+private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<
+  JavaScriptCoreClassCacheKey, JSCClass
+>()
 
 private func javaScriptCorePrivateData(
   from value: JSCValueHandle,
@@ -64,7 +70,7 @@ private func makeJavaScriptCoreObjectResultHandle(
 
 private func makeJavaScriptCoreAutoJSClass(
   definition: JSCAutoClassDefinition,
-  in runtime: JSCRuntimeHandle
+  in context: borrowing JSCInstantContext
 ) -> JSCClass {
   let backing = JSClassAutoNativeClassBacking(
     definition: definition,
@@ -72,7 +78,7 @@ private func makeJavaScriptCoreAutoJSClass(
       $0.definition()
     }
   )
-  let nativeDefinition = autoNativeDefinition(backing: backing, in: runtime)
+  let nativeDefinition = autoNativeDefinition(backing: backing, in: context)
   return JSCClass(
     nativeDefinition: nativeDefinition,
     retainedBacking: backing
@@ -88,65 +94,62 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
 
   public static func makeClass(
     definition: JSCAutoClassDefinition,
-    in runtime: JSCRuntimeHandle
+    identity: ObjectIdentifier,
+    in context: borrowing JSCInstantContext
   ) -> JSCClass {
-    makeJavaScriptCoreAutoJSClass(definition: definition, in: runtime)
+    guard let runtime = runtimeHandle(for: context.driverContextHandle) else {
+      preconditionFailure("JavaScriptCore context has no context group")
+    }
+    let key = JavaScriptCoreClassCacheKey(identity: identity, runtime: runtime)
+    return jsClassRegistry.value(forKey: key) {
+      makeJavaScriptCoreAutoJSClass(definition: definition, in: context)
+    }
   }
 
-  public static func runtimeHandle(
+  package static func runtimeHandle(
     for context: JSCContextHandle
   ) -> JSCRuntimeHandle? {
     JSCRuntimeHandle(borrowing: JSContextGetGroup(context.ref))
   }
 
-  public static func makeClassObjectResultHandle(
+  public static func makeHostObject(
     of jsClass: JSCClass,
     privateData: UnsafeMutableRawPointer,
-    in context: JSCContextHandle
-  ) -> JSResult<JSCValueHandle>? {
-    makeJavaScriptCoreObjectResultHandle(
+    in context: borrowing JSCInstantContext
+  ) -> JSCValue? {
+    switch makeJavaScriptCoreObjectResultHandle(
       of: jsClass.ref,
       privateData: privateData,
-      in: context
-    )
+      in: context.driverContextHandle
+    ) {
+    case .value(let object):
+      // The host object belongs to the encoding scope's synchronous window:
+      // its creation reference is settled when that scope drains. Anchoring
+      // on the context default scope instead would keep the object alive (and
+      // its finalizer unfired) until the context dies, even after JavaScript
+      // drops every reference to it.
+      return context.adoptCreatedHandle(JSCOwnedValueHandle.adopting(object))
+    case .exception:
+      // JavaScriptCore is GC-managed: the failure path owns nothing to
+      // settle, and the private data stays with the caller.
+      return nil
+    }
   }
 
-  public static func classObjectPrivateData(
-    from value: JSCValueHandle,
-    in context: JSCContextHandle
-  ) -> JSResult<UnsafeMutableRawPointer?>? {
-    javaScriptCorePrivateData(from: value, in: context)
+  public static func hostObjectPrivateData(
+    of value: borrowing JSCValue,
+    in context: borrowing JSCInstantContext
+  ) -> UnsafeMutableRawPointer? {
+    switch javaScriptCorePrivateData(
+      from: value.borrowHandle(), in: context.driverContextHandle
+    ) {
+    case .value(let data):
+      return data
+    case .exception:
+      return nil
+    }
   }
 
-}
-
-extension JSClassValueConvertible
-where
-  Engine == JSCEngine,
-  ParentClass == JSCClassParentDescriptor,
-  PropertyNameAccumulator == JSPropertyNameAccumulatorRef,
-  ClassDefinition == JSCAutoClassDefinition
-{
-  public static var jsClass: JSCClass {
-    let key = ObjectIdentifier(Self.self)
-    return jsClassRegistry.value(forKey: key, orInsert: Self.makeAutoJSClass)
-  }
-
-  fileprivate static func makeAutoJSClass() -> JSCClass {
-    let backing: JSClassAutoNativeClassBacking = Self.autoNativeClassBacking(
-      lookup: SwiftJavaScript.JSClassDefinitionLookup {
-        $0.definition()
-      }
-    )
-    let nativeDefinition = autoNativeDefinition(
-      backing: backing,
-      in: javaScriptCoreCompatibilityClassRuntime
-    )
-    return JSCClass(
-      nativeDefinition: nativeDefinition,
-      retainedBacking: backing
-    )
-  }
 }
 
 // The value-level convenience entries live on the concrete value view (S11):
@@ -567,7 +570,7 @@ private func installAutoStaticFunctionMembers(
 
 private func autoNativeDefinition(
   backing: JSClassAutoNativeClassBacking,
-  in runtime: JSCRuntimeHandle
+  in context: borrowing JSCInstantContext
 )
   -> JavaScriptCore.JSClassDefinition
 {
@@ -576,7 +579,7 @@ private func autoNativeDefinition(
   var cls = JavaScriptCore.kJSClassDefinitionEmpty
   cls.version = definition.version
   cls.attributes = definition.attributes.rawValue
-  cls.parentClass = definition.parentClass?.jsClass(in: runtime).ref
+  cls.parentClass = definition.parentClass?.jsClass(in: context).ref
   cls.initialize = autoClassInitializeCallback
   cls.finalize = autoClassFinalizeCallback
 

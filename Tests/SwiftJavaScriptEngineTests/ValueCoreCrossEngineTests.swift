@@ -46,18 +46,15 @@ private func predicateRow<V: SwiftJavaScript.JSValue & ~Copyable>(
 // the compiler's NoUsage diagnostic on `borrowing` parameters whose type is an
 // associated type of the generic parameter.
 
-private func adopt<C: JSContext>(
+/// Promote a window-created value into a view that the whole observation can
+/// read (`persist` moves its reference to the context default scope).
+private func promoted<C: JSContext>(
   _ contextType: C.Type,
-  _ handle: consuming C.OwnedValueHandle?,
+  _ value: borrowing C.CallbackValue,
   in scope: borrowing C.InstantContext
 ) -> C.Value {
   _ = contextType
-  switch consume handle {
-  case .some(let owned):
-    return scope.adoptCreatedHandle(owned)
-  case .none:
-    preconditionFailure("engine value factory returned nil")
-  }
+  return scope.persist(value)
 }
 
 private func adoptObject<C: JSContext>(
@@ -65,15 +62,10 @@ private func adoptObject<C: JSContext>(
   in scope: borrowing C.InstantContext
 ) -> C.Value {
   _ = contextType
-  let context = scope.driverContextHandle
-  guard let result = context.makeObjectResultHandle() else {
-    preconditionFailure("engine object factory returned nil")
-  }
-  switch consume result {
+  switch scope.makeObject() {
   case .value(let owned):
-    return scope.adoptCreatedHandle(owned)
-  case .exception(let owned):
-    context.releaseCreatedHandle(owned)
+    return scope.persist(owned)
+  case .exception:
     preconditionFailure("engine object factory returned an exception")
   }
 }
@@ -84,21 +76,10 @@ private func adoptEvaluated<C: JSContext>(
   in scope: borrowing C.InstantContext
 ) -> C.Value {
   _ = contextType
-  let context = scope.driverContextHandle
-  guard let script = context.makePreparedScriptHandle(source),
-    let result = context.evaluatePreparedScriptResultHandle(
-      script,
-      sourceURL: nil,
-      startingLineNumber: 1
-    )
-  else {
-    preconditionFailure("engine could not evaluate \(source)")
-  }
-  switch consume result {
-  case .value(let handle):
-    return scope.adoptCreatedHandle(C.OwnedValueHandle.adopting(handle))
-  case .exception(let handle):
-    context.releaseCreatedHandle(C.OwnedValueHandle.adopting(handle))
+  switch scope.evaluateScript(source) {
+  case .value(let value):
+    return value
+  case .exception:
     preconditionFailure("engine evaluation of \(source) threw")
   }
 }
@@ -110,26 +91,31 @@ private func observeValueCore<C: JSContext>(
   in scope: borrowing C.InstantContext
 ) -> ValueCoreObservation {
   _ = contextType
-  let context = scope.driverContextHandle
   var observation = ValueCoreObservation()
 
-  let undefined: C.Value = adopt(contextType, context.makeUndefinedValueHandle(), in: scope)
-  let null: C.Value = adopt(contextType, context.makeNullValueHandle(), in: scope)
-  let trueValue: C.Value = adopt(contextType, context.makeBooleanValueHandle(true), in: scope)
-  let falseValue: C.Value = adopt(contextType, context.makeBooleanValueHandle(false), in: scope)
-  let number: C.Value = adopt(contextType, context.makeNumberValueHandle(42.5), in: scope)
-  let zero: C.Value = adopt(contextType, context.makeNumberValueHandle(0), in: scope)
-  let nan: C.Value = adopt(contextType, context.makeNumberValueHandle(.nan), in: scope)
-  let nanAgain: C.Value = adopt(contextType, context.makeNumberValueHandle(.nan), in: scope)
-  let string: C.Value = adopt(contextType, context.makeStringValueHandle("hello"), in: scope)
-  let emptyString: C.Value = adopt(contextType, context.makeStringValueHandle(""), in: scope)
-  let symbol: C.Value = adopt(contextType, context.makeSymbolValueHandle("surface"), in: scope)
+  let undefined: C.Value = promoted(contextType, scope.makeUndefined(), in: scope)
+  let null: C.Value = promoted(contextType, scope.makeNull(), in: scope)
+  let trueValue: C.Value = promoted(contextType, scope.makeBoolean(true), in: scope)
+  let falseValue: C.Value = promoted(contextType, scope.makeBoolean(false), in: scope)
+  let number: C.Value = promoted(contextType, scope.makeNumber(42.5), in: scope)
+  let zero: C.Value = promoted(contextType, scope.makeNumber(0), in: scope)
+  let nan: C.Value = promoted(contextType, scope.makeNumber(.nan), in: scope)
+  let nanAgain: C.Value = promoted(contextType, scope.makeNumber(.nan), in: scope)
+  let string: C.Value = promoted(contextType, scope.makeString("hello"), in: scope)
+  let emptyString: C.Value = promoted(contextType, scope.makeString(""), in: scope)
+  let symbol: C.Value = promoted(contextType, scope.makeSymbol("surface"), in: scope)
   let bigInt: C.Value = adoptEvaluated(contextType, "1n", in: scope)
   let object: C.Value = adoptObject(contextType, in: scope)
   let otherObject: C.Value = adoptObject(contextType, in: scope)
 
-  let anchoredNumber: C.Value = scope.anchorBorrowedHandle(number.borrowHandle())
-  let anchoredObject: C.Value = scope.anchorBorrowedHandle(object.borrowHandle())
+  // Two independent views of the same values: the number comparison is a
+  // plain value comparison, and the object view comes back from a global
+  // round-trip (the only value-level way to obtain a second view of one JS
+  // object without a persistent binding).
+  let anchoredNumber: C.Value = promoted(contextType, scope.makeNumber(42.5), in: scope)
+  scope.setGlobalProperty(object, forKey: "valueCoreProbe", with: .none)
+  let anchoredObject: C.Value = scope.getGlobalProperty(forKey: "valueCoreProbe")
+  scope.deleteGlobalProperty(forKey: "valueCoreProbe")
 
   record(undefined, into: &observation)
   record(null, into: &observation)
@@ -181,41 +167,17 @@ private func record<V: SwiftJavaScript.JSValue & ~Copyable>(
 
 // MARK: - Engine drivers
 
-private func observeJSCValueCore() -> ValueCoreObservation {
-  let runtime = JSCEngine.makeRuntimeHandle()
-  guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    preconditionFailure("JSCEngine could not create a context handle")
+/// Run the whole observation inside one synchronous window of a real context
+/// actor, so neither branch leans on an engine-specific handle path.
+private func observeValueCore<C: JSContext>(_: C.Type) async -> ValueCoreObservation {
+  let context = C(virtualMachine: C.VirtualMachine())
+  return await context.withInstantContext { scope in
+    observeValueCore(C.self, in: scope)
   }
-  let observation: ValueCoreObservation
-  do {
-    let scope = JSCInstantContext(handle: context)
-    observation = observeValueCore(JSCContext.self, in: scope)
-    // Keep the arena alive until every observation above has been read.
-    _ = scope.driverContextHandle
-  }
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
-  return observation
 }
 
-private func observeQJSValueCore() -> ValueCoreObservation {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    preconditionFailure("QJSEngine could not create a context handle")
-  }
-  let observation: ValueCoreObservation
-  do {
-    let scope = QJSInstantContext(handle: context)
-    observation = observeValueCore(QJSContext.self, in: scope)
-    // QuickJS frees arena-owned references at drain; the scope must die before
-    // the context it belongs to.
-    _ = scope.driverContextHandle
-  }
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
-  return observation
-}
-
-@Test func valueCoreSemanticsMatchAcrossEngines() {
-  #expect(observeJSCValueCore() == observeQJSValueCore())
+@Test func valueCoreSemanticsMatchAcrossEngines() async {
+  let javaScriptCore = await observeValueCore(JSCContext.self)
+  let quickJS = await observeValueCore(QJSContext.self)
+  #expect(javaScriptCore == quickJS)
 }

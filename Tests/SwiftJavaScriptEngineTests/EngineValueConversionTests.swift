@@ -211,17 +211,18 @@ private enum ConverterOverrideForPropertyReadWrite: ScriptEngineAssertion {
 // MARK: - Test argument view
 //
 // The surface `JSArguments` protocol is the argument face; this stand-in
-// exposes borrowed handles as the engine's value views, so the shared
-// variadic decode helpers can be exercised without an engine call frame.
+// produces the engine's value views on each read, so the shared variadic
+// decode helpers can be exercised without an engine call frame. The closure
+// runs inside the caller's window, so `localValue` yields a non-owning view
+// that stays valid for the synchronous decode.
 
 private struct SurfaceTestArguments<C: JSContext>: JSArguments, ~Copyable {
   typealias Context = C
   typealias Value = C.Value
   typealias InstantContext = C.InstantContext
 
-  let handles: [C.ValueHandle]
-
-  var count: Int { handles.count }
+  let count: Int
+  let valueAt: (Int, borrowing C.InstantContext) -> C.Value
 
   func withValue<R: ~Copyable>(
     at index: Int,
@@ -229,7 +230,7 @@ private struct SurfaceTestArguments<C: JSContext>: JSArguments, ~Copyable {
     _ body: (borrowing C.Value) -> R
   ) -> R {
     precondition(index >= 0 && index < count, "Index out of bounds")
-    return body(context.anchorBorrowedHandle(handles[index]))
+    return body(valueAt(index, context))
   }
 }
 
@@ -238,9 +239,9 @@ private enum ConverterOverrideForArgumentsRead: ScriptEngineAssertion {
     let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { scope in
-      let source = scope.makeNumber(1)
       let args = SurfaceTestArguments<C>(
-        handles: [source.borrowHandle()]
+        count: 1,
+        valueAt: { _, window in window.localValue(window.makeNumber(1)) }
       )
       let decoded: Bool = args.unpack(
         using: SharedZeroOneBoolConverter.self, in: scope)
@@ -254,10 +255,11 @@ private enum ConverterOverrideForArgumentsReadVariadic: ScriptEngineAssertion {
     let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { scope in
-      let boolSource = scope.makeNumber(1)
-      let numberSource = scope.makeNumber(42.5)
       let args = SurfaceTestArguments<C>(
-        handles: [boolSource.borrowHandle(), numberSource.borrowHandle()]
+        count: 2,
+        valueAt: { index, window in
+          window.localValue(window.makeNumber(index == 0 ? 1 : 42.5))
+        }
       )
       let (decodedBool, decodedNumber): (Bool, Double) = args.unpack(
         using: SharedZeroOneBoolConverter.self,
@@ -292,9 +294,9 @@ private enum StrictTryUnpackRejectsMismatchedType: ScriptEngineAssertion {
     let context = C(virtualMachine: C.VirtualMachine())
 
     await context.withInstantContext { scope in
-      let source = scope.makeString("x")
       let args = SurfaceTestArguments<C>(
-        handles: [source.borrowHandle()]
+        count: 1,
+        valueAt: { _, window in window.localValue(window.makeString("x")) }
       )
       do {
         let _: Double = try args.tryUnpack(

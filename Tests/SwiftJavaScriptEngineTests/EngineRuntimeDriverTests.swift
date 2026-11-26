@@ -61,11 +61,6 @@ struct EngineRuntimeDriverTests {
     }
   }
 
-  @Test(arguments: ScriptEngine.allCases)
-  func valuesCanBeUsedAcrossContextsInSameVirtualMachine(_ engine: ScriptEngine) async {
-    await engine.run(ValuesCanBeUsedAcrossContextsInSameVirtualMachine.self)
-  }
-
   @Test
   func engineCapabilitiesMatchImplementedPublicSurface() {
     expectTrue(JSCEngine.capabilities.supportsHostObjects)
@@ -339,35 +334,13 @@ private func runContextHashableAndGlobalObject<C: JSContext>(_: C.Type) async {
   }
 }
 
-private enum ValuesCanBeUsedAcrossContextsInSameVirtualMachine: ScriptEngineAssertion {
-  static func run<C: JSContext>(_: C.Type) async {
-    let virtualMachine = C.VirtualMachine()
-    // Two raw context handles on one VM, deliberately without `C` actors: the
-    // test releases them itself.
-    guard
-      let sourceContext = virtualMachine.makeContextHandle(),
-      let targetContext = virtualMachine.makeContextHandle(),
-      let value = sourceContext.makeNumberValueHandle(7)
-    else {
-      Issue.record("Expected same-VM driver handles to be creatable")
-      return
-    }
-    // Downgrade to the borrow token for cross-context reads; the owning
-    // reference is released only after the reads.
-    let borrowed = value.borrowed()
-    defer {
-      _ = targetContext.releaseReference()
-      _ = sourceContext.releaseReference()
-    }
-
-    let isCompatible = sourceContext.isContextCompatibleWith(targetContext)
-    let targetValue = targetContext.toNumberForHandle(borrowed)
-    sourceContext.releaseCreatedHandle(value)
-
-    expectTrue(isCompatible)
-    expectTrue(targetValue == 7)
-  }
-}
+// MARK: - Cross-context values
+//
+// "A value created on one context handle can be read through a sibling context
+// handle of the same runtime" is a raw driver property: it needs two context
+// handles and a borrowed value token, and the public protocol surface no
+// longer names either. The coverage lives in the two concrete engine targets
+// (`JSCContextSurfaceTests`/`QJSContextSurfaceTests`).
 
 /// `#expect` cannot capture the non-copyable surface value views; binding the
 /// boolean first keeps the macro on a plain `Bool`.

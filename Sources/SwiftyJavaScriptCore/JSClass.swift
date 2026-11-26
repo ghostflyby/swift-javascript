@@ -10,12 +10,11 @@ import JavaScriptCore
 /// raw `JSClassRef` only through this owner.
 public final class JSCClass: SwiftJavaScript.JSClass, @unchecked Sendable {
   public typealias Context = JSCContext
-  public typealias ClassHandle = JSCClassHandle
 
   package let handle: JSCClassHandle
   package let retainedOwner: AnyObject?
 
-  public init(handleClass: JSCClassHandle, retainedOwner: AnyObject? = nil) {
+  package init(handleClass: JSCClassHandle, retainedOwner: AnyObject? = nil) {
     self.handle = handleClass
     self.retainedOwner = retainedOwner
     _ = handleClass.retainReference()
@@ -28,10 +27,6 @@ public final class JSCClass: SwiftJavaScript.JSClass, @unchecked Sendable {
 
   deinit {
     _ = handle.releaseReference()
-  }
-
-  public func classHandle() -> JSCClassHandle {
-    handle
   }
 }
 
@@ -47,36 +42,36 @@ extension JSCClass: Hashable {
   }
 }
 
-public struct JSCClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,
+package struct JSCClassHandle: SwiftJavaScript.JSClassManualReferenceCountedHandle,
   @unchecked Sendable
 {
-  public let ref: JSClassRef
+  package let ref: JSClassRef
 
-  public init(ref: JSClassRef) {
+  package init(ref: JSClassRef) {
     self.ref = ref
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     JSClassRetain(ref)
     return true
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     JSClassRelease(ref)
     return true
   }
 }
 
 extension JSCClassHandle: Hashable {
-  public static func == (lhs: JSCClassHandle, rhs: JSCClassHandle)
+  package static func == (lhs: JSCClassHandle, rhs: JSCClassHandle)
     -> Bool
   {
     lhs.ref == rhs.ref
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: ref))
   }
 }
@@ -1031,11 +1026,11 @@ extension JSCContext {
 }
 
 extension JSCClass {
-  public var ref: JSClassRef {
-    classHandle().ref
+  package var ref: JSClassRef {
+    handle.ref
   }
 
-  public convenience init(ref: JSClassRef) {
+  package convenience init(ref: JSClassRef) {
     self.init(handleClass: JSCClassHandle(ref: ref))
   }
 

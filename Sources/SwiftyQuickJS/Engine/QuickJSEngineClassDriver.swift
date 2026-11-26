@@ -78,8 +78,23 @@ private struct QuickJSClassRegistry: Sendable, ~Copyable {
 
 private let quickJSClassRegistry = QuickJSClassRegistry()
 
+/// Class cache keyed by Swift type identity plus runtime. The key deliberately
+/// does not contain the class ID: the ID is allocated while the class is
+/// being created, so keying on it would never hit. Reuse is per runtime —
+/// one Swift type maps to one `QJSClass` there — while the record table keeps
+/// its `(runtime, classID)` key.
+private struct QuickJSClassCacheKey: Hashable, Sendable {
+  let identity: ObjectIdentifier
+  let runtime: QJSRuntimeHandle
+}
+
+private let quickJSClassCache = SwiftJavaScript.JSClassMapRegistry<
+  QuickJSClassCacheKey, QJSClass
+>()
+
 func removeQuickJSClassRecords(in runtime: QJSRuntimeHandle) {
   quickJSClassRegistry.removeRecords(in: runtime)
+  quickJSClassCache.removeValues { $0.runtime == runtime }
 }
 
 private struct QuickJSClassObjectContextRegistry: Sendable, ~Copyable {
@@ -112,73 +127,96 @@ extension QJSEngine: JSEngineClassBridgeDriver {
 
   public static func makeClass(
     definition: QJSClassDefinition,
-    in runtime: QJSRuntimeHandle
+    identity: ObjectIdentifier,
+    in context: borrowing QJSInstantContext
   ) -> QJSClass {
-    var classID = JSClassID(0)
-    JS_NewClassID(runtime.ref, &classID)
+    guard let runtime = runtimeHandle(for: context.driverContextHandle) else {
+      preconditionFailure("QuickJS context has no runtime")
+    }
+    let key = QuickJSClassCacheKey(identity: identity, runtime: runtime)
+    return quickJSClassCache.value(forKey: key) {
+      // Only the ID and the record are created here. Registering the engine
+      // class (`JS_NewClass`/`JS_SetClassProto`) stays in `makeHostObject`'s
+      // `registerClassIfNeeded`: doing it here would make that function's
+      // `JS_IsRegisteredClass` early return skip the prototype and the parent
+      // prototype wiring.
+      var classID = JSClassID(0)
+      JS_NewClassID(runtime.ref, &classID)
 
-    let record = QuickJSClassRecord(
-      definition: definition,
-      parentClass: definition.parentClass?.jsClass(in: runtime)
-    )
-    quickJSClassRegistry.record(
-      record,
-      for: QuickJSClassRegistryKey(runtime: runtime, classID: classID)
-    )
-    return QJSClass(
-      adoptingHandleClass: QJSClassHandle(id: classID, runtime: runtime),
-      retainedOwner: record
-    )
+      let record = QuickJSClassRecord(
+        definition: definition,
+        parentClass: definition.parentClass?.jsClass(in: context)
+      )
+      quickJSClassRegistry.record(
+        record,
+        for: QuickJSClassRegistryKey(runtime: runtime, classID: classID)
+      )
+      return QJSClass(
+        adoptingHandleClass: QJSClassHandle(id: classID, runtime: runtime),
+        retainedOwner: record
+      )
+    }
   }
 
-  public static func runtimeHandle(for context: QJSContextHandle) -> QJSRuntimeHandle? {
+  package static func runtimeHandle(for context: QJSContextHandle) -> QJSRuntimeHandle? {
     QJSRuntimeHandle(ref: JS_GetRuntime(context.ref), ownsRuntime: false)
   }
 
-  public static func makeClassObjectResultHandle(
+  public static func makeHostObject(
     of jsClass: QJSClass,
     privateData: UnsafeMutableRawPointer,
-    in context: QJSContextHandle
-  ) -> JSResult<QJSValueHandle>? {
-    guard let definition = jsClassDefinition(jsClass, in: context) else {
+    in context: borrowing QJSInstantContext
+  ) -> QJSValue? {
+    let contextHandle = context.driverContextHandle
+    guard let definition = jsClassDefinition(jsClass, in: contextHandle) else {
       return nil
     }
-    registerClassIfNeeded(jsClass, in: context)
-    let object = JS_NewObjectClass(context.ref, jsClass.classHandle().id)
+    registerClassIfNeeded(jsClass, in: contextHandle)
+    let object = JS_NewObjectClass(contextHandle.ref, jsClass.handle.id)
     if JS_IsException(object) {
-      return quickJSResultHandle(for: object, in: context.ref)
+      // The failure path's references belong to the engine: clear the pending
+      // exception and settle both values here, then report "no object".
+      JS_FreeValue(contextHandle.ref, object)
+      let exception = JS_GetException(contextHandle.ref)
+      JS_FreeValue(contextHandle.ref, exception)
+      return nil
     }
     if JS_SetOpaque(object, privateData) < 0 {
-      JS_FreeValue(context.ref, object)
-      let exception = JS_GetException(context.ref)
-      return .exception(QJSValueHandle(ref: exception))
+      JS_FreeValue(contextHandle.ref, object)
+      let exception = JS_GetException(contextHandle.ref)
+      JS_FreeValue(contextHandle.ref, exception)
+      return nil
     }
-    quickJSClassObjectContextRegistry.record(context.ref, for: privateData)
-    initializeClassObject(object, definition: definition, in: context.ref)
-    installStaticValueMembers(on: object, definition: definition, in: context.ref)
-    installStaticFunctionMembers(on: object, definition: definition, in: context.ref)
-    return .value(QJSValueHandle(ref: object))
+    quickJSClassObjectContextRegistry.record(contextHandle.ref, for: privateData)
+    initializeClassObject(object, definition: definition, in: contextHandle.ref)
+    installStaticValueMembers(on: object, definition: definition, in: contextHandle.ref)
+    installStaticFunctionMembers(on: object, definition: definition, in: contextHandle.ref)
+    return context.adoptCreatedHandle(
+      QJSOwnedValueHandle.adopting(QJSValueHandle(ref: object))
+    )
   }
 
-  public static func classObjectPrivateData(
-    from value: QJSValueHandle,
-    in context: QJSContextHandle
-  ) -> JSResult<UnsafeMutableRawPointer?>? {
-    let classID = JS_GetClassID(value.ref)
+  public static func hostObjectPrivateData(
+    of value: borrowing QJSValue,
+    in context: borrowing QJSInstantContext
+  ) -> UnsafeMutableRawPointer? {
+    let contextHandle = context.driverContextHandle
+    let handle = value.borrowHandle()
+    let classID = JS_GetClassID(handle.ref)
     guard classID != JS_INVALID_CLASS_ID else {
-      return .value(nil)
+      return nil
     }
-    guard let runtime = runtimeHandle(for: context),
+    guard let runtime = runtimeHandle(for: contextHandle),
       quickJSClassRegistry.definition(
         for: QuickJSClassRegistryKey(runtime: runtime, classID: classID)
       ) != nil
     else {
-      return .value(nil)
+      return nil
     }
-    return .value(JS_GetOpaque2(context.ref, value.ref, classID))
+    return JS_GetOpaque2(contextHandle.ref, handle.ref, classID)
   }
 
-  public static func classDefinition(
+  package static func classDefinition(
     for classHandle: QJSClassHandle,
     in runtime: QJSRuntimeHandle
   ) -> QJSClassDefinition? {
@@ -194,9 +232,9 @@ extension QJSEngine: JSEngineClassBridgeDriver {
 private func registerClassIfNeeded(
   _ jsClass: QJSClass, in context: QJSContextHandle
 ) {
-  let classID = jsClass.classHandle().id
+  let classID = jsClass.handle.id
   guard let runtimeHandle = QJSEngine.runtimeHandle(for: context),
-    jsClass.classHandle().runtime == nil || jsClass.classHandle().runtime == runtimeHandle
+    jsClass.handle.runtime == nil || jsClass.handle.runtime == runtimeHandle
   else {
     return
   }
@@ -230,7 +268,7 @@ private func registerClassIfNeeded(
   let prototype = JS_NewObject(context.ref)
   if !JS_IsException(prototype) {
     if let parentClass = record.parentClass {
-      let parentPrototype = JS_GetClassProto(context.ref, parentClass.classHandle().id)
+      let parentPrototype = JS_GetClassProto(context.ref, parentClass.handle.id)
       if !JS_IsException(parentPrototype) && JS_IsObject(parentPrototype) {
         _ = JS_SetPrototype(context.ref, prototype, parentPrototype)
       }
@@ -247,7 +285,7 @@ private func jsClassDefinition(
   guard let runtime = QJSEngine.runtimeHandle(for: context) else {
     return nil
   }
-  return QJSEngine.classDefinition(for: jsClass.classHandle(), in: runtime)
+  return QJSEngine.classDefinition(for: jsClass.handle, in: runtime)
 }
 
 private func quickJSClassDefinition(

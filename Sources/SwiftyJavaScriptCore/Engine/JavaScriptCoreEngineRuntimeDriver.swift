@@ -3,7 +3,7 @@ import SwiftJavaScript
 
 extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
 
-  public static let capabilities = JSEngineCapabilities(
+  package static let capabilities = JSEngineCapabilities(
     supportsBigInt: true,
     supportsSymbol: true,
     supportsExternalArrayBuffer: true,
@@ -12,17 +12,17 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     supportsPromiseJobQueueControl: false
   )
 
-  public static func makeRuntimeHandle() -> JSCRuntimeHandle {
+  package static func makeRuntimeHandle() -> JSCRuntimeHandle {
     JSCRuntimeHandle()
   }
 
-  public static func makeBorrowedContextHandleFromRuntime(
+  package static func makeBorrowedContextHandleFromRuntime(
     in runtime: JSCRuntimeHandle
   ) -> JSCContextHandle? {
     JSCContextHandle(runtime: runtime)
   }
 
-  public static func globalObjectValueHandle(
+  package static func globalObjectValueHandle(
     _ context: JSCContextHandle
   ) -> JSValueHandle<JSCEngine>? {
     guard let objectRef = JSContextGetGlobalObject(context.ref) else {
@@ -31,7 +31,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return JSCValueHandle(ref: objectRef)
   }
 
-  public static func contextDataStorageBox(in context: JSCContextHandle)
+  package static func contextDataStorageBox(in context: JSCContextHandle)
     -> JSContextDataStorageBox?
   {
     guard let privateData = JSObjectGetPrivate(context.globalObjectRef) else {
@@ -41,7 +41,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
       .takeUnretainedValue()
   }
 
-  public static func installContextDataStorageBox(
+  package static func installContextDataStorageBox(
     _ storage: JSContextDataStorageBox?,
     in context: JSCContextHandle
   ) {
@@ -54,7 +54,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func makeFunctionValueHandle(
+  package static func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<JSCInstantContext>,
     in context: JSCContextHandle
@@ -85,7 +85,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return JSCOwnedValueHandle(ref: functionRef)
   }
 
-  public static func makePreparedScriptHandle(
+  package static func makePreparedScriptHandle(
     _ source: String,
     in context: JSCContextHandle
   ) -> JSCPreparedScriptHandle? {
@@ -94,7 +94,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return JSCPreparedScriptHandle(ref: scriptRef)
   }
 
-  public static func isPreparedScriptHandleCompatibleWithContext(
+  package static func isPreparedScriptHandleCompatibleWithContext(
     _ script: JSCPreparedScriptHandle,
     in context: JSCContextHandle
   ) -> Bool {
@@ -103,7 +103,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return true
   }
 
-  public static func evaluatePreparedScriptResultHandle(
+  package static func evaluatePreparedScriptResultHandle(
     _ script: JSCPreparedScriptHandle,
     _ context: JSCContextHandle,
     sourceURL: String? = nil,
@@ -123,7 +123,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func valueTypeForHandle(
+  package static func valueTypeForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> SwiftJavaScript.JSType? {
@@ -149,35 +149,35 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     }
   }
 
-  public static func toBooleanForHandle(
+  package static func toBooleanForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Bool {
     JSValueToBoolean(context.ref, value.ref)
   }
 
-  public static func toNumberForHandle(
+  package static func toNumberForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> Double {
     JSValueToNumber(context.ref, value.ref, nil)
   }
 
-  public static func toStringForHandle(
+  package static func toStringForHandle(
     _ value: JSValueHandle<JSCEngine>,
     in context: JSCContextHandle
   ) -> String? {
     javaScriptCoreString(value.ref, in: context.ref)
   }
 
-  public static func makeStringValueHandle(
+  package static func makeStringValueHandle(
     _ value: String,
     _ context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
     JSCOwnedValueHandle.adopting(javaScriptCoreMakeStringValue(value, in: context))
   }
 
-  public static func makeSymbolValueHandle(
+  package static func makeSymbolValueHandle(
     _ value: String,
     _ context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
@@ -189,7 +189,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return JSCOwnedValueHandle(ref: symbolRef)
   }
 
-  public static func makeNumberValueHandle(
+  package static func makeNumberValueHandle(
     _ value: Double,
     _ context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
@@ -198,7 +198,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     )
   }
 
-  public static func makeBooleanValueHandle(
+  package static func makeBooleanValueHandle(
     _ value: Bool,
     _ context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
@@ -207,7 +207,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     )
   }
 
-  public static func makeNullValueHandle(_ context: JSCContextHandle)
+  package static func makeNullValueHandle(_ context: JSCContextHandle)
     -> JSOwnedValueHandle<JSCEngine>?
   {
     JSCOwnedValueHandle(
@@ -215,13 +215,13 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     )
   }
 
-  public static func makeUndefinedValueHandle(
+  package static func makeUndefinedValueHandle(
     _ context: JSCContextHandle
   ) -> JSOwnedValueHandle<JSCEngine>? {
     JSCOwnedValueHandle.adopting(javaScriptCoreMakeUndefined(in: context))
   }
 
-  public static func makeObjectResultHandle(
+  package static func makeObjectResultHandle(
     _ context: JSCContextHandle
   ) -> JSResult<JSOwnedValueHandle<JSCEngine>>? {
     guard let objectRef = JSObjectMake(context.ref, nil, nil) else {
@@ -231,7 +231,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return .value(JSCOwnedValueHandle(ref: objectRef))
   }
 
-  public static func makeArrayResultHandle(
+  package static func makeArrayResultHandle(
     _ context: JSCContextHandle
   ) -> JSResult<JSOwnedValueHandle<JSCEngine>>? {
     var exception: JSValueRef?
@@ -246,7 +246,7 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
     return .value(JSCOwnedValueHandle(ref: objectRef))
   }
 
-  public static func isContextCompatibleWith(
+  package static func isContextCompatibleWith(
     _ this: JSCContextHandle,
     _ that: JSCContextHandle
   ) -> Bool {
@@ -258,93 +258,93 @@ extension JSCEngine: JSEngineRuntimeDriver, JSEnginePreparedScriptDriver {
 // MARK: - Context-side driver conformance (Stage 2B)
 
 extension JSCContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDriver {
-  public typealias InstantContext = JSCInstantContext
-  public typealias ValueHandle = JSCValueHandle
-  public typealias OwnedValueHandle = JSCOwnedValueHandle
-  public typealias PreparedScriptHandle = JSCPreparedScriptHandle
+  package typealias InstantContext = JSCInstantContext
+  package typealias ValueHandle = JSCValueHandle
+  package typealias OwnedValueHandle = JSCOwnedValueHandle
+  package typealias PreparedScriptHandle = JSCPreparedScriptHandle
 
-  public func globalObjectValueHandle() -> JSCValueHandle? {
+  package func globalObjectValueHandle() -> JSCValueHandle? {
     JSCEngine.globalObjectValueHandle(self)
   }
 
-  public func makeFunctionValueHandle(
+  package func makeFunctionValueHandle(
     named name: String,
     callback: @escaping JSFunctionCallback<JSCInstantContext>
   ) -> JSCOwnedValueHandle? {
     JSCEngine.makeFunctionValueHandle(named: name, callback: callback, in: self)
   }
 
-  public func valueTypeForHandle(_ value: JSCValueHandle) -> SwiftJavaScript.JSType? {
+  package func valueTypeForHandle(_ value: JSCValueHandle) -> SwiftJavaScript.JSType? {
     JSCEngine.valueTypeForHandle(value, in: self)
   }
 
-  public func toBooleanForHandle(_ value: JSCValueHandle) -> Bool {
+  package func toBooleanForHandle(_ value: JSCValueHandle) -> Bool {
     JSCEngine.toBooleanForHandle(value, in: self)
   }
 
-  public func toNumberForHandle(_ value: JSCValueHandle) -> Double {
+  package func toNumberForHandle(_ value: JSCValueHandle) -> Double {
     JSCEngine.toNumberForHandle(value, in: self)
   }
 
-  public func toStringForHandle(_ value: JSCValueHandle) -> String? {
+  package func toStringForHandle(_ value: JSCValueHandle) -> String? {
     JSCEngine.toStringForHandle(value, in: self)
   }
 
-  public func makeStringValueHandle(_ value: String) -> JSCOwnedValueHandle? {
+  package func makeStringValueHandle(_ value: String) -> JSCOwnedValueHandle? {
     JSCEngine.makeStringValueHandle(value, self)
   }
 
-  public func makeSymbolValueHandle(_ value: String) -> JSCOwnedValueHandle? {
+  package func makeSymbolValueHandle(_ value: String) -> JSCOwnedValueHandle? {
     JSCEngine.makeSymbolValueHandle(value, self)
   }
 
-  public func makeNumberValueHandle(_ value: Double) -> JSCOwnedValueHandle? {
+  package func makeNumberValueHandle(_ value: Double) -> JSCOwnedValueHandle? {
     JSCEngine.makeNumberValueHandle(value, self)
   }
 
-  public func makeBooleanValueHandle(_ value: Bool) -> JSCOwnedValueHandle? {
+  package func makeBooleanValueHandle(_ value: Bool) -> JSCOwnedValueHandle? {
     JSCEngine.makeBooleanValueHandle(value, self)
   }
 
-  public func makeNullValueHandle() -> JSCOwnedValueHandle? {
+  package func makeNullValueHandle() -> JSCOwnedValueHandle? {
     JSCEngine.makeNullValueHandle(self)
   }
 
-  public func makeUndefinedValueHandle() -> JSCOwnedValueHandle? {
+  package func makeUndefinedValueHandle() -> JSCOwnedValueHandle? {
     JSCEngine.makeUndefinedValueHandle(self)
   }
 
-  public func makeObjectResultHandle() -> JSResult<JSCOwnedValueHandle>? {
+  package func makeObjectResultHandle() -> JSResult<JSCOwnedValueHandle>? {
     JSCEngine.makeObjectResultHandle(self)
   }
 
-  public func makeArrayResultHandle() -> JSResult<JSCOwnedValueHandle>? {
+  package func makeArrayResultHandle() -> JSResult<JSCOwnedValueHandle>? {
     JSCEngine.makeArrayResultHandle(self)
   }
 
-  public func isContextCompatibleWith(_ other: JSCContextHandle) -> Bool {
+  package func isContextCompatibleWith(_ other: JSCContextHandle) -> Bool {
     JSCEngine.isContextCompatibleWith(self, other)
   }
 
-  public func contextDataStorageBox() -> JSContextDataStorageBox? {
+  package func contextDataStorageBox() -> JSContextDataStorageBox? {
     JSCEngine.contextDataStorageBox(in: self)
   }
 
   /// The engine-side swap runs on the context's VM thread: inline when the
   /// caller is isolated to it, otherwise queued on it.
-  public func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+  package func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
     JSCEngine.swapContextDataStorageBox(storage, on: self) { context, storage in
       JSCEngine.installContextDataStorageBox(storage, in: context)
     }
   }
 
   /// JSC is GC-managed: created handles need no explicit release.
-  public func releaseCreatedHandle(_ handle: consuming JSCOwnedValueHandle) {}
+  package func releaseCreatedHandle(_ handle: consuming JSCOwnedValueHandle) {}
 
   /// Claiming a borrowed JSC reference is an identity operation: JSC has no
   /// reference count, and the target arena's explicit root (if any) is what
   /// keeps the value alive.
-  public func claimOwnedValueHandle(
+  package func claimOwnedValueHandle(
     _ handle: JSCValueHandle
   ) -> JSCOwnedValueHandle {
     JSCOwnedValueHandle.adopting(handle)
@@ -352,28 +352,28 @@ extension JSCContextHandle: JSContextRuntimeDriver, JSContextPreparedScriptDrive
 
   /// Explicit root for heap-resident scopes (context default scope): JSC's
   /// conservative stack scan cannot see arena storage, so protect on add.
-  public func rootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
+  package func rootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
     JSValueProtect(ref, handle.ref)
   }
 
   /// Leave the explicit root taken by `rootOwnedValueHandle` (drain/unlink).
-  public func unrootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
+  package func unrootOwnedValueHandle(_ handle: borrowing JSCOwnedValueHandle) {
     JSValueUnprotect(ref, handle.ref)
   }
 
-  public func makePreparedScriptHandle(_ source: String)
+  package func makePreparedScriptHandle(_ source: String)
     -> JSCPreparedScriptHandle?
   {
     JSCEngine.makePreparedScriptHandle(source, in: self)
   }
 
-  public func isPreparedScriptHandleCompatibleWithContext(
+  package func isPreparedScriptHandleCompatibleWithContext(
     _ script: JSCPreparedScriptHandle
   ) -> Bool {
     JSCEngine.isPreparedScriptHandleCompatibleWithContext(script, in: self)
   }
 
-  public func evaluatePreparedScriptResultHandle(
+  package func evaluatePreparedScriptResultHandle(
     _ script: JSCPreparedScriptHandle,
     sourceURL: String?,
     startingLineNumber: Int32

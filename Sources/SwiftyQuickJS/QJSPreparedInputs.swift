@@ -7,8 +7,8 @@ import SwiftJavaScript
 /// the context's VM thread when it has one (`releasePreparedInput`).
 public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = QJSContext
-  public typealias ContextHandle = QJSContextHandle
-  public typealias Handle = QJSPropertyStringKeyHandle
+  package typealias ContextHandle = QJSContextHandle
+  package typealias Handle = QJSPropertyStringKeyHandle
 
   package let handle: QJSPropertyStringKeyHandle
   private let contextHandle: QJSContextHandle
@@ -25,7 +25,11 @@ public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
     _ = contextHandle.retainReference()
   }
 
-  public borrowing func borrowHandle(
+  /// The engine key handle, validated against the context that created it.
+  /// Package-internal: the protocol surface no longer names engine handles,
+  /// but the compatibility precondition stays on every engine-internal use
+  /// (do not replace it with a field read).
+  package borrowing func borrowHandle(
     in contextHandle: QJSContextHandle
   ) -> QJSPropertyStringKeyHandle {
     precondition(
@@ -52,8 +56,8 @@ public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
 /// `QJSPropertyStringKey`.
 public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Copyable {
   public typealias Context = QJSContext
-  public typealias ContextHandle = QJSContextHandle
-  public typealias Handle = QJSPreparedScriptHandle
+  package typealias ContextHandle = QJSContextHandle
+  package typealias Handle = QJSPreparedScriptHandle
 
   package let handle: QJSPreparedScriptHandle
   private let contextHandle: QJSContextHandle
@@ -70,7 +74,11 @@ public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
     _ = contextHandle.retainReference()
   }
 
-  public borrowing func borrowHandle(
+  /// The engine script handle, validated against the context that compiled
+  /// it. Package-internal: the protocol surface no longer names engine
+  /// handles, but the compatibility precondition stays on every
+  /// engine-internal use (do not replace it with a field read).
+  package borrowing func borrowHandle(
     in contextHandle: QJSContextHandle
   ) -> QJSPreparedScriptHandle {
     precondition(

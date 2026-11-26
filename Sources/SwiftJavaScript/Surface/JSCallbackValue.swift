@@ -10,18 +10,6 @@
 public protocol JSCallbackValue: ~Copyable {
   /// The context this view belongs to.
   associatedtype Context: JSContext
-  /// The context identity this view is addressed through. Its driver also
-  /// classifies, converts and compares values.
-  associatedtype ContextHandle: JSContextRuntimeDriver & JSContextInvocationDriver
-  where ContextHandle == Context.ContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == Context.ValueHandle
-
-  /// The borrowed engine handle token backing this view.
-  borrowing func borrowHandle() -> ValueHandle
-
-  /// The context identity this view is addressed through.
-  var contextHandle: ContextHandle { get }
 
   /// The engine's classification of this value (`JSValueGetType`/`JS_TypeOfValue`).
   func type() -> JSType
@@ -49,29 +37,21 @@ public protocol JSCallbackValue: ~Copyable {
 
   /// `===` in JavaScript (engine `IsStrictEqual`).
   func strictlyEquals(_ other: borrowing Self) -> Bool
+
+  /// Pack this callback-window value into a single call-argument token.
+  ///
+  /// The value factories (`makeNumber`/`makeString`) return this type, not the
+  /// owned `Value`, so the callback window needs its own token entry point.
+  /// The token borrows this value's engine handle and is valid only for the
+  /// immediate synchronous call it is passed to.
+  func asCallArgument() -> Context.CallArgument
 }
 
-// The callback window's conversion/equality operations route through the same
-// context driver as `JSValue`; only `type()` is left to the concrete type,
-// because it is the one operation whose engine shape differs. All of them are
-// `noasync`, preserving the callback-window contract: these views only
-// exist inside a synchronous callback window.
+// The callback window's eight predicates derive from `type()`, exactly like
+// `JSValue`'s. Conversion and equality are requirements: the engine's callback
+// value implements them directly against its own context driver and keeps the
+// `noasync` callback-window contract on the concrete type.
 extension JSCallbackValue where Self: ~Copyable {
-  @available(*, noasync)
-  public func toString() -> String {
-    contextHandle.toStringForHandle(borrowHandle()) ?? ""
-  }
-
-  @available(*, noasync)
-  public func toNumber() -> Double {
-    contextHandle.toNumberForHandle(borrowHandle())
-  }
-
-  @available(*, noasync)
-  public func toBoolean() -> Bool {
-    contextHandle.toBooleanForHandle(borrowHandle())
-  }
-
   @available(*, noasync)
   public func isUndefined() -> Bool { type() == .undefined }
   @available(*, noasync)
@@ -88,14 +68,4 @@ extension JSCallbackValue where Self: ~Copyable {
   public func isObject() -> Bool { type() == .object }
   @available(*, noasync)
   public func isBigInt() -> Bool { type() == .bigInt }
-
-  @available(*, noasync)
-  public func looselyEquals(_ other: borrowing Self) -> Bool {
-    contextHandle.looselyEqualsHandle(borrowHandle(), other.borrowHandle()) ?? false
-  }
-
-  @available(*, noasync)
-  public func strictlyEquals(_ other: borrowing Self) -> Bool {
-    contextHandle.strictlyEqualsHandle(borrowHandle(), other.borrowHandle()) ?? false
-  }
 }

@@ -8,14 +8,14 @@ enum JavaScriptCoreObjectLookup {
 }
 
 public enum JSCEngine: Sendable {
-  public typealias ValueHandle = JSCValueHandle
-  public typealias OwnedValueHandle = JSCOwnedValueHandle
-  public typealias ClassHandle = JSCClassHandle
+  package typealias ValueHandle = JSCValueHandle
+  package typealias OwnedValueHandle = JSCOwnedValueHandle
+  package typealias ClassHandle = JSCClassHandle
   public typealias Engine = JSCEngine
-  public typealias RuntimeHandle = JSCRuntimeHandle
-  public typealias ContextHandle = JSCContextHandle
-  public typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
-  public typealias PreparedScriptHandle = JSCPreparedScriptHandle
+  package typealias RuntimeHandle = JSCRuntimeHandle
+  package typealias ContextHandle = JSCContextHandle
+  package typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
+  package typealias PreparedScriptHandle = JSCPreparedScriptHandle
 }
 
 private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {

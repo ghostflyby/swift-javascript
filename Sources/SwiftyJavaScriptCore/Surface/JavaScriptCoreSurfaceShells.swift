@@ -7,18 +7,16 @@ import SwiftJavaScript
 // protocol needs: its context, and the rest as aliases of that context's.
 public struct JSCCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
-  public typealias ValueHandle = JSCValueHandle
 
   package let handle: JSCValueHandle
-  public let contextHandle: JSCContextHandle
+  package let contextHandle: JSCContextHandle
 
   package init(handle: JSCValueHandle, contextHandle: JSCContextHandle) {
     self.handle = handle
     self.contextHandle = contextHandle
   }
 
-  public borrowing func borrowHandle() -> JSCValueHandle {
+  package borrowing func borrowHandle() -> JSCValueHandle {
     handle
   }
 
@@ -29,12 +27,43 @@ public struct JSCCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
     }
     return valueType
   }
+
+  // MARK: - Conversion and equality
+  //
+  // The callback window's views are `noasync` on the concrete type: they only
+  // exist inside a synchronous callback window.
+
+  @available(*, noasync)
+  public func toString() -> String {
+    contextHandle.toStringForHandle(handle) ?? ""
+  }
+
+  @available(*, noasync)
+  public func toNumber() -> Double {
+    contextHandle.toNumberForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func toBoolean() -> Bool {
+    contextHandle.toBooleanForHandle(handle)
+  }
+
+  @available(*, noasync)
+  public func looselyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
+    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
+
+  @available(*, noasync)
+  public func strictlyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
+    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+  }
 }
 
 public struct JSCCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = JSCContext
-  public typealias ValueHandle = JSCValueHandle
 
+  /// The borrowed engine handle carried by this handoff. Package-internal:
+  /// the trampolines and the same-package tests are the only readers.
   package let handle: JSCValueHandle
   /// Semantic marker only: trampolines hand the engine its own reference for
   /// every state and branch on this flag solely to choose `throw` vs return.
@@ -60,7 +89,7 @@ public struct JSCCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
     self.isException = true
   }
 
-  public borrowing func borrowHandle() -> JSCValueHandle {
+  package borrowing func borrowHandle() -> JSCValueHandle {
     handle
   }
 }

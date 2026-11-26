@@ -8,9 +8,12 @@
 - 各引擎的值和上下文在编译期隔离，避免跨引擎误用。
 - 公共 API 稳定，具体引擎差异收敛到后端适配层。
 
-> **实现状态（2026-11，§3.16）。** 迁移已完成。core 公开以 `JSContext` 为
-> 锚点的 `JS*` 协议；JavaScriptCore/QuickJS 分别提供具体 `JSC*`/`QJS*`
-> 类型。下文保留的 `JSValue<E>` 等泛型句柄描述仅作设计历史；当前契约以
+> **实现状态（2026-11，§3.17）。** 迁移已完成，包含 dehandle 收口。core 公开以
+> `JSContext` 为锚点的 `JS*` 协议；JavaScriptCore/QuickJS 分别提供具体
+> `JSC*`/`QJS*` 类型。public 协议不再暴露任何引擎 handle 类型或 handle 级
+> 成员：handle 与 context driver 协议均为 package 内部实现，
+> `JSPersistentHandle` 是唯一 public 的 handle 命名家族（绑定身份，不是引擎
+> 句柄）。下文保留的 `JSValue<E>` 等泛型句柄描述仅作设计历史；当前契约以
 > [类型系统策略](#类型系统策略) 与
 > [持久 handle 设计](PERSISTENT_HANDLE_DESIGN.md) 为准。迁移之外还有一个
 > 后续项：QuickJS 仍使用 package 缝（`TODO.md` §1.5）；这是可见性决策，
@@ -91,27 +94,27 @@ JavaScriptCore 使用系统框架，不需要单独 bridge target。
 ```swift
 public protocol JSValue: ~Copyable {
   associatedtype Context: JSContext
-  associatedtype ContextHandle: JSContextRuntimeDriver & JSContextInvocationDriver
-  where ContextHandle == Context.ContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == Context.ValueHandle
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext
-  borrowing func borrowHandle() -> ValueHandle
-  // 属性/调用/转换操作 ...
+
+  func type() -> JSType
+  /// Copyable 的值级调用 token；只在紧接着的同步调用内有效。
+  func asCallArgument() -> Context.CallArgument
+  // 属性/调用/转换操作收 `in context: borrowing InstantContext`，
+  // 返回 `JSResult<Context.Value>` ...
 }
 
 public struct JSCValue: JSValue, ~Copyable { /* JavaScriptCore */ }
 public struct QJSValue: JSValue, ~Copyable { /* QuickJS */ }
 
 public protocol JSContext: Actor, Hashable {
-  associatedtype ContextHandle: JSScopeContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == ContextHandle.ValueHandle
   associatedtype Value: JSValue & ~Copyable
-  where Value.Context == Self, Value.ValueHandle == ValueHandle
+  where Value.Context == Self, Value.InstantContext == InstantContext
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext.Context == Self, InstantContext.Value == Value
+  associatedtype CallArgument: JSCallArgument
+  associatedtype Class: JSClass
+  where Class.Context == Self
   // scope、工厂、持久 handle、data ...
 }
 
@@ -119,10 +122,16 @@ public actor JSCContext: JSContext { /* JavaScriptCore */ }
 public actor QJSContext: JSContext { /* QuickJS */ }
 ```
 
-成员协议不陈述任何关系：各自声明所属的 context（`Context`），并把它用到的
-成员类型别名过去（`ValueHandle == Context.ValueHandle`、
-`Value == Context.Value` ……）。所有等式都在 `JSContext` 里，方向是从 context
-指向它的成员。
+成员协议不陈述任何关系：各自声明所属的 context（`Context`），并只把它用到的
+非 handle 成员类型别名过去（`Value == Context.Value`、
+`InstantContext == Context.InstantContext` ……）。所有等式都在 `JSContext`
+里，方向是从 context 指向它的成员。`ContextHandle`/`ValueHandle` 等 handle
+关联已不在 public 协议上。
+
+public 面不出现任何引擎 handle。具体值视图在 package 内部保存 borrowed handle
+与 context handle；调用实参走 `JSValue`/`JSCallbackValue` 上 `asCallArgument()`
+产出的 Copyable 值级 `Context.CallArgument` token（只在源 arena 存活且用于紧
+接着的同步调用时有效）。`JSPersistentHandle` 是刻意的例外：它是绑定身份，不是引擎句柄。
 
 引擎隔离由 context 的 same-type 约束表达（`JSCContext.Value == JSCValue`、
 `QJSContext.Value == QJSValue` 以及其余关联），不是运行时检查。
@@ -155,27 +164,32 @@ context 可以补上这一缺口，但会让类型检查不收敛（Swift 6.4.2�
 - scope 与 value view 携带 `Context` 并把它的类型别名过来；same-type 别名
   阻止跨引擎混用。
 - 宏直接生成具体的 `JSC*` surface，不额外增加抽象层。
-- handle-only 缝（`JSEngineValueTypes`）刻意窄于用户面，不作为用户值抽象暴露。
+- package 内部的 handle 缝（`JSEngineValueTypes`、context driver 协议与引擎
+  handle）刻意窄于用户面，不作为用户值抽象暴露。
 
 ## 驱动协议
 
-原先的单一后端驱动已拆分：
+原先的单一后端驱动已拆分，且全部保持在 package 内部；它们不出现在
+public 协议面上：
 
 - context 寻址的操作位于 `JSContextRuntimeDriver`、
   `JSContextPropertyDriver`、`JSContextInvocationDriver`、
-  `JSContextTypedArrayDriver`、`JSContextPreparedScriptDriver`，由
+  `JSContextTypedArrayDriver`、`JSContextPreparedScriptDriver`，由 package 的
   `JSCContextHandle`/`QJSContextHandle` 实现。
-- 生命周期与能力描述留在引擎标记（`JSCEngine`/`QJSEngine`）；class 桥
-  （`JSEngineClassBridgeDriver`）建在它上面。
+- 生命周期与能力描述留在 public 引擎标记（`JSCEngine`/`QJSEngine`）；其
+  `JSEngine*` driver conformance 是 package。class 桥
+  （`JSEngineClassBridgeDriver`）是独立的 public 值级协议
+  （`makeClass`/`makeHostObject`/`hostObjectPrivateData`），由引擎标记遵循。
 - core 的共享 arena/registry 以 context handle 为键，只看得到它的
   `JSContextRuntimeDriver` 能力（`ValueHandle`/`OwnedValueHandle`/
-  `InstantContext`）。它们从不构造值视图：把已落账的 handle 包成本引擎的
-  视图，是引擎 scope/context 的落账原语。
+  `InstantContext`）。落账原语（`adoptCreatedHandle`、
+  `anchorBorrowedHandle`、`adoptCallbackHandle`）是引擎 scope/context 上的
+  package 方法；core 从不把已落账的 handle 变成 public 值视图。
 
 示意：
 
 ```swift
-public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
+package protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   associatedtype InstantContext: JSInstantContext & ~Copyable
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
   where ValueHandle.Context == Self
@@ -186,8 +200,8 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 }
 ```
 
-public 的 `JSCContext`/`QJSContext` actor 持有各自句柄并转发到 context
-driver，不暴露 raw 引擎类型。
+public 的 `JSCContext`/`QJSContext` actor 把各自句柄保留为 package 内部实现，
+只暴露值级协议操作。
 
 ## 引擎标签类型
 
@@ -202,7 +216,11 @@ public actor JSCContext: JSContext { /* JSCValue, JSCInstantContext, ... */ }
 public actor QJSContext: JSContext { /* QJSValue, QJSInstantContext, ... */ }
 ```
 
-这样值隔离是编译期完成的，而不是依靠运行时判断。
+引擎标记上的 handle 别名（`ContextHandle`、`ValueHandle`、
+`OwnedValueHandle`、`RuntimeHandle`、`ClassHandle`、
+`PropertyStringKeyHandle`、`PreparedScriptHandle`）都是
+`package typealias`，只用于满足 package driver 协议的 witness。这样值隔离是
+编译期完成的，而不是依靠运行时判断。
 
 ## 宿主模块模型
 
@@ -323,7 +341,7 @@ public actor QJSContext: JSContext { /* ... */ }
 
 - 它能明确区分长期所有权和短时借用。
 - 它能适配 JSCore 和 QuickJS 两种常见嵌入模型。
-- 它能和 noncopyable scope 类型及 handle 级所有权自然配合。
+- 它能和 noncopyable scope 类型及 scope arena 的引用所有权自然配合。
 
 ## 公共值编解码协议
 
@@ -333,10 +351,10 @@ public actor QJSContext: JSContext { /* ... */ }
 
 ```swift
 public protocol JSValueDecodable: ~Copyable {
-  static func tryDecode<V: JSValue & ~Copyable, C: JSInstantContext & ~Copyable>(
-    _ value: borrowing V,
+  init<C: JSInstantContext & ~Copyable>(
+    value: borrowing C.Value,
     in context: borrowing C
-  ) throws(JSValueConversionError) -> Self where V.Engine == C.Engine
+  )
 }
 
 public protocol JSValueEncodable: ~Copyable {
@@ -347,8 +365,10 @@ public protocol JSValueEncodable: ~Copyable {
 ```
 
 `JSDefaultConverter`、`JSValueDecoder`、`JSValueEncoder` 以及
-`JSValueConverter`/`JSValueCodable` 别名建立在这两个协议上。same-type 约束
-`V.Engine == C.Engine` 阻止转换器把某个引擎的值和另一个引擎的 scope 混用。
+`JSValueConverter`/`JSValueCodable` 别名建立在这两个协议上。解码以 scope
+窗口为单根：值始终是窗口自己的 `C.Value`，因此转换器不可能把某个引擎的值视图
+和另一个引擎的 scope 混用。抛错形式（`tryDecode`/`tryEncodeSurface`）是带有
+默认转发实现的协议要求；非抛错入口（`init`/`toSurfaceValue`）仍是协议要求。
 
 ## 哪些约束必须静态化
 
@@ -402,9 +422,9 @@ Package
 
 ### 第二步：重写当前 JavaScriptCore 后端
 
-已完成：`JSCEngine`、`JSCContextHandle` 与 `JSCValue`/`JSCContext` 家族实现
-core 协议；`SwiftyJavaScriptCore` 保留为 facade 产品，只留 JSC 薄别名与 raw C
-桥接。
+已完成：`JSCEngine`、`JSCValue`/`JSCContext` 等 public `JSC*` 类型实现 core
+协议；`JSCContextHandle` 与其余 `*Handle` 类型是 package 桥接内部实现。
+`SwiftyJavaScriptCore` 保留为 facade 产品，只留 JSC 薄别名与 raw C 桥接。
 
 ### 第三步：让宏生成具体 facade
 
@@ -413,8 +433,9 @@ surface 与描述符，不再生成 legacy 泛型包装。
 
 ### 第四步：接入 QuickJS
 
-已完成：`QJSEngine`、`QJS*` handle、`QJSValue`/`QJSContext`、class 与 buffer
-支持、`QJSVirtualMachine.gc()` 已落地，并由共享引擎测试目标覆盖。
+已完成：`QJSEngine`、`QJS*` 家族（其 handle 是 package 内部实现）、
+`QJSValue`/`QJSContext`、class 与 buffer 支持、`QJSVirtualMachine.gc()` 已落地，
+并由共享引擎测试目标覆盖。
 
 ## 第一阶段能力范围
 
@@ -442,8 +463,11 @@ TypedArray 和外部内存在后续切片中已实现。
 当前采用的组合：
 
 - 以 `JSContext` 为唯一锚点：为十五个用户面类型命名，并把它们的关系各陈述一次。
-- 公共 API 使用 `JS*` 协议 + 具体 `JSC*`/`QJS*` 类型。
-- `JSEngineValueTypes` 只作为 handle 层底层缝，不作为用户值抽象。
+- 公共 API 使用 `JS*` 协议 + 具体 `JSC*`/`QJS*` 类型，public 面没有 handle
+  关联或 handle 级成员。
+- `JSEngineValueTypes`、context driver 协议与全部 `*Handle` 只作为 package
+  底层缝，不作为用户值抽象；`JSPersistentHandle` 是唯一保留的 public handle
+  命名家族。
 - 把跨引擎可复用能力建立在宿主模块描述和宿主类型描述之上。
 - 把跨引擎误用限制在编译期完成，而不是依赖运行时检查。
 

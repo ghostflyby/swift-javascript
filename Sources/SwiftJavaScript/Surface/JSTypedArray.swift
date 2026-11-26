@@ -1,12 +1,13 @@
 /// An engine TypedArray wrapper.
 ///
 /// The concrete type is the engine's typed array (`JSCTypedArray`,
-/// `QJSTypedArray`); core keeps the shared `byteOffset` arithmetic below.
+/// `QJSTypedArray`); core keeps the whole-buffer convenience initializer.
+/// Shape and byte access are implemented by the engine: only its own value type
+/// can read the array's kind/offset and overlay `byteOffset` on its backing
+/// pointer.
 public protocol JSTypedArray: ~Copyable {
   /// The context this typed array belongs to.
   associatedtype Context: JSContext
-  associatedtype ContextHandle: JSScopeContextHandle & JSContextTypedArrayDriver
-  where ContextHandle == Context.ContextHandle
   associatedtype Value: JSValue & ~Copyable
   where Value == Context.Value
   associatedtype InstantContext: JSInstantContext & ~Copyable
@@ -14,11 +15,6 @@ public protocol JSTypedArray: ~Copyable {
   /// The buffer type this array views.
   associatedtype Buffer: JSArrayBuffer & ~Copyable
   where Buffer == Context.ArrayBuffer
-
-  var contextHandle: ContextHandle { get }
-
-  /// The engine value handle behind this typed array.
-  borrowing func borrowHandle() -> ContextHandle.ValueHandle
 
   /// Borrow the underlying value view. The typed array's arena keeps the
   /// reference alive, so `body` must not let the view outlive the call.
@@ -70,11 +66,10 @@ public protocol JSTypedArray: ~Copyable {
   ) -> R
 }
 
-// MARK: - Shared shape and byte access
+// MARK: - Shared construction convenience
 //
-// The driver reports lengths in bytes plus the array's offset into its buffer;
-// core turns those into the element count and overlays `byteOffset` on the
-// backing pointer, so neither engine writes its own offset arithmetic.
+// The engine reports kind/length/byteLength/byteOffset and the bytes itself;
+// core only supplies the argument completion that needs no engine access.
 
 extension JSTypedArray where Self: ~Copyable {
   /// Create a typed array that views the whole buffer.
@@ -84,63 +79,5 @@ extension JSTypedArray where Self: ~Copyable {
     in context: borrowing InstantContext
   ) {
     self.init(kind: kind, buffer: buffer, byteOffset: 0, length: nil, in: context)
-  }
-
-  public var kind: JSTypedArrayKind {
-    guard let kind = contextHandle.typedArrayKindForHandle(borrowHandle()) else {
-      preconditionFailure("Wrapped value is not a TypedArray")
-    }
-    return kind
-  }
-
-  public var length: Int {
-    guard let length = contextHandle.typedArrayLengthForHandle(borrowHandle()) else {
-      preconditionFailure("Failed to read TypedArray length")
-    }
-    return length
-  }
-
-  public var byteLength: Int {
-    guard let byteLength = contextHandle.typedArrayByteLengthForHandle(borrowHandle()) else {
-      preconditionFailure("Failed to read TypedArray byteLength")
-    }
-    return byteLength
-  }
-
-  public var byteOffset: Int {
-    guard let byteOffset = contextHandle.typedArrayByteOffsetForHandle(borrowHandle()) else {
-      preconditionFailure("Failed to read TypedArray byteOffset")
-    }
-    return byteOffset
-  }
-
-  public var bytes: [UInt8] {
-    withUnsafeBytes { Array($0) }
-  }
-
-  public borrowing func withUnsafeBytes<R: ~Copyable>(
-    _ body: (UnsafeRawBufferPointer) -> R
-  ) -> R {
-    let byteLength = self.byteLength
-    let access = contextHandle.typedArrayBytesPtrForHandle(borrowHandle())
-    guard !access.hadException else {
-      preconditionFailure("Failed to access TypedArray bytes")
-    }
-    // The driver reports the backing buffer's base pointer; the array's own
-    // view starts `byteOffset` bytes into it.
-    let start = access.bytes?.advanced(by: byteOffset)
-    return body(UnsafeRawBufferPointer(start: start, count: byteLength))
-  }
-
-  public borrowing func withUnsafeMutableBytes<R: ~Copyable>(
-    _ body: (UnsafeMutableRawBufferPointer) -> R
-  ) -> R {
-    let byteLength = self.byteLength
-    let access = contextHandle.typedArrayBytesPtrForHandle(borrowHandle())
-    guard !access.hadException else {
-      preconditionFailure("Failed to access mutable TypedArray bytes")
-    }
-    let start = access.bytes?.advanced(by: byteOffset)
-    return body(UnsafeMutableRawBufferPointer(start: start, count: byteLength))
   }
 }

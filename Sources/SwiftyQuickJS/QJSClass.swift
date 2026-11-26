@@ -10,12 +10,11 @@ import SwiftJavaScript
 /// record (definition + exotic method table) alive for the wrapper's lifetime.
 public final class QJSClass: SwiftJavaScript.JSClass, @unchecked Sendable {
   public typealias Context = QJSContext
-  public typealias ClassHandle = QJSClassHandle
 
   package let handle: QJSClassHandle
   package let retainedOwner: AnyObject?
 
-  public init(handleClass: QJSClassHandle, retainedOwner: AnyObject? = nil) {
+  package init(handleClass: QJSClassHandle, retainedOwner: AnyObject? = nil) {
     self.handle = handleClass
     self.retainedOwner = retainedOwner
     _ = handleClass.retainReference()
@@ -28,10 +27,6 @@ public final class QJSClass: SwiftJavaScript.JSClass, @unchecked Sendable {
 
   deinit {
     _ = handle.releaseReference()
-  }
-
-  public func classHandle() -> QJSClassHandle {
-    handle
   }
 }
 

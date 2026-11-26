@@ -3,15 +3,16 @@ import SwiftJavaScript
 // MARK: - JavaScriptCore scopes
 //
 // Both scopes hold the shared `ScopeCore<JSCContextHandle, JSImplicitStackRoots>`:
-// push/pop and arena settlement stay in core, and the value factories, global
-// reads and script evaluation are the protocol defaults. What remains here is
-// the engine's part: wrapping tracked handles in `JSCValue`/`JSCCallbackValue`
-// and the few operations that build engine wrapper types.
+// push/pop and arena settlement stay in core; the operations that create and
+// adopt values (factories, global reads, script results, function/key/script
+// construction, context data) are implemented here, on this scope's arena.
+// What stays in core is the value-level composition that never adopts (the
+// installed-function wrapper, the callback-value global write).
 
 /// The synchronous callback window handed to a `JSFunctionCallback`.
 public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
+  package typealias ContextHandle = JSCContextHandle
   public typealias Value = JSCValue
   public typealias CallbackValue = JSCCallbackValue
   public typealias CallbackReturn = JSCCallbackReturn
@@ -23,7 +24,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   private var core: ScopeCore<JSCContextHandle, JSImplicitStackRoots>
 
-  public var driverContextHandle: JSCContextHandle { core.driverContextHandle }
+  package var driverContextHandle: JSCContextHandle { core.driverContextHandle }
 
   package init(handle: JSCContextHandle) {
     self.core = ScopeCore(handle: handle)
@@ -37,18 +38,18 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Ledger primitives
 
-  public func adoptCreatedHandle(_ handle: consuming JSCOwnedValueHandle) -> JSCValue {
+  package func adoptCreatedHandle(_ handle: consuming JSCOwnedValueHandle) -> JSCValue {
     JSCValue(handle: core.trackCreatedHandle(handle), contextHandle: core.driverContextHandle)
   }
 
-  public func adoptCallbackHandle(
+  package func adoptCallbackHandle(
     _ handle: consuming JSCOwnedValueHandle
   ) -> JSCCallbackValue {
     JSCCallbackValue(
       handle: core.trackCreatedHandle(handle), contextHandle: core.driverContextHandle)
   }
 
-  public func anchorBorrowedHandle(_ handle: JSCValueHandle) -> JSCValue {
+  package func anchorBorrowedHandle(_ handle: JSCValueHandle) -> JSCValue {
     JSCValue(handle: core.claimAndTrackHandle(handle), contextHandle: core.driverContextHandle)
   }
 
@@ -57,6 +58,99 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public func persist(_ value: borrowing JSCCallbackValue) -> JSCValue {
     core.transferToDefaultFrame(value.borrowHandle())
     return JSCValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  @available(*, noasync)
+  public func localValue(_ value: borrowing JSCCallbackValue) -> JSCValue {
+    JSCValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ value: String) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeStringValueHandle(value) else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCCallbackValue {
+    let contextHandle = core.driverContextHandle
+    guard
+      let handle = contextHandle.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: contextHandle)
+      )
+    else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNumber(_ value: Double) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeNumberValueHandle(value) else {
+      preconditionFailure("makeNumberValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeBoolean(_ value: Bool) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeBooleanValueHandle(value) else {
+      preconditionFailure("makeBooleanValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNull() -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeNullValueHandle() else {
+      preconditionFailure("makeNullValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeUndefined() -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeUndefinedValueHandle() else {
+      preconditionFailure("makeUndefinedValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeSymbol(_ value: String) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeSymbolValueHandle(value) else {
+      preconditionFailure("makeSymbolValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeObject() -> JSResult<JSCCallbackValue> {
+    guard let result = core.driverContextHandle.makeObjectResultHandle() else {
+      preconditionFailure("makeObjectResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  public func makeArray() -> JSResult<JSCCallbackValue> {
+    guard let result = core.driverContextHandle.makeArrayResultHandle() else {
+      preconditionFailure("makeArrayResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  // MARK: - Instant window
+
+  public func withInstantWindow<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing JSCInstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    try body(self)
   }
 
   // MARK: - Callback exit
@@ -94,6 +188,52 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return JSCValue(handle: handle, contextHandle: core.driverContextHandle)
   }
 
+  public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
+    let contextHandle = core.driverContextHandle
+    guard let global = contextHandle.globalObjectValueHandle() else {
+      preconditionFailure("JSCInstantContext.getGlobalProperty could not get global object")
+    }
+    guard let result = contextHandle.getStaticStringPropertyHandle(key, on: global) else {
+      preconditionFailure("JSCInstantContext.getGlobalProperty returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+    case .exception(let handle):
+      contextHandle.releaseCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+      guard let undefined = contextHandle.makeUndefinedValueHandle() else {
+        preconditionFailure("JSCInstantContext could not create an undefined handle")
+      }
+      return adoptCreatedHandle(undefined)
+    }
+  }
+
+  public func setGlobalProperty(
+    _ value: borrowing JSCValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: global,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func deleteGlobalProperty(forKey key: StaticString) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+  }
+
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else {
+      return false
+    }
+    return core.driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
+  }
+
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<JSCInstantContext>
@@ -151,6 +291,40 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
       vmThread: ScopeStackRegistry<JSCContextHandle>.vmThread(for: core.driverContextHandle)
     )
   }
+  // MARK: - Scripts
+
+  public func evaluateScript(
+    _ script: borrowing JSCPreparedScript,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<JSCValue> {
+    let contextHandle = core.driverContextHandle
+    guard
+      let result = contextHandle.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: contextHandle),
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    else {
+      preconditionFailure("JSCInstantContext.evaluateScript unexpectedly returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    case .exception(let handle):
+      return .exception(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    }
+  }
+
+  // MARK: - Context data
+
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
+    core.driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
+    core.driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
+  }
 }
 
 extension JSCInstantContext: JSScopeWitness {
@@ -164,7 +338,7 @@ extension JSCInstantContext: JSScopeWitness {
 /// The manual JavaScriptCore scope (`JSContext`-derived construction).
 public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   public typealias Context = JSCContext
-  public typealias ContextHandle = JSCContextHandle
+  package typealias ContextHandle = JSCContextHandle
   public typealias Value = JSCValue
   public typealias CallbackValue = JSCCallbackValue
   public typealias PropertyStringKey = JSCPropertyStringKey
@@ -175,7 +349,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   private var core: ScopeCore<JSCContextHandle, JSImplicitStackRoots>
   private var isOpen = false
 
-  public var driverContextHandle: JSCContextHandle { core.driverContextHandle }
+  package var driverContextHandle: JSCContextHandle { core.driverContextHandle }
 
   package init(handle: JSCContextHandle) {
     self.core = ScopeCore(handle: handle)
@@ -196,18 +370,18 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   // MARK: - Ledger primitives
 
-  public func adoptCreatedHandle(_ handle: consuming JSCOwnedValueHandle) -> JSCValue {
+  package func adoptCreatedHandle(_ handle: consuming JSCOwnedValueHandle) -> JSCValue {
     JSCValue(handle: core.trackCreatedHandle(handle), contextHandle: core.driverContextHandle)
   }
 
-  public func adoptCallbackHandle(
+  package func adoptCallbackHandle(
     _ handle: consuming JSCOwnedValueHandle
   ) -> JSCCallbackValue {
     JSCCallbackValue(
       handle: core.trackCreatedHandle(handle), contextHandle: core.driverContextHandle)
   }
 
-  public func anchorBorrowedHandle(_ handle: JSCValueHandle) -> JSCValue {
+  package func anchorBorrowedHandle(_ handle: JSCValueHandle) -> JSCValue {
     JSCValue(handle: core.claimAndTrackHandle(handle), contextHandle: core.driverContextHandle)
   }
 
@@ -218,6 +392,100 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return JSCValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
   }
 
+  @available(*, noasync)
+  public func localValue(_ value: borrowing JSCCallbackValue) -> JSCValue {
+    JSCValue(handle: value.borrowHandle(), contextHandle: core.driverContextHandle)
+  }
+
+  // MARK: - Value factories
+
+  public func makeString(_ value: String) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeStringValueHandle(value) else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCCallbackValue {
+    let contextHandle = core.driverContextHandle
+    guard
+      let handle = contextHandle.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowHandle(in: contextHandle)
+      )
+    else {
+      preconditionFailure("makeStringValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNumber(_ value: Double) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeNumberValueHandle(value) else {
+      preconditionFailure("makeNumberValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeBoolean(_ value: Bool) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeBooleanValueHandle(value) else {
+      preconditionFailure("makeBooleanValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeNull() -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeNullValueHandle() else {
+      preconditionFailure("makeNullValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeUndefined() -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeUndefinedValueHandle() else {
+      preconditionFailure("makeUndefinedValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeSymbol(_ value: String) -> JSCCallbackValue {
+    guard let handle = core.driverContextHandle.makeSymbolValueHandle(value) else {
+      preconditionFailure("makeSymbolValueHandle failed")
+    }
+    return adoptCallbackHandle(handle)
+  }
+
+  public func makeObject() -> JSResult<JSCCallbackValue> {
+    guard let result = core.driverContextHandle.makeObjectResultHandle() else {
+      preconditionFailure("makeObjectResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  public func makeArray() -> JSResult<JSCCallbackValue> {
+    guard let result = core.driverContextHandle.makeArrayResultHandle() else {
+      preconditionFailure("makeArrayResultHandle failed")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCallbackHandle(handle))
+    case .exception(let handle):
+      return .exception(adoptCallbackHandle(handle))
+    }
+  }
+
+  // MARK: - Instant window
+
+  public func withInstantWindow<R: ~Copyable, Failure: Error>(
+    _ body: (borrowing JSCInstantContext) throws(Failure) -> R
+  ) throws(Failure) -> R {
+    let window = JSCInstantContext(handle: core.driverContextHandle)
+    return try body(window)
+  }
+
   // MARK: - Global object
 
   public func globalObjectValue() -> JSCValue {
@@ -225,6 +493,52 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
       preconditionFailure("JSCScope.globalObjectValue could not get global object")
     }
     return JSCValue(handle: handle, contextHandle: core.driverContextHandle)
+  }
+
+  public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
+    let contextHandle = core.driverContextHandle
+    guard let global = contextHandle.globalObjectValueHandle() else {
+      preconditionFailure("JSCScope.getGlobalProperty could not get global object")
+    }
+    guard let result = contextHandle.getStaticStringPropertyHandle(key, on: global) else {
+      preconditionFailure("JSCScope.getGlobalProperty returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+    case .exception(let handle):
+      contextHandle.releaseCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+      guard let undefined = contextHandle.makeUndefinedValueHandle() else {
+        preconditionFailure("JSCScope could not create an undefined handle")
+      }
+      return adoptCreatedHandle(undefined)
+    }
+  }
+
+  public func setGlobalProperty(
+    _ value: borrowing JSCValue,
+    forKey key: StaticString,
+    with attributes: JSHostMemberAttributes
+  ) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.setStaticStringPropertyHandle(
+      key,
+      on: global,
+      to: value.borrowHandle(),
+      attributes: attributes
+    )
+  }
+
+  public func deleteGlobalProperty(forKey key: StaticString) {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else { return }
+    _ = core.driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+  }
+
+  public func hasGlobalProperty(_ key: StaticString) -> Bool {
+    guard let global = core.driverContextHandle.globalObjectValueHandle() else {
+      return false
+    }
+    return core.driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
   }
 
   public func makeFunction(
@@ -283,6 +597,40 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
       contextHandle: core.driverContextHandle,
       vmThread: ScopeStackRegistry<JSCContextHandle>.vmThread(for: core.driverContextHandle)
     )
+  }
+  // MARK: - Scripts
+
+  public func evaluateScript(
+    _ script: borrowing JSCPreparedScript,
+    sourceURL: String?,
+    startingLineNumber: Int32
+  ) -> JSResult<JSCValue> {
+    let contextHandle = core.driverContextHandle
+    guard
+      let result = contextHandle.evaluatePreparedScriptResultHandle(
+        script.borrowHandle(in: contextHandle),
+        sourceURL: sourceURL,
+        startingLineNumber: startingLineNumber
+      )
+    else {
+      preconditionFailure("JSCScope.evaluateScript unexpectedly returned nil")
+    }
+    switch consume result {
+    case .value(let handle):
+      return .value(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    case .exception(let handle):
+      return .exception(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    }
+  }
+
+  // MARK: - Context data
+
+  public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
+    core.driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+  }
+
+  public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
+    core.driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
   }
 }
 

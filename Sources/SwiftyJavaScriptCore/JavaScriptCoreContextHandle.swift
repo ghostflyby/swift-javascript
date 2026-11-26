@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JSCContextHandle: JSContextManualReferenceCountedHandle, Equatable,
+package struct JSCContextHandle: JSContextManualReferenceCountedHandle, Equatable,
   @unchecked Sendable
 {
   package let ref: JSGlobalContextRef
@@ -76,12 +76,12 @@ public struct JSCContextHandle: JSContextManualReferenceCountedHandle, Equatable
     JSCContext.borrow(ctx: ref)?.driverContextHandle
   }
 
-  public var engineType: JSCEngine.Type {
+  package var engineType: JSCEngine.Type {
     JSCEngine.self
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     guard ownsContext else {
       return false
     }
@@ -99,7 +99,7 @@ public struct JSCContextHandle: JSContextManualReferenceCountedHandle, Equatable
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     guard ownsContext else {
       return false
     }
@@ -145,13 +145,13 @@ private func makeJavaScriptCorePropertyNamesFunction(in context: JSGlobalContext
 }
 
 extension JSCContextHandle: Hashable {
-  public static func == (lhs: JSCContextHandle, rhs: JSCContextHandle)
+  package static func == (lhs: JSCContextHandle, rhs: JSCContextHandle)
     -> Bool
   {
     lhs.ref == rhs.ref
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(ref)
   }
 }

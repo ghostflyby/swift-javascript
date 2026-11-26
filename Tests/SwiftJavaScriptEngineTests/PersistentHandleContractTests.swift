@@ -27,10 +27,10 @@ import Testing
 /// (`docs/PERSISTENT_HANDLE_DESIGN.md` §8.2).
 ///
 /// The core layer needs no backend additions: mint and resolve are built from
-/// the existing `claimOwnedValueHandle` / `rootOwnedValueHandle` /
-/// `unrootOwnedValueHandle` / `releaseCreatedHandle` requirements, and each
-/// backend already implements them (JSC: protect/unprotect + identity claim;
-/// QuickJS: `JS_DupValue` / `JS_FreeValue` with identity rooting).
+/// the existing claim/root/unroot/release requirements of the engine context
+/// driver, and each backend already implements them (JSC: protect/unprotect +
+/// identity claim; QuickJS: `JS_DupValue` / `JS_FreeValue` with identity
+/// rooting).
 @Suite
 struct PersistentHandleContractTests {
   @Test(arguments: ScriptEngine.allCases)
@@ -215,7 +215,7 @@ private enum PersistentBindingSurvivesCollection: ScriptEngineAssertion {
     // it. JSC collects here; QuickJS needs no collection hook (the binding
     // owns a duplicated reference).
     let number = await context.withInstantContext { isolatedContext in
-      stage3CollectGarbageIfSupported(isolatedContext.driverContextHandle)
+      stage3CollectGarbageIfSupported(context)
       guard let value = isolatedContext.resolve(handle) else { return -1.0 }
       return value.toNumber()
     }
@@ -328,12 +328,15 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
     let handle = await context.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("detached"))
     }
-    guard let box = context.driverContextHandle.contextDataStorageBox() else {
+    guard
+      let contextHandle = engineRuntimeDriver(context),
+      let box = contextHandle.contextDataStorageBox()
+    else {
       Issue.record("C did not install a context data storage box")
       return
     }
     await context.withInstantContext { _ in
-      context.driverContextHandle.installContextDataStorageBox(nil)
+      contextHandle.installContextDataStorageBox(nil)
     }
     let scopeWithoutBox = await context.withInstantContext { scope in
       scope.resolve(handle) == nil
@@ -342,7 +345,7 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
     #expect(scopeWithoutBox)
     #expect(actorWithRegistry)
     await context.withInstantContext { _ in
-      context.driverContextHandle.installContextDataStorageBox(box)
+      contextHandle.installContextDataStorageBox(box)
     }
 
     // Dead identity: metadata dies immediately, independent of the pump.
@@ -387,16 +390,13 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
     let handle = await context.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("boxed"))
     }
-    // An engine read: taken inside the actor window.
-    let box = await context.withInstantContext { scope in
-      scope.driverContextHandle.contextDataStorageBox()
-    }
-    guard let box else {
+    // An engine read: reachable through the concrete engine's driver.
+    guard let box = engineRuntimeDriver(context)?.contextDataStorageBox() else {
       Issue.record("C did not install a context data storage box")
       return
     }
 
-    context.driverContextHandle.installContextDataStorageBox(nil)
+    engineRuntimeDriver(context)?.installContextDataStorageBox(nil)
     await awaitPersistentHandleSettlement(C.self, on: virtualMachine)
     let scopeWithoutBox = await context.withInstantContext { scope in
       scope.resolve(handle) == nil
@@ -405,7 +405,7 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
     #expect(scopeWithoutBox)
     #expect(actorKeepsRegistry)
 
-    context.driverContextHandle.installContextDataStorageBox(box)
+    engineRuntimeDriver(context)?.installContextDataStorageBox(box)
     await awaitPersistentHandleSettlement(C.self, on: virtualMachine)
     let scopeRestored = await context.withInstantContext { scope in
       scope.resolve(handle) != nil
@@ -509,8 +509,7 @@ private enum PersistentBindingSurvivesForcedCollection: ScriptEngineAssertion {
     // root (and, on JSC, the conservative stack scan of the live frame) can
     // keep the property readable.
     let kind = await context.withInstantContext { scope -> String in
-      stage4CollectGarbage(
-        virtualMachine, contextHandle: scope.driverContextHandle)
+      stage4CollectGarbage(context)
       guard let value = scope.resolve(handle) else { return "<nil>" }
       let property = value.getProperty("kind", in: scope)
       switch consume property {
@@ -568,9 +567,8 @@ private enum PersistentBindingReleasePermitsCollection: ScriptEngineAssertion {
 
     // The binding's duplicate keeps the object alive across a forced cycle
     // collection with no JS-visible strong reference.
-    await context.withInstantContext { scope in
-      stage4CollectGarbage(
-        virtualMachine, contextHandle: scope.driverContextHandle)
+    await context.withInstantContext { _ in
+      stage4CollectGarbage(context)
     }
     let aliveKind = await context.withInstantContext { scope -> String in
       guard let value = scope.resolve(handle) else { return "<nil>" }
@@ -589,9 +587,8 @@ private enum PersistentBindingReleasePermitsCollection: ScriptEngineAssertion {
     // Two collection turns: the first may only reach the sweep phase that
     // frees the binding's last reference, the second clears the weak record.
     for _ in 0..<2 {
-      await context.withInstantContext { scope in
-        stage4CollectGarbage(
-          virtualMachine, contextHandle: scope.driverContextHandle)
+      await context.withInstantContext { _ in
+        stage4CollectGarbage(context)
       }
     }
     let collected = await context.withInstantContext { scope -> Bool in

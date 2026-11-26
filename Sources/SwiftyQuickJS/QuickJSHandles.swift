@@ -44,7 +44,7 @@ private struct QuickJSRuntimeIdentityRegistry: Sendable, ~Copyable {
 
 private let quickJSRuntimeIdentityRegistry = QuickJSRuntimeIdentityRegistry()
 
-public struct QJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
+package struct QJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecked Sendable {
   private let rawRef: OpaquePointer
   private let runtimeID: UInt64
   let ownsRuntime: Bool
@@ -66,17 +66,16 @@ public struct QJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecke
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     false
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     guard ownsRuntime else {
       return false
     }
     JS_FreeRuntime(ref)
-    removeJSClassValueConvertibleClasses(for: QJSEngine.self, in: self)
     removeQuickJSClassRecords(in: self)
     quickJSRuntimeIdentityRegistry.removeID(for: rawRef)
     return true
@@ -84,17 +83,17 @@ public struct QJSRuntimeHandle: JSRuntimeManualReferenceCountedHandle, @unchecke
 }
 
 extension QJSRuntimeHandle: Hashable {
-  public static func == (lhs: QJSRuntimeHandle, rhs: QJSRuntimeHandle) -> Bool {
+  package static func == (lhs: QJSRuntimeHandle, rhs: QJSRuntimeHandle) -> Bool {
     lhs.rawRef == rhs.rawRef && lhs.runtimeID == rhs.runtimeID
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(rawRef)
     hasher.combine(runtimeID)
   }
 }
 
-public struct QJSContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable {
+package struct QJSContextHandle: JSContextManualReferenceCountedHandle, @unchecked Sendable {
   private let rawRef: OpaquePointer
 
   init(ref: OpaquePointer) {
@@ -112,31 +111,31 @@ public struct QJSContextHandle: JSContextManualReferenceCountedHandle, @unchecke
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     let duplicated = JS_DupContext(ref)
     return duplicated != nil
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     JS_FreeContext(ref)
     return true
   }
 }
 
 extension QJSContextHandle: Hashable {
-  public static func == (lhs: QJSContextHandle, rhs: QJSContextHandle) -> Bool {
+  package static func == (lhs: QJSContextHandle, rhs: QJSContextHandle) -> Bool {
     lhs.rawRef == rhs.rawRef
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(rawRef)
   }
 }
 
-public struct QJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable, Hashable {
-  public typealias Context = QJSContextHandle
-  public typealias Owned = QJSOwnedValueHandle
+package struct QJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Sendable, Hashable {
+  package typealias Context = QJSContextHandle
+  package typealias Owned = QJSOwnedValueHandle
 
   let rawRef: CQuickJSValue
 
@@ -152,7 +151,7 @@ public struct QJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Se
   /// Comparing only `u.int32` truncates heap pointers to their low 32 bits,
   /// which lets two distinct live objects collide and corrupts identity
   /// matching (e.g. the scope arena's persist removal).
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     guard lhs.rawRef.tag == rhs.rawRef.tag else { return false }
     return withUnsafeBytes(of: lhs.rawRef.u) { lhsBytes in
       withUnsafeBytes(of: rhs.rawRef.u) { rhsBytes in
@@ -161,16 +160,16 @@ public struct QJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Se
     }
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(rawRef.tag)
     withUnsafeBytes(of: rawRef.u) { hasher.combine($0.load(as: UInt64.self)) }
   }
 
-  public func retainReference(in context: QJSContextHandle) {
+  package func retainReference(in context: QJSContextHandle) {
     _ = JS_DupValue(context.ref, rawRef)
   }
 
-  public func releaseReference(in context: QJSContextHandle) {
+  package func releaseReference(in context: QJSContextHandle) {
     JS_FreeValue(context.ref, rawRef)
   }
 
@@ -183,11 +182,11 @@ public struct QJSValueHandle: JSValueManualReferenceCountedHandle, @unchecked Se
 /// noncopyable type makes double frees (and lost releases) a compile-time
 /// error — the owned reference can live in only one place (creation
 /// result, scope-arena element, or handoff).
-public struct QJSOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
+package struct QJSOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
   Equatable, ~Copyable
 {
-  public typealias Context = QJSContextHandle
-  public typealias Borrowed = QJSValueHandle
+  package typealias Context = QJSContextHandle
+  package typealias Borrowed = QJSValueHandle
 
   let rawRef: CQuickJSValue
 
@@ -195,15 +194,15 @@ public struct QJSOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
     self.rawRef = ref
   }
 
-  public borrowing func borrowed() -> QJSValueHandle {
+  package borrowing func borrowed() -> QJSValueHandle {
     QJSValueHandle(ref: rawRef)
   }
 
-  public static func adopting(_ handle: borrowing QJSValueHandle) -> Self {
+  package static func adopting(_ handle: borrowing QJSValueHandle) -> Self {
     Self(ref: handle.rawRef)
   }
 
-  public static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+  package static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool {
     guard lhs.rawRef.tag == rhs.rawRef.tag else { return false }
     return withUnsafeBytes(of: lhs.rawRef.u) { lhsBytes in
       withUnsafeBytes(of: rhs.rawRef.u) { rhsBytes in
@@ -213,29 +212,29 @@ public struct QJSOwnedValueHandle: JSOwnedValueManualReferenceCountedHandle,
   }
 }
 
-public struct QJSClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable {
+package struct QJSClassHandle: JSClassManualReferenceCountedHandle, @unchecked Sendable {
   let id: JSClassID
   let runtime: QJSRuntimeHandle?
 
-  public init(id: JSClassID, runtime: QJSRuntimeHandle? = nil) {
+  package init(id: JSClassID, runtime: QJSRuntimeHandle? = nil) {
     self.id = id
     self.runtime = runtime
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     false
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     false
   }
 }
 
 extension QJSClassHandle: Hashable {}
 
-public struct QJSPropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle,
+package struct QJSPropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCountedHandle,
   @unchecked Sendable
 {
   let atom: JSAtom
@@ -247,18 +246,18 @@ public struct QJSPropertyStringKeyHandle: JSPropertyStringKeyManualReferenceCoun
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     JS_DupAtom(contextRef, atom) != 0
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     JS_FreeAtom(contextRef, atom)
     return true
   }
 }
 
-public struct QJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
+package struct QJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHandle,
   @unchecked Sendable
 {
   let source: String
@@ -280,12 +279,12 @@ public struct QJSPreparedScriptHandle: JSPreparedScriptManualReferenceCountedHan
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     true
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     true
   }
 }

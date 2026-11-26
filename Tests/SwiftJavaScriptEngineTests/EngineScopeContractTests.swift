@@ -129,18 +129,17 @@ struct EngineScopeContractTests {
   }
 }
 
-/// `JSContextLegacy.makeScope()` 是 `JSScopeLegacy` 的公共构造路径(TODO §2.7.1):工厂
+/// `JSContext.makeScope()` 是 `JSScope` 的公共构造路径(TODO §2.7.1):工厂
 /// actor 隔离,scope 生、用、析构都在 context 的隔离域内。嵌套 scope 内:
 /// 工厂产物经 `persist` 晋升到默认 scope;持久 handle 在其中 mint/resolve;
-/// scope 结束后帧弹回默认帧,晋升值仍可用。
+/// scope 结束后晋升值仍可用。(“scope 结束后栈顶回到默认帧”的身份断言按
+/// 具体引擎下沉到 `JSCScopeSurfaceTests`/`QJSScopeSurfaceTests`——公共协议面
+/// 已不再暴露 context handle。)
 private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
     let context = C(virtualMachine: C.VirtualMachine())
 
-    let (resolved, stackBackAtDefault) = await context.withInstantContext {
-      window -> (String, Bool) in
-      let contextHandle = window.driverContextHandle
-      let defaultFrame = ScopeStackRegistry<C.ContextHandle>.top(of: contextHandle)
+    let resolved = await context.withInstantContext { window -> String in
       let handle = window.makePersistentHandle(
         window.makeString("bound"))
 
@@ -148,13 +147,10 @@ private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion 
       // 结束后仍由默认 scope / 全局对象持有。
       let durable = window.persist(window.makeString("promoted"))
       window.setGlobalProperty(durable, forKey: "durable", with: .none)
-      let resolved = window.resolve(handle)?.toString() ?? "<nil>"
-
-      return (resolved, ScopeStackRegistry<C.ContextHandle>.top(of: contextHandle) === defaultFrame)
+      return window.resolve(handle)?.toString() ?? "<nil>"
     }
 
     #expect(resolved == "bound")
-    #expect(stackBackAtDefault)
 
     // 晋升值锚在默认 scope:窗口结束后、跨窗口仍可读取。
     let durableAfterScope = await context.withInstantContext { window in
@@ -166,7 +162,7 @@ private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion 
 
 /// 回调 B 同步执行于 A 的引擎调用内,普通引用类型即可带出观察结果;
 /// 写入全部发生在 context actor 的执行器上,await 返回后才被读取,
-/// 按仓库惯例(如 MockValueHandleStorage)标 @unchecked Sendable。
+/// 按仓库惯例(如 mock 的 handle 存储)标 @unchecked Sendable。
 /// (局部类型不能嵌套在泛型函数中,故提至文件作用域。)
 private final class NestedCallbackObservations: @unchecked Sendable {
   var argumentCount: Int? = nil
@@ -201,11 +197,11 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
       ic.installGlobalFunction(named: "inner") { c, _, arguments in
         observations.argumentCount = arguments.count
         arguments.withValue(at: 0, in: c) { value in
-          let view = c.anchorBorrowedHandle(value.borrowHandle())
+          let view = c.localValue(value)
           observations.receivedType = view.type()
           observations.receivedContent = view.toString()
           observations.strictlyMatchesTwin = view.strictlyEquals(
-            c.anchorBorrowedHandle(c.makeString("payload-from-A").borrowHandle()))
+            c.localValue(c.makeString("payload-from-A")))
         }
         return c.return(c.makeString("ack-from-B"))
       }
@@ -214,7 +210,7 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
       ic.installGlobalFunction(named: "outer") { c, _, _ in
         let created = c.makeString("payload-from-A")
         let relay = c.getGlobalProperty(forKey: "relay")
-        let relayResult = relay.call(arguments: [created.borrowHandle()], in: c)
+        let relayResult = relay.call(arguments: [created.asCallArgument()], in: c)
         switch consume relayResult {
         case .value(let acknowledgement):
           return c.return(c.makeString("relay:" + acknowledgement.toString()))

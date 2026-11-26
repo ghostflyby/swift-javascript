@@ -441,26 +441,13 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
 
   do {
     let context = QJSInstantContext(handle: firstHandle)
-    guard QJSEngine.runtimeHandle(for: context.driverContextHandle) != nil else {
-      Issue.record("Expected QuickJS runtime handle")
-      return
-    }
     let childDefinition = QuickJSRuntimeChildNode.jsClassDefinition
     #expect(childDefinition.parentClass == .for(QuickJSRuntimeParentNode.self))
 
     do {
       let encoded = try QuickJSRuntimeChildNode.tryEncode(
         QuickJSRuntimeChildNode(), in: context)
-      let privateData: UnsafeMutableRawPointer?
-      switch QJSEngine.classObjectPrivateData(
-        from: encoded.borrowHandle(),
-        in: context.driverContextHandle
-      ) {
-      case .value(let data):
-        privateData = data
-      case .exception, nil:
-        privateData = nil
-      }
+      let privateData = QJSEngine.hostObjectPrivateData(of: encoded, in: context)
       let storage = privateData.map {
         Unmanaged<JSClassAutoObjectStorage<QJSClassDefinition>>
           .fromOpaque($0)

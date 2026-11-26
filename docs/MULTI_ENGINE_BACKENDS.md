@@ -8,11 +8,15 @@ This document defines the multi-engine architecture of SwiftyJavaScriptCore. The
 - Values and contexts from different engines are isolated at compile time to prevent cross-engine misuse.
 - The public API remains stable, while engine-specific differences are contained within backend adapters.
 
-> **Implementation status (2026-11, §3.16).** The migration is complete. Core
-> exposes public `JS*` protocols anchored on `JSContext`; JavaScriptCore and
-> QuickJS provide concrete `JSC*`/`QJS*` types. Older sections below that
-> described generic handles such as `JSValue<E>` are retained as design
-> history only; the current contract is the protocol + concrete-type model in
+> **Implementation status (2026-11, §3.17).** The migration is complete,
+> including the dehandle pass. Core exposes public `JS*` protocols anchored on
+> `JSContext`; JavaScriptCore and QuickJS provide concrete `JSC*`/`QJS*`
+> types. No public protocol exposes an engine handle type or a handle-level
+> member: the handle and context-driver protocols are package internals, and
+> `JSPersistentHandle` is the only public handle-named family (a binding
+> identity, not an engine handle). Older sections below that described
+> generic handles such as `JSValue<E>` are retained as design history only;
+> the current contract is the protocol + concrete-type model in
 > [Type System Strategy](#type-system-strategy) and
 > [Persistent handle design](PERSISTENT_HANDLE_DESIGN.md). One follow-up
 > remains outside this migration: QuickJS still reaches package seams
@@ -96,27 +100,27 @@ between them exactly once.
 ```swift
 public protocol JSValue: ~Copyable {
   associatedtype Context: JSContext
-  associatedtype ContextHandle: JSContextRuntimeDriver & JSContextInvocationDriver
-  where ContextHandle == Context.ContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == Context.ValueHandle
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext
-  borrowing func borrowHandle() -> ValueHandle
-  // property/call/conversion operations ...
+
+  func type() -> JSType
+  /// Copyable value-level call token; valid for the immediate synchronous call.
+  func asCallArgument() -> Context.CallArgument
+  // property/call/conversion operations take `in context: borrowing InstantContext`
+  // and return `JSResult<Context.Value>` ...
 }
 
 public struct JSCValue: JSValue, ~Copyable { /* JavaScriptCore */ }
 public struct QJSValue: JSValue, ~Copyable { /* QuickJS */ }
 
 public protocol JSContext: Actor, Hashable {
-  associatedtype ContextHandle: JSScopeContextHandle
-  associatedtype ValueHandle: JSValueManualReferenceCountedHandle
-  where ValueHandle == ContextHandle.ValueHandle
   associatedtype Value: JSValue & ~Copyable
-  where Value.Context == Self, Value.ValueHandle == ValueHandle
+  where Value.Context == Self, Value.InstantContext == InstantContext
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext.Context == Self, InstantContext.Value == Value
+  associatedtype CallArgument: JSCallArgument
+  associatedtype Class: JSClass
+  where Class.Context == Self
   // scopes, factories, persistent handles, data ...
 }
 
@@ -125,9 +129,18 @@ public actor QJSContext: JSContext { /* QuickJS */ }
 ```
 
 The member protocols state no relationships of their own: each names the
-context it belongs to (`Context`) and aliases the member types it uses
-(`ValueHandle == Context.ValueHandle`, `Value == Context.Value`, ...). Every
-equality lives in `JSContext` and points from the context to its members.
+context it belongs to (`Context`) and aliases the non-handle member types it
+uses (`Value == Context.Value`, `InstantContext == Context.InstantContext`,
+...). Every equality lives in `JSContext` and points from the context to its
+members. Handle associations such as `ContextHandle`/`ValueHandle` no longer
+exist on the public protocols.
+
+No engine handle appears on the public surface. A concrete value view keeps
+its borrowed handle and context handle as package implementation details;
+call arguments travel as the Copyable, value-level `Context.CallArgument`
+token produced by `asCallArgument()` on either `JSValue` or `JSCallbackValue`
+(valid only for the immediate synchronous call while the source arena lives). `JSPersistentHandle` is the deliberate
+exception: it is a binding identity, not an engine handle.
 
 Engine isolation is expressed through the context's same-type constraints
 (`JSCContext.Value == JSCValue`, `QJSContext.Value == QJSValue`, and the other
@@ -168,30 +181,35 @@ protocol graph by giving it exactly one hub:
 - Scopes and value views carry their `Context` and alias its types; their
   same-type aliases keep values from crossing engines.
 - Macros generate the concrete `JSC*` surface, not an additional abstraction.
-- The handle-only seam (`JSEngineValueTypes`) is deliberately narrower than the
-  user surface; it is not exposed as a user-facing value abstraction.
+- The package-only handle seam (`JSEngineValueTypes`, the context-driver
+  protocols and the engine handles) is deliberately narrower than the user
+  surface; it is not exposed as a user-facing value abstraction.
 
 ## Driver Protocols
 
-The original single backend driver was decomposed during migration:
+The original single backend driver was decomposed during migration and is now
+package-internal; none of it appears on the public protocol surface:
 
 - Context-addressed operations live on `JSContextRuntimeDriver`,
   `JSContextPropertyDriver`, `JSContextInvocationDriver`,
   `JSContextTypedArrayDriver`, and `JSContextPreparedScriptDriver`,
-  implemented by `JSCContextHandle` and `QJSContextHandle`.
-- Lifecycle and capability descriptors stay on the engine marker
-  (`JSCEngine` / `QJSEngine`); the class bridge (`JSEngineClassBridgeDriver`)
-  is built on it.
+  implemented by the package `JSCContextHandle` and `QJSContextHandle`.
+- Lifecycle and capability descriptors stay on the public engine marker
+  (`JSCEngine` / `QJSEngine`); its `JSEngine*` driver conformances are package.
+  The class bridge (`JSEngineClassBridgeDriver`) is a separate public,
+  value-level protocol (`makeClass`/`makeHostObject`/`hostObjectPrivateData`)
+  implemented by the marker.
 - Core's shared arena and registry are keyed on the context handle and see
   only its `JSContextRuntimeDriver` capabilities (`ValueHandle`,
-  `OwnedValueHandle`, `InstantContext`). They never construct a value view:
-  wrapping a tracked handle in the engine's view is the ledger primitive of
-  the engine's scope or context.
+  `OwnedValueHandle`, `InstantContext`). The ledger primitives
+  (`adoptCreatedHandle`, `anchorBorrowedHandle`, `adoptCallbackHandle`) are
+  package methods on the engine's scope/context; core never turns a tracked
+  handle into a public value view.
 
 Illustrative shape:
 
 ```swift
-public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
+package protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
   associatedtype InstantContext: JSInstantContext & ~Copyable
   associatedtype ValueHandle: JSValueManualReferenceCountedHandle
   where ValueHandle.Context == Self
@@ -202,8 +220,8 @@ public protocol JSContextRuntimeDriver: JSContextManualReferenceCountedHandle {
 }
 ```
 
-The public `JSCContext`/`QJSContext` actors own their handles and forward to the
-context driver; they do not expose raw engine types.
+The public `JSCContext`/`QJSContext` actors keep their handles as package
+implementation details and expose only value-level protocol operations.
 
 ## Engine Marker Types
 
@@ -218,7 +236,11 @@ public actor JSCContext: JSContext { /* JSCValue, JSCInstantContext, ... */ }
 public actor QJSContext: JSContext { /* QJSValue, QJSInstantContext, ... */ }
 ```
 
-This makes engine isolation a compile-time property instead of a runtime check.
+The marker's handle aliases (`ContextHandle`, `ValueHandle`,
+`OwnedValueHandle`, `RuntimeHandle`, `ClassHandle`,
+`PropertyStringKeyHandle`, `PreparedScriptHandle`) are `package typealias`es,
+kept only to witness the package driver protocols. This makes engine isolation
+a compile-time property instead of a runtime check.
 
 ## Host Module Model
 
@@ -342,7 +364,8 @@ This model remains a good fit because:
 
 - It cleanly separates long-lived ownership from short-lived borrowing.
 - It works well for both JSCore and QuickJS embedding models.
-- It naturally matches noncopyable scope types and handle-level ownership.
+- It naturally matches noncopyable scope types and scope-arena ownership of
+  engine references.
 
 ## Public Value Conversion Protocols
 
@@ -353,10 +376,10 @@ Current outline:
 
 ```swift
 public protocol JSValueDecodable: ~Copyable {
-  static func tryDecode<V: JSValue & ~Copyable, C: JSInstantContext & ~Copyable>(
-    _ value: borrowing V,
+  init<C: JSInstantContext & ~Copyable>(
+    value: borrowing C.Value,
     in context: borrowing C
-  ) throws(JSValueConversionError) -> Self where V.Engine == C.Engine
+  )
 }
 
 public protocol JSValueEncodable: ~Copyable {
@@ -367,9 +390,12 @@ public protocol JSValueEncodable: ~Copyable {
 ```
 
 `JSDefaultConverter`, `JSValueDecoder`, `JSValueEncoder`, and the
-`JSValueConverter`/`JSValueCodable` aliases build on these two protocols. The
-same-type constraint `V.Engine == C.Engine` keeps a converter from mixing an
-engine value with another engine's scope.
+`JSValueConverter`/`JSValueCodable` aliases build on these two protocols.
+Decoding is rooted at the scope window: the value is always the window's own
+`C.Value`, so a converter cannot mix another engine's value view with this
+window. The throwing forms (`tryDecode`/`tryEncodeSurface`) are requirements
+with default forwarding implementations; the non-throwing entries
+(`init`/`toSurfaceValue`) remain requirements.
 
 ## Constraints That Should Be Static
 
@@ -423,9 +449,10 @@ protocols, and handle/scope infrastructure live in `SwiftJavaScript`.
 
 ### Phase 2: Rebuild the Existing JavaScriptCore Backend
 
-Completed: `JSCEngine`, `JSCContextHandle`, and the `JSCValue`/`JSCContext`
-family implement the core protocols; `SwiftyJavaScriptCore` remains the facade
-product and keeps only thin JSC-specific aliases and raw C bridging.
+Completed: `JSCEngine`, `JSCValue`/`JSCContext` and the other public `JSC*`
+types implement the core protocols; `JSCContextHandle` and the remaining
+`*Handle` types are package bridge internals. `SwiftyJavaScriptCore` remains
+the facade product and keeps only thin JSC-specific aliases and raw C bridging.
 
 ### Phase 3: Make Macros Generate the Concrete Facade
 
@@ -434,9 +461,10 @@ the `JSC*` surface types and descriptors instead of legacy generic wrappers.
 
 ### Phase 4: Add QuickJS
 
-Completed: `QJSEngine`, the `QJS*` handles, `QJSValue`/`QJSContext`, class and
-buffer support, and `QJSVirtualMachine.gc()` are implemented and covered by the
-shared engine test targets.
+Completed: `QJSEngine`, the `QJS*` family (its handles are package internals),
+`QJSValue`/`QJSContext`, class and buffer support, and
+`QJSVirtualMachine.gc()` are implemented and covered by the shared engine test
+targets.
 
 ## Recommended First-Phase Feature Scope
 
@@ -464,8 +492,8 @@ TypedArray and external memory were subsequently implemented as well.
 The implemented combination is:
 
 - Use `JSContext` as the single anchor that names all fifteen user-facing types and states their relationships once.
-- Use public `JS*` protocols with concrete `JSC*`/`QJS*` types.
-- Keep `JSEngineValueTypes` as a handle-only low-level seam, not a user-facing value abstraction.
+- Use public `JS*` protocols with concrete `JSC*`/`QJS*` types, with no public handle association or handle-level member.
+- Keep `JSEngineValueTypes`, the context-driver protocols and all `*Handle` types as package-only low-level seams, not user-facing value abstractions; `JSPersistentHandle` remains the sole public handle-named family.
 - Base cross-engine reuse on host module descriptors and host type descriptors.
 - Enforce cross-engine misuse constraints at compile time rather than through runtime checks.
 

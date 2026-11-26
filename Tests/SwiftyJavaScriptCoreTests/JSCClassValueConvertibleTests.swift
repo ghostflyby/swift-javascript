@@ -134,18 +134,14 @@ private func makeExportedClassContext() -> JSCInstantContext {
   #expect(ExportedChildNode.jsClassDefinition.parentClass == .for(ExportedBaseNode.self))
   #expect(ExportedLeafNode.jsClassDefinition.parentClass == .for(ExportedChildNode.self))
 
-  let runtime = JSCEngine.runtimeHandle(for: context.driverContextHandle)
-  #expect(runtime != nil)
-  if let runtime {
-    #expect(
-      ExportedChildNode.jsClassDefinition.parentClass?.jsClass(in: runtime).ref
-        == ExportedBaseNode.jsClass(in: runtime).ref
-    )
-    #expect(
-      ExportedLeafNode.jsClassDefinition.parentClass?.jsClass(in: runtime).ref
-        == ExportedChildNode.jsClass(in: runtime).ref
-    )
-  }
+  #expect(
+    ExportedChildNode.jsClassDefinition.parentClass?.jsClass(in: context).ref
+      == ExportedBaseNode.jsClass(in: context).ref
+  )
+  #expect(
+    ExportedLeafNode.jsClassDefinition.parentClass?.jsClass(in: context).ref
+      == ExportedChildNode.jsClass(in: context).ref
+  )
 
   let base = ExportedBaseNode(base: 1)
   let encodedBase = try ExportedBaseNode.tryEncode(base, in: context)

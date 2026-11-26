@@ -1,5 +1,5 @@
 /// Context-side TypedArray/ArrayBuffer operations (Stage 2B decomposition).
-public protocol JSContextTypedArrayDriver: JSContextRuntimeDriver {
+package protocol JSContextTypedArrayDriver: JSContextRuntimeDriver {
   func makeArrayBufferWithBytesNoCopyHandle(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
@@ -45,5 +45,5 @@ public protocol JSContextTypedArrayDriver: JSContextRuntimeDriver {
 
 /// Engine-side descriptor. TypedArray requirements now live on
 /// `JSContextTypedArrayDriver`, implemented by `ContextHandle`.
-public protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver
+package protocol JSEngineTypedArrayDriver: JSEngineRuntimeDriver
 where ContextHandle: JSContextTypedArrayDriver {}

@@ -1,7 +1,7 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-public struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
+package struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
   @unchecked Sendable
 {
   package let ref: JSContextGroupRef
@@ -17,12 +17,12 @@ public struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
     self.ownsRuntime = false
   }
 
-  public var engineType: JSCEngine.Type {
+  package var engineType: JSCEngine.Type {
     JSCEngine.self
   }
 
   @discardableResult
-  public func retainReference() -> Bool {
+  package func retainReference() -> Bool {
     guard ownsRuntime else {
       return false
     }
@@ -31,7 +31,7 @@ public struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
   }
 
   @discardableResult
-  public func releaseReference() -> Bool {
+  package func releaseReference() -> Bool {
     guard ownsRuntime else {
       return false
     }
@@ -41,13 +41,13 @@ public struct JSCRuntimeHandle: JSRuntimeManualReferenceCountedHandle,
 }
 
 extension JSCRuntimeHandle: Hashable {
-  public static func == (lhs: JSCRuntimeHandle, rhs: JSCRuntimeHandle)
+  package static func == (lhs: JSCRuntimeHandle, rhs: JSCRuntimeHandle)
     -> Bool
   {
     lhs.ref == rhs.ref
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     hasher.combine(ref)
   }
 }
