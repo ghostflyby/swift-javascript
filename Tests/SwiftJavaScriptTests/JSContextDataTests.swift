@@ -14,8 +14,21 @@ private enum OptionalContextDataKey: JSContextDataKey {
   typealias Value = Int?
 }
 
+/// The data box is engine-agnostic; these tests drive it directly.
+private struct TestDataContext: Sendable {
+  let box = JSContextDataStorageBox()
+
+  func data<K: JSContextDataKey>(for key: K.Type) async -> K.Value? {
+    box.data(for: key)
+  }
+
+  func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) async {
+    box.setData(value, for: key)
+  }
+}
+
 @Test func contextDataUsesMarkerTypeIdentityAndDefaultValues() async {
-  let context = MockSurfaceContext()
+  let context = TestDataContext()
 
   let defaultValue: String? = await context.data(for: StringContextDataKey.self)
   let missingInt: Int? = await context.data(for: IntContextDataKey.self)
@@ -34,7 +47,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataOverwritesAndRemovesValues() async {
-  let context = MockSurfaceContext()
+  let context = TestDataContext()
 
   await context.setData(1, for: IntContextDataKey.self)
   await context.setData(2, for: IntContextDataKey.self)
@@ -48,7 +61,7 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataCanStoreSemanticOptionalNil() async {
-  let context = MockSurfaceContext()
+  let context = TestDataContext()
 
   await context.setData(.some(nil), for: OptionalContextDataKey.self)
   let stored: Int?? = await context.data(for: OptionalContextDataKey.self)
@@ -58,8 +71,8 @@ private enum OptionalContextDataKey: JSContextDataKey {
 }
 
 @Test func contextDataIsSeparatePerContext() async {
-  let first = MockSurfaceContext()
-  let second = MockSurfaceContext()
+  let first = TestDataContext()
+  let second = TestDataContext()
 
   await first.setData("first", for: StringContextDataKey.self)
   await second.setData("second", for: StringContextDataKey.self)
@@ -69,21 +82,4 @@ private enum OptionalContextDataKey: JSContextDataKey {
 
   #expect(firstValue == "first")
   #expect(secondValue == "second")
-}
-
-@Test func contextAndInstantContextShareData() async {
-  let context = MockSurfaceContext()
-
-  await context.setData("actor", for: StringContextDataKey.self)
-  let instantRead: String? = await context.withInstantContext {
-    $0.data(for: StringContextDataKey.self)
-  }
-
-  await context.withInstantContext {
-    $0.setData("instant", for: StringContextDataKey.self)
-  }
-  let actorRead: String? = await context.data(for: StringContextDataKey.self)
-
-  #expect(instantRead == "actor")
-  #expect(actorRead == "instant")
 }

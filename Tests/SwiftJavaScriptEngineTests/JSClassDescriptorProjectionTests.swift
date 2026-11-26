@@ -1,51 +1,46 @@
 import Foundation
+import JavaScriptCore
 import Testing
 
 @testable import SwiftJavaScript
+import SwiftyJavaScriptCore
 
-private func mockClass(_ id: String) -> MockSurfaceClass {
-  MockSurfaceClass(classHandle: MockClassHandle(rawClass: MockClass(id: id)))
-}
-
-private func mockUndefinedValue() -> MockSurfaceValue {
-  let context = MockContextHandle(rawContext: MockContext(runtimeID: "test"))
-  return MockSurfaceValue(
-    handle: MockValueHandle(rawValue: MockValue(kind: "undefined", payload: "test")),
-    contextHandle: context
-  )
+private func makeTestClass() -> JSCClass {
+  var definition = kJSClassDefinitionEmpty
+  return JSCClass(ref: JSClassCreate(&definition)!)
 }
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
-  let parentClass = mockClass("BaseType")
+  let parentClass = makeTestClass()
 
-  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
+  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
-    JSStaticValue<MockEngine>(
+    JSStaticValue<JSCEngine>(
       name: "version",
       attributes: [.readOnly, .dontDelete],
-      getProperty: { _, _ in .value(mockUndefinedValue()) },
-      setProperty: { _, _, _ in .value(mockUndefinedValue()) }
+      getProperty: { _, _ in fatalError("descriptor projection does not invoke callbacks") },
+      setProperty: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction<MockEngine>(
+    JSStaticFunction<JSCEngine>(
       name: "ping",
       attributes: .dontEnum,
-      callAsFunction: { _, _, _ in .value(mockUndefinedValue()) }
+      callAsFunction: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
     )
   ]
   definition.initialize = { _, _ in }
   definition.hasProperty = { _, _, name in name == "version" }
-  definition.getProperty = { _, _, _ in .value(mockUndefinedValue()) }
+  definition.getProperty = { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { _, _, _, _ in mockUndefinedValue() }
-  definition.callAsConstructor = { _, _, _, _ in mockUndefinedValue() }
+  definition.callAsFunction = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.callAsConstructor = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
   definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { _, _, _, _ in mockUndefinedValue() }
+  definition.convertToType = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
   definition.finalize = { _ in }
 
   let descriptor = definition.hostTypeDescriptor(
@@ -81,32 +76,32 @@ private func mockUndefinedValue() -> MockSurfaceValue {
 }
 
 @Test func classDefinitionProjectsHostDescriptorBindings() {
-  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
+  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "BackendProjected"
   definition.staticValues = [
-    JSStaticValue<MockEngine>(
+    JSStaticValue<JSCEngine>(
       name: "version",
       attributes: .readOnly,
-      getProperty: { _, _ in .value(mockUndefinedValue()) },
-      setProperty: { _, _, _ in .value(mockUndefinedValue()) }
+      getProperty: { _, _ in fatalError("descriptor projection does not invoke callbacks") },
+      setProperty: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction<MockEngine>(
+    JSStaticFunction<JSCEngine>(
       name: "ping",
       attributes: .dontEnum,
-      callAsFunction: { _, _, _ in .value(mockUndefinedValue()) }
+      callAsFunction: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
     )
   ]
-  definition.getProperty = { _, _, _ in .value(mockUndefinedValue()) }
+  definition.getProperty = { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
   definition.setProperty = { _, _, _, _ in nil }
   definition.hasProperty = { _, _, _ in true }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { _, _, _, _ in mockUndefinedValue() }
-  definition.callAsConstructor = { _, _, _, _ in mockUndefinedValue() }
+  definition.callAsFunction = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.callAsConstructor = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
   definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { _, _, _, _ in mockUndefinedValue() }
+  definition.convertToType = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
 
   let descriptor = definition.hostTypeDescriptor(parentName: nil)
 
@@ -125,7 +120,7 @@ private func mockUndefinedValue() -> MockSurfaceValue {
 }
 
 @Test func classNameMutationStillBuildsClass() {
-  var definition = JSEngineClassDefinition<MockEngine, MockSurfaceClass, Never>()
+  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "A"
   definition.className = "B"
   definition.className = "C"
