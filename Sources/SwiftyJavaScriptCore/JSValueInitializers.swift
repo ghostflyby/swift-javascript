@@ -59,9 +59,6 @@ extension JSCValue {
     persisting value: borrowing JSCCallbackValue, in context: borrowing JSCInstantContext
   ) {
     let persisted = context.persist(value)
-    self.init(
-      handle: persisted.borrowHandle(),
-      contextHandle: persisted.contextHandle
-    )
+    self.init(ref: persisted.ref, contextRef: persisted.contextRef)
   }
 }

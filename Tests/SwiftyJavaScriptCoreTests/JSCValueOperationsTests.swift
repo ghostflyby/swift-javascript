@@ -11,8 +11,8 @@ import Testing
 // function isolated to the context actor. Every result handle is adopted by
 // the receiving arena exactly once, so the scope drain settles each reference.
 
-private func makeContext() -> (JSCRuntimeHandle, JSCContextHandle) {
-  let runtime = JSCEngine.makeRuntimeHandle()
+private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
+  let runtime = JSCEngine.makeRuntime()
   guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     preconditionFailure("JSCEngine could not create a context handle")
   }
@@ -20,15 +20,15 @@ private func makeContext() -> (JSCRuntimeHandle, JSCContextHandle) {
 }
 
 private func adoptObject(in scope: borrowing JSCInstantContext) -> JSCValue {
-  let context = scope.driverContextHandle
-  guard let result = context.makeObjectResultHandle() else {
+  let context = scope.contextRef
+  guard let result = JSCEngine.makeObjectResultHandle(context) else {
     preconditionFailure("JSCEngine could not create an object")
   }
   switch consume result {
   case .value(let handle):
     return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
-    context.releaseCreatedHandle(handle)
+    
     preconditionFailure("JSCEngine object creation returned an exception")
   }
 }
@@ -37,10 +37,11 @@ private func adoptEvaluated(
   _ source: String,
   in scope: borrowing JSCInstantContext
 ) -> JSCValue {
-  let context = scope.driverContextHandle
-  guard let script = context.makePreparedScriptHandle(source),
-    let result = context.evaluatePreparedScriptResultHandle(
+  let context = scope.contextRef
+  guard let script = JSCEngine.makePreparedScriptHandle(source, in: context),
+    let result = JSCEngine.evaluatePreparedScriptResultHandle(
       script,
+      context,
       sourceURL: nil,
       startingLineNumber: 1
     )
@@ -49,9 +50,9 @@ private func adoptEvaluated(
   }
   switch consume result {
   case .value(let handle):
-    return scope.adoptCreatedHandle(JSCEngine.OwnedValueHandle.adopting(handle))
+    return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
-    context.releaseCreatedHandle(JSCEngine.OwnedValueHandle.adopting(handle))
+    
     preconditionFailure("JSCEngine evaluation of \(source) threw")
   }
 }
@@ -60,7 +61,7 @@ private func adoptString(
   _ value: String,
   in scope: borrowing JSCInstantContext
 ) -> JSCValue {
-  guard let handle = scope.driverContextHandle.makeStringValueHandle(value) else {
+  guard let handle = JSCEngine.makeStringValueHandle(value, scope.contextRef) else {
     preconditionFailure("JSCEngine could not create a string")
   }
   return scope.adoptCreatedHandle(handle)
@@ -93,10 +94,10 @@ private func value(_ result: consuming JSResult<JSCValue>) -> JSCValue {
 /// The window is opened on the actor itself, so nothing but the context handle
 /// crosses isolation.
 private func isolatedNameRead(
-  _ contextHandle: JSCContextHandle,
+  _ contextRef: JSGlobalContextRef,
   on _: isolated JSCContext
 ) -> String {
-  let scope = JSCInstantContext(handle: contextHandle)
+  let scope = JSCInstantContext(contextRef: contextRef)
   let object = adoptObject(in: scope)
   let text = adoptString("seven", in: scope)
   _ = object.setProperty("name", to: text, attributes: .none, in: scope)
@@ -114,7 +115,7 @@ struct JSCValueOperationsTests {
   func readsWritesAndRemovesStaticAndKeyProperties() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
+      let scope = JSCInstantContext(contextRef: context)
       let object = adoptObject(in: scope)
       let text = adoptString("seven", in: scope)
 
@@ -131,15 +132,15 @@ struct JSCValueOperationsTests {
       #expect(absentText == "undefined")
       #expect(names == ["name"])
 
-      guard let keyHandle = context.makePropertyStringKeyHandle("count") else {
+      guard let keyHandle = JSCEngine.makePropertyStringKeyHandle("count", in: context) else {
         Issue.record("JSCEngine could not make a property key")
         return
       }
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(3)!)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(3, context)!)
       do {
         let key = JSCPropertyStringKey(
-          handle: keyHandle,
-          contextHandle: context,
+          stringRef: keyHandle,
+          contextRef: context,
           vmThread: nil
         )
         let keyDidSet = object.setProperty(
@@ -169,8 +170,8 @@ struct JSCValueOperationsTests {
       // Callback-window value views only carry an identity; the direct-value
       // surface accepts them by borrowing that identity.
       let callbackValue = JSCCallbackValue(
-        handle: text.borrowHandle(),
-        contextHandle: context
+        ref: text.ref,
+        contextRef: context
       )
       let callbackDidSet = object.setProperty(
         "alias",
@@ -182,17 +183,17 @@ struct JSCValueOperationsTests {
       #expect(callbackDidSet)
       #expect(aliasText == "seven")
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
   func callsConstructsInvokesMethodsAndClassifiesObjects() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
+      let scope = JSCInstantContext(contextRef: context)
       let text = adoptString("seven", in: scope)
 
       let function = adoptEvaluated("(function () { return 42; })", in: scope)
@@ -215,7 +216,7 @@ struct JSCValueOperationsTests {
         in: scope
       )
       let methodText = describe(methodObject.invokeMethod("double", arguments: [], in: scope))
-      let argument = scope.adoptCreatedHandle(context.makeNumberValueHandle(21)!)
+      let argument = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(21, context)!)
       let withArgumentText = describe(
         methodObject.invokeMethod("plus", arguments: [argument.asCallArgument()], in: scope)
       )
@@ -247,7 +248,7 @@ struct JSCValueOperationsTests {
       #expect(!typedIsArrayBuffer)
       #expect(!arrayIsTypedArray)
 
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(7)!)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
       let boxed = value(number.toObject(in: scope))
       let boxedIsObject = boxed.isObject()
       #expect(boxedIsObject)
@@ -262,8 +263,8 @@ struct JSCValueOperationsTests {
 
       // The callback-value parameter overloads borrow the same identities.
       let receiverShell = JSCCallbackValue(
-        handle: receiver.borrowHandle(),
-        contextHandle: context
+        ref: receiver.ref,
+        contextRef: context
       )
       let callbackThisText = describe(
         thisFunction.call(this: receiverShell, arguments: [], in: scope)
@@ -271,23 +272,23 @@ struct JSCValueOperationsTests {
       #expect(callbackThisText == "seven")
 
       let constructorShell = JSCCallbackValue(
-        handle: constructor.borrowHandle(),
-        contextHandle: context
+        ref: constructor.ref,
+        contextRef: context
       )
       let callbackInstanceOf = instance.isInstanceOf(constructorShell, in: scope)
       #expect(callbackInstanceOf)
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
   func propertyExceptionAdoptsTheThrownValue() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
+      let scope = JSCInstantContext(contextRef: context)
       let throwing = adoptEvaluated(
         "({ get boom() { throw new Error('kaboom'); } })",
         in: scope
@@ -306,10 +307,10 @@ struct JSCValueOperationsTests {
       // still work and the scope drains cleanly.
       let names = throwing.propertyNames(in: scope)
       #expect(names == ["boom"])
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
@@ -317,7 +318,7 @@ struct JSCValueOperationsTests {
     // The `in:` default reads `#isolation`, so the *opened window* and the
     // actor must be the same context: use the concrete context's own handle.
     let context = JSCContext()
-    let isolatedText = await isolatedNameRead(context.driverContextHandle, on: context)
+    let isolatedText = await isolatedNameRead(context.contextRef, on: context)
     #expect(isolatedText == "seven")
   }
 }

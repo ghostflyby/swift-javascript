@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 import SwiftyJavaScriptCore
 import Testing
@@ -8,48 +9,9 @@ import Testing
 // package-level scope/VM seams directly. Compiling them is the assertion:
 // the package surface is what the engine modules and sibling test targets
 // consume.
-//
-// The handle layer is keyed on the context handle (`ScopeCore<JSCContextHandle>`,
-// `ScopeStackRegistry<JSCContextHandle>`); value-level operations are the
-// scope protocol defaults, reached through the engine's scope type.
-
-@Test func packageScopeSeamsAreCallableAcrossTargets() {
-  let runtime = JSCEngine.makeRuntimeHandle()
-  guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
-    return
-  }
-
-  let core = ScopeCore<JSCContextHandle, JSImplicitStackRoots>(handle: context)
-  let frame: ScopeFrame<JSCContextHandle> = core.frame
-  #expect(frame.driverContextHandle == context)
-  #expect(core.driverContextHandle == context)
-
-  let created = context.makeNumberValueHandle(1)!
-  let borrowed = created.borrowed()
-  frame.track(created)
-  #expect(frame.contains(matching: { $0.borrowed() == borrowed }))
-
-  ScopeStackRegistry<JSCContextHandle>.push(core, for: context)
-  #expect(ScopeStackRegistry<JSCContextHandle>.top(of: context) === frame)
-  #expect(ScopeStackRegistry<JSCContextHandle>.defaultFrame(for: context) === frame)
-  #expect(ScopeStackRegistry<JSCContextHandle>.vmThread(for: context) == nil)
-
-  let taken = frame.takeFirst(matching: { $0.borrowed() == borrowed })
-  if let taken = consume taken {
-    context.releaseCreatedHandle(taken)
-  }
-
-  let popped = ScopeStackRegistry<JSCContextHandle>.pop(for: context)
-  #expect(popped === frame)
-  core.drain()
-
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
-}
 
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     Issue.record("JSCEngine could not create a context handle")
     return
@@ -60,7 +22,7 @@ import Testing
   // are reachable from a sibling target through it. The window lives in its
   // own block: its deinit drains the arena before the context goes away.
   do {
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let stringText = scope.makeString("seam").toString()
     let numberValue = scope.makeNumber(3).toNumber()
@@ -126,8 +88,8 @@ import Testing
     }
   }
 
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
+  JSGlobalContextRelease(context)
+  JSCEngine.releaseRuntime(runtime)
 }
 
 @Test func packageVMThreadSeamsAreCallableAcrossTargets() {

@@ -11,68 +11,39 @@ import JavaScriptCore
 public final class JSCClass: SwiftJavaScript.JSClass, @unchecked Sendable {
   public typealias Context = JSCContext
 
-  package let handle: JSCClassHandle
+  package let classRef: JSClassRef
   package let retainedOwner: AnyObject?
+  private let retainsReference: Bool
 
-  package init(handleClass: JSCClassHandle, retainedOwner: AnyObject? = nil) {
-    self.handle = handleClass
+  package init(classRef: JSClassRef, retainedOwner: AnyObject? = nil) {
+    self.classRef = classRef
     self.retainedOwner = retainedOwner
-    _ = handleClass.retainReference()
+    self.retainsReference = true
+    JSClassRetain(classRef)
   }
 
-  package init(adoptingHandleClass: JSCClassHandle, retainedOwner: AnyObject? = nil) {
-    self.handle = adoptingHandleClass
+  package init(adoptingClassRef: JSClassRef, retainedOwner: AnyObject? = nil) {
+    self.classRef = adoptingClassRef
     self.retainedOwner = retainedOwner
+    self.retainsReference = false
   }
 
   deinit {
-    _ = handle.releaseReference()
+    if retainsReference {
+      JSClassRelease(classRef)
+    }
   }
 }
 
 extension JSCClass: Equatable {
   public static func == (lhs: JSCClass, rhs: JSCClass) -> Bool {
-    lhs.handle == rhs.handle
+    lhs.classRef == rhs.classRef
   }
 }
 
 extension JSCClass: Hashable {
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(handle)
-  }
-}
-
-package struct JSCClassHandle: JSClassManualReferenceCountedHandle,
-  @unchecked Sendable
-{
-  package let ref: JSClassRef
-
-  package init(ref: JSClassRef) {
-    self.ref = ref
-  }
-
-  @discardableResult
-  package func retainReference() -> Bool {
-    JSClassRetain(ref)
-    return true
-  }
-
-  @discardableResult
-  package func releaseReference() -> Bool {
-    JSClassRelease(ref)
-    return true
-  }
-}
-
-extension JSCClassHandle: Hashable {
-  package static func == (lhs: JSCClassHandle, rhs: JSCClassHandle)
-    -> Bool
-  {
-    lhs.ref == rhs.ref
-  }
-
-  package func hash(into hasher: inout Hasher) {
-    hasher.combine(UInt(bitPattern: ref))
+    hasher.combine(UInt(bitPattern: classRef))
   }
 }
 
@@ -147,7 +118,7 @@ func makeRememberedClassCallbackContext(
   _ ctx: JSContextRef, _ object: JSObjectRef
 ) -> JSCInstantContext {
   rememberClassObjectContext(ctx, object)
-  return JSCInstantContext(handle: JSCContextHandle(borrowing: ctx))
+  return JSCInstantContext(contextRef: ctx)
 }
 
 func withRememberedClassObjectValue<R>(
@@ -173,7 +144,7 @@ func withStoredClassObjectValue<R>(
   guard let objectContext = classObjectContext(object) else {
     return nil
   }
-  let context = JSCInstantContext(handle: JSCContextHandle(borrowing: objectContext))
+  let context = JSCInstantContext(contextRef: objectContext)
   let thisValue = JSCValue(ref: object, in: context)
   return body(context, thisValue)
 }
@@ -401,7 +372,7 @@ private func withJavaScriptCoreStaticValueCallbackInput<R>(
     return nil
   }
 
-  let context = JSCInstantContext(handle: JSCContextHandle(borrowing: ctx))
+  let context = JSCInstantContext(contextRef: ctx)
   let thisValue = JSCValue(ref: object, in: context)
   return body(valueDefinition, context, thisValue)
 }
@@ -626,13 +597,20 @@ private func installSetPropertyCallbackIfNeeded(
       propertyName: propertyName
     ) { definition, context, thisValue, propertyName in
       let newValue = JSCValue(ref: value, in: context)
+      let failure = definition.setDynamicPropertyException(
+        in: context,
+        on: thisValue,
+        forKey: propertyName,
+        to: newValue
+      )
+      let exceptionRef: JSValueRef?
+      if let failure {
+        exceptionRef = failure.ref
+      } else {
+        exceptionRef = nil
+      }
       return javaScriptCoreCallbackSucceeded(
-        exceptionValue: definition.setDynamicPropertyException(
-          in: context,
-          on: thisValue,
-          forKey: propertyName,
-          to: newValue
-        )?.ref,
+        exceptionValue: exceptionRef,
         exception: exception
       )
     }
@@ -955,12 +933,19 @@ private let staticValueSetPropertyCallback: JSObjectSetPropertyCallback = {
     propertyName: propertyName
   ) { valueDefinition, context, thisValue in
     let newValue = JSCValue(ref: value, in: context)
+    let failure = valueDefinition.setPropertyException(
+      in: context,
+      on: thisValue,
+      to: newValue
+    )
+    let exceptionRef: JSValueRef?
+    if let failure {
+      exceptionRef = failure.ref
+    } else {
+      exceptionRef = nil
+    }
     return javaScriptCoreCallbackSucceeded(
-      exceptionValue: valueDefinition.setPropertyException(
-        in: context,
-        on: thisValue,
-        to: newValue
-      )?.ref,
+      exceptionValue: exceptionRef,
       exception: exception
     )
   }
@@ -1027,11 +1012,11 @@ extension JSCContext {
 
 extension JSCClass {
   package var ref: JSClassRef {
-    handle.ref
+    classRef
   }
 
   package convenience init(ref: JSClassRef) {
-    self.init(handleClass: JSCClassHandle(ref: ref))
+    self.init(classRef: ref)
   }
 
   public convenience init(
@@ -1045,7 +1030,7 @@ extension JSCClass {
     var copy = defination.manualNativeDefinition(backing: backing)
     let ref = JSClassCreate(&copy)
     self.init(
-      adoptingHandleClass: JSCClassHandle(ref: ref!),
+      adoptingClassRef: ref!,
       retainedOwner: backing
     )
     rememberClassDefinition(defination, for: self.ref)
@@ -1059,7 +1044,7 @@ extension JSCClass {
     var copy = nativeDefinition
     let ref = JSClassCreate(&copy)
     self.init(
-      adoptingHandleClass: JSCClassHandle(ref: ref!),
+      adoptingClassRef: ref!,
       retainedOwner: retainedBacking
     )
     if let rememberedDefinition {

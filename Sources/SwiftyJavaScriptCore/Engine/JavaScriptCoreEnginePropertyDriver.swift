@@ -1,30 +1,30 @@
 import JavaScriptCore
 import SwiftJavaScript
 
-extension JSCEngine: JSEnginePropertyDriver {
+extension JSCEngine {
   package static func makePropertyStringKeyHandle(
     _ value: String,
-    in context: JSCContextHandle
-  ) -> JSCPropertyStringKeyHandle? {
+    in context: JSGlobalContextRef
+  ) -> JSStringRef? {
     _ = context
     let keyRef = JSStringCreateWithCFString(value as CFString)!
-    return JSCPropertyStringKeyHandle(ref: keyRef)
+    return keyRef
   }
 
   package static func makePropertyStringKeyHandle(
     _ value: StaticString,
-    in context: JSCContextHandle
-  ) -> JSCPropertyStringKeyHandle? {
+    in context: JSGlobalContextRef
+  ) -> JSStringRef? {
     _ = context
     let keyRef = withJavaScriptCoreString(value) { keyRef in
       JSStringRetain(keyRef)!
     }
-    return JSCPropertyStringKeyHandle(ref: keyRef)
+    return keyRef
   }
 
   package static func isPropertyStringKeyHandleCompatibleWithContext(
-    _ key: JSCPropertyStringKeyHandle,
-    in context: JSCContextHandle
+    _ key: JSStringRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     _ = key
     _ = context
@@ -32,48 +32,46 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   package static func makeStringValueHandle(
-    fromPropertyStringKey key: JSCPropertyStringKeyHandle,
-    in context: JSCContextHandle
-  ) -> JSOwnedValueHandle<JSCEngine>? {
-    JSCOwnedValueHandle(
-      ref: JSValueMakeString(context.ref, key.ref)!
-    )
+    fromPropertyStringKey key: JSStringRef,
+    in context: JSGlobalContextRef
+  ) -> JSValueRef? {
+    JSValueMakeString(context, key)!
   }
 
   package static func propertyNamesForHandle(
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> [String]? {
     propertyNames(on: object, in: context)
   }
 
   package static func getStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
-  ) -> JSResult<JSValueHandle<JSCEngine>>? {
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef>? {
     withJavaScriptCoreString(key) { keyRef in
-      getProperty(keyRef, on: object, in: context)
+      getStringProperty(keyRef, on: object, in: context)
     }
   }
 
   package static func getPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
-  ) -> JSResult<JSValueHandle<JSCEngine>>? {
-    getProperty(key.ref, on: object, in: context)
+    _ key: JSStringRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef>? {
+    getStringProperty(key, on: object, in: context)
   }
 
   package static func setStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: JSValueHandle<JSCEngine>,
-    to value: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle,
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     withJavaScriptCoreString(key) { keyRef in
-      switch setProperty(keyRef, on: object, to: value, in: context, attributes: attributes) {
+      switch setStringProperty(keyRef, on: object, to: value, in: context, attributes: attributes) {
       case .value:
         return true
       case .exception:
@@ -83,13 +81,13 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   package static func setPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSValueHandle<JSCEngine>,
-    to value: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle,
+    _ key: JSStringRef,
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    switch setProperty(key.ref, on: object, to: value, in: context, attributes: attributes) {
+    switch setStringProperty(key, on: object, to: value, in: context, attributes: attributes) {
     case .value:
       return true
     case .exception:
@@ -98,26 +96,26 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   package static func getValuePropertyHandle(
-    _ key: JSValueHandle<JSCEngine>,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
-  ) -> JSResult<JSValueHandle<JSCEngine>>? {
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef>? {
     getProperty(key, on: object, in: context)
   }
 
   package static func getIndexPropertyHandle(
     at index: UInt32,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
-  ) -> JSResult<JSValueHandle<JSCEngine>>? {
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef>? {
     getProperty(at: index, on: object, in: context)
   }
 
   package static func setValuePropertyHandle(
-    _ key: JSValueHandle<JSCEngine>,
-    on object: JSValueHandle<JSCEngine>,
-    to value: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle,
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
     switch setProperty(key, on: object, to: value, in: context, attributes: attributes) {
@@ -130,9 +128,9 @@ extension JSCEngine: JSEnginePropertyDriver {
 
   package static func setIndexPropertyHandle(
     at index: UInt32,
-    on object: JSValueHandle<JSCEngine>,
-    to value: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     switch setProperty(at: index, on: object, to: value, in: context) {
     case .value:
@@ -143,37 +141,37 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   package static func hasPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    _ key: JSStringRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool? {
-    hasProperty(key.ref, on: object, in: context)
+    hasStringProperty(key, on: object, in: context)
   }
 
   package static func hasStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool? {
     withJavaScriptCoreString(key) { keyRef in
-      hasProperty(keyRef, on: object, in: context)
+      hasStringProperty(keyRef, on: object, in: context)
     }
   }
 
   package static func hasValuePropertyHandle(
-    _ key: JSValueHandle<JSCEngine>,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool? {
     hasProperty(key, on: object, in: context)
   }
 
   package static func deletePropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    _ key: JSStringRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
-    switch deleteProperty(key.ref, on: object, in: context) {
+    switch deleteStringProperty(key, on: object, in: context) {
     case .value:
       return true
     case .exception:
@@ -183,11 +181,11 @@ extension JSCEngine: JSEnginePropertyDriver {
 
   package static func deleteStaticStringPropertyHandle(
     _ key: StaticString,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     withJavaScriptCoreString(key) { keyRef in
-      switch deleteProperty(keyRef, on: object, in: context) {
+      switch deleteStringProperty(keyRef, on: object, in: context) {
       case .value:
         return true
       case .exception:
@@ -197,9 +195,9 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   package static func deleteValuePropertyHandle(
-    _ key: JSValueHandle<JSCEngine>,
-    on object: JSValueHandle<JSCEngine>,
-    in context: JSCContextHandle
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     switch deleteProperty(key, on: object, in: context) {
     case .value:
@@ -210,53 +208,77 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   private static func propertyNames(
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> [String] {
-    guard let propertyNamesFunction = context.propertyNamesFunctionRef else {
-      return []
-    }
-
-    var exception: JSValueRef?
-    var argument = Optional(object.ref)
-    let namesValue = withUnsafePointer(to: &argument) { arguments in
-      JSObjectCallAsFunction(
-        context.ref,
-        propertyNamesFunction,
-        nil,
-        1,
-        arguments,
-        &exception
-      )
-    }
-    guard let namesValue, exception == nil else {
-      return []
-    }
-
-    switch javaScriptCoreObjectRef(
-      for: JSCValueHandle(ref: namesValue),
-      in: context
-    ) {
+    switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return []
-    case .object(let namesArray):
+    case .object(let objectRef):
+      guard let function = javaScriptCorePropertyNamesFunction(for: context) else {
+        return []
+      }
+      var exception: JSValueRef?
+      var argument = Optional(object)
+      let namesValue = withUnsafePointer(to: &argument) { arguments in
+        JSObjectCallAsFunction(
+          context,
+          function,
+          nil,
+          1,
+          arguments,
+          &exception
+        )
+      }
+      guard let namesValue, exception == nil,
+        case .object(let namesArray) = javaScriptCoreObjectRef(
+          for: namesValue,
+          in: context
+        )
+      else {
+        return []
+      }
       return arrayElements(from: namesArray, in: context)
+    }
+  }
+
+  /// `Object.keys` returns own enumerable string keys; the raw
+  /// `JSObjectCopyPropertyNames` also returns non-enumerable ones.
+  package static func makePropertyNamesFunction(
+    in context: JSGlobalContextRef
+  ) -> JSObjectRef? {
+    let source = """
+      (function(keys) {
+        return function(value) {
+          return keys(value);
+        };
+      })(Object.keys)
+      """
+    return withJavaScriptCoreString(source) { scriptRef in
+      var exception: JSValueRef?
+      guard
+        let value = JSEvaluateScript(context, scriptRef, nil, nil, 1, &exception),
+        exception == nil
+      else {
+        return nil
+      }
+      return JSValueToObject(context, value, nil)
     }
   }
 
   private static func arrayElements(
     from array: JSObjectRef,
-    in context: JSCContextHandle
+    in context: JSGlobalContextRef
   ) -> [String] {
     let count = withJavaScriptCoreString("length") { lengthKey in
       var exception: JSValueRef?
       guard
-        let lengthValue = JSObjectGetProperty(context.ref, array, lengthKey, &exception),
+        let lengthValue = JSObjectGetProperty(context, array, lengthKey, &exception),
         exception == nil
       else {
         return 0
       }
-      return Int(JSValueToNumber(context.ref, lengthValue, nil))
+      return Int(JSValueToNumber(context, lengthValue, nil))
     }
 
     var result: [String] = []
@@ -265,13 +287,13 @@ extension JSCEngine: JSEnginePropertyDriver {
       var exception: JSValueRef?
       guard
         let value = JSObjectGetPropertyAtIndex(
-          context.ref,
+          context,
           array,
           UInt32(index),
           &exception
         ),
         exception == nil,
-        let string = javaScriptCoreString(value, in: context.ref)
+        let string = javaScriptCoreString(value, in: context)
       else {
         continue
       }
@@ -280,56 +302,56 @@ extension JSCEngine: JSEnginePropertyDriver {
     return result
   }
 
-  private static func getProperty(
+  private static func getStringProperty(
     _ key: JSStringRef,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
-  ) -> JSResult<JSCValueHandle> {
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
       var exception: JSValueRef?
-      let valueRef = JSObjectGetProperty(context.ref, objectRef, key, &exception)
+      let valueRef = JSObjectGetProperty(context, objectRef, key, &exception)
       return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
 
   private static func getProperty(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
-  ) -> JSResult<JSCValueHandle> {
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
       var exception: JSValueRef?
-      let valueRef = JSObjectGetPropertyForKey(context.ref, objectRef, key.ref, &exception)
+      let valueRef = JSObjectGetPropertyForKey(context, objectRef, key, &exception)
       return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
 
   private static func getProperty(
     at index: UInt32,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
-  ) -> JSResult<JSCValueHandle> {
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
+  ) -> JSResult<JSValueRef> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception(let exception):
       return .exception(exception)
     case .object(let objectRef):
       var exception: JSValueRef?
-      let valueRef = JSObjectGetPropertyAtIndex(context.ref, objectRef, index, &exception)
+      let valueRef = JSObjectGetPropertyAtIndex(context, objectRef, index, &exception)
       return javaScriptCoreResult(value: valueRef, exception: exception, in: context)
     }
   }
 
-  private static func setProperty(
+  private static func setStringProperty(
     _ key: JSStringRef,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    in context: JSCContextHandle,
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef,
     attributes: JSHostMemberAttributes
   ) -> JSResult<Void> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
@@ -338,10 +360,10 @@ extension JSCEngine: JSEnginePropertyDriver {
     case .object(let objectRef):
       var exception: JSValueRef?
       JSObjectSetProperty(
-        context.ref,
+        context,
         objectRef,
         key,
-        value.ref,
+        value,
         javaScriptCorePropertyAttributes(from: attributes),
         &exception
       )
@@ -353,10 +375,10 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   private static func setProperty(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    in context: JSCContextHandle,
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef,
     attributes: JSHostMemberAttributes
   ) -> JSResult<Void> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
@@ -365,10 +387,10 @@ extension JSCEngine: JSEnginePropertyDriver {
     case .object(let objectRef):
       var exception: JSValueRef?
       JSObjectSetPropertyForKey(
-        context.ref,
+        context,
         objectRef,
-        key.ref,
-        value.ref,
+        key,
+        value,
         javaScriptCorePropertyAttributes(from: attributes),
         &exception
       )
@@ -381,16 +403,16 @@ extension JSCEngine: JSEnginePropertyDriver {
 
   private static func setProperty(
     at index: UInt32,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    to value: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> JSResult<Void> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return .exception(())
     case .object(let objectRef):
       var exception: JSValueRef?
-      JSObjectSetPropertyAtIndex(context.ref, objectRef, index, value.ref, &exception)
+      JSObjectSetPropertyAtIndex(context, objectRef, index, value, &exception)
       if exception != nil {
         return .exception(())
       }
@@ -398,45 +420,45 @@ extension JSCEngine: JSEnginePropertyDriver {
     }
   }
 
-  private static func hasProperty(
+  private static func hasStringProperty(
     _ key: JSStringRef,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return false
     case .object(let objectRef):
-      return JSObjectHasProperty(context.ref, objectRef, key)
+      return JSObjectHasProperty(context, objectRef, key)
     }
   }
 
   private static func hasProperty(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> Bool {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return false
     case .object(let objectRef):
       var exception: JSValueRef?
-      let result = JSObjectHasPropertyForKey(context.ref, objectRef, key.ref, &exception)
+      let result = JSObjectHasPropertyForKey(context, objectRef, key, &exception)
       return exception == nil && result
     }
   }
 
-  private static func deleteProperty(
+  private static func deleteStringProperty(
     _ key: JSStringRef,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> JSResult<Void> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return .exception(())
     case .object(let objectRef):
       var exception: JSValueRef?
-      JSObjectDeleteProperty(context.ref, objectRef, key, &exception)
+      JSObjectDeleteProperty(context, objectRef, key, &exception)
       if exception != nil {
         return .exception(())
       }
@@ -445,16 +467,16 @@ extension JSCEngine: JSEnginePropertyDriver {
   }
 
   private static func deleteProperty(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle,
-    in context: JSCContextHandle
+    _ key: JSValueRef,
+    on object: JSValueRef,
+    in context: JSGlobalContextRef
   ) -> JSResult<Void> {
     switch javaScriptCoreObjectRef(for: object, in: context) {
     case .exception:
       return .exception(())
     case .object(let objectRef):
       var exception: JSValueRef?
-      JSObjectDeletePropertyForKey(context.ref, objectRef, key.ref, &exception)
+      JSObjectDeletePropertyForKey(context, objectRef, key, &exception)
       if exception != nil {
         return .exception(())
       }
@@ -465,157 +487,11 @@ extension JSCEngine: JSEnginePropertyDriver {
 
 // MARK: - Context-side driver conformance (Stage 2B)
 
-extension JSCContextHandle: JSContextPropertyDriver {
-  package typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
-
-  package func makePropertyStringKeyHandle(_ value: String)
-    -> JSCPropertyStringKeyHandle?
-  {
-    JSCEngine.makePropertyStringKeyHandle(value, in: self)
+package func javaScriptCorePropertyNamesFunction(
+  for context: JSGlobalContextRef
+) -> JSObjectRef? {
+  if let cached = JSCContext.borrow(ctx: context)?.propertyNamesFunction {
+    return cached
   }
-
-  package func makePropertyStringKeyHandle(_ value: StaticString)
-    -> JSCPropertyStringKeyHandle?
-  {
-    JSCEngine.makePropertyStringKeyHandle(value, in: self)
-  }
-
-  package func isPropertyStringKeyHandleCompatibleWithContext(
-    _ key: JSCPropertyStringKeyHandle
-  ) -> Bool {
-    JSCEngine.isPropertyStringKeyHandleCompatibleWithContext(key, in: self)
-  }
-
-  package func makeStringValueHandle(
-    fromPropertyStringKey key: JSCPropertyStringKeyHandle
-  ) -> JSCOwnedValueHandle? {
-    JSCEngine.makeStringValueHandle(fromPropertyStringKey: key, in: self)
-  }
-
-  package func propertyNamesForHandle(on object: JSCValueHandle) -> [String]? {
-    JSCEngine.propertyNamesForHandle(on: object, in: self)
-  }
-
-  package func getStaticStringPropertyHandle(
-    _ key: StaticString,
-    on object: JSCValueHandle
-  ) -> JSResult<JSCValueHandle>? {
-    JSCEngine.getStaticStringPropertyHandle(key, on: object, in: self)
-  }
-
-  package func setStaticStringPropertyHandle(
-    _ key: StaticString,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    attributes: JSHostMemberAttributes
-  ) -> Bool {
-    JSCEngine.setStaticStringPropertyHandle(
-      key,
-      on: object,
-      to: value,
-      in: self,
-      attributes: attributes
-    )
-  }
-
-  package func getPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSCValueHandle
-  ) -> JSResult<JSCValueHandle>? {
-    JSCEngine.getPropertyStringKeyHandle(key, on: object, in: self)
-  }
-
-  package func setPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    attributes: JSHostMemberAttributes
-  ) -> Bool {
-    JSCEngine.setPropertyStringKeyHandle(
-      key,
-      on: object,
-      to: value,
-      in: self,
-      attributes: attributes
-    )
-  }
-
-  package func getValuePropertyHandle(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle
-  ) -> JSResult<JSCValueHandle>? {
-    JSCEngine.getValuePropertyHandle(key, on: object, in: self)
-  }
-
-  package func getIndexPropertyHandle(
-    at index: UInt32,
-    on object: JSCValueHandle
-  ) -> JSResult<JSCValueHandle>? {
-    JSCEngine.getIndexPropertyHandle(at: index, on: object, in: self)
-  }
-
-  package func setValuePropertyHandle(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle,
-    attributes: JSHostMemberAttributes
-  ) -> Bool {
-    JSCEngine.setValuePropertyHandle(
-      key,
-      on: object,
-      to: value,
-      in: self,
-      attributes: attributes
-    )
-  }
-
-  package func setIndexPropertyHandle(
-    at index: UInt32,
-    on object: JSCValueHandle,
-    to value: JSCValueHandle
-  ) -> Bool {
-    JSCEngine.setIndexPropertyHandle(at: index, on: object, to: value, in: self)
-  }
-
-  package func hasStaticStringPropertyHandle(
-    _ key: StaticString,
-    on object: JSCValueHandle
-  ) -> Bool? {
-    JSCEngine.hasStaticStringPropertyHandle(key, on: object, in: self)
-  }
-
-  package func hasPropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSCValueHandle
-  ) -> Bool? {
-    JSCEngine.hasPropertyStringKeyHandle(key, on: object, in: self)
-  }
-
-  package func hasValuePropertyHandle(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle
-  ) -> Bool? {
-    JSCEngine.hasValuePropertyHandle(key, on: object, in: self)
-  }
-
-  package func deleteStaticStringPropertyHandle(
-    _ key: StaticString,
-    on object: JSCValueHandle
-  ) -> Bool {
-    JSCEngine.deleteStaticStringPropertyHandle(key, on: object, in: self)
-  }
-
-  package func deletePropertyStringKeyHandle(
-    _ key: JSCPropertyStringKeyHandle,
-    on object: JSCValueHandle
-  ) -> Bool {
-    JSCEngine.deletePropertyStringKeyHandle(key, on: object, in: self)
-  }
-
-  package func deleteValuePropertyHandle(
-    _ key: JSCValueHandle,
-    on object: JSCValueHandle
-  ) -> Bool {
-    JSCEngine.deleteValuePropertyHandle(key, on: object, in: self)
-  }
+  return JSCEngine.makePropertyNamesFunction(in: context)
 }

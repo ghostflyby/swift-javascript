@@ -9,24 +9,10 @@ import JavaScriptCore
 
 extension JSCValue {
   init(ref: JSValueRef, ctx: isolated JSCContext) {
-    self.init(
-      handle: JSCValueHandle(ref: ref),
-      contextHandle: ctx.driverContextHandle
-    )
+    self.init(ref: ref, contextRef: ctx.contextRef)
   }
 
   init(ref: JSValueRef, in context: borrowing JSCInstantContext) {
-    self.init(
-      handle: JSCValueHandle(ref: ref),
-      contextHandle: context.driverContextHandle
-    )
-  }
-
-  borrowing func borrowedRef() -> JSValueRef {
-    borrowHandle().ref
-  }
-
-  var ref: JSValueRef {
-    borrowHandle().ref
+    self.init(ref: ref, contextRef: context.contextRef)
   }
 }

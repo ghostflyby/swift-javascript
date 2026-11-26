@@ -15,17 +15,13 @@ private let javaScriptCoreSurfaceFunctionCallback: JSObjectCallAsFunctionCallbac
     return JSValueMakeUndefined(ctx)
   }
 
-  let contextHandle = JSCContextHandle(borrowing: ctx)
-  let scope = JSCInstantContext(handle: contextHandle)
+  let scope = JSCInstantContext(contextRef: ctx)
 
   let callback = Unmanaged<Box<JSFunctionCallback<JSCInstantContext>>>.fromOpaque(
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
 
-  let thisValue = JSCCallbackValue(
-    handle: JSCValueHandle(ref: thisObject),
-    contextHandle: contextHandle
-  )
+  let thisValue = JSCCallbackValue(ref: thisObject, contextRef: ctx)
 
   let result = withJavaScriptCoreSurfaceCallbackArguments(
     pointer: arguments,
@@ -35,10 +31,10 @@ private let javaScriptCoreSurfaceFunctionCallback: JSObjectCallAsFunctionCallbac
   }
 
   if result.isException {
-    exception?.pointee = result.handle.ref
+    exception?.pointee = result.ref
     return JSValueMakeUndefined(ctx)
   }
-  return result.handle.ref
+  return result.ref
 }
 
 func makeJavaScriptCoreSurfaceFunctionClassDefinition() -> JavaScriptCore.JSClassDefinition {
@@ -68,7 +64,7 @@ func withJavaScriptCoreSurfaceCallbackArguments<R: ~Copyable>(
     { empty in
       let arguments = JSCCallbackArguments(
         count: count,
-        borrowedValueHandleAt: { index in
+        borrowedValueRefAt: { index in
           guard
             index >= 0,
             index < count,
@@ -76,7 +72,7 @@ func withJavaScriptCoreSurfaceCallbackArguments<R: ~Copyable>(
           else {
             return nil
           }
-          return JSCValueHandle(ref: valueRef)
+          return valueRef
         }
       )
       return body(arguments)
@@ -97,7 +93,7 @@ func withJavaScriptCoreArguments<R: ~Copyable>(
     { empty in
       let arguments = JSCArguments(
         count: count,
-        borrowedValueHandleAt: { index, _ in
+        borrowedValueRefAt: { index, _ in
           guard
             index >= 0,
             index < count,
@@ -105,7 +101,7 @@ func withJavaScriptCoreArguments<R: ~Copyable>(
           else {
             return nil
           }
-          return JSCValueHandle(ref: valueRef)
+          return valueRef
         }
       )
       return body(arguments)

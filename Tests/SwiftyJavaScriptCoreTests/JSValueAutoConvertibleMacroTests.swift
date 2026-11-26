@@ -1,9 +1,10 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
 
-private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JSCContextHandle) {
-  let runtime = JSCEngine.makeRuntimeHandle()
+private func makeMacroHandles() -> (runtime: JSContextGroupRef, contextRef: JSGlobalContextRef) {
+  let runtime = JSCEngine.makeRuntime()
   guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime)
   else {
     preconditionFailure("JSCEngine could not create a context handle")
@@ -14,7 +15,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroDefaultSynthesisRoundtrip() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroDefaultUser(name: "alice", age: 42)
   context.setGlobalProperty(value, forKey: "macroDefault")
 
@@ -27,7 +28,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroTypeLevelDecoderEncoderOverride() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroDelegatedUser(score: 9)
   context.setGlobalProperty(value, forKey: "macroDelegated")
 
@@ -42,7 +43,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroFieldLevelOverrideUsesCustomConverter() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroFieldOverrideUser(name: "bob", active: true)
   context.setGlobalProperty(value, forKey: "macroField")
 
@@ -63,7 +64,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroFinalClassSerializationUsesValueSemantics() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroSerializedClass(name: "iris", active: true)
   context.setGlobalProperty(value, forKey: "macroClass")
 
@@ -89,7 +90,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroEnumSynthesisUsesCaseNameStrings() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroStringEnum.running
   context.setGlobalProperty(value, forKey: "macroEnum")
 
@@ -105,7 +106,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroRawEnumSynthesisUsesRawValue() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   let value = MacroRawEnum.alpha
   context.setGlobalProperty(value, forKey: "macroRawEnum")
 
@@ -121,7 +122,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroAssociatedEnumSynthesisUsesTaggedObjects() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   context.setGlobalProperty(MacroAssociatedEnum.idle, forKey: "enumIdle")
   context.setGlobalProperty(MacroAssociatedEnum.count(7), forKey: "enumCount")
   context.setGlobalProperty(MacroAssociatedEnum.range(3, 9), forKey: "enumRange")
@@ -149,7 +150,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroAssociatedEnumCanDecodeTaggedObjects() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   _ = context.evaluateScript(
     """
     globalThis.enumIdle = { kind: 'idle' }
@@ -176,7 +177,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroAssociatedEnumCanCustomizeTagAndPayloadKeys() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   context.setGlobalProperty(MacroCustomKeyAssociatedEnum.idle, forKey: "customIdle")
   context.setGlobalProperty(MacroCustomKeyAssociatedEnum.count(11), forKey: "customCount")
   context.setGlobalProperty(
@@ -222,7 +223,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroAssociatedEnumCanFlattenLabeledPayloadIntoTopLevelObject() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   context.setGlobalProperty(
     MacroFlattenedAssociatedEnum.rgb(r: 1, g: 2, b: 3), forKey: "flattenedRgb")
   context.setGlobalProperty(
@@ -273,7 +274,7 @@ private func makeMacroHandles() -> (runtime: JSCRuntimeHandle, contextHandle: JS
 @Test func macroAssociatedEnumFieldOverridesApplyPerPayloadField() {
   let (runtime, contextHandle) = makeMacroHandles()
   _ = runtime
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
   context.setGlobalProperty(MacroAssociatedOverrideEnum.enabled(true), forKey: "enumEnabled")
   context.setGlobalProperty(MacroAssociatedOverrideEnum.pair(true, false), forKey: "enumPair")
   context.setGlobalProperty(

@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 
 /// The JavaScriptCore virtual machine: one context group plus the dedicated
@@ -11,14 +12,13 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   @unchecked Sendable
 {
   public typealias Context = JSCContext
-  package typealias ContextHandle = JSCContextHandle
-  package typealias RuntimeHandle = JSCRuntimeHandle
 
   public let unownedExecutor: UnownedSerialExecutor
 
-  /// The runtime identity of this VM. Package-internal: it is a handle, so it
-  /// must not appear in a public signature; `==`/`hash` still use it.
-  package let driverRuntimeHandle: JSCRuntimeHandle
+  /// This VM's JavaScriptCore context group. Package-internal: the raw
+  /// reference is an implementation detail and must not appear in a public
+  /// signature; `==`/`hash` still use it.
+  package let groupRef: JSContextGroupRef
 
   private let owner: VMThread.Owner
   /// Retained so registry cleanup jobs can be scheduled without retaining the
@@ -30,10 +30,13 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   }
 
   private init(thread: VMThread) {
-    let runtime = thread.runAndWait {
-      JSCEngine.makeRuntimeHandle()
+    let groupBits = thread.runAndWait {
+      UInt(bitPattern: JSCEngine.makeRuntime())
     }
-    self.driverRuntimeHandle = runtime
+    guard let groupRef = JSContextGroupRef(bitPattern: groupBits) else {
+      preconditionFailure("JavaScriptCore could not create a context group")
+    }
+    self.groupRef = groupRef
     self.unownedExecutor = thread.unownedExecutor
     self.owner = thread.owner
     self.thread = thread
@@ -43,11 +46,21 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   /// creating a context mutates the shared runtime, which that thread may be
   /// using for the VM's other contexts. Package-internal: only
   /// `JSCContext.init(virtualMachine:)` and same-package tests call it.
-  package func makeContextHandle() -> JSCContextHandle? {
-    let runtimeHandle = driverRuntimeHandle
-    return thread.runAndWait {
-      JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  package func makeContextHandle() -> JSGlobalContextRef? {
+    let groupBits = UInt(bitPattern: groupRef)
+    let contextBits = thread.runAndWait { () -> UInt? in
+      guard let groupRef = JSContextGroupRef(bitPattern: groupBits) else {
+        return nil
+      }
+      guard
+        let contextRef = JSCEngine.makeBorrowedContextHandleFromRuntime(in: groupRef)
+      else {
+        return nil
+      }
+      return UInt(bitPattern: contextRef)
     }
+    guard let contextBits else { return nil }
+    return JSGlobalContextRef(bitPattern: contextBits)
   }
 
   /// Scheduling handle for persistent-binding settlement (design §2.4
@@ -67,17 +80,19 @@ public final class JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine,
     // An engine call, so it belongs on the VM thread (design §0.2.3). Every
     // context retained the VM, so by now they are all gone and the thread is
     // idle; the release completes before `Owner` stops the thread.
-    let runtimeHandle = driverRuntimeHandle
+    let groupBits = UInt(bitPattern: groupRef)
     thread.runAndWait {
-      _ = runtimeHandle.releaseReference()
+      if let groupRef = JSContextGroupRef(bitPattern: groupBits) {
+        JSCEngine.releaseRuntime(groupRef)
+      }
     }
   }
 
   public static func == (lhs: JSCVirtualMachine, rhs: JSCVirtualMachine) -> Bool {
-    lhs.driverRuntimeHandle == rhs.driverRuntimeHandle
+    lhs.groupRef == rhs.groupRef
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(driverRuntimeHandle)
+    hasher.combine(UInt(bitPattern: groupRef))
   }
 }

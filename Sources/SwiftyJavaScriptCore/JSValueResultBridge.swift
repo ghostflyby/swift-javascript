@@ -9,9 +9,9 @@ extension JSResult where Value == JSCValue {
   borrowing func toPrivateResult() -> JSResult<JSValueRef> {
     switch self {
     case .value(let v):
-      return .value(v.borrowedRef())
+      return .value(v.ref)
     case .exception(let e):
-      return .exception(e.borrowedRef())
+      return .exception(e.ref)
     }
   }
 }

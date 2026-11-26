@@ -14,8 +14,8 @@ import Testing
 
 @Suite
 struct JSCCallbackSurfaceTests {
-  private func makeContext() -> (JSCRuntimeHandle, JSCContextHandle) {
-    let runtime = JSCEngine.makeRuntimeHandle()
+  private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
+    let runtime = JSCEngine.makeRuntime()
     guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
       preconditionFailure("JSCEngine could not create a context handle")
     }
@@ -26,15 +26,15 @@ struct JSCCallbackSurfaceTests {
   func callbackValueExposesConversionsAndEquality() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
+      let scope = JSCInstantContext(contextRef: context)
 
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("seven")!)
-      let twinText = scope.adoptCreatedHandle(context.makeStringValueHandle("seven")!)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(7)!)
+      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("seven", context)!)
+      let twinText = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("seven", context)!)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
 
-      let value = JSCCallbackValue(handle: text.borrowHandle(), contextHandle: context)
-      let twin = JSCCallbackValue(handle: twinText.borrowHandle(), contextHandle: context)
-      let numeric = JSCCallbackValue(handle: number.borrowHandle(), contextHandle: context)
+      let value = JSCCallbackValue(ref: text.ref, contextRef: context)
+      let twin = JSCCallbackValue(ref: twinText.ref, contextRef: context)
+      let numeric = JSCCallbackValue(ref: number.ref, contextRef: context)
 
       let valueType = value.type()
       let valueText = value.toString()
@@ -58,20 +58,20 @@ struct JSCCallbackSurfaceTests {
       #expect(strictlyMatchesTwin)
       #expect(!strictlyMatchesNumber)
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
   func callbackArgumentsAccessValuesByIndex() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("alpha")!)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(41)!)
-      let handles = [text.borrowHandle(), number.borrowHandle()]
+      let scope = JSCInstantContext(contextRef: context)
+      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("alpha", context)!)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(41, context)!)
+      let handles = [text.ref, number.ref]
 
       let arguments = JSCCallbackArguments(count: handles.count) { index in
         index >= 0 && index < handles.count ? handles[index] : nil
@@ -93,17 +93,17 @@ struct JSCCallbackSurfaceTests {
       #expect(secondText == "41")
       #expect(throwingResult == "alpha")
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
   func throwingArgumentAccessPropagatesConversionErrors() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(3)!)
-      let arguments = JSCCallbackArguments(count: 1) { _ in number.borrowHandle() }
+      let scope = JSCInstantContext(contextRef: context)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(3, context)!)
+      let arguments = JSCCallbackArguments(count: 1) { _ in number.ref }
 
       do {
         let _: String = try arguments.withThrowingValue(at: 0, in: scope) {
@@ -123,18 +123,18 @@ struct JSCCallbackSurfaceTests {
         #expect(expected == "string")
       }
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 
   @Test
   func argumentsViewDecodesVariadically() {
     let (runtime, context) = makeContext()
     do {
-      let scope = JSCInstantContext(handle: context)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(1)!)
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("two")!)
-      let handles = [number.borrowHandle(), text.borrowHandle()]
+      let scope = JSCInstantContext(contextRef: context)
+      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(1, context)!)
+      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("two", context)!)
+      let handles = [number.ref, text.ref]
 
       let arguments = JSCArguments(count: handles.count) { index, _ in
         index >= 0 && index < handles.count ? handles[index] : nil
@@ -156,8 +156,8 @@ struct JSCCallbackSurfaceTests {
       #expect(strictlyConverted.0 == 2)
       #expect(strictlyConverted.1 == "TWO")
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JSGlobalContextRelease(context)
+    JSCEngine.releaseRuntime(runtime)
   }
 }
 

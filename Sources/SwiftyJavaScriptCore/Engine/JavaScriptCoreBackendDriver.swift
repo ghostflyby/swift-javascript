@@ -4,18 +4,11 @@ import SwiftJavaScript
 
 enum JavaScriptCoreObjectLookup {
   case object(JSObjectRef)
-  case exception(JSCValueHandle)
+  case exception(JSValueRef)
 }
 
 public enum JSCEngine: Sendable {
-  package typealias ValueHandle = JSCValueHandle
-  package typealias OwnedValueHandle = JSCOwnedValueHandle
-  package typealias ClassHandle = JSCClassHandle
   public typealias Engine = JSCEngine
-  package typealias RuntimeHandle = JSCRuntimeHandle
-  package typealias ContextHandle = JSCContextHandle
-  package typealias PropertyStringKeyHandle = JSCPropertyStringKeyHandle
-  package typealias PreparedScriptHandle = JSCPreparedScriptHandle
 }
 
 private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {
@@ -31,13 +24,13 @@ private var javaScriptCoreEmptyStringRef: JSStringRef {
 }
 
 func javaScriptCoreObjectRef(
-  for value: JSCValueHandle,
-  in context: JSCContextHandle
+  for value: JSValueRef,
+  in context: JSGlobalContextRef
 ) -> JavaScriptCoreObjectLookup {
   var exception: JSValueRef?
-  guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
+  guard let objectRef = JSValueToObject(context, value, &exception) else {
     if let exception {
-      return .exception(JSCValueHandle(ref: exception))
+      return .exception(exception)
     }
     return .exception(javaScriptCoreMakeUndefined(in: context))
   }
@@ -47,37 +40,33 @@ func javaScriptCoreObjectRef(
 func javaScriptCoreResult(
   value resultRef: JSValueRef?,
   exception exceptionRef: JSValueRef?,
-  in context: JSCContextHandle
-) -> JSResult<JSCValueHandle> {
+  in context: JSGlobalContextRef
+) -> JSResult<JSValueRef> {
   if let exceptionRef {
-    return .exception(JSCValueHandle(ref: exceptionRef))
+    return .exception(exceptionRef)
   }
   if let resultRef {
-    return .value(JSCValueHandle(ref: resultRef))
+    return .value(resultRef)
   }
   return .value(javaScriptCoreMakeUndefined(in: context))
 }
 
-func javaScriptCoreMakeUndefined(in context: JSCContextHandle)
-  -> JSCValueHandle
+func javaScriptCoreMakeUndefined(in context: JSGlobalContextRef)
+  -> JSValueRef
 {
-  JSCValueHandle(ref: JSValueMakeUndefined(context.ref)!)
+  JSValueMakeUndefined(context)
 }
 
 func javaScriptCoreMakeStringValue(
   _ value: String,
-  in context: JSCContextHandle
-) -> JSCValueHandle {
+  in context: JSGlobalContextRef
+) -> JSValueRef {
   guard !value.isEmpty else {
-    return JSCValueHandle(
-      ref: JSValueMakeString(context.ref, javaScriptCoreEmptyStringRef)!
-    )
+    return JSValueMakeString(context, javaScriptCoreEmptyStringRef)!
   }
 
   return withJavaScriptCoreString(value) { stringHandle in
-    JSCValueHandle(
-      ref: JSValueMakeString(context.ref, stringHandle)!
-    )
+    JSValueMakeString(context, stringHandle)!
   }
 }
 

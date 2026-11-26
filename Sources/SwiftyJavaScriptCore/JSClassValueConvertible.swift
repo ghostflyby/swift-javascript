@@ -36,7 +36,7 @@ public typealias JSCAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinitio
 
 private struct JavaScriptCoreClassCacheKey: Hashable, Sendable {
   let identity: ObjectIdentifier
-  let runtime: JSCRuntimeHandle
+  let runtime: UInt
 }
 
 private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<
@@ -44,11 +44,11 @@ private let jsClassRegistry = SwiftJavaScript.JSClassMapRegistry<
 >()
 
 private func javaScriptCorePrivateData(
-  from value: JSCValueHandle,
-  in context: JSCContextHandle
+  from value: JSValueRef,
+  in context: JSGlobalContextRef
 ) -> JSResult<UnsafeMutableRawPointer?> {
   var exception: JSValueRef?
-  guard let objectRef = JSValueToObject(context.ref, value.ref, &exception) else {
+  guard let objectRef = JSValueToObject(context, value, &exception) else {
     return .exception(nil)
   }
   return .value(JSObjectGetPrivate(objectRef))
@@ -57,15 +57,13 @@ private func javaScriptCorePrivateData(
 private func makeJavaScriptCoreObjectResultHandle(
   of jsClass: JSClassRef,
   privateData: UnsafeMutableRawPointer?,
-  in context: JSCContextHandle
-) -> JSResult<JSCValueHandle> {
-  guard let objectRef = JSObjectMake(context.ref, jsClass, privateData) else {
-    let exception = JSCValueHandle(
-      ref: JSValueMakeUndefined(context.ref)!
-    )
+  in context: JSGlobalContextRef
+) -> JSResult<JSValueRef> {
+  guard let objectRef = JSObjectMake(context, jsClass, privateData) else {
+    let exception = JSValueMakeUndefined(context)!
     return .exception(exception)
   }
-  return .value(JSCValueHandle(ref: objectRef))
+  return .value(objectRef)
 }
 
 private func makeJavaScriptCoreAutoJSClass(
@@ -97,7 +95,7 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
     identity: ObjectIdentifier,
     in context: borrowing JSCInstantContext
   ) -> JSCClass {
-    guard let runtime = runtimeHandle(for: context.driverContextHandle) else {
+    guard let runtime = contextGroupBits(for: context.contextRef) else {
       preconditionFailure("JavaScriptCore context has no context group")
     }
     let key = JavaScriptCoreClassCacheKey(identity: identity, runtime: runtime)
@@ -106,10 +104,10 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
     }
   }
 
-  package static func runtimeHandle(
-    for context: JSCContextHandle
-  ) -> JSCRuntimeHandle? {
-    JSCRuntimeHandle(borrowing: JSContextGetGroup(context.ref))
+  package static func contextGroupBits(
+    for context: JSGlobalContextRef
+  ) -> UInt? {
+    UInt(bitPattern: JSContextGetGroup(context))
   }
 
   public static func makeHostObject(
@@ -120,7 +118,7 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
     switch makeJavaScriptCoreObjectResultHandle(
       of: jsClass.ref,
       privateData: privateData,
-      in: context.driverContextHandle
+      in: context.contextRef
     ) {
     case .value(let object):
       // The host object belongs to the encoding scope's synchronous window:
@@ -128,7 +126,7 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
       // on the context default scope instead would keep the object alive (and
       // its finalizer unfired) until the context dies, even after JavaScript
       // drops every reference to it.
-      return context.adoptCreatedHandle(JSCOwnedValueHandle.adopting(object))
+      return context.adoptCreatedHandle(object)
     case .exception:
       // JavaScriptCore is GC-managed: the failure path owns nothing to
       // settle, and the private data stays with the caller.
@@ -141,7 +139,7 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
     in context: borrowing JSCInstantContext
   ) -> UnsafeMutableRawPointer? {
     switch javaScriptCorePrivateData(
-      from: value.borrowHandle(), in: context.driverContextHandle
+      from: value.ref, in: context.contextRef
     ) {
     case .value(let data):
       return data
@@ -371,12 +369,19 @@ private func autoStaticSetPropertyCallbackResult(
   newValue: borrowing JSCValue,
   exception: UnsafeMutablePointer<JSValueRef?>?
 ) -> Bool {
-  javaScriptCoreCallbackSucceeded(
-    exceptionValue: valueDefinition.setPropertyException(
-      in: context,
-      on: thisValue,
-      to: newValue
-    )?.ref,
+  let failure = valueDefinition.setPropertyException(
+    in: context,
+    on: thisValue,
+    to: newValue
+  )
+  let exceptionRef: JSValueRef?
+  if let failure {
+    exceptionRef = failure.ref
+  } else {
+    exceptionRef = nil
+  }
+  return javaScriptCoreCallbackSucceeded(
+    exceptionValue: exceptionRef,
     exception: exception
   )
 }

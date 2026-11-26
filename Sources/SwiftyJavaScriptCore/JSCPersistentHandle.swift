@@ -20,23 +20,23 @@ public final class JSCPersistentHandle: SwiftJavaScript.JSPersistentHandle, Send
   /// Weak by design (§2.6 in `docs/PERSISTENT_HANDLE_DESIGN.md`): keeping the
   /// registry alive from a handle would keep the whole context alive and make
   /// "container death yields nil" unreachable.
-  private let registryReference: PersistentRegistryReference<JSCContextHandle>
+  private let registryReference: JSCPersistentBindingsReference
 
-  package init(
+  init(
     identity: JSPersistentHandleIdentity,
-    registry: JSPersistentHandleRegistry<JSCContextHandle>
+    registry: JSCPersistentBindings
   ) {
     self.identity = identity
-    self.registryReference = PersistentRegistryReference(registry)
+    self.registryReference = JSCPersistentBindingsReference(registry)
   }
 
   @discardableResult
   public func invalidate() -> Bool {
-    registryReference.value?.release(identity) ?? false
+    registryReference.bindings?.release(identity) ?? false
   }
 
   deinit {
-    _ = registryReference.value?.release(identity)
+    _ = registryReference.bindings?.release(identity)
   }
 
   public static func == (lhs: JSCPersistentHandle, rhs: JSCPersistentHandle) -> Bool {

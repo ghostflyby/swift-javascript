@@ -339,12 +339,12 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 }
 
 @Test func autoClassDefinitionRoundTripsThroughJavaScript() throws {
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     Issue.record("JSCEngine could not create a context handle")
     return
   }
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
 
   let instance = JSCExportedNode(name: "leaf")
   let encoded = try JSCExportedNode.tryEncode(instance, in: context)
@@ -365,12 +365,12 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 }
 
 @Test func macroGeneratedClassDefinitionUsesSurfaceCallbacks() throws {
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     Issue.record("JSCEngine could not create a context handle")
     return
   }
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
 
   let node = JSCMacroNode()
   node.name = "macro"
@@ -389,12 +389,12 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 }
 
 @Test func macroGeneratedClassMethodsUseSurfaceCallbacks() throws {
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     Issue.record("JSCEngine could not create a context handle")
     return
   }
-  let context = JSCInstantContext(handle: contextHandle)
+  let context = JSCInstantContext(contextRef: contextHandle)
 
   let node = JSCMacroMethodNode()
   let encoded = try JSCMacroMethodNode.tryEncode(node, in: context)

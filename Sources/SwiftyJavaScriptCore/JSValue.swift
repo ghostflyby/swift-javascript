@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 
 /// The JavaScriptCore call-argument token.
@@ -6,18 +7,18 @@ import SwiftJavaScript
 /// instead. It borrows the value handle: keep the source value's arena alive
 /// and use the token only for the immediate synchronous call it is passed to.
 public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
-  package let handle: JSCValueHandle
+  package let ref: JSValueRef
 
   public init(_ value: borrowing JSCValue) {
-    self.handle = value.handle
+    self.ref = value.ref
   }
 
   public init(_ value: borrowing JSCCallbackValue) {
-    self.handle = value.handle
+    self.ref = value.ref
   }
 
-  package init(handle: JSCValueHandle) {
-    self.handle = handle
+  package init(ref: JSValueRef) {
+    self.ref = ref
   }
 }
 
@@ -31,59 +32,53 @@ public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
 /// no release.
 ///
 /// Base classification, conversion, and equality route directly to the
-/// `JSCContextHandle` driver; the property/invocation/typed-array surface is
-/// added by S5.
+/// `JSCEngine` statics over the raw `JSValueRef` and `JSGlobalContextRef`;
+/// the property/invocation/typed-array surface is added by S5.
 public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
-  package typealias ContextHandle = JSCContextHandle
-  package typealias ValueHandle = JSCValueHandle
   public typealias Context = JSCContext
   public typealias InstantContext = JSCInstantContext
 
-  package let handle: JSCValueHandle
-  package let contextHandle: JSCContextHandle
+  package let ref: JSValueRef
+  package let contextRef: JSGlobalContextRef
 
-  package init(handle: JSCValueHandle, contextHandle: JSCContextHandle) {
-    self.handle = handle
-    self.contextHandle = contextHandle
-  }
-
-  package borrowing func borrowHandle() -> JSCValueHandle {
-    handle
+  package init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
+    self.ref = ref
+    self.contextRef = contextRef
   }
 
   public func asCallArgument() -> JSCCallArgument {
-    JSCCallArgument(handle: handle)
+    JSCCallArgument(ref: ref)
   }
 
   // MARK: - Classification and conversion
 
-  public func type() -> JSType {
-    guard let valueType = contextHandle.valueTypeForHandle(handle) else {
+  public func type() -> SwiftJavaScript.JSType {
+    guard let valueType = JSCEngine.valueTypeForHandle(ref, in: contextRef) else {
       preconditionFailure("JSCValue.type() could not query value type")
     }
     return valueType
   }
 
   public func toString() -> String {
-    contextHandle.toStringForHandle(handle) ?? ""
+    JSCEngine.toStringForHandle(ref, in: contextRef) ?? ""
   }
 
   public func toNumber() -> Double {
-    contextHandle.toNumberForHandle(handle)
+    JSCEngine.toNumberForHandle(ref, in: contextRef)
   }
 
   public func toBoolean() -> Bool {
-    contextHandle.toBooleanForHandle(handle)
+    JSCEngine.toBooleanForHandle(ref, in: contextRef)
   }
 
   // MARK: - Equality
 
   public func looselyEquals(_ other: borrowing JSCValue) -> Bool {
-    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+    JSCEngine.looselyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 
   public func strictlyEquals(_ other: borrowing JSCValue) -> Bool {
-    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+    JSCEngine.strictlyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 }
 
@@ -93,6 +88,6 @@ extension JSCContext {
 
 extension JSCCallbackValue {
   public func asCallArgument() -> JSCCallArgument {
-    JSCCallArgument(handle: handle)
+    JSCCallArgument(ref: ref)
   }
 }

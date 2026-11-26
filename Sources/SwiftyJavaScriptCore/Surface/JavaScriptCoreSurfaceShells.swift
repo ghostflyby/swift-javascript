@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 
 // MARK: - Callback views and argument views
@@ -8,21 +9,17 @@ import SwiftJavaScript
 public struct JSCCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
   public typealias Context = JSCContext
 
-  package let handle: JSCValueHandle
-  package let contextHandle: JSCContextHandle
+  package let ref: JSValueRef
+  package let contextRef: JSGlobalContextRef
 
-  package init(handle: JSCValueHandle, contextHandle: JSCContextHandle) {
-    self.handle = handle
-    self.contextHandle = contextHandle
-  }
-
-  package borrowing func borrowHandle() -> JSCValueHandle {
-    handle
+  package init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
+    self.ref = ref
+    self.contextRef = contextRef
   }
 
   @available(*, noasync)
-  public func type() -> JSType {
-    guard let valueType = contextHandle.valueTypeForHandle(handle) else {
+  public func type() -> SwiftJavaScript.JSType {
+    guard let valueType = JSCEngine.valueTypeForHandle(ref, in: contextRef) else {
       preconditionFailure("JSCCallbackValue.type() could not query value type")
     }
     return valueType
@@ -35,62 +32,58 @@ public struct JSCCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
 
   @available(*, noasync)
   public func toString() -> String {
-    contextHandle.toStringForHandle(handle) ?? ""
+    JSCEngine.toStringForHandle(ref, in: contextRef) ?? ""
   }
 
   @available(*, noasync)
   public func toNumber() -> Double {
-    contextHandle.toNumberForHandle(handle)
+    JSCEngine.toNumberForHandle(ref, in: contextRef)
   }
 
   @available(*, noasync)
   public func toBoolean() -> Bool {
-    contextHandle.toBooleanForHandle(handle)
+    JSCEngine.toBooleanForHandle(ref, in: contextRef)
   }
 
   @available(*, noasync)
   public func looselyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
-    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+    JSCEngine.looselyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 
   @available(*, noasync)
   public func strictlyEquals(_ other: borrowing JSCCallbackValue) -> Bool {
-    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+    JSCEngine.strictlyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 }
 
 public struct JSCCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = JSCContext
 
-  /// The borrowed engine handle carried by this handoff. Package-internal:
+  /// The borrowed engine reference carried by this handoff. Package-internal:
   /// the trampolines and the same-package tests are the only readers.
-  package let handle: JSCValueHandle
+  package let ref: JSValueRef
   /// Semantic marker only: trampolines hand the engine its own reference for
   /// every state and branch on this flag solely to choose `throw` vs return.
   public let isException: Bool
 
   /// A value created in the callback window and anchored by its arena.
-  package init(temporary handle: JSCValueHandle) {
-    self.handle = handle
+  package init(temporary ref: JSValueRef) {
+    self.ref = ref
     self.isException = false
   }
 
   /// A value promoted to the context default scope (or otherwise arena-owned
   /// beyond the callback window).
   package init(persistent value: borrowing JSCValue) {
-    self.handle = value.borrowHandle()
+    self.ref = value.ref
     self.isException = false
   }
 
   /// A thrown value. The trampoline hands the engine its own reference; the
   /// owning arena settles its reference at drain.
-  package init(exception handle: JSCValueHandle) {
-    self.handle = handle
+  package init(exception ref: JSValueRef) {
+    self.ref = ref
     self.isException = true
-  }
-
-  package borrowing func borrowHandle() -> JSCValueHandle {
-    handle
   }
 }
 
@@ -102,14 +95,14 @@ public struct JSCArguments: SwiftJavaScript.JSArguments, ~Copyable {
   public typealias InstantContext = JSCInstantContext
 
   public let count: Int
-  package let borrowedValueHandleAt: (Int, JSCContextHandle) -> JSCValueHandle?
+  package let borrowedValueRefAt: (Int, JSGlobalContextRef) -> JSValueRef?
 
   package init(
     count: Int,
-    borrowedValueHandleAt: @escaping (Int, JSCContextHandle) -> JSCValueHandle?
+    borrowedValueRefAt: @escaping (Int, JSGlobalContextRef) -> JSValueRef?
   ) {
     self.count = count
-    self.borrowedValueHandleAt = borrowedValueHandleAt
+    self.borrowedValueRefAt = borrowedValueRefAt
   }
 
   public func withValue<R: ~Copyable>(
@@ -120,11 +113,10 @@ public struct JSCArguments: SwiftJavaScript.JSArguments, ~Copyable {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index, context.driverContextHandle) else {
+    guard let ref = borrowedValueRefAt(index, context.contextRef) else {
       fatalError("JSArgument handle is unavailable")
     }
-    return body(
-      JSCValue(handle: handle, contextHandle: context.driverContextHandle))
+    return body(JSCValue(ref: ref, contextRef: context.contextRef))
   }
 }
 
@@ -134,14 +126,14 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
   public typealias InstantContext = JSCInstantContext
 
   public let count: Int
-  package let borrowedValueHandleAt: (Int) -> JSCValueHandle?
+  package let borrowedValueRefAt: (Int) -> JSValueRef?
 
   package init(
     count: Int,
-    borrowedValueHandleAt: @escaping (Int) -> JSCValueHandle?
+    borrowedValueRefAt: @escaping (Int) -> JSValueRef?
   ) {
     self.count = count
-    self.borrowedValueHandleAt = borrowedValueHandleAt
+    self.borrowedValueRefAt = borrowedValueRefAt
   }
 
   @available(*, noasync)
@@ -153,11 +145,10 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index) else {
+    guard let ref = borrowedValueRefAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    return body(
-      JSCCallbackValue(handle: handle, contextHandle: context.driverContextHandle))
+    return body(JSCCallbackValue(ref: ref, contextRef: context.contextRef))
   }
 
   @available(*, noasync)
@@ -169,11 +160,10 @@ public struct JSCCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index) else {
+    guard let ref = borrowedValueRefAt(index) else {
       fatalError("JSArgument handle is unavailable")
     }
-    return try body(
-      JSCCallbackValue(handle: handle, contextHandle: context.driverContextHandle))
+    return try body(JSCCallbackValue(ref: ref, contextRef: context.contextRef))
   }
 }
 

@@ -29,8 +29,8 @@ private enum JSCScopeDataKey: JSContextDataKey {
 
 @Suite
 struct JSCScopeSurfaceTests {
-  private func makeContext() -> (JSCRuntimeHandle, JSCContextHandle) {
-    let runtime = JSCEngine.makeRuntimeHandle()
+  private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
+    let runtime = JSCEngine.makeRuntime()
     guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
       preconditionFailure("JSCEngine could not create a context handle")
     }
@@ -41,7 +41,7 @@ struct JSCScopeSurfaceTests {
   func factoriesProduceExpectedPrimitives() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let stringType = scope.makeString("hello").type()
     let numberType = scope.makeNumber(3.5).type()
@@ -85,22 +85,22 @@ struct JSCScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var outer = JSCScope(handle: context)
+    var outer = JSCScope(contextRef: context)
     outer.open()
 
-    let persistedHandle: JSCValueHandle
-    let persistedContext: JSCContextHandle
+    let persistedHandle: JSValueRef
+    let persistedContext: JSGlobalContextRef
     do {
-      let inner = JSCInstantContext(handle: context)
+      let inner = JSCInstantContext(contextRef: context)
       let persisted = inner.persist(inner.makeString("kept"))
-      persistedHandle = persisted.borrowHandle()
-      persistedContext = persisted.contextHandle
+      persistedHandle = persisted.ref
+      persistedContext = persisted.contextRef
       let inside = persisted.toString()
       #expect(inside == "kept")
     }
 
     // The inner window drained; the outer scope's arena now owns the value.
-    let revived = JSCValue(handle: persistedHandle, contextHandle: persistedContext)
+    let revived = JSCValue(ref: persistedHandle, contextRef: persistedContext)
     let text = revived.toString()
     #expect(text == "kept")
   }
@@ -110,16 +110,16 @@ struct JSCScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var outer = JSCScope(handle: context)
+    var outer = JSCScope(contextRef: context)
     outer.open()
 
     do {
-      let first = JSCInstantContext(handle: context)
+      let first = JSCInstantContext(contextRef: context)
       let outerValue = first.persist(first.makeNumber(1))
       #expect(outerValue.toNumber() == 1)
 
       do {
-        let second = JSCInstantContext(handle: context)
+        let second = JSCInstantContext(contextRef: context)
         let innerValue = second.persist(second.makeNumber(2))
         #expect(innerValue.toNumber() == 2)
       }
@@ -139,13 +139,13 @@ struct JSCScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    let window = JSCInstantContext(handle: context)
+    let window = JSCInstantContext(contextRef: context)
     let windowIsCaller = window.withInstantWindow { inner in
-      inner.driverContextHandle == window.driverContextHandle
+      inner.contextRef == window.contextRef
     }
     #expect(windowIsCaller)
 
-    var scope = JSCScope(handle: context)
+    var scope = JSCScope(contextRef: context)
     scope.open()
 
     let (innerNumber, innerText) = scope.withInstantWindow { inner -> (Double, String) in
@@ -165,19 +165,19 @@ struct JSCScopeSurfaceTests {
   func returnAndThrowCarryTheExpectedFlags() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let returned = scope.return(scope.makeString("ok"))
     let returnedIsException = returned.isException
-    let returnedHandle = returned.borrowHandle()
+    let returnedHandle = returned.ref
     #expect(!returnedIsException)
-    #expect(JSCValue(handle: returnedHandle, contextHandle: context).toString() == "ok")
+    #expect(JSCValue(ref: returnedHandle, contextRef: context).toString() == "ok")
 
     let thrown = scope.throw(scope.makeString("boom"))
     let thrownIsException = thrown.isException
-    let thrownHandle = thrown.borrowHandle()
+    let thrownHandle = thrown.ref
     #expect(thrownIsException)
-    #expect(JSCValue(handle: thrownHandle, contextHandle: context).toString() == "boom")
+    #expect(JSCValue(ref: thrownHandle, contextRef: context).toString() == "boom")
 
     let undefinedReturn = scope.returnUndefined()
     let undefinedReturnIsException = undefinedReturn.isException
@@ -197,7 +197,7 @@ struct JSCScopeSurfaceTests {
   func globalPropertyReadWriteDelete() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
     let answer: StaticString = "answer"
 
     scope.setGlobalProperty(scope.makeNumber(41), forKey: answer)
@@ -228,7 +228,7 @@ struct JSCScopeSurfaceTests {
   func scriptEvaluationThroughPreparedAndSourceForms() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let prepared = scope.prepareScript("6 * 7")
     let preparedResult = scope.evaluateScript(
@@ -258,7 +258,7 @@ struct JSCScopeSurfaceTests {
   func functionCallbackUsesTheSurfaceWindow() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     scope.installGlobalFunction(named: "double") { callbackContext, _, arguments in
       let value = arguments.withValue(at: 0, in: callbackContext) { argument in
@@ -293,7 +293,7 @@ struct JSCScopeSurfaceTests {
   func surfaceEncoderWitnessesProduceValues() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let boolean = true.toSurfaceValue(in: scope)
     let string = "encoded".toSurfaceValue(in: scope)
@@ -317,7 +317,7 @@ struct JSCScopeSurfaceTests {
   func codableConverterTraversesSurfaceObjects() throws {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let payload = JSCScopePayload(
       name: "surface",
@@ -360,7 +360,7 @@ struct JSCScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var scope = JSCScope(handle: context)
+    var scope = JSCScope(contextRef: context)
     scope.open()
 
     let payload = JSCScopePayload(
@@ -371,17 +371,17 @@ struct JSCScopeSurfaceTests {
     )
 
     let encodedHandle = try scope.withInstantWindow {
-      window throws(JSValueConversionError) -> JSCValueHandle in
+      window throws(JSValueConversionError) -> JSValueRef in
       let encoded = try JSCodableValueConverter<JSCScopePayload>.tryEncode(
         payload,
         in: window
       )
-      return encoded.borrowHandle()
+      return encoded.ref
     }
 
     // `tryEncode` persists its object graph into the context default scope, so
     // the encoded object is still readable after the nested window drained.
-    let persisted = JSCValue(handle: encodedHandle, contextHandle: context)
+    let persisted = JSCValue(ref: encodedHandle, contextRef: context)
     let decoded = try scope.withInstantWindow {
       window throws(JSValueConversionError) -> JSCScopePayload in
       let name = persisted.getProperty("name", in: window)
@@ -403,7 +403,7 @@ struct JSCScopeSurfaceTests {
   func simpleValueInitializersPersistIntoTheDefaultScope() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = JSCInstantContext(handle: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     let string = JSCValue(string: "initial", in: scope)
     let number = JSCValue(number: 12, in: scope)
@@ -429,8 +429,8 @@ struct JSCScopeSurfaceTests {
     _ = runtime
     // A bare engine context has no host-installed storage box; install one to
     // exercise the scope's data pass-through.
-    context.installContextDataStorageBox(JSContextDataStorageBox())
-    let scope = JSCInstantContext(handle: context)
+    JSCEngine.installContextDataStorageBox(JSContextDataStorageBox(), in: context)
+    let scope = JSCInstantContext(contextRef: context)
 
     scope.setData("shared", for: JSCScopeDataKey.self)
     let value = scope.data(for: JSCScopeDataKey.self)
@@ -452,19 +452,17 @@ struct JSCScopeSurfaceTests {
   @Test
   func instantWindowRestoresTheDefaultScopeFrame() async {
     let context = JSCContext()
-    let defaultFrame = ScopeStackRegistry<JSCContextHandle>.top(
-      of: context.driverContextHandle)
+    let defaultFrame = JSCScopeStacks.top(of: context.contextRef)
 
     await context.withInstantContext { scope in
-      let windowTop = ScopeStackRegistry<JSCContextHandle>.top(
-        of: context.driverContextHandle)
+      let windowTop = JSCScopeStacks.top(
+        of: context.contextRef)
       #expect(windowTop !== defaultFrame)
       _ = scope.makeString("windowed")
     }
 
     // The window drained; the context default frame is back on top.
-    let restored = ScopeStackRegistry<JSCContextHandle>.top(
-      of: context.driverContextHandle)
+    let restored = JSCScopeStacks.top(of: context.contextRef)
     #expect(restored === defaultFrame)
   }
 
@@ -476,9 +474,10 @@ struct JSCScopeSurfaceTests {
     let context = JSCContext()
     await context.withInstantContext { scope in
       let buffer = JSCArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
-      let rejected = scope.driverContextHandle.makeTypedArrayHandle(
+      let rejected = JSCEngine.makeTypedArrayHandle(
+        in: scope.contextRef,
         kind: .uint16Array,
-        arrayBuffer: buffer.withValue { $0.borrowHandle() },
+        arrayBuffer: buffer.withValue { $0.ref },
         byteOffset: 1,
         length: 1
       )
@@ -512,37 +511,38 @@ struct JSCScopeSurfaceTests {
 
       let key = scope.persist(scope.makeString("valueKey"))
       let stored = scope.persist(scope.makeString("abc"))
-      let contextHandle = scope.driverContextHandle
+      let contextHandle = scope.contextRef
 
-      let wrote = contextHandle.setValuePropertyHandle(
-        key.borrowHandle(),
-        on: object.borrowHandle(),
-        to: stored.borrowHandle(),
+      let wrote = JSCEngine.setValuePropertyHandle(
+        key.ref,
+        on: object.ref,
+        to: stored.ref,
+        in: contextHandle,
         attributes: .none
       )
       let has =
-        contextHandle.hasValuePropertyHandle(
-          key.borrowHandle(), on: object.borrowHandle()) ?? false
+        JSCEngine.hasValuePropertyHandle(
+          key.ref, on: object.ref, in: contextHandle) ?? false
       let readIsString: Bool
-      if let result = contextHandle.getValuePropertyHandle(
-        key.borrowHandle(), on: object.borrowHandle())
+      if let result = JSCEngine.getValuePropertyHandle(
+        key.ref, on: object.ref, in: contextHandle)
       {
         switch consume result {
         case .value(let handle):
           readIsString =
-            scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)).isString()
+            scope.adoptCreatedHandle(handle).isString()
         case .exception(let handle):
-          _ = scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+          _ = scope.adoptCreatedHandle(handle)
           readIsString = false
         }
       } else {
         readIsString = false
       }
-      let deleted = contextHandle.deleteValuePropertyHandle(
-        key.borrowHandle(), on: object.borrowHandle())
+      let deleted = JSCEngine.deleteValuePropertyHandle(
+        key.ref, on: object.ref, in: contextHandle)
       let hasAfterDelete =
-        contextHandle.hasValuePropertyHandle(
-          key.borrowHandle(), on: object.borrowHandle()) ?? true
+        JSCEngine.hasValuePropertyHandle(
+          key.ref, on: object.ref, in: contextHandle) ?? true
 
       #expect(wrote)
       #expect(has)
@@ -567,51 +567,55 @@ struct JSCScopeSurfaceTests {
         return
       }
 
-      let contextHandle = scope.driverContextHandle
+      let contextHandle = scope.contextRef
       let lockedKey = scope.persist(scope.makeString("locked"))
       let seven = scope.persist(scope.makeNumber(7))
       let nine = scope.persist(scope.makeNumber(9))
-      _ = contextHandle.setValuePropertyHandle(
-        lockedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: seven.borrowHandle(),
+      _ = JSCEngine.setValuePropertyHandle(
+        lockedKey.ref,
+        on: object.ref,
+        to: seven.ref,
+        in: contextHandle,
         attributes: .readOnly
       )
-      _ = contextHandle.setValuePropertyHandle(
-        lockedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: nine.borrowHandle(),
+      _ = JSCEngine.setValuePropertyHandle(
+        lockedKey.ref,
+        on: object.ref,
+        to: nine.ref,
+        in: contextHandle,
         attributes: .none
       )
 
       let hiddenKey = scope.persist(scope.makeString("hidden"))
       let hiddenValue = scope.persist(scope.makeNumber(1))
-      _ = contextHandle.setValuePropertyHandle(
-        hiddenKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: hiddenValue.borrowHandle(),
+      _ = JSCEngine.setValuePropertyHandle(
+        hiddenKey.ref,
+        on: object.ref,
+        to: hiddenValue.ref,
+        in: contextHandle,
         attributes: .dontEnum
       )
 
       let pinnedKey = scope.persist(scope.makeString("pinned"))
       let pinnedValue = scope.persist(scope.makeNumber(2))
-      _ = contextHandle.setValuePropertyHandle(
-        pinnedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: pinnedValue.borrowHandle(),
+      _ = JSCEngine.setValuePropertyHandle(
+        pinnedKey.ref,
+        on: object.ref,
+        to: pinnedValue.ref,
+        in: contextHandle,
         attributes: .dontDelete
       )
 
       let lockedNumber: Double?
-      if let result = contextHandle.getValuePropertyHandle(
-        lockedKey.borrowHandle(), on: object.borrowHandle())
+      if let result = JSCEngine.getValuePropertyHandle(
+        lockedKey.ref, on: object.ref, in: contextHandle)
       {
         switch consume result {
         case .value(let handle):
           lockedNumber =
-            scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)).toNumber()
+            scope.adoptCreatedHandle(handle).toNumber()
         case .exception(let handle):
-          _ = scope.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+          _ = scope.adoptCreatedHandle(handle)
           lockedNumber = nil
         }
       } else {

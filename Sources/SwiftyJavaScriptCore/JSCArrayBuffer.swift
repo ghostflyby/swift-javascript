@@ -3,8 +3,8 @@ import SwiftJavaScript
 
 // MARK: - JavaScriptCore buffers (S10)
 //
-// Both wrappers are real structs over the `JSCContextHandle` typed-array
-// driver: the driver owns every C call, core owns the byte allocation/copy
+// Both wrappers are real structs over the `JSCEngine` typed-array statics over
+// raw refs: the engine owns every C call, core owns the byte allocation/copy
 // helpers, and the wrapper states the JavaScriptCore identity, the byte/shape
 // access, and the arena adoption.
 
@@ -77,16 +77,15 @@ public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     guard value.isArrayBuffer(in: context) else {
       return nil
     }
-    self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
+    self.init(value: context.anchorBorrowedHandle(value.ref))
   }
 
   // MARK: - Bytes
 
   public var byteLength: Int {
     guard
-      let length = value.contextHandle.arrayBufferByteLengthForHandle(
-        value.borrowHandle()
-      )
+      let length = JSCEngine.arrayBufferByteLengthForHandle(
+        value.ref, in: value.contextRef)
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
     }
@@ -101,7 +100,7 @@ public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    let access = JSCEngine.arrayBufferBytesPtrForHandle(value.ref, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -112,7 +111,7 @@ public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    let access = JSCEngine.arrayBufferBytesPtrForHandle(value.ref, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -143,15 +142,15 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     precondition(length >= 0, "TypedArray length must be non-negative")
 
     guard
-      let handle = context.driverContextHandle.makeTypedArrayHandle(
+      let ref = JSCEngine.makeTypedArrayHandle(
+        in: context.contextRef,
         kind: kind,
         length: length
       )
     else {
       preconditionFailure("Failed to create TypedArray")
     }
-    self.init(
-      value: context.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    self.init(value: context.adoptCreatedHandle(ref))
   }
 
   public init(
@@ -166,34 +165,36 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
       precondition(length >= 0, "TypedArray length must be non-negative")
     }
 
-    let bufferHandle = buffer.value.borrowHandle()
-    let handle: JSCValueHandle?
+    let bufferRef = buffer.value.ref
+    let ref: JSValueRef?
     if let length {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      ref = JSCEngine.makeTypedArrayHandle(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle,
+        arrayBuffer: bufferRef,
         byteOffset: byteOffset,
         length: length
       )
     } else if byteOffset == 0 {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      ref = JSCEngine.makeTypedArrayHandle(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle
+        arrayBuffer: bufferRef
       )
     } else {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      ref = JSCEngine.makeTypedArrayHandle(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle,
+        arrayBuffer: bufferRef,
         byteOffset: byteOffset,
         length: buffer.remainingElementCount(from: byteOffset, kind: kind)
       )
     }
 
-    guard let handle else {
+    guard let ref else {
       preconditionFailure("Failed to create TypedArray from ArrayBuffer")
     }
-    self.init(
-      value: context.adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    self.init(value: context.adoptCreatedHandle(ref))
   }
 
   public init?(
@@ -203,14 +204,14 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     guard value.isTypedArray(in: context) else {
       return nil
     }
-    self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
+    self.init(value: context.anchorBorrowedHandle(value.ref))
   }
 
   // MARK: - Shape
 
   public var kind: JSTypedArrayKind {
     guard
-      let kind = value.contextHandle.typedArrayKindForHandle(value.borrowHandle())
+      let kind = JSCEngine.typedArrayKindForHandle(value.ref, in: value.contextRef)
     else {
       preconditionFailure("Wrapped value is not a TypedArray")
     }
@@ -219,7 +220,7 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var length: Int {
     guard
-      let length = value.contextHandle.typedArrayLengthForHandle(value.borrowHandle())
+      let length = JSCEngine.typedArrayLengthForHandle(value.ref, in: value.contextRef)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -228,8 +229,8 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var byteLength: Int {
     guard
-      let byteLength = value.contextHandle.typedArrayByteLengthForHandle(
-        value.borrowHandle())
+      let byteLength = JSCEngine.typedArrayByteLengthForHandle(
+        value.ref, in: value.contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
     }
@@ -238,8 +239,8 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var byteOffset: Int {
     guard
-      let byteOffset = value.contextHandle.typedArrayByteOffsetForHandle(
-        value.borrowHandle())
+      let byteOffset = JSCEngine.typedArrayByteOffsetForHandle(
+        value.ref, in: value.contextRef)
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
     }
@@ -249,20 +250,18 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
   /// JavaScriptCore returns the buffer as an unprotected object reference, so
   /// the wrapper adopts it into the context default scope exactly once.
   public var buffer: JSCArrayBuffer {
-    let contextHandle = value.contextHandle
+    let contextRef = value.contextRef
     guard
-      let bufferHandle = contextHandle.typedArrayBufferForHandle(value.borrowHandle())
+      let bufferRef = JSCEngine.typedArrayBufferForHandle(value.ref, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray buffer")
     }
-    guard
-      let target = ScopeStackRegistry<JSCContextHandle>.defaultFrame(for: contextHandle)
-    else {
+    guard let target = JSCScopeStacks.defaultFrame(for: contextRef) else {
       preconditionFailure("TypedArray buffer requires an open context default scope")
     }
-    target.track(JSCOwnedValueHandle.adopting(bufferHandle))
+    target.track(bufferRef)
     return JSCArrayBuffer(
-      value: JSCValue(handle: bufferHandle, contextHandle: contextHandle))
+      value: JSCValue(ref: bufferRef, contextRef: contextRef))
   }
 
   // MARK: - Bytes
@@ -275,7 +274,7 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    let access = JSCEngine.typedArrayBytesPtrForHandle(value.ref, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -289,7 +288,7 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    let access = JSCEngine.typedArrayBytesPtrForHandle(value.ref, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }
@@ -314,7 +313,8 @@ extension JSCInstantContext: JSArrayBufferHostScope {
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> JSCValue? {
     guard
-      let handle = driverContextHandle.makeArrayBufferWithBytesNoCopyHandle(
+      let ref = JSCEngine.makeArrayBufferWithBytesNoCopyHandle(
+        in: contextRef,
         bytes: bytes,
         byteLength: byteLength,
         bytesDeallocator: bytesDeallocator,
@@ -323,6 +323,6 @@ extension JSCInstantContext: JSArrayBufferHostScope {
     else {
       return nil
     }
-    return adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
+    return adoptCreatedHandle(ref)
   }
 }

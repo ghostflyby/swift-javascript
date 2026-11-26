@@ -19,13 +19,16 @@ extension JSCValue {
     in context: borrowing JSCInstantContext
   ) {
     guard
-      let handle = context.driverContextHandle.makeFunctionValueHandle(
-        named: name, callback: callback)
+      let ref = JSCEngine.makeFunctionValueHandle(
+        named: name,
+        callback: callback,
+        in: context.contextRef
+      )
     else {
-      preconditionFailure("JSCValue(name:callback:) could not create function handle")
+      preconditionFailure("JSCValue(name:callback:) could not create function")
     }
-    let adopted = context.adoptCreatedHandle(handle)
-    self.init(handle: adopted.borrowHandle(), contextHandle: adopted.contextHandle)
+    let adopted = context.adoptCreatedHandle(ref)
+    self.init(ref: adopted.ref, contextRef: adopted.contextRef)
   }
 
   // MARK: Typed function (decodable arguments, encodable return/error)
@@ -67,7 +70,7 @@ extension JSCValue {
       }
     }
     let value = context.makeFunction(named: name, callback: callback)
-    self.init(handle: value.borrowHandle(), contextHandle: value.contextHandle)
+    self.init(ref: value.ref, contextRef: value.contextRef)
   }
 
   // MARK: Coder-based typed function
@@ -114,7 +117,7 @@ extension JSCValue {
       }
     }
     let value = context.makeFunction(named: name, callback: callback)
-    self.init(handle: value.borrowHandle(), contextHandle: value.contextHandle)
+    self.init(ref: value.ref, contextRef: value.contextRef)
   }
 }
 
@@ -134,10 +137,7 @@ private func decodeFunctionArgument<T: JSValueDecodable>(
   defer { index += 1 }
   return try arguments.withThrowingValue(at: index, in: context) {
     callbackValue throws(JSValueConversionError) -> T in
-    let value = JSCValue(
-      handle: callbackValue.borrowHandle(),
-      contextHandle: context.driverContextHandle
-    )
+    let value = JSCValue(ref: callbackValue.ref, contextRef: context.contextRef)
     return try T.tryDecode(value, in: context)
   }
 }
@@ -152,10 +152,7 @@ private func decodeFunctionArgument<C: JSValueDecoder>(
   defer { index += 1 }
   return try arguments.withThrowingValue(at: index, in: context) {
     callbackValue throws(JSValueConversionError) -> C.SwiftType in
-    let value = JSCValue(
-      handle: callbackValue.borrowHandle(),
-      contextHandle: context.driverContextHandle
-    )
+    let value = JSCValue(ref: callbackValue.ref, contextRef: context.contextRef)
     return try C.tryDecode(value, in: context)
   }
 }

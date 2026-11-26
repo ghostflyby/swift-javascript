@@ -3,27 +3,6 @@ import Testing
 
 @testable import SwiftyJavaScriptCore
 
-@Test func javaScriptCoreBackendDriverHandleReferenceCountingChain() {
-  let runtimeHandle = JSCEngine.makeRuntimeHandle()
-  #expect(runtimeHandle.retainReference())
-  #expect(runtimeHandle.releaseReference())
-
-  guard
-    let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(
-      in: runtimeHandle)
-  else {
-    Issue.record("expected runtime handle to create context handle")
-    return
-  }
-
-  #expect(contextHandle.retainReference())
-  #expect(contextHandle.releaseReference())
-
-  // Release the creation-time references so this test does not leak engine objects.
-  #expect(contextHandle.releaseReference())
-  #expect(runtimeHandle.releaseReference())
-}
-
 // MARK: - Facade thin aliases and surface factories (S12)
 
 @Test func javaScriptCoreFacadeThinAliasesAndSurfaceFactoriesSmoke() {
@@ -56,7 +35,7 @@ import Testing
   )
   #expect(staticFunction.name == "fn")
 
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard
     let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime)
   else {
@@ -64,7 +43,7 @@ import Testing
     return
   }
   do {
-    let context = JSCInstantContext(handle: contextHandle)
+    let context = JSCInstantContext(contextRef: contextHandle)
     let identity = ObjectIdentifier(JSCAutoClassDefinition.self)
     let madeClass = JSCEngine.makeClass(
       definition: definition,
@@ -79,15 +58,15 @@ import Testing
     #expect(madeClass == cachedClass)
   }
 
-  let undefinedHandle = JSCValueHandle(ref: JSValueMakeUndefined(contextHandle.ref))
+  let undefinedValue = JSValueMakeUndefined(contextHandle)!
   let madeValue: JSCValue = JSCValue(
-    handle: undefinedHandle,
-    contextHandle: contextHandle
+    ref: undefinedValue,
+    contextRef: contextHandle
   )
   #expect(madeValue.type() == .undefined)
 
-  #expect(contextHandle.releaseReference())
-  #expect(runtime.releaseReference())
+  JSGlobalContextRelease(contextHandle)
+  JSCEngine.releaseRuntime(runtime)
 }
 
 // MARK: - Surface context/VM smoke (S8)
@@ -98,9 +77,9 @@ import Testing
   let sibling = JSCContext(virtualMachine: virtualMachine)
 
   #expect(context.virtualMachine == virtualMachine)
-  #expect(context.driverContextHandle == context.driverContextHandle)
-  #expect(context.driverContextHandle != sibling.driverContextHandle)
-  #expect(context.driverContextHandle.contextDataStorageBox() != nil)
+  #expect(context.contextRef == context.contextRef)
+  #expect(context.contextRef != sibling.contextRef)
+  #expect(context.contextDataStorageBox() != nil)
 
   let sum = await context.withInstantContext { scope in
     scope.makeNumber(20).toNumber() + scope.makeNumber(22).toNumber()
@@ -122,7 +101,7 @@ import Testing
 // MARK: - makeFunction inside a raw callback (S8 regression)
 //
 // A function register built from inside an engine callback holds a *borrowing*
-// context handle (`JSCContextHandle(borrowing:)`), so `surfaceFunctionClassRef` has to
+// context handle (`JSGlobalContextRef(borrowing:)`), so `surfaceFunctionClassRef` has to
 // resolve the owning context through the data box. Before S8 that lookup comprehended only the legacy actor; the concrete `JSCContext` is now the owner, and
 // this test is the crash regression for the whole fallback path.
 
@@ -185,7 +164,7 @@ import Testing
 // so the owning path needs no fallback at all.
 
 @Test func javaScriptCoreContextBorrowReturnsNilWithoutBoundOwner() {
-  let runtimeHandle = JSCEngine.makeRuntimeHandle()
+  let runtimeHandle = JSCEngine.makeRuntime()
   guard
     let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
   else {
@@ -193,10 +172,9 @@ import Testing
     return
   }
 
-  #expect(JSCContext.borrow(ctx: contextHandle.ref) == nil)
-  #expect(contextHandle.surfaceFunctionClassRef != nil)
-  #expect(contextHandle.propertyNamesFunctionRef != nil)
+  #expect(JSCContext.borrow(ctx: contextHandle) == nil)
+  #expect(javaScriptCoreSurfaceFunctionClass(for: contextHandle) != nil)
 
-  #expect(contextHandle.releaseReference())
-  #expect(runtimeHandle.releaseReference())
+  JSGlobalContextRelease(contextHandle)
+  JSCEngine.releaseRuntime(runtimeHandle)
 }

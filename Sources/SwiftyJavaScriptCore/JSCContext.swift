@@ -3,11 +3,11 @@ import SwiftJavaScript
 
 /// The JavaScriptCore context actor.
 ///
-/// Holds the engine handle, the VM it belongs to, and the shared
-/// `JSContextStorage<JSCContextHandle>` that owns the default scope, the
-/// persistent registry, and the context data box. The context-level factories,
-/// global reads/writes, script evaluation, and data storage create or settle
-/// engine references on the context default scope, so they live here rather
+/// Holds the raw `JSGlobalContextRef`, the VM it belongs to, its default
+/// scope, concrete persistent-binding table, and VM thread. The context-level
+/// factories, global reads/writes, script evaluation, and data storage create
+/// or settle engine references on the context default scope, so they live here
+/// rather
 /// than in a core default; the actor also runs the storage teardown in its
 /// isolated deinit, on the VM thread.
 public actor JSCContext: SwiftJavaScript.JSContext {
@@ -26,19 +26,19 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   public typealias PropertyStringKey = JSCPropertyStringKey
   public typealias PreparedScript = JSCPreparedScript
 
-  /// The engine context identity every operation of this actor is addressed
-  /// through. Package-internal: it is a handle, so it must not appear in a
-  /// public signature.
-  package nonisolated let driverContextHandle: JSCContextHandle
+  /// The raw JavaScriptCore context every operation of this actor is
+  /// addressed through. Package-internal: it must not appear in a public
+  /// signature.
+  nonisolated(unsafe) let contextRef: JSGlobalContextRef
+  /// Cached `Object.keys` wrapper, created before any user script can patch
+  /// `Object.keys`. Immutable and only read by engine-side property queries.
+  package nonisolated(unsafe) let propertyNamesFunction: JSObjectRef?
   public nonisolated let virtualMachine: JSCVirtualMachine
   public nonisolated let unownedExecutor: UnownedSerialExecutor
 
-  /// The same identity as the shared driver interface, for package-internal
-  /// seams (the scope witness and the contract tests' driver dispatch). This
-  /// lets those call sites avoid naming the handle type.
-  package nonisolated var runtimeDriver: any JSContextRuntimeDriver { driverContextHandle }
-
-  private let storage: JSContextStorage<JSCContextHandle>
+  private let defaultScope: JSCScopeCore
+  private let persistentBindings: JSCPersistentBindings
+  private let vmThread: VMThread
 
   public init() {
     self.init(virtualMachine: JSCVirtualMachine())
@@ -50,37 +50,70 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   /// caller already on the VM thread (inside another context's window) runs
   /// inline.
   public init(virtualMachine: JSCVirtualMachine) {
-    guard let driverContextHandle = virtualMachine.makeContextHandle() else {
-      preconditionFailure("JSCContext could not create a context handle from its runtime")
+    guard let contextRef = virtualMachine.makeContextHandle() else {
+      preconditionFailure("JSCContext could not create a context from its runtime")
     }
-    self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
+    self.init(virtualMachine: virtualMachine, contextRef: contextRef)
   }
 
   package init(
     virtualMachine: JSCVirtualMachine,
-    driverContextHandle: JSCContextHandle
+    contextRef: JSGlobalContextRef
   ) {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
-    self.driverContextHandle = driverContextHandle
-    let storage = JSContextStorage<JSCContextHandle>(
-      driverContextHandle: driverContextHandle,
-      scheduler: virtualMachine.persistentCleanupScheduler,
+    self.contextRef = contextRef
+    self.vmThread = virtualMachine.vmThread
+    let defaultScope = JSCScopeCore(contextRef: contextRef, rootsArenaValues: true)
+    self.defaultScope = defaultScope
+    let persistentBindings = JSCPersistentBindings(
+      contextRef: contextRef,
       vmThread: virtualMachine.vmThread
     )
-    self.storage = storage
+    self.persistentBindings = persistentBindings
+    let contextBits = UInt(bitPattern: contextRef)
+    let propertyNamesBits = virtualMachine.vmThread.runAndWait { () -> UInt? in
+      guard let contextRef = JSGlobalContextRef(bitPattern: contextBits) else {
+        return nil
+      }
+      guard let function = JSCEngine.makePropertyNamesFunction(in: contextRef) else {
+        return nil
+      }
+      return UInt(bitPattern: function)
+    }
+    self.propertyNamesFunction = propertyNamesBits.flatMap { JSObjectRef(bitPattern: $0) }
+    JSCScopeStacks.push(defaultScope)
+
     // The context data box exists from the end of init: synchronous scope
-    // witnesses reach the registry through it, and the box remembers this
-    // actor as its unretained owner (used by raw callback contexts).
-    storage.attachDataBox(bindingOwner: self)
+    // witnesses reach the binding table through it, and the box remembers
+    // this actor as its unretained owner (used by raw callback contexts).
+    let box = JSContextDataStorageBox()
+    virtualMachine.vmThread.runAndWait {
+      guard let contextRef = JSGlobalContextRef(bitPattern: contextBits) else {
+        return
+      }
+      JSCEngine.installContextDataStorageBox(box, in: contextRef)
+      box.bindContextOwner(self)
+      box.setData(persistentBindings, for: JSCPersistentBindingsKey.self)
+    }
+    JSCScopeStacks.bind(virtualMachine.vmThread, for: contextRef)
   }
 
   /// Isolated deinit (SE-0371): runs on the actor's dedicated VM thread, so
-  /// the engine-touching teardown never executes on a foreign thread. The
-  /// storage owns the order: registry close → default-scope drain → box clear
-  /// → context release → scope-stack pop.
+  /// the engine-touching teardown never executes on a foreign thread.
   isolated deinit {
-    storage.teardown()
+    persistentBindings.close()
+    defaultScope.drain()
+    let contextBits = UInt(bitPattern: contextRef)
+    let vmThread = self.vmThread
+    vmThread.runAndWait {
+      guard let contextRef = JSGlobalContextRef(bitPattern: contextBits) else {
+        return
+      }
+      JSCEngine.installContextDataStorageBox(nil, in: contextRef)
+    }
+    JSGlobalContextRelease(contextRef)
+    JSCScopeStacks.pop(for: contextRef)
   }
 
   // MARK: - Synchronous scopes
@@ -88,12 +121,12 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing JSCInstantContext) throws(Failure) -> R
   ) throws(Failure) -> R {
-    let instantContext = JSCInstantContext(handle: driverContextHandle)
+    let instantContext = JSCInstantContext(contextRef: contextRef)
     return try body(instantContext)
   }
 
   public func makeScope() -> JSCScope {
-    var scope = JSCScope(handle: driverContextHandle)
+    var scope = JSCScope(contextRef: contextRef)
     scope.open()
     return scope
   }
@@ -104,87 +137,82 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   // below creates or settles an engine reference on the context default scope
   // through these two.
 
-  package func adoptCreatedHandle(_ handle: consuming JSCOwnedValueHandle) -> JSCValue {
-    JSCValue(
-      handle: storage.defaultScope.trackCreatedHandle(handle),
-      contextHandle: driverContextHandle
-    )
+  package func adoptCreatedHandle(_ ref: JSValueRef) -> JSCValue {
+    JSCValue(ref: defaultScope.trackCreatedHandle(ref), contextRef: contextRef)
   }
 
-  package func anchorBorrowedHandle(_ handle: JSCValueHandle) -> JSCValue {
-    JSCValue(
-      handle: storage.defaultScope.claimAndTrackHandle(handle),
-      contextHandle: driverContextHandle
-    )
+  package func anchorBorrowedHandle(_ ref: JSValueRef) -> JSCValue {
+    JSCValue(ref: defaultScope.claimAndTrackHandle(ref), contextRef: contextRef)
   }
 
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> JSCValue {
-    guard let handle = driverContextHandle.makeStringValueHandle(value) else {
+    guard let ref = JSCEngine.makeStringValueHandle(value, contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
-      let handle = driverContextHandle.makeStringValueHandle(
-        fromPropertyStringKey: key.borrowHandle(in: driverContextHandle)
+      let ref = JSCEngine.makeStringValueHandle(
+        fromPropertyStringKey: key.borrowString(in: contextRef),
+        in: contextRef
       )
     else {
       preconditionFailure("makeStringValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeNumber(_ value: Double) -> JSCValue {
-    guard let handle = driverContextHandle.makeNumberValueHandle(value) else {
+    guard let ref = JSCEngine.makeNumberValueHandle(value, contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeBoolean(_ value: Bool) -> JSCValue {
-    guard let handle = driverContextHandle.makeBooleanValueHandle(value) else {
+    guard let ref = JSCEngine.makeBooleanValueHandle(value, contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeNull() -> JSCValue {
-    guard let handle = driverContextHandle.makeNullValueHandle() else {
+    guard let ref = JSCEngine.makeNullValueHandle(contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeUndefined() -> JSCValue {
-    guard let handle = driverContextHandle.makeUndefinedValueHandle() else {
+    guard let ref = JSCEngine.makeUndefinedValueHandle(contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreatedHandle(ref)
   }
 
   public func makeObject() -> JSCValue {
-    guard let result = driverContextHandle.makeObjectResultHandle() else {
+    guard let result = JSCEngine.makeObjectResultHandle(contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(handle)
+    case .value(let ref):
+      return adoptCreatedHandle(ref)
     case .exception:
       preconditionFailure("JSCContext.makeObject failed")
     }
   }
 
   public func makeArray() -> JSCValue {
-    guard let result = driverContextHandle.makeArrayResultHandle() else {
+    guard let result = JSCEngine.makeArrayResultHandle(contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(handle)
+    case .value(let ref):
+      return adoptCreatedHandle(ref)
     case .exception:
       preconditionFailure("JSCContext.makeArray failed")
     }
@@ -197,85 +225,89 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     callback: @escaping JSFunctionCallback<JSCInstantContext>
   ) -> JSCValue {
     guard
-      let handle = driverContextHandle.makeFunctionValueHandle(named: name, callback: callback)
+      let ref = JSCEngine.makeFunctionValueHandle(
+        named: name,
+        callback: callback,
+        in: contextRef
+      )
     else {
-      preconditionFailure("makeFunctionValueHandle could not create handle")
+      preconditionFailure("makeFunctionValueHandle could not create function")
     }
-    return adoptCreatedHandle(handle)
+    defaultScope.trackOnDefaultFrame(ref)
+    return JSCValue(ref: ref, contextRef: contextRef)
   }
 
   // MARK: - Persistent bindings
 
   public func makePersistentHandle(_ value: borrowing JSCValue) -> JSCPersistentHandle {
     precondition(
-      value.contextHandle == driverContextHandle,
+      value.contextRef == contextRef,
       "JSPersistentHandle can only be minted for values of its own context"
     )
     return JSCPersistentHandle(
-      identity: storage.persistentRegistry.mintIdentity(value.borrowHandle()),
-      registry: storage.persistentRegistry
+      identity: persistentBindings.mint(value.ref),
+      registry: persistentBindings
     )
   }
 
   public func resolve(_ handle: JSCPersistentHandle) -> JSCValue? {
-    guard let borrowed = storage.persistentRegistry.borrowLive(handle.identity) else {
+    guard let ref = persistentBindings.borrowLive(handle.identity) else {
       return nil
     }
-    return JSCValue(
-      handle: storage.defaultScope.claimAndTrackHandle(borrowed),
-      contextHandle: driverContextHandle
-    )
+    defaultScope.frame.track(ref)
+    return JSCValue(ref: ref, contextRef: contextRef)
   }
 
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> JSCPropertyStringKey {
-    guard let handle = driverContextHandle.makePropertyStringKeyHandle(value) else {
-      preconditionFailure("makePropertyStringKeyHandle could not create handle")
+    guard let stringRef = JSCEngine.makePropertyStringKeyHandle(value, in: contextRef) else {
+      preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
     return JSCPropertyStringKey(
-      handle: handle,
-      contextHandle: driverContextHandle,
-      vmThread: ScopeStackRegistry<JSCContextHandle>.vmThread(for: driverContextHandle)
+      stringRef: stringRef,
+      contextRef: contextRef,
+      vmThread: vmThread
     )
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
-    guard let handle = driverContextHandle.makePreparedScriptHandle(source) else {
-      preconditionFailure("makePreparedScriptHandle could not create handle")
+    guard let scriptRef = JSCEngine.makePreparedScriptHandle(source, in: contextRef) else {
+      preconditionFailure("makePreparedScriptHandle could not create script")
     }
     return JSCPreparedScript(
-      handle: handle,
-      contextHandle: driverContextHandle,
-      vmThread: ScopeStackRegistry<JSCContextHandle>.vmThread(for: driverContextHandle)
+      scriptRef: scriptRef,
+      contextRef: contextRef,
+      vmThread: vmThread
     )
   }
 
   // MARK: - Global object
 
   public func globalObjectValue() -> JSCValue {
-    guard let handle = driverContextHandle.globalObjectValueHandle() else {
+    guard let ref = JSCEngine.globalObjectValueHandle(contextRef) else {
       preconditionFailure("JSCContext.globalObjectValue could not get global object")
     }
-    return JSCValue(handle: handle, contextHandle: driverContextHandle)
+    return JSCValue(ref: ref, contextRef: contextRef)
   }
 
   /// Read a global property. A failed read is reported as `undefined`: the
   /// engine's exception reference is settled instead of being dropped.
   public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
-    guard let global = driverContextHandle.globalObjectValueHandle() else {
+    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else {
       preconditionFailure("JSCContext.getGlobalProperty could not get global object")
     }
-    guard let result = driverContextHandle.getStaticStringPropertyHandle(key, on: global) else {
+    guard
+      let result = JSCEngine.getStaticStringPropertyHandle(key, on: global, in: contextRef)
+    else {
       preconditionFailure("JSCContext.getGlobalProperty returned nil")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle))
-    case .exception(let handle):
-      driverContextHandle.releaseCreatedHandle(JSCOwnedValueHandle.adopting(handle))
-      guard let undefined = driverContextHandle.makeUndefinedValueHandle() else {
-        preconditionFailure("JSCContext could not create an undefined handle")
+    case .value(let ref):
+      return adoptCreatedHandle(ref)
+    case .exception:
+      guard let undefined = JSCEngine.makeUndefinedValueHandle(contextRef) else {
+        preconditionFailure("JSCContext could not create an undefined value")
       }
       return adoptCreatedHandle(undefined)
     }
@@ -286,25 +318,26 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
-    _ = driverContextHandle.setStaticStringPropertyHandle(
+    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else { return }
+    _ = JSCEngine.setStaticStringPropertyHandle(
       key,
       on: global,
-      to: value.borrowHandle(),
+      to: value.ref,
+      in: contextRef,
       attributes: attributes
     )
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
-    _ = driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else { return }
+    _ = JSCEngine.deleteStaticStringPropertyHandle(key, on: global, in: contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = driverContextHandle.globalObjectValueHandle() else {
+    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else {
       return false
     }
-    return driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
+    return JSCEngine.hasStaticStringPropertyHandle(key, on: global, in: contextRef) ?? false
   }
 
   // MARK: - Scripts
@@ -315,8 +348,9 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     startingLineNumber: Int32
   ) -> JSResult<JSCValue> {
     guard
-      let result = driverContextHandle.evaluatePreparedScriptResultHandle(
-        script.borrowHandle(in: driverContextHandle),
+      let result = JSCEngine.evaluatePreparedScriptResultHandle(
+        script.borrowScript(in: contextRef),
+        contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
       )
@@ -324,21 +358,40 @@ public actor JSCContext: SwiftJavaScript.JSContext {
       preconditionFailure("JSCContext.evaluateScript unexpectedly returned nil")
     }
     switch consume result {
-    case .value(let handle):
-      return .value(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
-    case .exception(let handle):
-      return .exception(adoptCreatedHandle(JSCOwnedValueHandle.adopting(handle)))
+    case .value(let ref):
+      return .value(adoptCreatedHandle(ref))
+    case .exception(let ref):
+      return .exception(adoptCreatedHandle(ref))
     }
   }
 
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+    JSCEngine.contextDataStorageBox(in: contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
+    JSCEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
+  }
+
+  /// Package-internal data-box seam used by the cross-engine contract tests.
+  package nonisolated func contextDataStorageBox() -> JSContextDataStorageBox? {
+    JSCEngine.contextDataStorageBox(in: contextRef)
+  }
+
+  package nonisolated func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+    let contextBits = UInt(bitPattern: contextRef)
+    if let vmThread = JSCScopeStacks.vmThread(for: contextRef) {
+      vmThread.perform {
+        guard let contextRef = JSGlobalContextRef(bitPattern: contextBits) else {
+          return
+        }
+        JSCEngine.installContextDataStorageBox(storage, in: contextRef)
+      }
+    } else {
+      JSCEngine.installContextDataStorageBox(storage, in: contextRef)
+    }
   }
 
   // MARK: - Identity
@@ -348,14 +401,14 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   /// the shared contract tests can force collection without a public handle
   /// API; `JSGarbageCollect` takes the context ref, not the context group.
   package nonisolated func collectGarbage() {
-    JSGarbageCollect(driverContextHandle.ref)
+    JSGarbageCollect(contextRef)
   }
 
   public nonisolated static func == (lhs: JSCContext, rhs: JSCContext) -> Bool {
-    lhs.driverContextHandle == rhs.driverContextHandle
+    lhs.contextRef == rhs.contextRef
   }
 
   public nonisolated func hash(into hasher: inout Hasher) {
-    hasher.combine(driverContextHandle)
+    hasher.combine(UInt(bitPattern: contextRef))
   }
 }

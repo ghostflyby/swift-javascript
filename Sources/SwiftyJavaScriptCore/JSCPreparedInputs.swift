@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 
 /// A self-owning JavaScriptCore property string key.
@@ -8,44 +9,56 @@ import SwiftJavaScript
 /// `releasePreparedInput` in core.
 public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = JSCContext
-  package typealias ContextHandle = JSCContextHandle
-  package typealias Handle = JSCPropertyStringKeyHandle
 
-  package let handle: JSCPropertyStringKeyHandle
-  private let contextHandle: JSCContextHandle
+  private let stringBits: UInt
+  private let contextBits: UInt
   private let vmThread: VMThread?
 
-  package init(
-    handle: JSCPropertyStringKeyHandle,
-    contextHandle: JSCContextHandle,
-    vmThread: VMThread?
-  ) {
-    self.handle = handle
-    self.contextHandle = contextHandle
-    self.vmThread = vmThread
-    _ = contextHandle.retainReference()
+  package var stringRef: JSStringRef {
+    JSStringRef(bitPattern: stringBits)!
   }
 
-  /// The engine key handle, validated against the context that created it.
+  package init(
+    stringRef: JSStringRef,
+    contextRef: JSGlobalContextRef,
+    vmThread: VMThread?
+  ) {
+    self.stringBits = UInt(bitPattern: stringRef)
+    self.contextBits = UInt(bitPattern: contextRef)
+    self.vmThread = vmThread
+    _ = JSGlobalContextRetain(contextRef)
+  }
+
+  /// The engine key reference, validated against the context that created it.
   /// Package-internal: the protocol surface no longer names engine handles,
   /// but the compatibility precondition stays on every engine-internal use
   /// (do not replace it with a field read).
-  package borrowing func borrowHandle(
-    in contextHandle: JSCContextHandle
-  ) -> JSCPropertyStringKeyHandle {
+  package borrowing func borrowString(
+    in contextRef: JSGlobalContextRef
+  ) -> JSStringRef {
     precondition(
-      contextHandle.isPropertyStringKeyHandleCompatibleWithContext(handle),
+      JSCEngine.isPropertyStringKeyHandleCompatibleWithContext(stringRef, in: contextRef),
       "JSCPropertyStringKey can only be used with the context that created it"
     )
-    return handle
+    return stringRef
   }
 
   deinit {
-    releasePreparedInput(
-      handle: handle,
-      contextHandle: contextHandle,
-      vmThread: vmThread
-    )
+    let stringBits = self.stringBits
+    let contextBits = self.contextBits
+    let release: @Sendable () -> Void = {
+      if let stringRef = JSStringRef(bitPattern: stringBits) {
+        JSStringRelease(stringRef)
+      }
+      if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
+        JSGlobalContextRelease(contextRef)
+      }
+    }
+    if let vmThread {
+      vmThread.perform(release)
+    } else {
+      release()
+    }
   }
 }
 
@@ -55,43 +68,55 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
 /// reference and a context reference, exactly like `JSCPropertyStringKey`.
 public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Copyable {
   public typealias Context = JSCContext
-  package typealias ContextHandle = JSCContextHandle
-  package typealias Handle = JSCPreparedScriptHandle
 
-  package let handle: JSCPreparedScriptHandle
-  private let contextHandle: JSCContextHandle
+  private let scriptBits: UInt
+  private let contextBits: UInt
   private let vmThread: VMThread?
 
-  package init(
-    handle: JSCPreparedScriptHandle,
-    contextHandle: JSCContextHandle,
-    vmThread: VMThread?
-  ) {
-    self.handle = handle
-    self.contextHandle = contextHandle
-    self.vmThread = vmThread
-    _ = contextHandle.retainReference()
+  package var scriptRef: JSStringRef {
+    JSStringRef(bitPattern: scriptBits)!
   }
 
-  /// The engine script handle, validated against the context that compiled
+  package init(
+    scriptRef: JSStringRef,
+    contextRef: JSGlobalContextRef,
+    vmThread: VMThread?
+  ) {
+    self.scriptBits = UInt(bitPattern: scriptRef)
+    self.contextBits = UInt(bitPattern: contextRef)
+    self.vmThread = vmThread
+    _ = JSGlobalContextRetain(contextRef)
+  }
+
+  /// The engine script reference, validated against the context that compiled
   /// it. Package-internal: the protocol surface no longer names engine
   /// handles, but the compatibility precondition stays on every
   /// engine-internal use (do not replace it with a field read).
-  package borrowing func borrowHandle(
-    in contextHandle: JSCContextHandle
-  ) -> JSCPreparedScriptHandle {
+  package borrowing func borrowScript(
+    in contextRef: JSGlobalContextRef
+  ) -> JSStringRef {
     precondition(
-      contextHandle.isPreparedScriptHandleCompatibleWithContext(handle),
+      JSCEngine.isPreparedScriptHandleCompatibleWithContext(scriptRef, in: contextRef),
       "JSCPreparedScript can only be used with the context that compiled it"
     )
-    return handle
+    return scriptRef
   }
 
   deinit {
-    releasePreparedInput(
-      handle: handle,
-      contextHandle: contextHandle,
-      vmThread: vmThread
-    )
+    let scriptBits = self.scriptBits
+    let contextBits = self.contextBits
+    let release: @Sendable () -> Void = {
+      if let scriptRef = JSStringRef(bitPattern: scriptBits) {
+        JSStringRelease(scriptRef)
+      }
+      if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
+        JSGlobalContextRelease(contextRef)
+      }
+    }
+    if let vmThread {
+      vmThread.perform(release)
+    } else {
+      release()
+    }
   }
 }

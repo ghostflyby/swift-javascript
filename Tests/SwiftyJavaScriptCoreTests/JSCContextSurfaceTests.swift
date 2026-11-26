@@ -1,3 +1,4 @@
+import JavaScriptCore
 import Testing
 
 @testable import SwiftyJavaScriptCore
@@ -34,7 +35,7 @@ private func makeScopePersistedValue(on context: isolated JSCContext) -> String 
 /// engine reference on the context default scope, outside any window.
 private func exerciseContextValueOperations(
   on context: isolated JSCContext
-) -> (read: Double, script: Double, objectKind: JSType) {
+) -> (read: Double, script: Double, objectKind: SwiftJavaScript.JSType) {
   context.setGlobalProperty(context.makeNumber(41), forKey: "answer")
   let read = context.getGlobalProperty(forKey: "answer").toNumber()
   let key = context.makePropertyStringKey("answer")
@@ -81,7 +82,7 @@ struct JSCContextSurfaceTests {
   @Test
   func contextDataIsStoredInTheInstalledBox() async {
     let context = JSCContext()
-    #expect(context.driverContextHandle.contextDataStorageBox() != nil)
+    #expect(JSCEngine.contextDataStorageBox(in: context.contextRef) != nil)
 
     await context.setData("payload", for: JSCContextSurfaceDataKey.self)
     let stored = await context.data(for: JSCContextSurfaceDataKey.self)
@@ -145,20 +146,19 @@ struct JSCContextSurfaceTests {
     guard
       let sourceContext = virtualMachine.makeContextHandle(),
       let targetContext = virtualMachine.makeContextHandle(),
-      let value = sourceContext.makeNumberValueHandle(7)
+      let value = JSCEngine.makeNumberValueHandle(7, sourceContext)
     else {
       Issue.record("Expected same-VM context handles to be creatable")
       return
     }
-    let borrowed = value.borrowed()
+    let borrowed = value
     defer {
-      _ = targetContext.releaseReference()
-      _ = sourceContext.releaseReference()
+      JSGlobalContextRelease(targetContext)
+      JSGlobalContextRelease(sourceContext)
     }
 
-    let isCompatible = sourceContext.isContextCompatibleWith(targetContext)
-    let targetValue = targetContext.toNumberForHandle(borrowed)
-    sourceContext.releaseCreatedHandle(value)
+    let isCompatible = JSCEngine.isContextCompatibleWith(sourceContext, targetContext)
+    let targetValue = JSCEngine.toNumberForHandle(borrowed, in: targetContext)
 
     #expect(isCompatible)
     #expect(targetValue == 7)

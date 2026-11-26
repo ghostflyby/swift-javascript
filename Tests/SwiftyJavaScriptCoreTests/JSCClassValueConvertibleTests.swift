@@ -80,11 +80,11 @@ class ExportedFunctionNode {
 }
 
 private func makeExportedClassContext() -> JSCInstantContext {
-  let runtime = JSCEngine.makeRuntimeHandle()
+  let runtime = JSCEngine.makeRuntime()
   guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
     fatalError("JSCEngine could not create a context handle")
   }
-  return JSCInstantContext(handle: contextHandle)
+  return JSCInstantContext(contextRef: contextHandle)
 }
 
 @Test func jsClassAutoConvertibleRoundTripsReferenceIdentity() throws {
