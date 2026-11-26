@@ -2,12 +2,13 @@ import SwiftJavaScript
 
 // MARK: - Property, object, and invocation surface (S5)
 //
-// Mirror of the JavaScriptCore file: every operation drives `QJSContextHandle`
-// directly and adopts each engine-returned handle onto the passed scope's
-// arena exactly once — the exception path included. QuickJS hands back a new
-// reference (+1) for each result, so adopting it is what the arena drain later
-// settles with `JS_FreeValue`; no `JS_DupValue` happens on this path. The
-// `#isolation` forms below adopt onto the context default scope instead; both
+// Mirror of the JavaScriptCore file: every operation drives the `QJSEngine`
+// raw-value statics directly and adopts each engine-returned value onto the
+// passed scope's arena exactly once — the exception path included. QuickJS
+// hands back a new reference (+1) for each result, so adopting it is what the
+// arena drain later settles with `JS_FreeValue`; no `JS_DupValue` happens on
+// this path. The `#isolation` forms below adopt onto the context default scope
+// instead; both
 // live here because the value type is the engine's.
 
 extension QJSValue {
@@ -18,7 +19,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.getStaticStringPropertyHandle(key, on: handle),
+      QJSEngine.getStaticStringProperty(key, on: value, in: context.contextRef),
       in: context
     )
   }
@@ -27,11 +28,11 @@ extension QJSValue {
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
-    let contextHandle = context.driverContextHandle
-    return bridgeQJSValueResult(
-      contextHandle.getPropertyStringKeyHandle(
-        key.borrowHandle(in: contextHandle),
-        on: handle
+    bridgeQJSValueResult(
+      QJSEngine.getProperty(
+        atom: key.borrowAtom(in: context.contextRef),
+        on: value,
+        in: context.contextRef
       ),
       in: context
     )
@@ -42,7 +43,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.getIndexPropertyHandle(at: UInt32(index), on: handle),
+      QJSEngine.getIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
       in: context
     )
   }
@@ -55,10 +56,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.setStaticStringPropertyHandle(
+    QJSEngine.setStaticStringProperty(
       key,
-      on: handle,
-      to: value.borrowHandle(),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -69,11 +71,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.setPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle,
-      to: value.borrowHandle(),
+    QJSEngine.setProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -83,10 +85,11 @@ extension QJSValue {
     to value: borrowing QJSValue,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.setIndexPropertyHandle(
+    QJSEngine.setIndexProperty(
       at: UInt32(index),
-      on: handle,
-      to: value.borrowHandle()
+      on: self.value,
+      to: value.value,
+      in: context.contextRef
     )
   }
 
@@ -96,17 +99,17 @@ extension QJSValue {
     _ key: StaticString,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.deleteStaticStringPropertyHandle(key, on: handle)
+    QJSEngine.deleteStaticStringProperty(key, on: value, in: context.contextRef)
   }
 
   public func deleteProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.deletePropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle
+    QJSEngine.deleteProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: value,
+      in: context.contextRef
     )
   }
 
@@ -114,22 +117,22 @@ extension QJSValue {
     _ key: StaticString,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.hasStaticStringPropertyHandle(key, on: handle) ?? false
+    QJSEngine.hasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
   }
 
   public func hasProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.hasPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle
+    QJSEngine.hasProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: value,
+      in: context.contextRef
     ) ?? false
   }
 
   public func propertyNames(in context: borrowing QJSInstantContext) -> [String] {
-    context.driverContextHandle.propertyNamesForHandle(on: handle) ?? []
+    QJSEngine.propertyNames(on: value, in: context.contextRef) ?? []
   }
 
   // MARK: Calling and construction
@@ -139,10 +142,11 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
+      QJSEngine.callFunction(
+        value,
         this: nil,
-        argumentHandles: arguments.map(\.handle)
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -154,10 +158,11 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
-        this: thisValue.borrowHandle(),
-        argumentHandles: arguments.map(\.handle)
+      QJSEngine.callFunction(
+        value,
+        this: thisValue.value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -169,10 +174,11 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
-        this: thisValue.borrowHandle(),
-        argumentHandles: arguments.map(\.handle)
+      QJSEngine.callFunction(
+        value,
+        this: thisValue.value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -183,7 +189,11 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.constructHandle(handle, argumentHandles: arguments.map(\.handle)),
+      QJSEngine.construct(
+        value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
+      ),
       in: context
     )
   }
@@ -220,41 +230,42 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.toObjectHandle(handle),
+      QJSEngine.toObject(value, in: context.contextRef),
       in: context
     )
   }
 
   public func isArray(in context: borrowing QJSInstantContext) -> Bool {
-    context.driverContextHandle.isArrayHandle(handle) ?? false
+    QJSEngine.isArray(value, in: context.contextRef) ?? false
   }
 
   public func isDate(in context: borrowing QJSInstantContext) -> Bool {
-    context.driverContextHandle.isDateHandle(handle) ?? false
+    QJSEngine.isDate(value, in: context.contextRef) ?? false
   }
 
   public func isInstanceOf(
     _ constructor: borrowing QJSValue,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.isInstanceOfHandle(
-      handle,
-      constructor: constructor.borrowHandle()
+    QJSEngine.isInstanceOf(
+      value,
+      constructor: constructor.value,
+      in: context.contextRef
     ) ?? false
   }
 
   public func isArrayBuffer(in context: borrowing QJSInstantContext) -> Bool {
-    context.driverContextHandle.isArrayBufferHandle(handle)
+    QJSEngine.isArrayBuffer(value, in: context.contextRef)
   }
 
   public func isTypedArray(in context: borrowing QJSInstantContext) -> Bool {
-    context.driverContextHandle.typedArrayKindForHandle(handle) != nil
+    QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
   }
 
   // MARK: Callback-value parameters
   //
   // A callback window's value view is only an identity, so the operations that
-  // consume an argument value accept it directly and borrow its handle.
+  // consume an argument value accept it directly and borrow its value.
 
   public func setProperty(
     _ key: StaticString,
@@ -262,10 +273,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.setStaticStringPropertyHandle(
+    QJSEngine.setStaticStringProperty(
       key,
-      on: handle,
-      to: value.borrowHandle(),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -276,11 +288,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.setPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle,
-      to: value.borrowHandle(),
+    QJSEngine.setProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -289,9 +301,10 @@ extension QJSValue {
     _ constructor: borrowing QJSCallbackValue,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    context.driverContextHandle.isInstanceOfHandle(
-      handle,
-      constructor: constructor.borrowHandle()
+    QJSEngine.isInstanceOf(
+      value,
+      constructor: constructor.value,
+      in: context.contextRef
     ) ?? false
   }
 }
@@ -312,7 +325,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.getStaticStringPropertyHandle(key, on: handle),
+      QJSEngine.getStaticStringProperty(key, on: value, in: context.contextRef),
       in: context
     )
   }
@@ -321,11 +334,11 @@ extension QJSValue {
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
-    let contextHandle = context.driverContextHandle
-    return bridgeQJSValueResult(
-      contextHandle.getPropertyStringKeyHandle(
-        key.borrowHandle(in: contextHandle),
-        on: handle
+    bridgeQJSValueResult(
+      QJSEngine.getProperty(
+        atom: key.borrowAtom(in: context.contextRef),
+        on: value,
+        in: context.contextRef
       ),
       in: context
     )
@@ -336,7 +349,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.getIndexPropertyHandle(at: UInt32(index), on: handle),
+      QJSEngine.getIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
       in: context
     )
   }
@@ -349,10 +362,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.setStaticStringPropertyHandle(
+    QJSEngine.setStaticStringProperty(
       key,
-      on: handle,
-      to: value.borrowHandle(),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -363,11 +377,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.setPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle,
-      to: value.borrowHandle(),
+    QJSEngine.setProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -377,10 +391,11 @@ extension QJSValue {
     to value: borrowing QJSValue,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.setIndexPropertyHandle(
+    QJSEngine.setIndexProperty(
       at: UInt32(index),
-      on: handle,
-      to: value.borrowHandle()
+      on: self.value,
+      to: value.value,
+      in: context.contextRef
     )
   }
 
@@ -390,17 +405,17 @@ extension QJSValue {
     _ key: StaticString,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.deleteStaticStringPropertyHandle(key, on: handle)
+    QJSEngine.deleteStaticStringProperty(key, on: value, in: context.contextRef)
   }
 
   public func deleteProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.deletePropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle
+    QJSEngine.deleteProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: value,
+      in: context.contextRef
     )
   }
 
@@ -408,57 +423,58 @@ extension QJSValue {
     _ key: StaticString,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.hasStaticStringPropertyHandle(key, on: handle) ?? false
+    QJSEngine.hasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
   }
 
   public func hasProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.hasPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle
+    QJSEngine.hasProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: value,
+      in: context.contextRef
     ) ?? false
   }
 
   public func propertyNames(in context: isolated QJSContext = #isolation) -> [String] {
-    context.driverContextHandle.propertyNamesForHandle(on: handle) ?? []
+    QJSEngine.propertyNames(on: value, in: context.contextRef) ?? []
   }
 
   // MARK: Object conversion and classification
 
   public func toObject(in context: isolated QJSContext = #isolation) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.toObjectHandle(handle),
+      QJSEngine.toObject(value, in: context.contextRef),
       in: context
     )
   }
 
   public func isArray(in context: isolated QJSContext = #isolation) -> Bool {
-    context.driverContextHandle.isArrayHandle(handle) ?? false
+    QJSEngine.isArray(value, in: context.contextRef) ?? false
   }
 
   public func isDate(in context: isolated QJSContext = #isolation) -> Bool {
-    context.driverContextHandle.isDateHandle(handle) ?? false
+    QJSEngine.isDate(value, in: context.contextRef) ?? false
   }
 
   public func isInstanceOf(
     _ constructor: borrowing QJSValue,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.isInstanceOfHandle(
-      handle,
-      constructor: constructor.borrowHandle()
+    QJSEngine.isInstanceOf(
+      value,
+      constructor: constructor.value,
+      in: context.contextRef
     ) ?? false
   }
 
   public func isArrayBuffer(in context: isolated QJSContext = #isolation) -> Bool {
-    context.driverContextHandle.isArrayBufferHandle(handle)
+    QJSEngine.isArrayBuffer(value, in: context.contextRef)
   }
 
   public func isTypedArray(in context: isolated QJSContext = #isolation) -> Bool {
-    context.driverContextHandle.typedArrayKindForHandle(handle) != nil
+    QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
   }
 
   // MARK: Callback-value parameters
@@ -469,10 +485,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.setStaticStringPropertyHandle(
+    QJSEngine.setStaticStringProperty(
       key,
-      on: handle,
-      to: value.borrowHandle(),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -483,11 +500,11 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    let contextHandle = context.driverContextHandle
-    return contextHandle.setPropertyStringKeyHandle(
-      key.borrowHandle(in: contextHandle),
-      on: handle,
-      to: value.borrowHandle(),
+    QJSEngine.setProperty(
+      atom: key.borrowAtom(in: context.contextRef),
+      on: self.value,
+      to: value.value,
+      in: context.contextRef,
       attributes: attributes
     )
   }
@@ -496,9 +513,10 @@ extension QJSValue {
     _ constructor: borrowing QJSCallbackValue,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    context.driverContextHandle.isInstanceOfHandle(
-      handle,
-      constructor: constructor.borrowHandle()
+    QJSEngine.isInstanceOf(
+      value,
+      constructor: constructor.value,
+      in: context.contextRef
     ) ?? false
   }
 }
@@ -515,10 +533,11 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
+      QJSEngine.callFunction(
+        value,
         this: nil,
-        argumentHandles: arguments.map(\.handle)
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -530,10 +549,11 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
-        this: thisValue.borrowHandle(),
-        argumentHandles: arguments.map(\.handle)
+      QJSEngine.callFunction(
+        value,
+        this: thisValue.value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -545,10 +565,11 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.callFunctionHandle(
-        handle,
-        this: thisValue.borrowHandle(),
-        argumentHandles: arguments.map(\.handle)
+      QJSEngine.callFunction(
+        value,
+        this: thisValue.value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
       ),
       in: context
     )
@@ -559,7 +580,11 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      context.driverContextHandle.constructHandle(handle, argumentHandles: arguments.map(\.handle)),
+      QJSEngine.construct(
+        value,
+        arguments: arguments.map(\.value),
+        in: context.contextRef
+      ),
       in: context
     )
   }
@@ -570,17 +595,18 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
-      context.driverContextHandle.getStaticStringPropertyHandle(name, on: handle),
+      QJSEngine.getStaticStringProperty(name, on: value, in: context.contextRef),
       in: context
     ) {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
       return bridgeQJSValueResult(
-        context.driverContextHandle.callFunctionHandle(
-          method.borrowHandle(),
-          this: handle,
-          argumentHandles: arguments.map(\.handle)
+        QJSEngine.callFunction(
+          method.value,
+          this: value,
+          arguments: arguments.map(\.value),
+          in: context.contextRef
         ),
         in: context
       )
@@ -593,9 +619,10 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
-      context.driverContextHandle.getPropertyStringKeyHandle(
-        name.borrowHandle(in: context.driverContextHandle),
-        on: handle
+      QJSEngine.getProperty(
+        atom: name.borrowAtom(in: context.contextRef),
+        on: value,
+        in: context.contextRef
       ),
       in: context
     ) {
@@ -603,10 +630,11 @@ extension QJSValue {
       return .exception(exception)
     case .value(let method):
       return bridgeQJSValueResult(
-        context.driverContextHandle.callFunctionHandle(
-          method.borrowHandle(),
-          this: handle,
-          argumentHandles: arguments.map(\.handle)
+        QJSEngine.callFunction(
+          method.value,
+          this: value,
+          arguments: arguments.map(\.value),
+          in: context.contextRef
         ),
         in: context
       )
@@ -616,37 +644,37 @@ extension QJSValue {
 
 // MARK: - Engine-local result bridging
 //
-// Every value operation drives the QuickJS driver and adopts its engine-returned
-// handle onto the calling arena exactly once — the exception path included.
-// The adoption target belongs to the engine, so this helper lives with it (the
-// former core bridge is gone).
+// Every value operation drives the QuickJS engine statics and adopts the
+// engine-returned reference onto the calling arena exactly once — the
+// exception path included. The adoption target belongs to the engine, so this
+// helper lives with it.
 
 private func bridgeQJSValueResult(
-  _ result: JSResult<QJSValueHandle>?,
+  _ result: JSResult<CQuickJSValue>?,
   in context: borrowing QJSInstantContext
 ) -> JSResult<QJSValue> {
   guard let result else {
     preconditionFailure("JSValue operation unexpectedly returned nil")
   }
   switch consume result {
-  case .value(let handle):
-    return .value(context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
-  case .exception(let handle):
-    return .exception(context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
+  case .value(let created):
+    return .value(context.adoptCreated(created))
+  case .exception(let thrown):
+    return .exception(context.adoptCreated(thrown))
   }
 }
 
 private func bridgeQJSValueResult(
-  _ result: JSResult<QJSValueHandle>?,
+  _ result: JSResult<CQuickJSValue>?,
   in context: isolated QJSContext
 ) -> JSResult<QJSValue> {
   guard let result else {
     preconditionFailure("JSValue operation unexpectedly returned nil")
   }
   switch consume result {
-  case .value(let handle):
-    return .value(context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
-  case .exception(let handle):
-    return .exception(context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
+  case .value(let created):
+    return .value(context.adoptCreated(created))
+  case .exception(let thrown):
+    return .exception(context.adoptCreated(thrown))
   }
 }

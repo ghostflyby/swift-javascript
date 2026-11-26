@@ -2,6 +2,14 @@ import Testing
 
 @testable import SwiftyQuickJS
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 private enum QJSContextSurfaceDataKey: JSContextDataKey {
   typealias Value = String
 }
@@ -81,7 +89,7 @@ struct QJSContextSurfaceTests {
   @Test
   func contextDataIsStoredInTheInstalledBox() async {
     let context = QJSContext()
-    #expect(context.driverContextHandle.contextDataStorageBox() != nil)
+    #expect(context.contextDataStorageBox() != nil)
 
     await context.setData("payload", for: QJSContextSurfaceDataKey.self)
     let stored = await context.data(for: QJSContextSurfaceDataKey.self)
@@ -143,22 +151,22 @@ struct QJSContextSurfaceTests {
   func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() {
     let virtualMachine = QJSVirtualMachine()
     guard
-      let sourceContext = virtualMachine.makeContextHandle(),
-      let targetContext = virtualMachine.makeContextHandle(),
-      let value = sourceContext.makeNumberValueHandle(7)
+      let sourceContext = virtualMachine.makeContext(),
+      let targetContext = virtualMachine.makeContext(),
+      let value = QJSEngine.makeNumber(7, in: sourceContext)
     else {
       Issue.record("Expected same-VM context handles to be creatable")
       return
     }
-    let borrowed = value.borrowed()
+    let borrowed = value
     defer {
-      _ = targetContext.releaseReference()
-      _ = sourceContext.releaseReference()
+      JS_FreeContext(targetContext)
+      JS_FreeContext(sourceContext)
     }
 
-    let isCompatible = sourceContext.isContextCompatibleWith(targetContext)
-    let targetValue = targetContext.toNumberForHandle(borrowed)
-    sourceContext.releaseCreatedHandle(value)
+    let isCompatible = QJSEngine.isContextCompatibleWith(sourceContext, targetContext)
+    let targetValue = QJSEngine.toNumber(borrowed, in: targetContext)
+    JS_FreeValue(sourceContext, value)
 
     #expect(isCompatible)
     #expect(targetValue == 7)

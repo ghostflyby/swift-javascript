@@ -8,151 +8,102 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QJSEngine: JSEngineInvocationDriver {
-  package static func callFunctionHandle(
-    _ function: QJSValueHandle,
-    this thisValue: QJSValueHandle?,
-    argumentHandles: [QJSValueHandle],
-    in context: QJSContextHandle
-  ) -> JSResult<QJSValueHandle>? {
-    var rawArguments = argumentHandles.map(\.ref)
-    let thisRawValue = thisValue?.ref ?? quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
+extension QJSEngine {
+  package static func callFunction(
+    _ function: CQuickJSValue,
+    this thisValue: CQuickJSValue? = nil,
+    arguments: [CQuickJSValue] = [],
+    in context: OpaquePointer
+  ) -> JSResult<CQuickJSValue>? {
+    quickJSUpdateStackTop(context)
+    var rawArguments = arguments
+    let thisRawValue = thisValue ?? quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
       JS_Call(
-        context.ref,
-        function.ref,
+        context,
+        function,
         thisRawValue,
         Int32(buffer.count),
         buffer.baseAddress
       )
     }
-    return quickJSResultHandle(for: result, in: context.ref)
+    return quickJSResult(for: result, in: context)
   }
 
-  package static func constructHandle(
-    _ constructor: QJSValueHandle,
-    argumentHandles: [QJSValueHandle],
-    in context: QJSContextHandle
-  ) -> JSResult<QJSValueHandle>? {
-    var rawArguments = argumentHandles.map(\.ref)
+  package static func construct(
+    _ constructor: CQuickJSValue,
+    arguments: [CQuickJSValue] = [],
+    in context: OpaquePointer
+  ) -> JSResult<CQuickJSValue>? {
+    quickJSUpdateStackTop(context)
+    var rawArguments = arguments
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
-      JS_CallConstructor(context.ref, constructor.ref, Int32(buffer.count), buffer.baseAddress)
+      JS_CallConstructor(context, constructor, Int32(buffer.count), buffer.baseAddress)
     }
-    return quickJSResultHandle(for: result, in: context.ref)
+    return quickJSResult(for: result, in: context)
   }
 
-  package static func toObjectHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
-  ) -> JSResult<QJSValueHandle>? {
-    quickJSResultHandle(for: JS_ToObject(context.ref, value.ref), in: context.ref)
+  package static func toObject(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
+  ) -> JSResult<CQuickJSValue>? {
+    quickJSUpdateStackTop(context)
+    return quickJSResult(for: JS_ToObject(context, value), in: context)
   }
 
-  package static func isArrayHandle(
-    _ value: QJSValueHandle,
-    in _: QJSContextHandle
+  package static func isArray(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool? {
-    JS_IsArray(value.ref)
+    _ = context
+    return JS_IsArray(value)
   }
 
-  package static func isDateHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func isDate(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool? {
-    guard JS_IsObject(value.ref) else {
+    quickJSUpdateStackTop(context)
+    guard JS_IsObject(value) else {
       return false
     }
-    let globalObject = JS_GetGlobalObject(context.ref)
-    defer { JS_FreeValue(context.ref, globalObject) }
-    let dateConstructor = JS_GetPropertyStr(context.ref, globalObject, "Date")
-    defer { JS_FreeValue(context.ref, dateConstructor) }
+    let globalObject = JS_GetGlobalObject(context)
+    defer { JS_FreeValue(context, globalObject) }
+    let dateConstructor = JS_GetPropertyStr(context, globalObject, "Date")
+    defer { JS_FreeValue(context, dateConstructor) }
     if JS_IsException(dateConstructor) {
       return nil
     }
-    let result = JS_IsInstanceOf(context.ref, value.ref, dateConstructor)
+    let result = JS_IsInstanceOf(context, value, dateConstructor)
     return result >= 0 ? result == 1 : nil
   }
 
-  package static func isInstanceOfHandle(
-    _ value: QJSValueHandle,
-    constructor: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func isInstanceOf(
+    _ value: CQuickJSValue,
+    constructor: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool? {
-    let result = JS_IsInstanceOf(context.ref, value.ref, constructor.ref)
+    quickJSUpdateStackTop(context)
+    let result = JS_IsInstanceOf(context, value, constructor)
     return result >= 0 ? result == 1 : nil
   }
 
-  package static func looselyEqualsHandle(
-    _ lhs: QJSValueHandle,
-    _ rhs: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func looselyEquals(
+    _ lhs: CQuickJSValue,
+    _ rhs: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool? {
-    let result = JS_IsEqual(context.ref, lhs.ref, rhs.ref)
+    quickJSUpdateStackTop(context)
+    let result = JS_IsEqual(context, lhs, rhs)
     return result >= 0 ? result == 1 : nil
   }
 
-  package static func strictlyEqualsHandle(
-    _ lhs: QJSValueHandle,
-    _ rhs: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func strictlyEquals(
+    _ lhs: CQuickJSValue,
+    _ rhs: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool? {
-    JS_IsStrictEqual(context.ref, lhs.ref, rhs.ref)
-  }
-}
-
-// MARK: - Context-side driver conformance (Stage 2B)
-
-extension QJSContextHandle: JSContextInvocationDriver {
-  package func callFunctionHandle(
-    _ function: QJSValueHandle,
-    this thisValue: QJSValueHandle?,
-    argumentHandles: [QJSValueHandle]
-  ) -> JSResult<QJSValueHandle>? {
-    QJSEngine.callFunctionHandle(
-      function,
-      this: thisValue,
-      argumentHandles: argumentHandles,
-      in: self
-    )
-  }
-
-  package func constructHandle(
-    _ constructor: QJSValueHandle,
-    argumentHandles: [QJSValueHandle]
-  ) -> JSResult<QJSValueHandle>? {
-    QJSEngine.constructHandle(constructor, argumentHandles: argumentHandles, in: self)
-  }
-
-  package func toObjectHandle(_ value: QJSValueHandle) -> JSResult<QJSValueHandle>? {
-    QJSEngine.toObjectHandle(value, in: self)
-  }
-
-  package func isArrayHandle(_ value: QJSValueHandle) -> Bool? {
-    QJSEngine.isArrayHandle(value, in: self)
-  }
-
-  package func isDateHandle(_ value: QJSValueHandle) -> Bool? {
-    QJSEngine.isDateHandle(value, in: self)
-  }
-
-  package func isInstanceOfHandle(
-    _ value: QJSValueHandle,
-    constructor: QJSValueHandle
-  ) -> Bool? {
-    QJSEngine.isInstanceOfHandle(value, constructor: constructor, in: self)
-  }
-
-  package func looselyEqualsHandle(
-    _ lhs: QJSValueHandle,
-    _ rhs: QJSValueHandle
-  ) -> Bool? {
-    QJSEngine.looselyEqualsHandle(lhs, rhs, in: self)
-  }
-
-  package func strictlyEqualsHandle(
-    _ lhs: QJSValueHandle,
-    _ rhs: QJSValueHandle
-  ) -> Bool? {
-    QJSEngine.strictlyEqualsHandle(lhs, rhs, in: self)
+    quickJSUpdateStackTop(context)
+    return JS_IsStrictEqual(context, lhs, rhs)
   }
 }

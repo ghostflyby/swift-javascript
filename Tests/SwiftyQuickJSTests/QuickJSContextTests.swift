@@ -22,7 +22,7 @@ import Testing
   let context = QJSContext(virtualMachine: virtualMachine)
 
   #expect(context.virtualMachine == virtualMachine)
-  #expect(context.driverContextHandle.contextDataStorageBox() != nil)
+  #expect(context.contextDataStorageBox() != nil)
 
   let text = await context.withInstantContext { scope in
     scope.makeString("quickjs").toString()
@@ -37,11 +37,11 @@ import Testing
 
   await context.withInstantContext { scope in
     let value = scope.makeNumber(42)
-    let handle = value.borrowHandle()
-    let stored = QJSValue(handle: handle, contextHandle: scope.driverContextHandle)
-    #expect(stored.borrowHandle().ref.tag == handle.ref.tag)
-    #expect(stored.borrowHandle().ref.u.int32 == handle.ref.u.int32)
-    #expect(stored.contextHandle == scope.driverContextHandle)
+    let handle = value.value
+    let stored = QJSValue(value: handle, contextRef: scope.contextRef)
+    #expect(stored.value.tag == handle.tag)
+    #expect(stored.value.u.int32 == handle.u.int32)
+    #expect(stored.contextRef == scope.contextRef)
     // Both views are non-owning; the arena created by makeNumber owns the
     // reference and settles it at drain.
   }
@@ -62,16 +62,16 @@ import Testing
 @Test func quickJSPersistTransferSettlesCreationReferenceExactlyOnce() async {
   let virtualMachine = QJSVirtualMachine()
   var context: QJSContext? = QJSContext(virtualMachine: virtualMachine)
-  let runtime = virtualMachine.driverRuntimeHandle
+  let runtime = virtualMachine.runtimeRef
 
   var baseline = JSMemoryUsage()
-  JS_ComputeMemoryUsage(runtime.ref, &baseline)
+  JS_ComputeMemoryUsage(runtime, &baseline)
 
   await context!.withInstantContext { scope in
     let created = scope.makeString("stage3-persist-transfer")
     let transferred = scope.persist(created)
 
-    #expect(transferred.borrowHandle() == created.borrowHandle())
+    #expect(quickJSValueIdentityEquals(transferred.value, created.value))
     #expect(transferred.toString() == "stage3-persist-transfer")
   }
 
@@ -79,7 +79,7 @@ import Testing
   // released nothing: the value is still exactly one live allocation in the
   // context default scope.
   var whileDefaultScopeHolds = JSMemoryUsage()
-  JS_ComputeMemoryUsage(runtime.ref, &whileDefaultScopeHolds)
+  JS_ComputeMemoryUsage(runtime, &whileDefaultScopeHolds)
   #expect(whileDefaultScopeHolds.malloc_count == baseline.malloc_count + 1)
   #expect(whileDefaultScopeHolds.malloc_size > baseline.malloc_size)
 
@@ -91,7 +91,7 @@ import Testing
   // Zero leak (the old retain-and-abandon left +1) and zero double free (the
   // source had nothing left to settle).
   var afterDrain = JSMemoryUsage()
-  JS_ComputeMemoryUsage(runtime.ref, &afterDrain)
+  JS_ComputeMemoryUsage(runtime, &afterDrain)
   #expect(afterDrain.malloc_count == baseline.malloc_count)
   #expect(afterDrain.malloc_size == baseline.malloc_size)
 }
@@ -136,7 +136,7 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
 @Test func quickJSPersistentHandleCycleReturnsAllocatorToBaseline() async {
   let virtualMachine = QJSVirtualMachine()
   var context: QJSContext? = QJSContext(virtualMachine: virtualMachine)
-  let runtime = virtualMachine.driverRuntimeHandle
+  let runtime = virtualMachine.runtimeRef
   let bindings = 1000
 
   func mintCycle() async -> [QJSPersistentHandle] {
@@ -160,7 +160,7 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
   await awaitQuickJSSettlement(on: virtualMachine)
 
   var baseline = JSMemoryUsage()
-  JS_ComputeMemoryUsage(runtime.ref, &baseline)
+  JS_ComputeMemoryUsage(runtime, &baseline)
 
   // Measured cycle: 1000 engine-allocated strings kept alive only by their
   // bindings, then all invalidated and settled through the VM executor.
@@ -171,16 +171,16 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
   await awaitQuickJSSettlement(on: virtualMachine)
 
   var after = JSMemoryUsage()
-  JS_ComputeMemoryUsage(runtime.ref, &after)
+  JS_ComputeMemoryUsage(runtime, &after)
   #expect(after.malloc_count == baseline.malloc_count)
   #expect(after.malloc_size == baseline.malloc_size)
 
   context = nil
 }
 
-private func makeQuickJSClassContext() -> (QJSRuntimeHandle, QJSContextHandle) {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+private func makeQuickJSClassContext() -> (OpaquePointer, OpaquePointer) {
+  let runtime = QJSEngine.makeRuntime()
+  guard let context = QJSEngine.makeContext(in: runtime) else {
     preconditionFailure("QJSEngine could not create a context handle")
   }
   return (runtime, context)
@@ -224,7 +224,7 @@ private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sen
         return .value(
           context.makeFunction(named: "label") { c, this, arguments in
             let thisValue = QJSValue(
-              handle: this.borrowHandle(), contextHandle: c.driverContextHandle
+              value: this.value, contextRef: c.contextRef
             )
             guard
               let instance = try? QuickJSExportedNode.tryDecode(thisValue, in: c),
@@ -381,7 +381,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
 @Test func quickJSClassValueConvertibleRoundTripsReferenceIdentity() throws {
   let (runtime, contextHandle) = makeQuickJSClassContext()
   _ = runtime
-  let context = QJSInstantContext(handle: contextHandle)
+  let context = QJSInstantContext(contextRef: contextHandle)
 
   let instance = QuickJSExportedNode(name: "leaf", count: 4)
   let encoded = try QuickJSExportedNode.tryEncode(instance, in: context)
@@ -397,7 +397,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   _ = secondRuntime
 
   do {
-    let context = QJSInstantContext(handle: firstHandle)
+    let context = QJSInstantContext(contextRef: firstHandle)
     let instance = QuickJSExportedNode(name: "first", count: 1)
     let encoded = try QuickJSExportedNode.tryEncode(instance, in: context)
     context.setGlobalProperty(encoded, forKey: "node")
@@ -415,7 +415,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   }
 
   do {
-    let context = QJSInstantContext(handle: secondHandle)
+    let context = QJSInstantContext(contextRef: secondHandle)
     let instance = QuickJSExportedNode(name: "second", count: 2)
     let encoded = try QuickJSExportedNode.tryEncode(instance, in: context)
     context.setGlobalProperty(encoded, forKey: "node")
@@ -440,7 +440,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   _ = secondRuntime
 
   do {
-    let context = QJSInstantContext(handle: firstHandle)
+    let context = QJSInstantContext(contextRef: firstHandle)
     let childDefinition = QuickJSRuntimeChildNode.jsClassDefinition
     #expect(childDefinition.parentClass == .for(QuickJSRuntimeParentNode.self))
 
@@ -481,8 +481,8 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   }
 
   do {
-    let context = QJSInstantContext(handle: secondHandle)
-    guard QJSEngine.runtimeHandle(for: context.driverContextHandle) != nil else {
+    let context = QJSInstantContext(contextRef: secondHandle)
+    guard QJSEngine.runtimeRef(for: context.contextRef) != nil else {
       Issue.record("Expected QuickJS runtime handle")
       return
     }
@@ -494,7 +494,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
 @Test func quickJSClassBackedObjectSupportsDynamicPropertiesAndMethods() throws {
   let (runtime, contextHandle) = makeQuickJSClassContext()
   _ = runtime
-  let context = QJSInstantContext(handle: contextHandle)
+  let context = QJSInstantContext(contextRef: contextHandle)
 
   let instance = QuickJSExportedNode(name: "leaf", count: 4)
   let node = try QuickJSExportedNode.tryEncode(instance, in: context)
@@ -534,7 +534,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
 @Test func quickJSClassBackedObjectSupportsStaticMembers() throws {
   let (runtime, contextHandle) = makeQuickJSClassContext()
   _ = runtime
-  let context = QJSInstantContext(handle: contextHandle)
+  let context = QJSInstantContext(contextRef: contextHandle)
 
   let instance = QuickJSStaticMemberNode(count: 3)
   let node = try QuickJSStaticMemberNode.tryEncode(instance, in: context)
@@ -590,7 +590,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
   let (runtime, contextHandle) = makeQuickJSClassContext()
 
   do {
-    let context = QJSInstantContext(handle: contextHandle)
+    let context = QJSInstantContext(contextRef: contextHandle)
     let node = try QuickJSLifecycleNode.tryEncode(QuickJSLifecycleNode(), in: context)
     context.setGlobalProperty(node, forKey: "node")
     #expect(
@@ -599,7 +599,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
       })
     _ = context.evaluateScript("node = null")
   }
-  JS_RunGC(runtime.ref)
+  JS_RunGC(runtime)
 
   #expect(
     quickJSLifecycleEvents.withLock {

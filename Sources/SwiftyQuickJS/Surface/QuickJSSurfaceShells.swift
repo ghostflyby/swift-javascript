@@ -1,5 +1,13 @@
 import SwiftJavaScript
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 // MARK: - Callback views and argument views
 //
 // `QJSValue` is the value view (`JSValue.swift`); the types below are the
@@ -11,21 +19,17 @@ import SwiftJavaScript
 public struct QJSCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
   public typealias Context = QJSContext
 
-  package let handle: QJSValueHandle
-  package let contextHandle: QJSContextHandle
+  package let value: CQuickJSValue
+  package let contextRef: OpaquePointer
 
-  package init(handle: QJSValueHandle, contextHandle: QJSContextHandle) {
-    self.handle = handle
-    self.contextHandle = contextHandle
-  }
-
-  package borrowing func borrowHandle() -> QJSValueHandle {
-    handle
+  package init(value: CQuickJSValue, contextRef: OpaquePointer) {
+    self.value = value
+    self.contextRef = contextRef
   }
 
   @available(*, noasync)
   public func type() -> JSType {
-    guard let valueType = contextHandle.valueTypeForHandle(handle) else {
+    guard let valueType = QJSEngine.valueType(value) else {
       preconditionFailure("QJSCallbackValue.type() could not query value type")
     }
     return valueType
@@ -38,60 +42,56 @@ public struct QJSCallbackValue: SwiftJavaScript.JSCallbackValue, ~Copyable {
 
   @available(*, noasync)
   public func toString() -> String {
-    contextHandle.toStringForHandle(handle) ?? ""
+    QJSEngine.toString(value, in: contextRef) ?? ""
   }
 
   @available(*, noasync)
   public func toNumber() -> Double {
-    contextHandle.toNumberForHandle(handle)
+    QJSEngine.toNumber(value, in: contextRef)
   }
 
   @available(*, noasync)
   public func toBoolean() -> Bool {
-    contextHandle.toBooleanForHandle(handle)
+    QJSEngine.toBoolean(value, in: contextRef)
   }
 
   @available(*, noasync)
   public func looselyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
-    contextHandle.looselyEqualsHandle(handle, other.borrowHandle()) ?? false
+    QJSEngine.looselyEquals(value, other.value, in: contextRef) ?? false
   }
 
   @available(*, noasync)
   public func strictlyEquals(_ other: borrowing QJSCallbackValue) -> Bool {
-    contextHandle.strictlyEqualsHandle(handle, other.borrowHandle()) ?? false
+    QJSEngine.strictlyEquals(value, other.value, in: contextRef) ?? false
   }
 }
 
 public struct QJSCallbackReturn: SwiftJavaScript.JSCallbackReturn, ~Copyable {
   public typealias Context = QJSContext
 
-  /// The borrowed engine handle carried by this handoff. Package-internal:
-  /// the trampoline and the same-package tests are the only readers.
-  package let handle: QJSValueHandle
+  /// The borrowed engine value carried by this handoff. Package-internal: the
+  /// trampoline and the same-package tests are the only readers.
+  package let value: CQuickJSValue
   public let isException: Bool
 
   /// A value created in the callback window and anchored by its arena.
-  package init(temporary handle: QJSValueHandle) {
-    self.handle = handle
+  package init(temporary value: CQuickJSValue) {
+    self.value = value
     self.isException = false
   }
 
   /// A value promoted to the context default scope (or otherwise arena-owned
   /// beyond the callback window).
   package init(persistent value: borrowing QJSValue) {
-    self.handle = value.borrowHandle()
+    self.value = value.value
     self.isException = false
   }
 
   /// A thrown value. The trampoline duplicates before handing it to
   /// `JS_Throw`; the owning arena settles its own reference at drain.
-  package init(exception handle: QJSValueHandle) {
-    self.handle = handle
+  package init(exception value: CQuickJSValue) {
+    self.value = value
     self.isException = true
-  }
-
-  package borrowing func borrowHandle() -> QJSValueHandle {
-    handle
   }
 }
 
@@ -103,14 +103,14 @@ public struct QJSArguments: SwiftJavaScript.JSArguments, ~Copyable {
   public typealias InstantContext = QJSInstantContext
 
   public let count: Int
-  package let borrowedValueHandleAt: (Int, QJSContextHandle) -> QJSValueHandle?
+  package let borrowedValueAt: (Int, OpaquePointer) -> CQuickJSValue?
 
   package init(
     count: Int,
-    borrowedValueHandleAt: @escaping (Int, QJSContextHandle) -> QJSValueHandle?
+    borrowedValueAt: @escaping (Int, OpaquePointer) -> CQuickJSValue?
   ) {
     self.count = count
-    self.borrowedValueHandleAt = borrowedValueHandleAt
+    self.borrowedValueAt = borrowedValueAt
   }
 
   public func withValue<R: ~Copyable>(
@@ -121,11 +121,11 @@ public struct QJSArguments: SwiftJavaScript.JSArguments, ~Copyable {
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index, context.driverContextHandle) else {
-      fatalError("JSArgument handle is unavailable")
+    guard let value = borrowedValueAt(index, context.contextRef) else {
+      fatalError("JSArgument value is unavailable")
     }
     return body(
-      QJSValue(handle: handle, contextHandle: context.driverContextHandle))
+      QJSValue(value: value, contextRef: context.contextRef))
   }
 }
 
@@ -135,14 +135,14 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
   public typealias InstantContext = QJSInstantContext
 
   public let count: Int
-  package let borrowedValueHandleAt: (Int) -> QJSValueHandle?
+  package let borrowedValueAt: (Int) -> CQuickJSValue?
 
   package init(
     count: Int,
-    borrowedValueHandleAt: @escaping (Int) -> QJSValueHandle?
+    borrowedValueAt: @escaping (Int) -> CQuickJSValue?
   ) {
     self.count = count
-    self.borrowedValueHandleAt = borrowedValueHandleAt
+    self.borrowedValueAt = borrowedValueAt
   }
 
   @available(*, noasync)
@@ -154,11 +154,11 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index) else {
-      fatalError("JSArgument handle is unavailable")
+    guard let value = borrowedValueAt(index) else {
+      fatalError("JSArgument value is unavailable")
     }
     return body(
-      QJSCallbackValue(handle: handle, contextHandle: context.driverContextHandle))
+      QJSCallbackValue(value: value, contextRef: context.contextRef))
   }
 
   @available(*, noasync)
@@ -170,11 +170,11 @@ public struct QJSCallbackArguments: SwiftJavaScript.JSCallbackArguments, ~Copyab
     guard index >= 0, index < count else {
       fatalError("Index out of bounds")
     }
-    guard let handle = borrowedValueHandleAt(index) else {
-      fatalError("JSArgument handle is unavailable")
+    guard let value = borrowedValueAt(index) else {
+      fatalError("JSArgument value is unavailable")
     }
     return try body(
-      QJSCallbackValue(handle: handle, contextHandle: context.driverContextHandle))
+      QJSCallbackValue(value: value, contextRef: context.contextRef))
   }
 }
 

@@ -1,9 +1,17 @@
 import SwiftJavaScript
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 // MARK: - QuickJS buffers (S10)
 //
-// Mirrors the JavaScriptCore wrappers: real structs over the
-// `QJSContextHandle` typed-array driver, with core holding the byte
+// Mirrors the JavaScriptCore wrappers: real structs over the `QJSEngine`
+// typed-array statics over raw values, with core holding the byte
 // allocation/copy helpers and the wrapper implementing the byte/shape access.
 // Failure semantics are unchanged: the driver clears the pending exception and
 // releases the deallocator box it may have built, and the shared core helper
@@ -79,15 +87,16 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     guard value.isArrayBuffer(in: context) else {
       return nil
     }
-    self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
+    self.init(value: context.anchorBorrowed(value.value))
   }
 
   // MARK: - Bytes
 
   public var byteLength: Int {
     guard
-      let length = value.contextHandle.arrayBufferByteLengthForHandle(
-        value.borrowHandle()
+      let length = QJSEngine.arrayBufferByteLength(
+        value.value,
+        in: value.contextRef
       )
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
@@ -103,7 +112,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    let access = QJSEngine.arrayBufferBytesPtr(value.value, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -114,7 +123,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.arrayBufferBytesPtrForHandle(value.borrowHandle())
+    let access = QJSEngine.arrayBufferBytesPtr(value.value, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -145,15 +154,15 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     precondition(length >= 0, "TypedArray length must be non-negative")
 
     guard
-      let handle = context.driverContextHandle.makeTypedArrayHandle(
+      let created = QJSEngine.makeTypedArray(
+        in: context.contextRef,
         kind: kind,
         length: length
       )
     else {
       preconditionFailure("Failed to create TypedArray")
     }
-    self.init(
-      value: context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
+    self.init(value: context.adoptCreated(created))
   }
 
   public init(
@@ -168,34 +177,36 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
       precondition(length >= 0, "TypedArray length must be non-negative")
     }
 
-    let bufferHandle = buffer.value.borrowHandle()
-    let handle: QJSValueHandle?
+    let bufferValue = buffer.value.value
+    let created: CQuickJSValue?
     if let length {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      created = QJSEngine.makeTypedArray(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle,
+        arrayBuffer: bufferValue,
         byteOffset: byteOffset,
         length: length
       )
     } else if byteOffset == 0 {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      created = QJSEngine.makeTypedArray(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle
+        arrayBuffer: bufferValue
       )
     } else {
-      handle = context.driverContextHandle.makeTypedArrayHandle(
+      created = QJSEngine.makeTypedArray(
+        in: context.contextRef,
         kind: kind,
-        arrayBuffer: bufferHandle,
+        arrayBuffer: bufferValue,
         byteOffset: byteOffset,
         length: buffer.remainingElementCount(from: byteOffset, kind: kind)
       )
     }
 
-    guard let handle else {
+    guard let created else {
       preconditionFailure("Failed to create TypedArray from ArrayBuffer")
     }
-    self.init(
-      value: context.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
+    self.init(value: context.adoptCreated(created))
   }
 
   public init?(
@@ -205,14 +216,14 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     guard value.isTypedArray(in: context) else {
       return nil
     }
-    self.init(value: context.anchorBorrowedHandle(value.borrowHandle()))
+    self.init(value: context.anchorBorrowed(value.value))
   }
 
   // MARK: - Shape
 
   public var kind: JSTypedArrayKind {
     guard
-      let kind = value.contextHandle.typedArrayKindForHandle(value.borrowHandle())
+      let kind = QJSEngine.typedArrayKind(value.value, in: value.contextRef)
     else {
       preconditionFailure("Wrapped value is not a TypedArray")
     }
@@ -221,7 +232,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var length: Int {
     guard
-      let length = value.contextHandle.typedArrayLengthForHandle(value.borrowHandle())
+      let length = QJSEngine.typedArrayLength(value.value, in: value.contextRef)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -230,8 +241,10 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var byteLength: Int {
     guard
-      let byteLength = value.contextHandle.typedArrayByteLengthForHandle(
-        value.borrowHandle())
+      let byteLength = QJSEngine.typedArrayByteLength(
+        value.value,
+        in: value.contextRef
+      )
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
     }
@@ -240,8 +253,10 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var byteOffset: Int {
     guard
-      let byteOffset = value.contextHandle.typedArrayByteOffsetForHandle(
-        value.borrowHandle())
+      let byteOffset = QJSEngine.typedArrayByteOffset(
+        value.value,
+        in: value.contextRef
+      )
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
     }
@@ -251,20 +266,18 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
   /// QuickJS returns a new reference to the backing buffer, so the wrapper
   /// adopts it into the context default scope exactly once.
   public var buffer: QJSArrayBuffer {
-    let contextHandle = value.contextHandle
+    let contextRef = value.contextRef
     guard
-      let bufferHandle = contextHandle.typedArrayBufferForHandle(value.borrowHandle())
+      let bufferValue = QJSEngine.typedArrayBuffer(value.value, in: contextRef)
     else {
       preconditionFailure("Failed to read TypedArray buffer")
     }
-    guard
-      let target = ScopeStackRegistry<QJSContextHandle>.defaultFrame(for: contextHandle)
-    else {
+    guard let target = QJSScopeStacks.defaultFrame(for: contextRef) else {
       preconditionFailure("TypedArray buffer requires an open context default scope")
     }
-    target.track(QJSOwnedValueHandle.adopting(bufferHandle))
+    target.track(bufferValue)
     return QJSArrayBuffer(
-      value: QJSValue(handle: bufferHandle, contextHandle: contextHandle))
+      value: QJSValue(value: bufferValue, contextRef: contextRef))
   }
 
   // MARK: - Bytes
@@ -277,7 +290,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    let access = QJSEngine.typedArrayBytesPtr(value.value, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -291,7 +304,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = value.contextHandle.typedArrayBytesPtrForHandle(value.borrowHandle())
+    let access = QJSEngine.typedArrayBytesPtr(value.value, in: value.contextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }
@@ -305,6 +318,21 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 // The instant context owns the only two pieces the core helper cannot reach:
 // the driver call and the arena adoption.
 
+/// Heap box carrying an ArrayBuffer's byte deallocator across the C handoff.
+final class QuickJSArrayBufferDeallocatorBox: @unchecked Sendable {
+  let deallocator: @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+  let context: UnsafeMutableRawPointer?
+
+  init(
+    deallocator:
+      @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void,
+    context: UnsafeMutableRawPointer?
+  ) {
+    self.deallocator = deallocator
+    self.context = context
+  }
+}
+
 extension QJSInstantContext: JSArrayBufferHostScope {
   package func adoptArrayBufferBytesNoCopy(
     bytes: UnsafeMutableRawPointer?,
@@ -316,7 +344,8 @@ extension QJSInstantContext: JSArrayBufferHostScope {
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> QJSValue? {
     guard
-      let handle = driverContextHandle.makeArrayBufferWithBytesNoCopyHandle(
+      let created = QJSEngine.makeArrayBufferWithBytesNoCopy(
+        in: contextRef,
         bytes: bytes,
         byteLength: byteLength,
         bytesDeallocator: bytesDeallocator,
@@ -325,6 +354,6 @@ extension QJSInstantContext: JSArrayBufferHostScope {
     else {
       return nil
     }
-    return adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle))
+    return adoptCreated(created)
   }
 }

@@ -36,7 +36,7 @@ protocol ContextDataStorageBoxDriver: Sendable {
 }
 
 extension JSCContext: ContextDataStorageBoxDriver {}
-extension QJSContextHandle: ContextDataStorageBoxDriver {}
+extension QJSContext: ContextDataStorageBoxDriver {}
 
 /// The concrete engine's runtime driver behind a generic context.
 ///
@@ -50,7 +50,7 @@ func engineRuntimeDriver<C: SwiftJavaScript.JSContext>(
     return context
   }
   if let context = context as? QJSContext {
-    return context.driverContextHandle
+    return context
   }
   return nil
 }

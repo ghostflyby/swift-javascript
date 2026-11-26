@@ -26,9 +26,9 @@ private enum QJSScopeDataKey: JSContextDataKey {
 
 @Suite
 struct QJSScopeSurfaceTests {
-  private func makeContext() -> (QJSRuntimeHandle, QJSContextHandle) {
-    let runtime = QJSEngine.makeRuntimeHandle()
-    guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+  private func makeContext() -> (OpaquePointer, OpaquePointer) {
+    let runtime = QJSEngine.makeRuntime()
+    guard let context = QJSEngine.makeContext(in: runtime) else {
       preconditionFailure("QJSEngine could not create a context handle")
     }
     return (runtime, context)
@@ -38,7 +38,7 @@ struct QJSScopeSurfaceTests {
   func factoriesProduceExpectedPrimitives() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let stringType = scope.makeString("hello").type()
     let numberType = scope.makeNumber(3.5).type()
@@ -82,22 +82,22 @@ struct QJSScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var outer = QJSScope(handle: context)
+    var outer = QJSScope(contextRef: context)
     outer.open()
 
-    let persistedHandle: QJSValueHandle
-    let persistedContext: QJSContextHandle
+    let persistedHandle: CQuickJSValue
+    let persistedContext: OpaquePointer
     do {
-      let inner = QJSInstantContext(handle: context)
+      let inner = QJSInstantContext(contextRef: context)
       let persisted = inner.persist(inner.makeString("kept"))
-      persistedHandle = persisted.borrowHandle()
-      persistedContext = persisted.contextHandle
+      persistedHandle = persisted.value
+      persistedContext = persisted.contextRef
       let inside = persisted.toString()
       #expect(inside == "kept")
     }
 
     // The inner window drained; the outer scope's arena now owns the value.
-    let revived = QJSValue(handle: persistedHandle, contextHandle: persistedContext)
+    let revived = QJSValue(value: persistedHandle, contextRef: persistedContext)
     let text = revived.toString()
     #expect(text == "kept")
   }
@@ -107,16 +107,16 @@ struct QJSScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var outer = QJSScope(handle: context)
+    var outer = QJSScope(contextRef: context)
     outer.open()
 
     do {
-      let first = QJSInstantContext(handle: context)
+      let first = QJSInstantContext(contextRef: context)
       let outerValue = first.persist(first.makeNumber(1))
       #expect(outerValue.toNumber() == 1)
 
       do {
-        let second = QJSInstantContext(handle: context)
+        let second = QJSInstantContext(contextRef: context)
         let innerValue = second.persist(second.makeNumber(2))
         #expect(innerValue.toNumber() == 2)
       }
@@ -134,13 +134,13 @@ struct QJSScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    let window = QJSInstantContext(handle: context)
+    let window = QJSInstantContext(contextRef: context)
     let windowIsCaller = window.withInstantWindow { inner in
-      inner.driverContextHandle == window.driverContextHandle
+      inner.contextRef == window.contextRef
     }
     #expect(windowIsCaller)
 
-    var scope = QJSScope(handle: context)
+    var scope = QJSScope(contextRef: context)
     scope.open()
 
     let (innerNumber, innerText) = scope.withInstantWindow { inner -> (Double, String) in
@@ -160,19 +160,19 @@ struct QJSScopeSurfaceTests {
   func returnAndThrowCarryTheExpectedFlags() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let returned = scope.return(scope.makeString("ok"))
     let returnedIsException = returned.isException
-    let returnedHandle = returned.borrowHandle()
+    let returnedHandle = returned.value
     #expect(!returnedIsException)
-    #expect(QJSValue(handle: returnedHandle, contextHandle: context).toString() == "ok")
+    #expect(QJSValue(value: returnedHandle, contextRef: context).toString() == "ok")
 
     let thrown = scope.throw(scope.makeString("boom"))
     let thrownIsException = thrown.isException
-    let thrownHandle = thrown.borrowHandle()
+    let thrownHandle = thrown.value
     #expect(thrownIsException)
-    #expect(QJSValue(handle: thrownHandle, contextHandle: context).toString() == "boom")
+    #expect(QJSValue(value: thrownHandle, contextRef: context).toString() == "boom")
 
     let undefinedReturn = scope.returnUndefined()
     let undefinedReturnIsException = undefinedReturn.isException
@@ -191,7 +191,7 @@ struct QJSScopeSurfaceTests {
   func globalPropertyReadWriteDelete() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
     let answer: StaticString = "answer"
 
     scope.setGlobalProperty(scope.makeNumber(41), forKey: answer)
@@ -221,7 +221,7 @@ struct QJSScopeSurfaceTests {
   func scriptEvaluationThroughPreparedAndSourceForms() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let prepared = scope.prepareScript("6 * 7")
     let preparedResult = scope.evaluateScript(
@@ -251,7 +251,7 @@ struct QJSScopeSurfaceTests {
   func functionCallbackUsesTheSurfaceWindow() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     scope.installGlobalFunction(named: "double") { callbackContext, _, arguments in
       let value = arguments.withValue(at: 0, in: callbackContext) { argument in
@@ -286,7 +286,7 @@ struct QJSScopeSurfaceTests {
   func surfaceEncoderWitnessesProduceValues() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let boolean = true.toSurfaceValue(in: scope)
     let string = "encoded".toSurfaceValue(in: scope)
@@ -310,7 +310,7 @@ struct QJSScopeSurfaceTests {
   func codableConverterTraversesSurfaceObjects() throws {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let payload = QJSScopePayload(
       name: "surface",
@@ -353,7 +353,7 @@ struct QJSScopeSurfaceTests {
     let (runtime, context) = makeContext()
     _ = runtime
 
-    var scope = QJSScope(handle: context)
+    var scope = QJSScope(contextRef: context)
     scope.open()
 
     let payload = QJSScopePayload(
@@ -364,17 +364,17 @@ struct QJSScopeSurfaceTests {
     )
 
     let encodedHandle = try scope.withInstantWindow {
-      window throws(JSValueConversionError) -> QJSValueHandle in
+      window throws(JSValueConversionError) -> CQuickJSValue in
       let encoded = try JSCodableValueConverter<QJSScopePayload>.tryEncode(
         payload,
         in: window
       )
-      return encoded.borrowHandle()
+      return encoded.value
     }
 
     // `tryEncode` persists its object graph into the context default scope, so
     // the encoded object is still readable after the nested window drained.
-    let persisted = QJSValue(handle: encodedHandle, contextHandle: context)
+    let persisted = QJSValue(value: encodedHandle, contextRef: context)
     let decoded = try scope.withInstantWindow {
       window throws(JSValueConversionError) -> QJSScopePayload in
       let name = persisted.getProperty("name", in: window)
@@ -396,7 +396,7 @@ struct QJSScopeSurfaceTests {
   func simpleValueInitializersPersistIntoTheDefaultScope() {
     let (runtime, context) = makeContext()
     _ = runtime
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let string = QJSValue(string: "initial", in: scope)
     let number = QJSValue(number: 12, in: scope)
@@ -422,8 +422,8 @@ struct QJSScopeSurfaceTests {
     _ = runtime
     // A bare engine context has no host-installed storage box; install one to
     // exercise the scope's data pass-through.
-    context.installContextDataStorageBox(JSContextDataStorageBox())
-    let scope = QJSInstantContext(handle: context)
+    QJSEngine.installContextDataStorageBox(JSContextDataStorageBox(), in: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     scope.setData("shared", for: QJSScopeDataKey.self)
     let value = scope.data(for: QJSScopeDataKey.self)
@@ -445,19 +445,19 @@ struct QJSScopeSurfaceTests {
   @Test
   func instantWindowRestoresTheDefaultScopeFrame() async {
     let context = QJSContext()
-    let defaultFrame = ScopeStackRegistry<QJSContextHandle>.top(
-      of: context.driverContextHandle)
+    let defaultFrame = QJSScopeStacks.top(
+      of: context.contextRef)
 
     await context.withInstantContext { scope in
-      let windowTop = ScopeStackRegistry<QJSContextHandle>.top(
-        of: context.driverContextHandle)
+      let windowTop = QJSScopeStacks.top(
+        of: context.contextRef)
       #expect(windowTop !== defaultFrame)
       _ = scope.makeString("windowed")
     }
 
     // The window drained; the context default frame is back on top.
-    let restored = ScopeStackRegistry<QJSContextHandle>.top(
-      of: context.driverContextHandle)
+    let restored = QJSScopeStacks.top(
+      of: context.contextRef)
     #expect(restored === defaultFrame)
   }
 
@@ -469,9 +469,10 @@ struct QJSScopeSurfaceTests {
     let context = QJSContext()
     await context.withInstantContext { scope in
       let buffer = QJSArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
-      let rejected = scope.driverContextHandle.makeTypedArrayHandle(
+      let rejected = QJSEngine.makeTypedArray(
+        in: scope.contextRef,
         kind: .uint16Array,
-        arrayBuffer: buffer.withValue { $0.borrowHandle() },
+        arrayBuffer: buffer.withValue { $0.value },
         byteOffset: 1,
         length: 1
       )
@@ -505,37 +506,38 @@ struct QJSScopeSurfaceTests {
 
       let key = scope.persist(scope.makeString("valueKey"))
       let stored = scope.persist(scope.makeString("abc"))
-      let contextHandle = scope.driverContextHandle
+      let contextHandle = scope.contextRef
 
-      let wrote = contextHandle.setValuePropertyHandle(
-        key.borrowHandle(),
-        on: object.borrowHandle(),
-        to: stored.borrowHandle(),
+      let wrote = QJSEngine.setValueProperty(
+        key.value,
+        on: object.value,
+        to: stored.value,
+        in: contextHandle,
         attributes: .none
       )
       let has =
-        contextHandle.hasValuePropertyHandle(
-          key.borrowHandle(), on: object.borrowHandle()) ?? false
+        QJSEngine.hasValueProperty(
+          key.value, on: object.value, in: contextHandle) ?? false
       let readIsString: Bool
-      if let result = contextHandle.getValuePropertyHandle(
-        key.borrowHandle(), on: object.borrowHandle())
+      if let result = QJSEngine.getValueProperty(
+        key.value, on: object.value, in: contextHandle)
       {
         switch consume result {
         case .value(let handle):
           readIsString =
-            scope.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)).isString()
+            scope.adoptCreated(handle).isString()
         case .exception(let handle):
-          _ = scope.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle))
+          _ = scope.adoptCreated(handle)
           readIsString = false
         }
       } else {
         readIsString = false
       }
-      let deleted = contextHandle.deleteValuePropertyHandle(
-        key.borrowHandle(), on: object.borrowHandle())
+      let deleted = QJSEngine.deleteValueProperty(
+        key.value, on: object.value, in: contextHandle)
       let hasAfterDelete =
-        contextHandle.hasValuePropertyHandle(
-          key.borrowHandle(), on: object.borrowHandle()) ?? true
+        QJSEngine.hasValueProperty(
+          key.value, on: object.value, in: contextHandle) ?? true
 
       #expect(wrote)
       #expect(has)
@@ -560,51 +562,55 @@ struct QJSScopeSurfaceTests {
         return
       }
 
-      let contextHandle = scope.driverContextHandle
+      let contextHandle = scope.contextRef
       let lockedKey = scope.persist(scope.makeString("locked"))
       let seven = scope.persist(scope.makeNumber(7))
       let nine = scope.persist(scope.makeNumber(9))
-      _ = contextHandle.setValuePropertyHandle(
-        lockedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: seven.borrowHandle(),
+      _ = QJSEngine.setValueProperty(
+        lockedKey.value,
+        on: object.value,
+        to: seven.value,
+        in: contextHandle,
         attributes: .readOnly
       )
-      _ = contextHandle.setValuePropertyHandle(
-        lockedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: nine.borrowHandle(),
+      _ = QJSEngine.setValueProperty(
+        lockedKey.value,
+        on: object.value,
+        to: nine.value,
+        in: contextHandle,
         attributes: .none
       )
 
       let hiddenKey = scope.persist(scope.makeString("hidden"))
       let hiddenValue = scope.persist(scope.makeNumber(1))
-      _ = contextHandle.setValuePropertyHandle(
-        hiddenKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: hiddenValue.borrowHandle(),
+      _ = QJSEngine.setValueProperty(
+        hiddenKey.value,
+        on: object.value,
+        to: hiddenValue.value,
+        in: contextHandle,
         attributes: .dontEnum
       )
 
       let pinnedKey = scope.persist(scope.makeString("pinned"))
       let pinnedValue = scope.persist(scope.makeNumber(2))
-      _ = contextHandle.setValuePropertyHandle(
-        pinnedKey.borrowHandle(),
-        on: object.borrowHandle(),
-        to: pinnedValue.borrowHandle(),
+      _ = QJSEngine.setValueProperty(
+        pinnedKey.value,
+        on: object.value,
+        to: pinnedValue.value,
+        in: contextHandle,
         attributes: .dontDelete
       )
 
       let lockedNumber: Double?
-      if let result = contextHandle.getValuePropertyHandle(
-        lockedKey.borrowHandle(), on: object.borrowHandle())
+      if let result = QJSEngine.getValueProperty(
+        lockedKey.value, on: object.value, in: contextHandle)
       {
         switch consume result {
         case .value(let handle):
           lockedNumber =
-            scope.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)).toNumber()
+            scope.adoptCreated(handle).toNumber()
         case .exception(let handle):
-          _ = scope.adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle))
+          _ = scope.adoptCreated(handle)
           lockedNumber = nil
         }
       } else {

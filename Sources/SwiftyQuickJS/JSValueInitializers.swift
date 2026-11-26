@@ -60,8 +60,8 @@ extension QJSValue {
   ) {
     let persisted = context.persist(value)
     self.init(
-      handle: persisted.borrowHandle(),
-      contextHandle: persisted.contextHandle
+      value: persisted.value,
+      contextRef: persisted.contextRef
     )
   }
 }

@@ -1,31 +1,31 @@
 import SwiftJavaScript
 
 /// A persistent, Sendable identity for a QuickJS value bound in a
-/// context-side registry.
+/// context-side binding table.
 ///
 /// QuickJS counterpart of `JSCPersistentHandle`: public identity plus a weak
-/// view of the registry. Settlement is reference-counted (`JS_FreeValue`), so
-/// the payload is settled on the VM thread by the registry exactly once.
+/// view of the table. Settlement is reference-counted (`JS_FreeValue`), so the
+/// payload is settled on the VM thread exactly once.
 public final class QJSPersistentHandle: SwiftJavaScript.JSPersistentHandle, Sendable {
   public let identity: JSPersistentHandleIdentity
 
-  private let registryReference: PersistentRegistryReference<QJSContextHandle>
+  private let bindingsReference: QJSPersistentBindingsReference
 
-  package init(
+  init(
     identity: JSPersistentHandleIdentity,
-    registry: JSPersistentHandleRegistry<QJSContextHandle>
+    registry: QJSPersistentBindings
   ) {
     self.identity = identity
-    self.registryReference = PersistentRegistryReference(registry)
+    self.bindingsReference = QJSPersistentBindingsReference(registry)
   }
 
   @discardableResult
   public func invalidate() -> Bool {
-    registryReference.value?.release(identity) ?? false
+    bindingsReference.bindings?.release(identity) ?? false
   }
 
   deinit {
-    _ = registryReference.value?.release(identity)
+    _ = bindingsReference.bindings?.release(identity)
   }
 
   public static func == (lhs: QJSPersistentHandle, rhs: QJSPersistentHandle) -> Bool {

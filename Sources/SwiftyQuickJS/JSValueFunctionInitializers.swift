@@ -20,13 +20,16 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) {
     guard
-      let handle = context.driverContextHandle.makeFunctionValueHandle(
-        named: name, callback: callback)
+      let created = QJSEngine.makeFunction(
+        named: name,
+        callback: callback,
+        in: context.contextRef
+      )
     else {
-      preconditionFailure("QJSValue(name:callback:) could not create function handle")
+      preconditionFailure("QJSValue(name:callback:) could not create a function")
     }
-    let adopted = context.adoptCreatedHandle(handle)
-    self.init(handle: adopted.borrowHandle(), contextHandle: adopted.contextHandle)
+    let adopted = context.adoptCreated(created)
+    self.init(value: adopted.value, contextRef: adopted.contextRef)
   }
 
   // MARK: Typed function (decodable arguments, encodable return/error)
@@ -68,7 +71,7 @@ extension QJSValue {
       }
     }
     let value = context.makeFunction(named: name, callback: callback)
-    self.init(handle: value.borrowHandle(), contextHandle: value.contextHandle)
+    self.init(value: value.value, contextRef: value.contextRef)
   }
 
   // MARK: Coder-based typed function
@@ -115,7 +118,7 @@ extension QJSValue {
       }
     }
     let value = context.makeFunction(named: name, callback: callback)
-    self.init(handle: value.borrowHandle(), contextHandle: value.contextHandle)
+    self.init(value: value.value, contextRef: value.contextRef)
   }
 }
 
@@ -132,8 +135,8 @@ private func decodeFunctionArgument<T: JSValueDecodable>(
   return try arguments.withThrowingValue(at: index, in: context) {
     callbackValue throws(JSValueConversionError) -> T in
     let value = QJSValue(
-      handle: callbackValue.borrowHandle(),
-      contextHandle: context.driverContextHandle
+      value: callbackValue.value,
+      contextRef: context.contextRef
     )
     return try T.tryDecode(value, in: context)
   }
@@ -150,8 +153,8 @@ private func decodeFunctionArgument<C: JSValueDecoder>(
   return try arguments.withThrowingValue(at: index, in: context) {
     callbackValue throws(JSValueConversionError) -> C.SwiftType in
     let value = QJSValue(
-      handle: callbackValue.borrowHandle(),
-      contextHandle: context.driverContextHandle
+      value: callbackValue.value,
+      contextRef: context.contextRef
     )
     return try C.tryDecode(value, in: context)
   }

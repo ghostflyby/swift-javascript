@@ -14,16 +14,16 @@ import Testing
 // MARK: - Surface callback views (S6), QuickJS
 //
 // Mirror of `JSCCallbackSurfaceTests`: the callback-window views are concrete
-// identity structs over `QJSValueHandle`; the arena owns every reference, so
+// identity structs over `CQuickJSValue`; the arena owns every reference, so
 // the views stay valid while the scope below is alive. Return/throw semantics
 // belong to S7.
 
 @Suite
 struct QJSCallbackSurfaceTests {
-  private func makeContext() -> (QJSRuntimeHandle, QJSContextHandle) {
-    let runtime = QJSEngine.makeRuntimeHandle()
-    guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-      preconditionFailure("QJSEngine could not create a context handle")
+  private func makeContext() -> (OpaquePointer, OpaquePointer) {
+    let runtime = QJSEngine.makeRuntime()
+    guard let context = QJSEngine.makeContext(in: runtime) else {
+      preconditionFailure("QJSEngine could not create a context")
     }
     return (runtime, context)
   }
@@ -32,15 +32,15 @@ struct QJSCallbackSurfaceTests {
   func callbackValueExposesConversionsAndEquality() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
+      let scope = QJSInstantContext(contextRef: context)
 
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("seven")!)
-      let twinText = scope.adoptCreatedHandle(context.makeStringValueHandle("seven")!)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(7)!)
+      let text = scope.adoptCreated(QJSEngine.makeString("seven", in: context)!)
+      let twinText = scope.adoptCreated(QJSEngine.makeString("seven", in: context)!)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
 
-      let value = QJSCallbackValue(handle: text.borrowHandle(), contextHandle: context)
-      let twin = QJSCallbackValue(handle: twinText.borrowHandle(), contextHandle: context)
-      let numeric = QJSCallbackValue(handle: number.borrowHandle(), contextHandle: context)
+      let value = QJSCallbackValue(value: text.value, contextRef: context)
+      let twin = QJSCallbackValue(value: twinText.value, contextRef: context)
+      let numeric = QJSCallbackValue(value: number.value, contextRef: context)
 
       let valueType = value.type()
       let valueText = value.toString()
@@ -64,20 +64,20 @@ struct QJSCallbackSurfaceTests {
       #expect(strictlyMatchesTwin)
       #expect(!strictlyMatchesNumber)
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
   func callbackArgumentsAccessValuesByIndex() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("alpha")!)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(41)!)
-      let handles = [text.borrowHandle(), number.borrowHandle()]
+      let scope = QJSInstantContext(contextRef: context)
+      let text = scope.adoptCreated(QJSEngine.makeString("alpha", in: context)!)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(41, in: context)!)
+      let handles = [text.value, number.value]
 
       let arguments = QJSCallbackArguments(count: handles.count) { index in
         index >= 0 && index < handles.count ? handles[index] : nil
@@ -99,17 +99,17 @@ struct QJSCallbackSurfaceTests {
       #expect(secondText == "41")
       #expect(throwingResult == "alpha")
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
   func throwingArgumentAccessPropagatesConversionErrors() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(3)!)
-      let arguments = QJSCallbackArguments(count: 1) { _ in number.borrowHandle() }
+      let scope = QJSInstantContext(contextRef: context)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(3, in: context)!)
+      let arguments = QJSCallbackArguments(count: 1) { _ in number.value }
 
       do {
         let _: String = try arguments.withThrowingValue(at: 0, in: scope) {
@@ -129,18 +129,18 @@ struct QJSCallbackSurfaceTests {
         #expect(expected == "string")
       }
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
   func argumentsViewDecodesVariadically() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(1)!)
-      let text = scope.adoptCreatedHandle(context.makeStringValueHandle("two")!)
-      let handles = [number.borrowHandle(), text.borrowHandle()]
+      let scope = QJSInstantContext(contextRef: context)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(1, in: context)!)
+      let text = scope.adoptCreated(QJSEngine.makeString("two", in: context)!)
+      let handles = [number.value, text.value]
 
       let arguments = QJSArguments(count: handles.count) { index, _ in
         index >= 0 && index < handles.count ? handles[index] : nil
@@ -154,7 +154,7 @@ struct QJSCallbackSurfaceTests {
       #expect(strict.0 == 1)
       #expect(strict.1 == "two")
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 }

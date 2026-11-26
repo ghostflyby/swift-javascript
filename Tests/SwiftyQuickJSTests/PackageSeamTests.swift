@@ -2,56 +2,25 @@ import SwiftJavaScript
 import SwiftyQuickJS
 import Testing
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 // MARK: - Package seam (cross-target)
 //
 // Same assertion as the JavaScriptCore target's copy: the package-level
 // scope/VM seams compile and run from a sibling target. QuickJS is the
-// reference-counted engine, so the tracked creation handle is released by the
+// reference-counted engine, so the tracked creation value is released by the
 // arena drain instead of being a no-op.
-//
-// The handle layer is keyed on the context handle (`ScopeCore<QJSContextHandle>`,
-// `ScopeStackRegistry<QJSContextHandle>`); value-level operations are the
-// scope protocol defaults, reached through the engine's scope type.
-
-@Test func packageScopeSeamsAreCallableAcrossTargets() {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("QJSEngine could not create a context handle")
-    return
-  }
-
-  let core = ScopeCore<QJSContextHandle, JSImplicitStackRoots>(handle: context)
-  let frame: ScopeFrame<QJSContextHandle> = core.frame
-  #expect(frame.driverContextHandle == context)
-  #expect(core.driverContextHandle == context)
-
-  let created = context.makeNumberValueHandle(1)!
-  let borrowed = created.borrowed()
-  frame.track(created)
-  #expect(frame.contains(matching: { $0.borrowed() == borrowed }))
-
-  ScopeStackRegistry<QJSContextHandle>.push(core, for: context)
-  #expect(ScopeStackRegistry<QJSContextHandle>.top(of: context) === frame)
-  #expect(ScopeStackRegistry<QJSContextHandle>.defaultFrame(for: context) === frame)
-  #expect(ScopeStackRegistry<QJSContextHandle>.vmThread(for: context) == nil)
-
-  let taken = frame.takeFirst(matching: { $0.borrowed() == borrowed })
-  if let taken = consume taken {
-    context.releaseCreatedHandle(taken)
-  }
-
-  let popped = ScopeStackRegistry<QJSContextHandle>.pop(for: context)
-  #expect(popped === frame)
-  core.drain()
-
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
-}
 
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("QJSEngine could not create a context handle")
+  let runtime = QJSEngine.makeRuntime()
+  guard let context = QJSEngine.makeContext(in: runtime) else {
+    Issue.record("QJSEngine could not create a context")
     return
   }
 
@@ -60,7 +29,7 @@ import Testing
   // are reachable from a sibling target through it. The window lives in its
   // own block: its deinit drains the arena before the context goes away.
   do {
-    let scope = QJSInstantContext(handle: context)
+    let scope = QJSInstantContext(contextRef: context)
 
     let stringText = scope.makeString("seam").toString()
     let numberValue = scope.makeNumber(3).toNumber()
@@ -126,8 +95,8 @@ import Testing
     }
   }
 
-  _ = context.releaseReference()
-  _ = runtime.releaseReference()
+  JS_FreeContext(context)
+  QJSEngine.releaseRuntime(runtime)
 }
 
 @Test func packageVMThreadSeamsAreCallableAcrossTargets() {

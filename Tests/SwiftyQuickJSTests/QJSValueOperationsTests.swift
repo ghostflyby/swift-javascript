@@ -3,6 +3,14 @@ import Testing
 @testable import SwiftJavaScript
 @testable import SwiftyQuickJS
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 // MARK: - QJSValue property/object/invocation surface (S5)
 //
 // Mirror of `JSCValueOperationsTests` on the reference-counted engine. Every
@@ -10,24 +18,24 @@ import Testing
 // what the drain later settles exactly once, so the exception path must adopt
 // too rather than drop the handle.
 
-private func makeContext() -> (QJSRuntimeHandle, QJSContextHandle) {
-  let runtime = QJSEngine.makeRuntimeHandle()
-  guard let context = QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
-    preconditionFailure("QJSEngine could not create a context handle")
+private func makeContext() -> (OpaquePointer, OpaquePointer) {
+  let runtime = QJSEngine.makeRuntime()
+  guard let context = QJSEngine.makeContext(in: runtime) else {
+    preconditionFailure("QJSEngine could not create a context")
   }
   return (runtime, context)
 }
 
 private func adoptObject(in scope: borrowing QJSInstantContext) -> QJSValue {
-  let context = scope.driverContextHandle
-  guard let result = context.makeObjectResultHandle() else {
+  let context = scope.contextRef
+  guard let result = QJSEngine.makeObjectResult(in: context) else {
     preconditionFailure("QJSEngine could not create an object")
   }
   switch consume result {
-  case .value(let handle):
-    return scope.adoptCreatedHandle(handle)
-  case .exception(let handle):
-    context.releaseCreatedHandle(handle)
+  case .value(let value):
+    return scope.adoptCreated(value)
+  case .exception(let value):
+    JS_FreeValue(context, value)
     preconditionFailure("QJSEngine object creation returned an exception")
   }
 }
@@ -36,21 +44,16 @@ private func adoptEvaluated(
   _ source: String,
   in scope: borrowing QJSInstantContext
 ) -> QJSValue {
-  let context = scope.driverContextHandle
-  guard let script = context.makePreparedScriptHandle(source),
-    let result = context.evaluatePreparedScriptResultHandle(
-      script,
-      sourceURL: nil,
-      startingLineNumber: 1
-    )
-  else {
-    preconditionFailure("QJSEngine could not evaluate \(source)")
-  }
+  let script = scope.prepareScript(source)
+  let result = scope.evaluateScript(
+    script,
+    sourceURL: nil,
+    startingLineNumber: 1
+  )
   switch consume result {
-  case .value(let handle):
-    return scope.adoptCreatedHandle(QJSEngine.OwnedValueHandle.adopting(handle))
-  case .exception(let handle):
-    context.releaseCreatedHandle(QJSEngine.OwnedValueHandle.adopting(handle))
+  case .value(let value):
+    return value
+  case .exception:
     preconditionFailure("QJSEngine evaluation of \(source) threw")
   }
 }
@@ -59,10 +62,10 @@ private func adoptString(
   _ value: String,
   in scope: borrowing QJSInstantContext
 ) -> QJSValue {
-  guard let handle = scope.driverContextHandle.makeStringValueHandle(value) else {
+  guard let created = QJSEngine.makeString(value, in: scope.contextRef) else {
     preconditionFailure("QJSEngine could not create a string")
   }
-  return scope.adoptCreatedHandle(handle)
+  return scope.adoptCreated(created)
 }
 
 /// Collapse a noncopyable result into a Copyable description before any
@@ -92,10 +95,10 @@ private func value(_ result: consuming JSResult<QJSValue>) -> QJSValue {
 /// The window is opened on the actor itself, so nothing but the context handle
 /// crosses isolation.
 private func isolatedNameRead(
-  _ contextHandle: QJSContextHandle,
+  _ contextRef: OpaquePointer,
   on _: isolated QJSContext
 ) -> String {
-  let scope = QJSInstantContext(handle: contextHandle)
+  let scope = QJSInstantContext(contextRef: contextRef)
   let object = adoptObject(in: scope)
   let text = adoptString("seven", in: scope)
   _ = object.setProperty("name", to: text, attributes: .none, in: scope)
@@ -113,7 +116,7 @@ struct QJSValueOperationsTests {
   func readsWritesAndRemovesStaticAndKeyProperties() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
+      let scope = QJSInstantContext(contextRef: context)
       let object = adoptObject(in: scope)
       let text = adoptString("seven", in: scope)
 
@@ -130,15 +133,15 @@ struct QJSValueOperationsTests {
       #expect(absentText == "undefined")
       #expect(names == ["name"])
 
-      guard let keyHandle = context.makePropertyStringKeyHandle("count") else {
+      guard let keyHandle = QJSEngine.makePropertyStringAtom("count", in: context) else {
         Issue.record("QJSEngine could not make a property key")
         return
       }
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(3)!)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(3, in: context)!)
       do {
         let key = QJSPropertyStringKey(
-          handle: keyHandle,
-          contextHandle: context,
+          atom: keyHandle,
+          contextRef: context,
           vmThread: nil
         )
         let keyDidSet = object.setProperty(
@@ -168,8 +171,8 @@ struct QJSValueOperationsTests {
       // Callback-window value views only carry an identity; the direct-value
       // surface accepts them by borrowing that identity.
       let callbackValue = QJSCallbackValue(
-        handle: text.borrowHandle(),
-        contextHandle: context
+        value: text.value,
+        contextRef: context
       )
       let callbackDidSet = object.setProperty(
         "alias",
@@ -181,17 +184,17 @@ struct QJSValueOperationsTests {
       #expect(callbackDidSet)
       #expect(aliasText == "seven")
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
   func callsConstructsInvokesMethodsAndClassifiesObjects() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
+      let scope = QJSInstantContext(contextRef: context)
       let text = adoptString("seven", in: scope)
 
       let function = adoptEvaluated("(function () { return 42; })", in: scope)
@@ -214,7 +217,7 @@ struct QJSValueOperationsTests {
         in: scope
       )
       let methodText = describe(methodObject.invokeMethod("double", arguments: [], in: scope))
-      let argument = scope.adoptCreatedHandle(context.makeNumberValueHandle(21)!)
+      let argument = scope.adoptCreated(QJSEngine.makeNumber(21, in: context)!)
       let withArgumentText = describe(
         methodObject.invokeMethod("plus", arguments: [argument.asCallArgument()], in: scope)
       )
@@ -246,7 +249,7 @@ struct QJSValueOperationsTests {
       #expect(!typedIsArrayBuffer)
       #expect(!arrayIsTypedArray)
 
-      let number = scope.adoptCreatedHandle(context.makeNumberValueHandle(7)!)
+      let number = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
       let boxed = value(number.toObject(in: scope))
       let boxedIsObject = boxed.isObject()
       #expect(boxedIsObject)
@@ -261,8 +264,8 @@ struct QJSValueOperationsTests {
 
       // The callback-value parameter overloads borrow the same identities.
       let receiverShell = QJSCallbackValue(
-        handle: receiver.borrowHandle(),
-        contextHandle: context
+        value: receiver.value,
+        contextRef: context
       )
       let callbackThisText = describe(
         thisFunction.call(this: receiverShell, arguments: [], in: scope)
@@ -270,23 +273,23 @@ struct QJSValueOperationsTests {
       #expect(callbackThisText == "seven")
 
       let constructorShell = QJSCallbackValue(
-        handle: constructor.borrowHandle(),
-        contextHandle: context
+        value: constructor.value,
+        contextRef: context
       )
       let callbackInstanceOf = instance.isInstanceOf(constructorShell, in: scope)
       #expect(callbackInstanceOf)
 
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
   func propertyExceptionAdoptsTheThrownValue() {
     let (runtime, context) = makeContext()
     do {
-      let scope = QJSInstantContext(handle: context)
+      let scope = QJSInstantContext(contextRef: context)
       let throwing = adoptEvaluated(
         "({ get boom() { throw new Error('kaboom'); } })",
         in: scope
@@ -305,10 +308,10 @@ struct QJSValueOperationsTests {
       // still work and the scope drains cleanly.
       let names = throwing.propertyNames(in: scope)
       #expect(names == ["boom"])
-      #expect(scope.driverContextHandle == context)
+      #expect(scope.contextRef == context)
     }
-    _ = context.releaseReference()
-    _ = runtime.releaseReference()
+    JS_FreeContext(context)
+    QJSEngine.releaseRuntime(runtime)
   }
 
   @Test
@@ -316,7 +319,7 @@ struct QJSValueOperationsTests {
     // The `in:` default reads `#isolation`, so the *opened window* and the
     // actor must be the same context: use the concrete context's own handle.
     let context = QJSContext()
-    let isolatedText = await isolatedNameRead(context.driverContextHandle, on: context)
+    let isolatedText = await isolatedNameRead(context.contextRef, on: context)
     #expect(isolatedText == "seven")
   }
 }

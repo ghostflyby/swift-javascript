@@ -1,15 +1,21 @@
 import SwiftJavaScript
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#elseif canImport(CQuickJSSystem)
+  import CQuickJSSystem
+#endif
+
 /// The QuickJS context actor.
 ///
-/// Holds the engine handle, the VM it belongs to, and the shared
-/// `JSContextStorage<QJSContextHandle>` that owns the default scope, the
-/// persistent registry, and the context data box. The context-level factories,
-/// global reads/writes, script evaluation, and data storage create or settle
-/// engine references on the context default scope, so they live here rather
-/// than in a core default; the actor also runs the storage teardown in its
-/// isolated deinit, on the VM thread, so `JS_FreeContext` and the arena
-/// settlement stay on the thread that owns the runtime.
+/// Holds the raw `contextRef`, the VM it belongs to, its default scope,
+/// concrete persistent-binding table, and VM thread. The context-level
+/// factories, global reads/writes, script evaluation, and data storage create
+/// or settle engine references on the context default scope, so they live here
+/// rather than in a core default; the actor also runs the storage teardown in
+/// its isolated deinit, on the VM thread.
 public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias VirtualMachine = QJSVirtualMachine
   public typealias InstantContext = QJSInstantContext
@@ -26,61 +32,77 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias PropertyStringKey = QJSPropertyStringKey
   public typealias PreparedScript = QJSPreparedScript
 
-  /// The engine context identity every operation of this actor is addressed
-  /// through. Package-internal: it is a handle, so it must not appear in a
-  /// public signature.
-  package nonisolated let driverContextHandle: QJSContextHandle
+  /// The raw QuickJS context every operation of this actor is addressed
+  /// through. Package-internal: it must not appear in a public signature.
+  nonisolated(unsafe) let contextRef: OpaquePointer
   public nonisolated let virtualMachine: QJSVirtualMachine
   public nonisolated let unownedExecutor: UnownedSerialExecutor
 
-  /// The same identity as the shared driver interface, for package-internal
-  /// seams (the scope witness and the contract tests' driver dispatch). This
-  /// lets those call sites avoid naming the handle type.
-  package nonisolated var runtimeDriver: any JSContextRuntimeDriver { driverContextHandle }
-
-  private let storage: JSContextStorage<QJSContextHandle>
+  private let defaultScope: QJSScopeCore
+  private let persistentBindings: QJSPersistentBindings
+  private let vmThread: VMThread
 
   public init() {
     self.init(virtualMachine: QJSVirtualMachine())
   }
 
-  /// Engine access only on the VM thread: `makeContextHandle` creates the
-  /// context there, and this initializer's data-box install is posted there
-  /// too. `init` is synchronous: a caller on another thread waits for it, a
-  /// caller already on the VM thread (inside another context's window) runs
-  /// inline.
+  /// Engine access only on the VM thread: `makeContext` creates the context
+  /// there, and this initializer's data-box install is posted there too.
+  /// `init` is synchronous: a caller on another thread waits for it, a caller
+  /// already on the VM thread (inside another context's window) runs inline.
   public init(virtualMachine: QJSVirtualMachine) {
-    guard let driverContextHandle = virtualMachine.makeContextHandle() else {
-      preconditionFailure("QJSContext could not create a context handle from its runtime")
+    guard let contextRef = virtualMachine.makeContext() else {
+      preconditionFailure("QJSContext could not create a context from its runtime")
     }
-    self.init(virtualMachine: virtualMachine, driverContextHandle: driverContextHandle)
+    self.init(virtualMachine: virtualMachine, contextRef: contextRef)
   }
 
   package init(
     virtualMachine: QJSVirtualMachine,
-    driverContextHandle: QJSContextHandle
+    contextRef: OpaquePointer
   ) {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
-    self.driverContextHandle = driverContextHandle
-    let storage = JSContextStorage<QJSContextHandle>(
-      driverContextHandle: driverContextHandle,
-      scheduler: virtualMachine.persistentCleanupScheduler,
+    self.contextRef = contextRef
+    self.vmThread = virtualMachine.vmThread
+    let defaultScope = QJSScopeCore(contextRef: contextRef)
+    self.defaultScope = defaultScope
+    let persistentBindings = QJSPersistentBindings(
+      contextRef: contextRef,
       vmThread: virtualMachine.vmThread
     )
-    self.storage = storage
+    self.persistentBindings = persistentBindings
+    QJSScopeStacks.push(defaultScope)
+
     // The context data box exists from the end of init: synchronous scope
-    // witnesses reach the registry through it, and the box remembers this
-    // actor as its unretained owner.
-    storage.attachDataBox(bindingOwner: self)
+    // witnesses reach the binding table through it, and the box remembers
+    // this actor as its unretained owner (used by raw callback contexts).
+    let box = JSContextDataStorageBox()
+    let vmThread = virtualMachine.vmThread
+    let contextBits = UInt(bitPattern: contextRef)
+    vmThread.runAndWait {
+      guard let context = OpaquePointer(bitPattern: contextBits) else { return }
+      QJSEngine.installContextDataStorageBox(box, in: context)
+      box.bindContextOwner(self)
+      box.setData(persistentBindings, for: QJSPersistentBindingsKey.self)
+    }
+    QJSScopeStacks.bind(vmThread, for: contextRef)
   }
 
   /// Isolated deinit (SE-0371): runs on the actor's dedicated VM thread, so
-  /// the engine-touching teardown never executes on a foreign thread. The
-  /// storage owns the order: registry close → default-scope drain → box clear
-  /// → context release → scope-stack pop.
+  /// the engine-touching teardown never executes on a foreign thread.
   isolated deinit {
-    storage.teardown()
+    persistentBindings.close()
+    defaultScope.drain()
+    let contextBits = UInt(bitPattern: contextRef)
+    let vmThread = self.vmThread
+    vmThread.runAndWait {
+      guard let context = OpaquePointer(bitPattern: contextBits) else { return }
+      QJSEngine.installContextDataStorageBox(nil, in: context)
+    }
+    quickJSUpdateStackTop(contextRef)
+    JS_FreeContext(contextRef)
+    QJSScopeStacks.pop(for: contextRef)
   }
 
   // MARK: - Synchronous scopes
@@ -88,12 +110,12 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   public func withInstantContext<R: ~Copyable, Failure: Error>(
     _ body: (borrowing QJSInstantContext) throws(Failure) -> R
   ) throws(Failure) -> R {
-    let instantContext = QJSInstantContext(handle: driverContextHandle)
+    let instantContext = QJSInstantContext(contextRef: contextRef)
     return try body(instantContext)
   }
 
   public func makeScope() -> QJSScope {
-    var scope = QJSScope(handle: driverContextHandle)
+    var scope = QJSScope(contextRef: contextRef)
     scope.open()
     return scope
   }
@@ -104,87 +126,82 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // below creates or settles an engine reference on the context default scope
   // through these two.
 
-  package func adoptCreatedHandle(_ handle: consuming QJSOwnedValueHandle) -> QJSValue {
-    QJSValue(
-      handle: storage.defaultScope.trackCreatedHandle(handle),
-      contextHandle: driverContextHandle
-    )
+  package func adoptCreated(_ value: CQuickJSValue) -> QJSValue {
+    QJSValue(value: defaultScope.trackCreated(value), contextRef: contextRef)
   }
 
-  package func anchorBorrowedHandle(_ handle: QJSValueHandle) -> QJSValue {
-    QJSValue(
-      handle: storage.defaultScope.claimAndTrackHandle(handle),
-      contextHandle: driverContextHandle
-    )
+  package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
+    QJSValue(value: defaultScope.claimAndTrack(value), contextRef: contextRef)
   }
 
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> QJSValue {
-    guard let handle = driverContextHandle.makeStringValueHandle(value) else {
-      preconditionFailure("makeStringValueHandle failed")
+    guard let created = QJSEngine.makeString(value, in: contextRef) else {
+      preconditionFailure("makeString failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
-      let handle = driverContextHandle.makeStringValueHandle(
-        fromPropertyStringKey: key.borrowHandle(in: driverContextHandle)
+      let created = QJSEngine.makeStringValue(
+        fromAtom: key.borrowAtom(in: contextRef),
+        in: contextRef
       )
     else {
-      preconditionFailure("makeStringValueHandle failed")
+      preconditionFailure("makeStringValue failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeNumber(_ value: Double) -> QJSValue {
-    guard let handle = driverContextHandle.makeNumberValueHandle(value) else {
-      preconditionFailure("makeNumberValueHandle failed")
+    guard let created = QJSEngine.makeNumber(value, in: contextRef) else {
+      preconditionFailure("makeNumber failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeBoolean(_ value: Bool) -> QJSValue {
-    guard let handle = driverContextHandle.makeBooleanValueHandle(value) else {
-      preconditionFailure("makeBooleanValueHandle failed")
+    guard let created = QJSEngine.makeBoolean(value, in: contextRef) else {
+      preconditionFailure("makeBoolean failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeNull() -> QJSValue {
-    guard let handle = driverContextHandle.makeNullValueHandle() else {
-      preconditionFailure("makeNullValueHandle failed")
+    guard let created = QJSEngine.makeNull(in: contextRef) else {
+      preconditionFailure("makeNull failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeUndefined() -> QJSValue {
-    guard let handle = driverContextHandle.makeUndefinedValueHandle() else {
-      preconditionFailure("makeUndefinedValueHandle failed")
+    guard let created = QJSEngine.makeUndefined(in: contextRef) else {
+      preconditionFailure("makeUndefined failed")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   public func makeObject() -> QJSValue {
-    guard let result = driverContextHandle.makeObjectResultHandle() else {
-      preconditionFailure("makeObjectResultHandle failed")
+    guard let result = QJSEngine.makeObjectResult(in: contextRef) else {
+      preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(handle)
+    case .value(let created):
+      return adoptCreated(created)
     case .exception:
       preconditionFailure("QJSContext.makeObject failed")
     }
   }
 
   public func makeArray() -> QJSValue {
-    guard let result = driverContextHandle.makeArrayResultHandle() else {
-      preconditionFailure("makeArrayResultHandle failed")
+    guard let result = QJSEngine.makeArrayResult(in: contextRef) else {
+      preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(handle)
+    case .value(let created):
+      return adoptCreated(created)
     case .exception:
       preconditionFailure("QJSContext.makeArray failed")
     }
@@ -197,87 +214,86 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     callback: @escaping JSFunctionCallback<QJSInstantContext>
   ) -> QJSValue {
     guard
-      let handle = driverContextHandle.makeFunctionValueHandle(named: name, callback: callback)
+      let created = QJSEngine.makeFunction(
+        named: name,
+        callback: callback,
+        in: contextRef
+      )
     else {
-      preconditionFailure("makeFunctionValueHandle could not create handle")
+      preconditionFailure("makeFunction could not create a function")
     }
-    return adoptCreatedHandle(handle)
+    return adoptCreated(created)
   }
 
   // MARK: - Persistent bindings
 
   public func makePersistentHandle(_ value: borrowing QJSValue) -> QJSPersistentHandle {
     precondition(
-      value.contextHandle == driverContextHandle,
+      value.contextRef == contextRef,
       "JSPersistentHandle can only be minted for values of its own context"
     )
     return QJSPersistentHandle(
-      identity: storage.persistentRegistry.mintIdentity(value.borrowHandle()),
-      registry: storage.persistentRegistry
+      identity: persistentBindings.mint(value.value),
+      registry: persistentBindings
     )
   }
 
   public func resolve(_ handle: QJSPersistentHandle) -> QJSValue? {
-    guard let borrowed = storage.persistentRegistry.borrowLive(handle.identity) else {
+    guard let borrowed = persistentBindings.borrowLive(handle.identity) else {
       return nil
     }
-    return QJSValue(
-      handle: storage.defaultScope.claimAndTrackHandle(borrowed),
-      contextHandle: driverContextHandle
-    )
+    return anchorBorrowed(borrowed)
   }
 
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> QJSPropertyStringKey {
-    guard let handle = driverContextHandle.makePropertyStringKeyHandle(value) else {
-      preconditionFailure("makePropertyStringKeyHandle could not create handle")
+    guard let atom = QJSEngine.makePropertyStringAtom(value, in: contextRef) else {
+      preconditionFailure("makePropertyStringAtom could not create a key")
     }
     return QJSPropertyStringKey(
-      handle: handle,
-      contextHandle: driverContextHandle,
-      vmThread: ScopeStackRegistry<QJSContextHandle>.vmThread(for: driverContextHandle)
+      atom: atom,
+      contextRef: contextRef,
+      vmThread: vmThread
     )
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    guard let handle = driverContextHandle.makePreparedScriptHandle(source) else {
-      preconditionFailure("makePreparedScriptHandle could not create handle")
-    }
-    return QJSPreparedScript(
-      handle: handle,
-      contextHandle: driverContextHandle,
-      vmThread: ScopeStackRegistry<QJSContextHandle>.vmThread(for: driverContextHandle)
+    QJSPreparedScript(
+      source: source,
+      contextRef: contextRef,
+      vmThread: vmThread
     )
   }
 
   // MARK: - Global object
 
   public func globalObjectValue() -> QJSValue {
-    guard let handle = driverContextHandle.globalObjectValueHandle() else {
+    guard let global = QJSEngine.globalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.globalObjectValue could not get global object")
     }
-    return QJSValue(handle: handle, contextHandle: driverContextHandle)
+    return QJSValue(value: global, contextRef: contextRef)
   }
 
   /// Read a global property. A failed read is reported as `undefined`: the
   /// engine's exception reference is settled instead of being dropped.
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
-    guard let global = driverContextHandle.globalObjectValueHandle() else {
+    guard let global = QJSEngine.globalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.getGlobalProperty could not get global object")
     }
-    guard let result = driverContextHandle.getStaticStringPropertyHandle(key, on: global) else {
+    guard let result = QJSEngine.getStaticStringProperty(key, on: global, in: contextRef) else {
       preconditionFailure("QJSContext.getGlobalProperty returned nil")
     }
     switch consume result {
-    case .value(let handle):
-      return adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle))
-    case .exception(let handle):
-      driverContextHandle.releaseCreatedHandle(QJSOwnedValueHandle.adopting(handle))
-      guard let undefined = driverContextHandle.makeUndefinedValueHandle() else {
-        preconditionFailure("QJSContext could not create an undefined handle")
+    case .value(let created):
+      return adoptCreated(created)
+    case .exception(let thrown):
+      quickJSUpdateStackTop(contextRef)
+      JS_FreeValue(contextRef, thrown)
+      guard let undefined = QJSEngine.makeUndefined(in: contextRef) else {
+        preconditionFailure("QJSContext could not create an undefined value")
       }
-      return adoptCreatedHandle(undefined)
+      return adoptCreated(undefined)
     }
   }
 
@@ -286,25 +302,26 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
-    _ = driverContextHandle.setStaticStringPropertyHandle(
+    guard let global = QJSEngine.globalObjectValue(contextRef) else { return }
+    _ = QJSEngine.setStaticStringProperty(
       key,
       on: global,
-      to: value.borrowHandle(),
+      to: value.value,
+      in: contextRef,
       attributes: attributes
     )
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = driverContextHandle.globalObjectValueHandle() else { return }
-    _ = driverContextHandle.deleteStaticStringPropertyHandle(key, on: global)
+    guard let global = QJSEngine.globalObjectValue(contextRef) else { return }
+    _ = QJSEngine.deleteStaticStringProperty(key, on: global, in: contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = driverContextHandle.globalObjectValueHandle() else {
+    guard let global = QJSEngine.globalObjectValue(contextRef) else {
       return false
     }
-    return driverContextHandle.hasStaticStringPropertyHandle(key, on: global) ?? false
+    return QJSEngine.hasStaticStringProperty(key, on: global, in: contextRef) ?? false
   }
 
   // MARK: - Scripts
@@ -314,40 +331,56 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     sourceURL: String?,
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
-    guard
-      let result = driverContextHandle.evaluatePreparedScriptResultHandle(
-        script.borrowHandle(in: driverContextHandle),
-        sourceURL: sourceURL,
-        startingLineNumber: startingLineNumber
-      )
-    else {
-      preconditionFailure("QJSContext.evaluateScript unexpectedly returned nil")
-    }
+    let result = QJSEngine.evaluateScript(
+      script.borrowSource(in: contextRef),
+      sourceURL: sourceURL,
+      startingLineNumber: startingLineNumber,
+      in: contextRef
+    )
     switch consume result {
-    case .value(let handle):
-      return .value(adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
-    case .exception(let handle):
-      return .exception(adoptCreatedHandle(QJSOwnedValueHandle.adopting(handle)))
+    case .value(let created):
+      return .value(adoptCreated(created))
+    case .exception(let thrown):
+      return .exception(adoptCreated(thrown))
     }
   }
 
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    driverContextHandle.contextDataStorageBox()?.setData(value, for: key)
+    QJSEngine.contextDataStorageBox(in: contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    driverContextHandle.contextDataStorageBox()?.data(for: key) ?? K.defaultValue
+    QJSEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
+  }
+
+  /// Package-internal data-box seam used by the cross-engine contract tests.
+  package nonisolated func contextDataStorageBox() -> JSContextDataStorageBox? {
+    QJSEngine.contextDataStorageBox(in: contextRef)
+  }
+
+  package nonisolated func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
+    let contextBits = UInt(bitPattern: contextRef)
+    if let vmThread = QJSScopeStacks.vmThread(for: contextRef) {
+      vmThread.perform {
+        guard let contextRef = OpaquePointer(bitPattern: contextBits) else {
+          return
+        }
+        QJSEngine.installContextDataStorageBox(storage, in: contextRef)
+      }
+    } else {
+      QJSEngine.installContextDataStorageBox(storage, in: contextRef)
+    }
   }
 
   // MARK: - Identity
 
   public nonisolated static func == (lhs: QJSContext, rhs: QJSContext) -> Bool {
-    lhs.driverContextHandle == rhs.driverContextHandle
+    lhs.contextRef == rhs.contextRef
   }
 
   public nonisolated func hash(into hasher: inout Hasher) {
-    hasher.combine(driverContextHandle)
+    hasher.combine(UInt(bitPattern: contextRef))
   }
 }

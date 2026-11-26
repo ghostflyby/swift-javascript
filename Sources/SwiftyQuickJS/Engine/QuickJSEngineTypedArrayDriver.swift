@@ -8,16 +8,17 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QJSEngine: JSEngineTypedArrayDriver {
-  package static func makeArrayBufferWithBytesNoCopyHandle(
-    in context: QJSContextHandle,
+extension QJSEngine {
+  package static func makeArrayBufferWithBytesNoCopy(
+    in context: OpaquePointer,
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
     bytesDeallocator: (
       @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
     )?,
     deallocatorContext: UnsafeMutableRawPointer?
-  ) -> QJSValueHandle? {
+  ) -> CQuickJSValue? {
+    quickJSUpdateStackTop(context)
     let opaque: UnsafeMutableRawPointer? =
       if let bytesDeallocator {
         Unmanaged.passRetained(
@@ -30,7 +31,7 @@ extension QJSEngine: JSEngineTypedArrayDriver {
         nil
       }
     let value = JS_NewArrayBuffer(
-      context.ref,
+      context,
       bytes?.assumingMemoryBound(to: UInt8.self),
       byteLength,
       quickJSArrayBufferFree,
@@ -44,76 +45,82 @@ extension QJSEngine: JSEngineTypedArrayDriver {
       }
       return nil
     }
-    return QJSValueHandle(ref: value)
+    return value
   }
 
-  package static func arrayBufferByteLengthForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func arrayBufferByteLength(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Int? {
+    quickJSUpdateStackTop(context)
     var size = 0
-    guard JS_GetArrayBuffer(context.ref, &size, value.ref) != nil else {
+    guard JS_GetArrayBuffer(context, &size, value) != nil else {
       return nil
     }
     return size
   }
 
-  package static func arrayBufferBytesPtrForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func arrayBufferBytesPtr(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    quickJSUpdateStackTop(context)
     var size = 0
-    let bytes = JS_GetArrayBuffer(context.ref, &size, value.ref)
+    let bytes = JS_GetArrayBuffer(context, &size, value)
     return (UnsafeMutableRawPointer(bytes), bytes == nil)
   }
 
-  package static func makeTypedArrayHandle(
-    in context: QJSContextHandle,
+  package static func makeTypedArray(
+    in context: OpaquePointer,
     kind: JSTypedArrayKind,
     length: Int
-  ) -> QJSValueHandle? {
-    var arguments = [JS_NewFloat64(context.ref, Double(length))]
-    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
+  ) -> CQuickJSValue? {
+    quickJSUpdateStackTop(context)
+    var arguments = [JS_NewFloat64(context, Double(length))]
+    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
   }
 
-  package static func makeTypedArrayHandle(
-    in context: QJSContextHandle,
+  package static func makeTypedArray(
+    in context: OpaquePointer,
     kind: JSTypedArrayKind,
-    arrayBuffer: QJSValueHandle
-  ) -> QJSValueHandle? {
+    arrayBuffer: CQuickJSValue
+  ) -> CQuickJSValue? {
+    quickJSUpdateStackTop(context)
     var arguments = [
-      arrayBuffer.ref,
-      JS_NewFloat64(context.ref, 0),
+      arrayBuffer,
+      JS_NewFloat64(context, 0),
       quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
     ]
-    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
+    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
   }
 
-  package static func makeTypedArrayHandle(
-    in context: QJSContextHandle,
+  package static func makeTypedArray(
+    in context: OpaquePointer,
     kind: JSTypedArrayKind,
-    arrayBuffer: QJSValueHandle,
+    arrayBuffer: CQuickJSValue,
     byteOffset: Int,
     length: Int
-  ) -> QJSValueHandle? {
+  ) -> CQuickJSValue? {
+    quickJSUpdateStackTop(context)
     var arguments = [
-      arrayBuffer.ref,
-      JS_NewFloat64(context.ref, Double(byteOffset)),
-      JS_NewFloat64(context.ref, Double(length)),
+      arrayBuffer,
+      JS_NewFloat64(context, Double(byteOffset)),
+      JS_NewFloat64(context, Double(length)),
     ]
-    return quickJSMakeTypedArrayHandle(in: context, kind: kind, arguments: &arguments)
+    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
   }
 
-  package static func typedArrayLengthForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func typedArrayLength(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Int? {
+    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
     let buffer = JS_GetTypedArrayBuffer(
-      context.ref,
-      value.ref,
+      context,
+      value,
       &byteOffset,
       &byteLength,
       &bytesPerElement
@@ -121,23 +128,24 @@ extension QJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return nil
     }
-    JS_FreeValue(context.ref, buffer)
+    JS_FreeValue(context, buffer)
     guard bytesPerElement > 0 else {
       return nil
     }
     return byteLength / bytesPerElement
   }
 
-  package static func typedArrayByteLengthForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func typedArrayByteLength(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Int? {
+    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
     let buffer = JS_GetTypedArrayBuffer(
-      context.ref,
-      value.ref,
+      context,
+      value,
       &byteOffset,
       &byteLength,
       &bytesPerElement
@@ -145,20 +153,21 @@ extension QJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return nil
     }
-    JS_FreeValue(context.ref, buffer)
+    JS_FreeValue(context, buffer)
     return byteLength
   }
 
-  package static func typedArrayByteOffsetForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func typedArrayByteOffset(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Int? {
+    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
     let buffer = JS_GetTypedArrayBuffer(
-      context.ref,
-      value.ref,
+      context,
+      value,
       &byteOffset,
       &byteLength,
       &bytesPerElement
@@ -166,20 +175,22 @@ extension QJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return nil
     }
-    JS_FreeValue(context.ref, buffer)
+    JS_FreeValue(context, buffer)
     return byteOffset
   }
 
-  package static func typedArrayBufferForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
-  ) -> QJSValueHandle? {
+  /// A new owning reference to the backing buffer.
+  package static func typedArrayBuffer(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
+  ) -> CQuickJSValue? {
+    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
     let buffer = JS_GetTypedArrayBuffer(
-      context.ref,
-      value.ref,
+      context,
+      value,
       &byteOffset,
       &byteLength,
       &bytesPerElement
@@ -187,19 +198,20 @@ extension QJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return nil
     }
-    return QJSValueHandle(ref: buffer)
+    return buffer
   }
 
-  package static func typedArrayBytesPtrForHandle(
-    _ value: QJSValueHandle,
-    in context: QJSContextHandle
+  package static func typedArrayBytesPtr(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
     let buffer = JS_GetTypedArrayBuffer(
-      context.ref,
-      value.ref,
+      context,
+      value,
       &byteOffset,
       &byteLength,
       &bytesPerElement
@@ -207,25 +219,24 @@ extension QJSEngine: JSEngineTypedArrayDriver {
     guard !JS_IsException(buffer) else {
       return (nil, true)
     }
-    defer { JS_FreeValue(context.ref, buffer) }
-    return arrayBufferBytesPtrForHandle(
-      QJSValueHandle(ref: buffer),
-      in: context
-    )
+    defer { JS_FreeValue(context, buffer) }
+    return arrayBufferBytesPtr(buffer, in: context)
   }
 
-  package static func isArrayBufferHandle(
-    _ value: QJSValueHandle,
-    in _: QJSContextHandle
+  package static func isArrayBuffer(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> Bool {
-    JS_IsArrayBuffer(value.ref)
+    _ = context
+    return JS_IsArrayBuffer(value)
   }
 
-  package static func typedArrayKindForHandle(
-    _ value: QJSValueHandle,
-    in _: QJSContextHandle
+  package static func typedArrayKind(
+    _ value: CQuickJSValue,
+    in context: OpaquePointer
   ) -> JSTypedArrayKind? {
-    switch JS_GetTypedArrayType(value.ref) {
+    _ = context
+    switch JS_GetTypedArrayType(value) {
     case 1:
       return .int8Array
     case 2:
@@ -250,14 +261,14 @@ extension QJSEngine: JSEngineTypedArrayDriver {
   }
 }
 
-private func quickJSMakeTypedArrayHandle(
-  in context: QJSContextHandle,
+private func quickJSMakeTypedArray(
+  in context: OpaquePointer,
   kind: JSTypedArrayKind,
   arguments: inout [CQuickJSValue]
-) -> QJSValueHandle? {
+) -> CQuickJSValue? {
   let value = arguments.withUnsafeMutableBufferPointer { buffer in
     JS_NewTypedArray(
-      context.ref,
+      context,
       Int32(buffer.count),
       buffer.baseAddress,
       quickJSTypedArrayType(for: kind)
@@ -267,12 +278,12 @@ private func quickJSMakeTypedArrayHandle(
     quickJSClearPendingException(in: context)
     return nil
   }
-  return QJSValueHandle(ref: value)
+  return value
 }
 
-private func quickJSClearPendingException(in context: QJSContextHandle) {
-  let exception = JS_GetException(context.ref)
-  JS_FreeValue(context.ref, exception)
+private func quickJSClearPendingException(in context: OpaquePointer) {
+  let exception = JS_GetException(context)
+  JS_FreeValue(context, exception)
 }
 
 private func quickJSTypedArrayType(for kind: JSTypedArrayKind) -> JSTypedArrayEnum {
@@ -308,96 +319,4 @@ private func quickJSArrayBufferFree(
   }
   let box = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
   box.deallocator(ptr, box.context)
-}
-
-// MARK: - Context-side driver conformance (Stage 2B)
-
-extension QJSContextHandle: JSContextTypedArrayDriver {
-  package func makeArrayBufferWithBytesNoCopyHandle(
-    bytes: UnsafeMutableRawPointer?,
-    byteLength: Int,
-    bytesDeallocator: (
-      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-    )?,
-    deallocatorContext: UnsafeMutableRawPointer?
-  ) -> QJSValueHandle? {
-    QJSEngine.makeArrayBufferWithBytesNoCopyHandle(
-      in: self,
-      bytes: bytes,
-      byteLength: byteLength,
-      bytesDeallocator: bytesDeallocator,
-      deallocatorContext: deallocatorContext
-    )
-  }
-
-  package func arrayBufferByteLengthForHandle(_ value: QJSValueHandle) -> Int? {
-    QJSEngine.arrayBufferByteLengthForHandle(value, in: self)
-  }
-
-  package func arrayBufferBytesPtrForHandle(
-    _ value: QJSValueHandle
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    QJSEngine.arrayBufferBytesPtrForHandle(value, in: self)
-  }
-
-  package func makeTypedArrayHandle(
-    kind: JSTypedArrayKind,
-    length: Int
-  ) -> QJSValueHandle? {
-    QJSEngine.makeTypedArrayHandle(in: self, kind: kind, length: length)
-  }
-
-  package func makeTypedArrayHandle(
-    kind: JSTypedArrayKind,
-    arrayBuffer: QJSValueHandle
-  ) -> QJSValueHandle? {
-    QJSEngine.makeTypedArrayHandle(in: self, kind: kind, arrayBuffer: arrayBuffer)
-  }
-
-  package func makeTypedArrayHandle(
-    kind: JSTypedArrayKind,
-    arrayBuffer: QJSValueHandle,
-    byteOffset: Int,
-    length: Int
-  ) -> QJSValueHandle? {
-    QJSEngine.makeTypedArrayHandle(
-      in: self,
-      kind: kind,
-      arrayBuffer: arrayBuffer,
-      byteOffset: byteOffset,
-      length: length
-    )
-  }
-
-  package func typedArrayLengthForHandle(_ value: QJSValueHandle) -> Int? {
-    QJSEngine.typedArrayLengthForHandle(value, in: self)
-  }
-
-  package func typedArrayByteLengthForHandle(_ value: QJSValueHandle) -> Int? {
-    QJSEngine.typedArrayByteLengthForHandle(value, in: self)
-  }
-
-  package func typedArrayByteOffsetForHandle(_ value: QJSValueHandle) -> Int? {
-    QJSEngine.typedArrayByteOffsetForHandle(value, in: self)
-  }
-
-  package func typedArrayBufferForHandle(_ value: QJSValueHandle)
-    -> QJSValueHandle?
-  {
-    QJSEngine.typedArrayBufferForHandle(value, in: self)
-  }
-
-  package func typedArrayBytesPtrForHandle(
-    _ value: QJSValueHandle
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    QJSEngine.typedArrayBytesPtrForHandle(value, in: self)
-  }
-
-  package func isArrayBufferHandle(_ value: QJSValueHandle) -> Bool {
-    QJSEngine.isArrayBufferHandle(value, in: self)
-  }
-
-  package func typedArrayKindForHandle(_ value: QJSValueHandle) -> JSTypedArrayKind? {
-    QJSEngine.typedArrayKindForHandle(value, in: self)
-  }
 }

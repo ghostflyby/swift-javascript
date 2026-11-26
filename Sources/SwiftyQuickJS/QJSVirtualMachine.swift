@@ -12,22 +12,19 @@ import SwiftJavaScript
 /// context of this VM runs on.
 ///
 /// Engine access only happens on that thread (design §0.2.3): the runtime is
-/// created there, every context handle is created there, and the runtime is
-/// released there in the same order as before — `JS_FreeRuntime`, then the
-/// class/record registries, then the runtime identity entry.
-/// `nonisolated ==`/`hash` use the runtime handle.
+/// created there, every context is created there, and the runtime is released
+/// there in the same order as before — `JS_FreeRuntime`, then the class record
+/// cache. `nonisolated ==`/`hash` use the runtime reference.
 public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   @unchecked Sendable
 {
   public typealias Context = QJSContext
-  package typealias ContextHandle = QJSContextHandle
-  package typealias RuntimeHandle = QJSRuntimeHandle
 
   public let unownedExecutor: UnownedSerialExecutor
 
-  /// The runtime identity of this VM. Package-internal: it is a handle, so it
-  /// must not appear in a public signature; `==`/`hash` still use it.
-  package let driverRuntimeHandle: QJSRuntimeHandle
+  /// The raw QuickJS runtime. Package-internal: it is an engine reference, so
+  /// it must not appear in a public signature; `==`/`hash` still use it.
+  package let runtimeRef: OpaquePointer
 
   private let owner: VMThread.Owner
   /// Retained so registry cleanup jobs can be scheduled without retaining the
@@ -39,10 +36,13 @@ public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   }
 
   private init(thread: VMThread) {
-    let runtime = thread.runAndWait {
-      QJSEngine.makeRuntimeHandle()
+    let runtimeBits = thread.runAndWait {
+      UInt(bitPattern: QJSEngine.makeRuntime())
     }
-    self.driverRuntimeHandle = runtime
+    guard let runtimeRef = OpaquePointer(bitPattern: runtimeBits) else {
+      preconditionFailure("QuickJS could not create runtime")
+    }
+    self.runtimeRef = runtimeRef
     self.unownedExecutor = thread.unownedExecutor
     self.owner = thread.owner
     self.thread = thread
@@ -52,17 +52,28 @@ public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
   /// creating a context mutates the shared runtime, which that thread may be
   /// using for the VM's other contexts. Package-internal: only
   /// `QJSContext.init(virtualMachine:)` and same-package tests call it.
-  package func makeContextHandle() -> QJSContextHandle? {
-    let runtimeHandle = driverRuntimeHandle
-    return thread.runAndWait {
-      QJSEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+  package func makeContext() -> OpaquePointer? {
+    let runtimeBits = UInt(bitPattern: runtimeRef)
+    let contextBits = thread.runAndWait { () -> UInt? in
+      guard let runtime = OpaquePointer(bitPattern: runtimeBits),
+        let context = QJSEngine.makeContext(in: runtime)
+      else {
+        return nil
+      }
+      return UInt(bitPattern: context)
     }
+    guard let contextBits else { return nil }
+    return OpaquePointer(bitPattern: contextBits)
   }
 
-  /// Run QuickJS's garbage collector. Engine work, so the caller is expected
-  /// to be on the VM thread (a context callback or the actor's isolation).
-  public func gc() {
-    JS_RunGC(driverRuntimeHandle.ref)
+  /// Force a QuickJS cycle collection on the VM thread.
+  package func gc() {
+    let runtimeBits = UInt(bitPattern: runtimeRef)
+    thread.runAndWait {
+      guard let runtime = OpaquePointer(bitPattern: runtimeBits) else { return }
+      JS_UpdateStackTop(runtime)
+      JS_RunGC(runtime)
+    }
   }
 
   /// Scheduling handle for persistent-binding settlement (design §2.4
@@ -82,17 +93,19 @@ public final class QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine,
     // An engine call, so it belongs on the VM thread (design §0.2.3). Every
     // context retained the VM, so by now they are all gone and the thread is
     // idle; the release completes before `Owner` stops the thread.
-    let runtimeHandle = driverRuntimeHandle
+    let runtimeBits = UInt(bitPattern: runtimeRef)
     thread.runAndWait {
-      _ = runtimeHandle.releaseReference()
+      guard let runtime = OpaquePointer(bitPattern: runtimeBits) else { return }
+      QJSEngine.releaseRuntime(runtime)
+      removeQuickJSClassRecords(in: runtime)
     }
   }
 
   public static func == (lhs: QJSVirtualMachine, rhs: QJSVirtualMachine) -> Bool {
-    lhs.driverRuntimeHandle == rhs.driverRuntimeHandle
+    lhs.runtimeRef == rhs.runtimeRef
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(driverRuntimeHandle)
+    hasher.combine(UInt(bitPattern: runtimeRef))
   }
 }
