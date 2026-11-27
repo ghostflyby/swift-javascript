@@ -74,13 +74,13 @@ struct EngineRuntimeDriverTests {
 
   @Test
   func engineCapabilitiesMatchImplementedPublicSurface() {
-    expectTrue(JSCEngine.capabilities.supportsHostObjects)
-    expectTrue(!JSCEngine.capabilities.supportsESModules)
-    expectTrue(!JSCEngine.capabilities.supportsPromiseJobQueueControl)
+    expectTrue(JSCVirtualMachine.capabilities.supportsHostObjects)
+    expectTrue(!JSCVirtualMachine.capabilities.supportsESModules)
+    expectTrue(!JSCVirtualMachine.capabilities.supportsPromiseJobQueueControl)
 
-    expectTrue(QJSEngine.capabilities.supportsHostObjects)
-    expectTrue(!QJSEngine.capabilities.supportsESModules)
-    expectTrue(!QJSEngine.capabilities.supportsPromiseJobQueueControl)
+    expectTrue(QJSVirtualMachine.capabilities.supportsHostObjects)
+    expectTrue(!QJSVirtualMachine.capabilities.supportsESModules)
+    expectTrue(!QJSVirtualMachine.capabilities.supportsPromiseJobQueueControl)
   }
 }
 

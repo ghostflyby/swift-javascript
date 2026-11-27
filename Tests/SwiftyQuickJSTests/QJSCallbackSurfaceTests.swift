@@ -23,7 +23,7 @@ struct QJSCallbackSurfaceTests {
   private func makeContext() -> (OpaquePointer, OpaquePointer) {
     let runtime = quickJSMakeRuntime()
     guard let context = JS_NewContext(runtime) else {
-      preconditionFailure("QJSEngine could not create a context")
+      preconditionFailure("QuickJS could not create a context")
     }
     return (runtime, context)
   }

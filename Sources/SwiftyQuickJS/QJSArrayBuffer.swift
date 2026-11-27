@@ -10,7 +10,7 @@ import SwiftJavaScript
 
 // MARK: - QuickJS buffers (S10)
 //
-// Mirrors the JavaScriptCore wrappers: real structs over the `QJSEngine`
+// Mirrors the JavaScriptCore wrappers: real structs over the `QuickJS`
 // typed-array statics over raw values, with core holding the byte
 // allocation/copy helpers and the wrapper implementing the byte/shape access.
 // Failure semantics are unchanged: the driver clears the pending exception and

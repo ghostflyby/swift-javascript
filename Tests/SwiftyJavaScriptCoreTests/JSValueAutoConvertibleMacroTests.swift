@@ -7,7 +7,7 @@ private func makeMacroHandles() -> (runtime: JSContextGroupRef, contextRef: JSGl
   let runtime = JSContextGroupCreate()!
   guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime)
   else {
-    preconditionFailure("JSCEngine could not create a context handle")
+    preconditionFailure("JavaScriptCore could not create a context handle")
   }
   return (runtime, contextHandle)
 }

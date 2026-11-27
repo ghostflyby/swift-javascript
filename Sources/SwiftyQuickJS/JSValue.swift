@@ -34,7 +34,7 @@ public struct QJSCallArgument: SwiftJavaScript.JSCallArgument {
 /// this view owns nothing and its `deinit` releases nothing.
 ///
 /// Base classification, conversion, and equality route directly to the
-/// `QJSEngine` statics over the raw value and context.
+/// `QuickJS` statics over the raw value and context.
 public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   public typealias Context = QJSContext
   public typealias InstantContext = QJSInstantContext

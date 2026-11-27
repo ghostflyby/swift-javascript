@@ -21,7 +21,7 @@ import Testing
 private func makeContext() -> (OpaquePointer, OpaquePointer) {
   let runtime = quickJSMakeRuntime()
   guard let context = JS_NewContext(runtime) else {
-    preconditionFailure("QJSEngine could not create a context")
+    preconditionFailure("QuickJS could not create a context")
   }
   return (runtime, context)
 }
@@ -29,14 +29,14 @@ private func makeContext() -> (OpaquePointer, OpaquePointer) {
 private func adoptObject(in scope: borrowing QJSInstantContext) -> QJSValue {
   let context = scope.contextRef
   guard let result = quickJSMakeObjectResult(in: context) else {
-    preconditionFailure("QJSEngine could not create an object")
+    preconditionFailure("QuickJS could not create an object")
   }
   switch consume result {
   case .value(let value):
     return scope.adoptCreated(value)
   case .exception(let value):
     JS_FreeValue(context, value)
-    preconditionFailure("QJSEngine object creation returned an exception")
+    preconditionFailure("QuickJS object creation returned an exception")
   }
 }
 
@@ -54,7 +54,7 @@ private func adoptEvaluated(
   case .value(let value):
     return value
   case .exception:
-    preconditionFailure("QJSEngine evaluation of \(source) threw")
+    preconditionFailure("QuickJS evaluation of \(source) threw")
   }
 }
 
@@ -63,7 +63,7 @@ private func adoptString(
   in scope: borrowing QJSInstantContext
 ) -> QJSValue {
   guard let created = quickJSMakeString(value, in: scope.contextRef) else {
-    preconditionFailure("QJSEngine could not create a string")
+    preconditionFailure("QuickJS could not create a string")
   }
   return scope.adoptCreated(created)
 }
@@ -134,7 +134,7 @@ struct QJSValueOperationsTests {
       #expect(names == ["name"])
 
       guard let keyHandle = quickJSMakePropertyStringAtom("count", in: context) else {
-        Issue.record("QJSEngine could not make a property key")
+        Issue.record("QuickJS could not make a property key")
         return
       }
       let number = scope.adoptCreated(quickJSMakeNumber(3, in: context)!)

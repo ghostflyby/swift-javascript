@@ -2,7 +2,7 @@ import SwiftJavaScript
 
 // MARK: - Property, object, and invocation surface (S5)
 //
-// Mirror of the JavaScriptCore file: every operation drives the `QJSEngine`
+// Mirror of the JavaScriptCore file: every operation drives the `QuickJS`
 // raw-value statics directly and adopts each engine-returned value onto the
 // passed scope's arena exactly once — the exception path included. QuickJS
 // hands back a new reference (+1) for each result, so adopting it is what the

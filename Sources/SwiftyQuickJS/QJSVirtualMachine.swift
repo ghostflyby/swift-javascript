@@ -27,6 +27,16 @@ import ThreadAffinityExecutor
 public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   public typealias Context = QJSContext
 
+  /// The engine capabilities of QuickJS.
+  public static let capabilities = JSEngineCapabilities(
+    supportsBigInt: true,
+    supportsSymbol: true,
+    supportsExternalArrayBuffer: true,
+    supportsHostObjects: true,
+    supportsESModules: false,
+    supportsPromiseJobQueueControl: false
+  )
+
   public nonisolated let unownedExecutor: UnownedSerialExecutor
 
   /// The executor every context of this VM runs on. Package-internal so a

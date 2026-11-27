@@ -341,7 +341,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 @Test func autoClassDefinitionRoundTripsThroughJavaScript() throws {
   let runtime = JSContextGroupCreate()!
   guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
+    Issue.record("JavaScriptCore could not create a context handle")
     return
   }
   let context = JSCInstantContext(contextRef: contextHandle)
@@ -367,7 +367,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 @Test func macroGeneratedClassDefinitionUsesSurfaceCallbacks() throws {
   let runtime = JSContextGroupCreate()!
   guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
+    Issue.record("JavaScriptCore could not create a context handle")
     return
   }
   let context = JSCInstantContext(contextRef: contextHandle)
@@ -391,7 +391,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 @Test func macroGeneratedClassMethodsUseSurfaceCallbacks() throws {
   let runtime = JSContextGroupCreate()!
   guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
+    Issue.record("JavaScriptCore could not create a context handle")
     return
   }
   let context = JSCInstantContext(contextRef: contextHandle)

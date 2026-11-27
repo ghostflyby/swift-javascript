@@ -28,23 +28,23 @@ import Testing
 //
 //     // ✗ 应编译失败 —— actor 隔离域把非 Sendable 本地值返回给 nonisolated
 //     // 上下文:
-//     func leak(_ context: JSContextLegacy<JSCEngine>) async {
+//     func leak(_ context: JSContextLegacy<JavaScriptCore>) async {
 //       let value = await context.makeString("leak")
 //       _ = value
 //     }
 //
 //     // ✗ 应编译失败 —— 捕获进 @Sendable 任务(handle/context token 的
 //     // Sendable 不使本地值本身可跨域):
-//     func send(_ value: borrowing JSValueLegacy<JSCEngine>) {
+//     func send(_ value: borrowing JSValueLegacy<JavaScriptCore>) {
 //       Task.detached { _ = value }
 //     }
 //
 //     // ✗ 应编译失败 —— 作为 actor 间实例方法实参:
 //     actor Sink {
-//       func take(_ value: borrowing JSValueLegacy<JSCEngine>) {}
+//       func take(_ value: borrowing JSValueLegacy<JavaScriptCore>) {}
 //     }
 //     func send(
-//       _ value: borrowing JSValueLegacy<JSCEngine>,
+//       _ value: borrowing JSValueLegacy<JavaScriptCore>,
 //       to sink: Sink
 //     ) async {
 //       await sink.take(value)
@@ -53,7 +53,7 @@ import Testing
 // 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 /
 // swiftlang-6.4.2.1.9;探针文件临时加入 `SwiftJavaScriptEngineTests` target
 // 后 `swift build --build-tests`,确认三类诊断后删除探针并重建通过):
-// - actor 返回样例报 `error: non-Sendable 'JSValueLegacy<JSCEngine>'
+// - actor 返回样例报 `error: non-Sendable 'JSValueLegacy<JavaScriptCore>'
 //   -typed result can not be returned from actor-isolated instance method
 //   'makeString' to nonisolated context`,并附
 //   `note: generic struct 'JSValueLegacy' does not conform to the 'Sendable'
@@ -81,22 +81,22 @@ import Testing
 // 保留,标注「应编译失败」,该验证未自动化:
 //
 //     // ✗ 应编译失败 —— 从 nonisolated 上下文调用工厂,结果跨 actor 边界:
-//     func leak(_ context: JSContextLegacy<JSCEngine>) async {
+//     func leak(_ context: JSContextLegacy<JavaScriptCore>) async {
 //       let scope = await context.makeScope()
 //       _ = scope
 //     }
 //
 //     // ✗ 应编译失败 —— 把结果从 actor 隔离实例方法返回给 nonisolated 调用方:
 //     func leak(
-//       _ context: JSContextLegacy<JSCEngine>
-//     ) async -> JSScopeLegacy<JSCEngine> {
+//       _ context: JSContextLegacy<JavaScriptCore>
+//     ) async -> JSScopeLegacy<JavaScriptCore> {
 //       await context.makeScope()
 //     }
 //
 // 构建探针实测记录(2026-11-23,Apple Swift 6.4.2 / swiftlang-6.4.2.1.9;探针文件
 // 临时加入 `SwiftJavaScriptEngineTests` target 后 `swift build --build-tests`,
 // 确认诊断后删除探针并重建通过):
-// - 两个样例均报 `error: non-Sendable 'JSScopeLegacy<JSCEngine>'-typed
+// - 两个样例均报 `error: non-Sendable 'JSScopeLegacy<JavaScriptCore>'-typed
 //   result can not be returned from actor-isolated instance method 'makeScope()'
 //   to nonisolated context`,并附
 //   `note: generic struct 'JSScopeLegacy' does not conform to the 'Sendable' protocol`。

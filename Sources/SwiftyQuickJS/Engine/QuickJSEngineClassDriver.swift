@@ -199,19 +199,17 @@ extension QJSInstantContext {
   }
 }
 
-extension QJSEngine {
-  package static func classDefinition(
-    for classID: JSClassID,
-    runtimeRef: OpaquePointer?,
-    in runtime: OpaquePointer
-  ) -> QJSClassDefinition? {
-    guard runtimeRef == nil || runtimeRef == runtime else {
-      return nil
-    }
-    return quickJSClassRegistry.definition(
-      for: QuickJSClassRegistryKey(runtime: UInt(bitPattern: runtime), classID: classID)
-    )
+package func quickJSClassDefinition(
+  for classID: JSClassID,
+  runtimeRef: OpaquePointer?,
+  in runtime: OpaquePointer
+) -> QJSClassDefinition? {
+  guard runtimeRef == nil || runtimeRef == runtime else {
+    return nil
   }
+  return quickJSClassRegistry.definition(
+    for: QuickJSClassRegistryKey(runtime: UInt(bitPattern: runtime), classID: classID)
+  )
 }
 
 private func registerClassIfNeeded(
@@ -267,7 +265,7 @@ private func jsClassDefinition(
   in context: OpaquePointer
 ) -> QJSClassDefinition? {
   let runtime = quickJSRuntimeRef(for: context)
-  return QJSEngine.classDefinition(
+  return quickJSClassDefinition(
     for: jsClass.classID,
     runtimeRef: jsClass.runtimeRef,
     in: runtime

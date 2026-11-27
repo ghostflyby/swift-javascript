@@ -7,7 +7,7 @@ import Testing
 // MARK: - Surface callback views (S6)
 //
 // `JSCValue`/`JSCCallbackArguments` are the concrete callback-window
-// views handed to `JSFunctionCallback<JSCEngine>`. These tests construct them
+// views handed to `JSFunctionCallback<JavaScriptCore>`. These tests construct them
 // directly from arena-backed handles and exercise classification/conversion,
 // equality, and indexed argument access. Callback return/throw semantics belong
 // to the S7 scope slice.
@@ -17,7 +17,7 @@ struct JSCCallbackSurfaceTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
     let runtime = JSContextGroupCreate()!
     guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-      preconditionFailure("JSCEngine could not create a context handle")
+      preconditionFailure("JavaScriptCore could not create a context handle")
     }
     return (runtime, context)
   }

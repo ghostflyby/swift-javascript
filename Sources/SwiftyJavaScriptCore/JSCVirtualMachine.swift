@@ -9,11 +9,21 @@ import ThreadAffinityExecutor
 ///
 /// Engine state is created during `init`, on the VM's executor, and released
 /// by `isolated deinit` on that same executor. `init` blocks until the context
-/// group exists; `init() async` waits for it without blocking. A caller that
+/// group exists; the `JSInitMode.nonblocking` form awaits instead. A caller that
 /// already is on the executor runs the initialization inline.
 /// `nonisolated ==`/`hash` use object identity.
 public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   public typealias Context = JSCContext
+
+  /// The engine capabilities of JavaScriptCore.
+  public static let capabilities = JSEngineCapabilities(
+    supportsBigInt: true,
+    supportsSymbol: true,
+    supportsExternalArrayBuffer: true,
+    supportsHostObjects: true,
+    supportsESModules: false,
+    supportsPromiseJobQueueControl: false
+  )
 
   public nonisolated let unownedExecutor: UnownedSerialExecutor
 

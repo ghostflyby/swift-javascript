@@ -41,7 +41,7 @@ struct QJSValueCoreTests {
   private func makeContext() -> (OpaquePointer, OpaquePointer) {
     let runtime = quickJSMakeRuntime()
     guard let context = JS_NewContext(runtime) else {
-      preconditionFailure("QJSEngine could not create a context handle")
+      preconditionFailure("QuickJS could not create a context handle")
     }
     return (runtime, context)
   }
@@ -51,14 +51,14 @@ struct QJSValueCoreTests {
     on scope: borrowing QJSInstantContext
   ) -> QJSValue {
     guard let result = quickJSMakeObjectResult(in: context) else {
-      preconditionFailure("QJSEngine could not create an object")
+      preconditionFailure("QuickJS could not create an object")
     }
     switch consume result {
     case .value(let handle):
       return scope.adoptCreated(handle)
     case .exception(let handle):
       JS_FreeValue(context, handle)
-      preconditionFailure("QJSEngine object creation returned an exception")
+      preconditionFailure("QuickJS object creation returned an exception")
     }
   }
 
@@ -145,7 +145,7 @@ struct QJSValueCoreTests {
       case .value(let value):
         bigInt = value
       case .exception:
-        preconditionFailure("QJSEngine could not evaluate a BigInt literal")
+        preconditionFailure("QuickJS could not evaluate a BigInt literal")
       }
       let bigIntType = bigInt.type()
       #expect(bigIntType == .bigInt)

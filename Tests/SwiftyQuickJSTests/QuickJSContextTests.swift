@@ -182,7 +182,7 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
 private func makeQuickJSClassContext() -> (OpaquePointer, OpaquePointer) {
   let runtime = quickJSMakeRuntime()
   guard let context = JS_NewContext(runtime) else {
-    preconditionFailure("QJSEngine could not create a context handle")
+    preconditionFailure("QuickJS could not create a context handle")
   }
   return (runtime, context)
 }

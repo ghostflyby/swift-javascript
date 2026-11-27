@@ -3,7 +3,7 @@ import SwiftJavaScript
 
 // MARK: - Property, object, and invocation surface (S5)
 //
-// Each operation drives the `JSCEngine` raw-ref statics directly and adopts
+// Each operation drives the `JavaScriptCore` raw-ref statics directly and adopts
 // every engine-returned ref onto the passed scope's arena exactly once — the
 // exception path included — so the scope drain settles each reference once.
 // The `#isolation` forms below adopt onto the context default scope instead;

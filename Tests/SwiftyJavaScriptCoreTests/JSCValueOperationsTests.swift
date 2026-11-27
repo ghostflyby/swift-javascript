@@ -14,7 +14,7 @@ import Testing
 private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
   let runtime = JSContextGroupCreate()!
   guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    preconditionFailure("JSCEngine could not create a context handle")
+    preconditionFailure("JavaScriptCore could not create a context handle")
   }
   return (runtime, context)
 }
@@ -22,14 +22,14 @@ private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
 private func adoptObject(in scope: borrowing JSCInstantContext) -> JSCValue {
   let context = scope.contextRef
   guard let result = javaScriptCoreMakeObjectResultHandle(context) else {
-    preconditionFailure("JSCEngine could not create an object")
+    preconditionFailure("JavaScriptCore could not create an object")
   }
   switch consume result {
   case .value(let handle):
     return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
 
-    preconditionFailure("JSCEngine object creation returned an exception")
+    preconditionFailure("JavaScriptCore object creation returned an exception")
   }
 }
 
@@ -46,14 +46,14 @@ private func adoptEvaluated(
       startingLineNumber: 1
     )
   else {
-    preconditionFailure("JSCEngine could not evaluate \(source)")
+    preconditionFailure("JavaScriptCore could not evaluate \(source)")
   }
   switch consume result {
   case .value(let handle):
     return scope.adoptCreatedHandle(handle)
   case .exception(let handle):
 
-    preconditionFailure("JSCEngine evaluation of \(source) threw")
+    preconditionFailure("JavaScriptCore evaluation of \(source) threw")
   }
 }
 
@@ -62,7 +62,7 @@ private func adoptString(
   in scope: borrowing JSCInstantContext
 ) -> JSCValue {
   guard let handle = javaScriptCoreMakeStringValueHandle(value, scope.contextRef) else {
-    preconditionFailure("JSCEngine could not create a string")
+    preconditionFailure("JavaScriptCore could not create a string")
   }
   return scope.adoptCreatedHandle(handle)
 }
@@ -133,7 +133,7 @@ struct JSCValueOperationsTests {
       #expect(names == ["name"])
 
       guard let keyHandle = javaScriptCoreMakePropertyStringKeyHandle("count", in: context) else {
-        Issue.record("JSCEngine could not make a property key")
+        Issue.record("JavaScriptCore could not make a property key")
         return
       }
       let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(3, context)!)

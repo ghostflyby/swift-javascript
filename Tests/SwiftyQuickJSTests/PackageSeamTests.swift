@@ -20,7 +20,7 @@ import Testing
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
   let runtime = quickJSMakeRuntime()
   guard let context = JS_NewContext(runtime) else {
-    Issue.record("QJSEngine could not create a context")
+    Issue.record("QuickJS could not create a context")
     return
   }
 

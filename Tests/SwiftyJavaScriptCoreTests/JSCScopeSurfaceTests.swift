@@ -32,7 +32,7 @@ struct JSCScopeSurfaceTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
     let runtime = JSContextGroupCreate()!
     guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-      preconditionFailure("JSCEngine could not create a context handle")
+      preconditionFailure("JavaScriptCore could not create a context handle")
     }
     return (runtime, context)
   }

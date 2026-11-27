@@ -34,7 +34,7 @@ struct JSCValueCoreTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
     let runtime = JSContextGroupCreate()!
     guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-      preconditionFailure("JSCEngine could not create a context handle")
+      preconditionFailure("JavaScriptCore could not create a context handle")
     }
     return (runtime, context)
   }
@@ -44,14 +44,14 @@ struct JSCValueCoreTests {
     on scope: borrowing JSCInstantContext
   ) -> JSCValue {
     guard let result = javaScriptCoreMakeObjectResultHandle(context) else {
-      preconditionFailure("JSCEngine could not create an object")
+      preconditionFailure("JavaScriptCore could not create an object")
     }
     switch consume result {
     case .value(let handle):
       return scope.adoptCreatedHandle(handle)
     case .exception(let handle):
 
-      preconditionFailure("JSCEngine object creation returned an exception")
+      preconditionFailure("JavaScriptCore object creation returned an exception")
     }
   }
 

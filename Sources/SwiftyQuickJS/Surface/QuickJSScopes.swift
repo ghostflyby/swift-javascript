@@ -17,7 +17,7 @@ import SwiftJavaScript
 // implemented here, on this scope's frame. What stays in core is the
 // value-level composition that never adopts (the installed-function wrapper,
 // the callback-value global write). Engine calls refresh the runtime's stack
-// top through the `QJSEngine` statics.
+// top through the `QuickJS` statics.
 
 /// The synchronous callback window handed to a `JSFunctionCallback`.
 public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {

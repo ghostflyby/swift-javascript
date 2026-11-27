@@ -28,7 +28,7 @@ public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
 /// no release.
 ///
 /// Base classification, conversion, and equality route directly to the
-/// `JSCEngine` statics over the raw `JSValueRef` and `JSGlobalContextRef`;
+/// `JavaScriptCore` statics over the raw `JSValueRef` and `JSGlobalContextRef`;
 /// the property/invocation/typed-array surface is added by S5.
 public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
   public typealias Context = JSCContext

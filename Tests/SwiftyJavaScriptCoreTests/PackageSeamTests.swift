@@ -13,7 +13,7 @@ import Testing
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
   let runtime = JSContextGroupCreate()!
   guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    Issue.record("JSCEngine could not create a context handle")
+    Issue.record("JavaScriptCore could not create a context handle")
     return
   }
 

@@ -7,23 +7,10 @@ enum JavaScriptCoreObjectLookup {
   case exception(JSValueRef)
 }
 
-public enum JSCEngine: Sendable {}
-
-extension JSCEngine {
-  package static let capabilities = JSEngineCapabilities(
-    supportsBigInt: true,
-    supportsSymbol: true,
-    supportsExternalArrayBuffer: true,
-    supportsHostObjects: true,
-    supportsESModules: false,
-    supportsPromiseJobQueueControl: false
-  )
-
-  package static func contextGroupBits(
-    for context: JSGlobalContextRef
-  ) -> UInt? {
-    UInt(bitPattern: JSContextGetGroup(context))
-  }
+package func javaScriptCoreContextGroupBits(
+  for context: JSGlobalContextRef
+) -> UInt? {
+  UInt(bitPattern: JSContextGetGroup(context))
 }
 
 private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {

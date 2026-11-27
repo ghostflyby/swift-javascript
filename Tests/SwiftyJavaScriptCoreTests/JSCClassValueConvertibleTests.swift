@@ -82,7 +82,7 @@ class ExportedFunctionNode {
 private func makeExportedClassContext() -> JSCInstantContext {
   let runtime = JSContextGroupCreate()!
   guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
-    fatalError("JSCEngine could not create a context handle")
+    fatalError("JavaScriptCore could not create a context handle")
   }
   return JSCInstantContext(contextRef: contextHandle)
 }

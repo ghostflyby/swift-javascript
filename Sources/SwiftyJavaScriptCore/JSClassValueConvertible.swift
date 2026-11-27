@@ -88,7 +88,7 @@ extension JSCInstantContext {
     definition: JSCAutoClassDefinition,
     identity: ObjectIdentifier
   ) -> JSCClass {
-    guard let runtime = JSCEngine.contextGroupBits(for: contextRef) else {
+    guard let runtime = javaScriptCoreContextGroupBits(for: contextRef) else {
       preconditionFailure("JavaScriptCore context has no context group")
     }
     let key = JavaScriptCoreClassCacheKey(identity: identity, runtime: runtime)

@@ -3,7 +3,7 @@ import SwiftJavaScript
 
 // MARK: - JavaScriptCore buffers (S10)
 //
-// Both wrappers are real structs over the `JSCEngine` typed-array statics over
+// Both wrappers are real structs over the `JavaScriptCore` typed-array statics over
 // raw refs: the engine owns every C call, core owns the byte allocation/copy
 // helpers, and the wrapper states the JavaScriptCore identity, the byte/shape
 // access, and the arena adoption.
