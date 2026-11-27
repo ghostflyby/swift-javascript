@@ -269,7 +269,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return JSCPropertyStringKey(
       stringRef: stringRef,
       contextRef: core.contextRef,
-      vmThread: JSCScopeStacks.vmThread(for: core.contextRef)
+      context: JSCScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -280,7 +280,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return JSCPreparedScript(
       scriptRef: scriptRef,
       contextRef: core.contextRef,
-      vmThread: JSCScopeStacks.vmThread(for: core.contextRef)
+      context: JSCScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -573,7 +573,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return JSCPropertyStringKey(
       stringRef: stringRef,
       contextRef: core.contextRef,
-      vmThread: JSCScopeStacks.vmThread(for: core.contextRef)
+      context: JSCScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -584,7 +584,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return JSCPreparedScript(
       scriptRef: scriptRef,
       contextRef: core.contextRef,
-      vmThread: JSCScopeStacks.vmThread(for: core.contextRef)
+      context: JSCScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -636,5 +636,12 @@ private func mintPersistentHandle(
       "JSPersistentHandle minting requires a hosted JSContext (no registry installed)"
     )
   }
-  return JSCPersistentHandle(identity: bindings.mint(ref), registry: bindings)
+  guard let context = JSCScopeStacks.context(for: contextRef) else {
+    preconditionFailure("JSPersistentHandle minting requires a live JSContext actor")
+  }
+  return JSCPersistentHandle(
+    identity: bindings.mint(ref),
+    registry: bindings,
+    context: context
+  )
 }

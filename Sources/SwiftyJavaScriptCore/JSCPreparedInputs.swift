@@ -4,15 +4,17 @@ import SwiftJavaScript
 /// A self-owning JavaScriptCore property string key.
 ///
 /// Keeps the `JSStringRef` alive plus a reference to the context that created
-/// it, so the key can outlive `JSCContext`/`JSCInstantContext`. The release is
-/// routed to the context's VM thread when it has one; the shared algorithm is
-/// `releasePreparedInput` in core.
+/// it, so the key can outlive `JSCContext`/`JSCInstantContext`. The context
+/// holds the reverse reference: an input still registered at context teardown
+/// is released there, and a live context takes the references back through its
+/// actor when the input dies first.
 public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = JSCContext
 
   private let stringBits: UInt
   private let contextBits: UInt
-  private let vmThread: VMThread?
+  private let inputToken: UInt64?
+  private let contextReference: JSCContextReference?
 
   package var stringRef: JSStringRef {
     JSStringRef(bitPattern: stringBits)!
@@ -21,12 +23,21 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
   package init(
     stringRef: JSStringRef,
     contextRef: JSGlobalContextRef,
-    vmThread: VMThread?
+    context: JSCContext?
   ) {
     self.stringBits = UInt(bitPattern: stringRef)
     self.contextBits = UInt(bitPattern: contextRef)
-    self.vmThread = vmThread
     _ = JSGlobalContextRetain(contextRef)
+    if let context {
+      self.contextReference = JSCContextReference(context)
+      self.inputToken = context.registerInput(
+        stringBits: UInt(bitPattern: stringRef),
+        contextBits: UInt(bitPattern: contextRef)
+      )
+    } else {
+      self.contextReference = nil
+      self.inputToken = nil
+    }
   }
 
   /// The engine key reference, validated against the context that created it.
@@ -44,20 +55,23 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
   }
 
   deinit {
-    let stringBits = self.stringBits
-    let contextBits = self.contextBits
-    let release: @Sendable () -> Void = {
-      if let stringRef = JSStringRef(bitPattern: stringBits) {
-        JSStringRelease(stringRef)
+    if let contextReference {
+      // A live context takes the references back here, on the VM executor; a
+      // dead one already released them at teardown.
+      guard let context = contextReference.value, let inputToken else { return }
+      let token = inputToken
+      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+        context.releaseInput(token)
       }
-      if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
-        JSGlobalContextRelease(contextRef)
-      }
+      return
     }
-    if let vmThread {
-      vmThread.perform(release)
-    } else {
-      release()
+    // Created without a context (a raw engine window): the creator owns the
+    // release, on the calling thread.
+    if let stringRef = JSStringRef(bitPattern: stringBits) {
+      JSStringRelease(stringRef)
+    }
+    if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
+      JSGlobalContextRelease(contextRef)
     }
   }
 }
@@ -71,7 +85,8 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
 
   private let scriptBits: UInt
   private let contextBits: UInt
-  private let vmThread: VMThread?
+  private let inputToken: UInt64?
+  private let contextReference: JSCContextReference?
 
   package var scriptRef: JSStringRef {
     JSStringRef(bitPattern: scriptBits)!
@@ -80,12 +95,21 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
   package init(
     scriptRef: JSStringRef,
     contextRef: JSGlobalContextRef,
-    vmThread: VMThread?
+    context: JSCContext?
   ) {
     self.scriptBits = UInt(bitPattern: scriptRef)
     self.contextBits = UInt(bitPattern: contextRef)
-    self.vmThread = vmThread
     _ = JSGlobalContextRetain(contextRef)
+    if let context {
+      self.contextReference = JSCContextReference(context)
+      self.inputToken = context.registerInput(
+        stringBits: UInt(bitPattern: scriptRef),
+        contextBits: UInt(bitPattern: contextRef)
+      )
+    } else {
+      self.contextReference = nil
+      self.inputToken = nil
+    }
   }
 
   /// The engine script reference, validated against the context that compiled
@@ -103,20 +127,23 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
   }
 
   deinit {
-    let scriptBits = self.scriptBits
-    let contextBits = self.contextBits
-    let release: @Sendable () -> Void = {
-      if let scriptRef = JSStringRef(bitPattern: scriptBits) {
-        JSStringRelease(scriptRef)
+    if let contextReference {
+      // A live context takes the references back here, on the VM executor; a
+      // dead one already released them at teardown.
+      guard let context = contextReference.value, let inputToken else { return }
+      let token = inputToken
+      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+        context.releaseInput(token)
       }
-      if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
-        JSGlobalContextRelease(contextRef)
-      }
+      return
     }
-    if let vmThread {
-      vmThread.perform(release)
-    } else {
-      release()
+    // Created without a context (a raw engine window): the creator owns the
+    // release, on the calling thread.
+    if let scriptRef = JSStringRef(bitPattern: scriptBits) {
+      JSStringRelease(scriptRef)
+    }
+    if let contextRef = JSGlobalContextRef(bitPattern: contextBits) {
+      JSGlobalContextRelease(contextRef)
     }
   }
 }

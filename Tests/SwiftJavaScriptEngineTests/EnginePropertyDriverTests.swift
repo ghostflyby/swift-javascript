@@ -47,7 +47,7 @@ struct EnginePropertyDriverTests {
 
 private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
@@ -71,7 +71,7 @@ private enum SetGetHasDeletePropertyWithStringKey: ScriptEngineAssertion {
 
 private enum SetGetHasDeletePropertyWithValueKey: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
@@ -96,7 +96,7 @@ private enum SetGetHasDeletePropertyWithValueKey: ScriptEngineAssertion {
 
 private enum SetGetPropertyAtIndex: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
@@ -113,7 +113,7 @@ private enum SetGetPropertyAtIndex: ScriptEngineAssertion {
 
 private enum PropertyAttributesAreRespected: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
@@ -211,7 +211,7 @@ private enum PropertyAttributesAreRespected: ScriptEngineAssertion {
 
 private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let objectResult = scope.evaluateScript(
@@ -242,7 +242,7 @@ private enum PropertyNamesReturnOwnEnumerableStringAndIndexKeys: ScriptEngineAss
 
 private enum DefinePropertyAppliesAttributes: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)
@@ -269,7 +269,7 @@ private enum DefinePropertyAppliesAttributes: ScriptEngineAssertion {
 
 private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let hiddenKey: StaticString = "hiddenFlag"
@@ -314,7 +314,7 @@ private enum DefinePropertyRespectsDontEnumAndDontDelete: ScriptEngineAssertion 
 
 private enum StaticStringPropertyEdgeCases: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let object = makePersistentObject(in: scope)

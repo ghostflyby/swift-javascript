@@ -102,14 +102,14 @@ private func assertSurfaceScopeDefaults<S: JSInstantContext & ~Copyable>(
 }
 
 @Test func javaScriptCoreSurfaceScopeProtocolDefaults() async {
-  let context = JSCContext()
+  let context = await JSCContext(.nonblocking)
   await context.withInstantContext { scope in
     assertSurfaceScopeDefaults(scope)
   }
 }
 
 @Test func quickJSSurfaceScopeProtocolDefaults() async {
-  let context = QJSContext()
+  let context = await QJSContext(.nonblocking)
   await context.withInstantContext { scope in
     assertSurfaceScopeDefaults(scope)
   }

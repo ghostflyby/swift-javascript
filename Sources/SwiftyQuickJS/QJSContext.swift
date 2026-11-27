@@ -1,4 +1,6 @@
+import Dispatch
 import SwiftJavaScript
+import Synchronization
 
 #if canImport(CQuickJSStatic)
   import CQuickJSStatic
@@ -8,14 +10,23 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
+/// A weak, Sendable view of a context actor for non-actor owners (persistent
+/// handles, self-owning inputs): their deinit must not keep the context alive.
+final class QJSContextReference: @unchecked Sendable {
+  weak var value: QJSContext?
+
+  init(_ value: QJSContext) {
+    self.value = value
+  }
+}
+
 /// The QuickJS context actor.
 ///
-/// Holds the raw `contextRef`, the VM it belongs to, its default scope,
-/// concrete persistent-binding table, and VM thread. The context-level
-/// factories, global reads/writes, script evaluation, and data storage create
-/// or settle engine references on the context default scope, so they live here
-/// rather than in a core default; the actor also runs the storage teardown in
-/// its isolated deinit, on the VM thread.
+/// Engine state is created during `init` on the VM's executor: the
+/// synchronous initializer blocks until it exists (or runs inline when the
+/// caller already is the executor), and the `JSInitMode.nonblocking` form
+/// awaits instead. The actor runs the storage teardown in its isolated
+/// deinit, on the same executor.
 public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias VirtualMachine = QJSVirtualMachine
   public typealias InstantContext = QJSInstantContext
@@ -31,73 +42,164 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias PropertyStringKey = QJSPropertyStringKey
   public typealias PreparedScript = QJSPreparedScript
 
-  /// The raw QuickJS context every operation of this actor is addressed
-  /// through. Package-internal: it must not appear in a public signature.
-  nonisolated(unsafe) let contextRef: OpaquePointer
+  /// The raw QuickJS context, created during init on the VM executor and never
+  /// reassigned. Package-internal: it must not appear in a public signature.
+  private nonisolated(unsafe) var engineContext: OpaquePointer?
+
+  /// The engine context pointer, valid from the end of `init`.
+  package nonisolated var contextRef: OpaquePointer {
+    engineContext!
+  }
   public nonisolated let virtualMachine: QJSVirtualMachine
   public nonisolated let unownedExecutor: UnownedSerialExecutor
 
-  private let defaultScope: QJSScopeCore
-  private let persistentBindings: QJSPersistentBindings
-  private let vmThread: VMThread
+  /// The context default scope, created with the engine state.
+  private nonisolated(unsafe) var defaultScope: QJSScopeCore!
+  /// The persistent-binding table, created with the engine state.
+  private nonisolated(unsafe) var persistentBindings: QJSPersistentBindings!
+
+  /// Engine references owned by self-owning inputs, keyed by token. The
+  /// context is the reverse owner: whatever is still registered at teardown
+  /// is released there, so an input that outlives its context leaks nothing.
+  private struct InputRecord {
+    let atom: JSAtom?
+    let contextBits: UInt
+  }
+  private nonisolated let inputRecords = Mutex<[UInt64: InputRecord]>([:])
+  private nonisolated let inputCounter = Atomic<UInt64>(0)
 
   public init() {
     self.init(virtualMachine: QJSVirtualMachine())
   }
 
-  /// Engine access only on the VM thread: `makeContext` creates the context
-  /// there, and this initializer's data-box install is posted there too.
-  /// `init` is synchronous: a caller on another thread waits for it, a caller
-  /// already on the VM thread (inside another context's window) runs inline.
-  public init(virtualMachine: QJSVirtualMachine) {
-    guard let contextRef = virtualMachine.makeContext() else {
-      preconditionFailure("QJSContext could not create a context from its runtime")
-    }
-    self.init(virtualMachine: virtualMachine, contextRef: contextRef)
-  }
-
-  package init(
-    virtualMachine: QJSVirtualMachine,
-    contextRef: OpaquePointer
-  ) {
+  public init(_ mode: JSInitMode) async {
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
-    self.contextRef = contextRef
-    self.vmThread = virtualMachine.vmThread
-    let defaultScope = QJSScopeCore(contextRef: contextRef)
-    self.defaultScope = defaultScope
-    let persistentBindings = QJSPersistentBindings(
-      contextRef: contextRef,
-      vmThread: virtualMachine.vmThread
-    )
-    self.persistentBindings = persistentBindings
-    QJSScopeStacks.push(defaultScope)
-
-    // The context data box exists from the end of init: synchronous scope
-    // witnesses reach the binding table through it, and the box remembers
-    // this actor as its unretained owner (used by raw callback contexts).
-    let box = JSContextDataStorageBox()
-    let vmThread = virtualMachine.vmThread
-    let contextBits = UInt(bitPattern: contextRef)
-    vmThread.runAndWait {
-      guard let context = OpaquePointer(bitPattern: contextBits) else { return }
-      QJSEngine.installContextDataStorageBox(box, in: context)
-      box.bindContextOwner(self)
-      box.setData(persistentBindings, for: QJSPersistentBindingsKey.self)
-    }
-    QJSScopeStacks.bind(vmThread, for: contextRef)
+    await openEngine()
   }
 
-  /// Isolated deinit (SE-0371): runs on the actor's dedicated VM thread, so
-  /// the engine-touching teardown never executes on a foreign thread.
+  /// Build the engine state during init, on the VM executor. A caller that
+  /// already is that executor runs the work inline; otherwise it hops through
+  /// a temporary `JSExecutorHop`: the synchronous form blocks this thread, the
+  /// `JSInitMode.nonblocking` form awaits.
+  public init(virtualMachine: QJSVirtualMachine) {
+    self.virtualMachine = virtualMachine
+    self.unownedExecutor = virtualMachine.unownedExecutor
+    openEngineSynchronously()
+  }
+
+  public init(virtualMachine: QJSVirtualMachine, _ mode: JSInitMode) async {
+    self.virtualMachine = virtualMachine
+    self.unownedExecutor = virtualMachine.unownedExecutor
+    await openEngine()
+  }
+
+  private nonisolated func openEngineSynchronously() {
+    if virtualMachine.isOnVMExecutor() {
+      makeEngineStateOnExecutor()
+      return
+    }
+    // The VM's executor is a task executor, so the job is enqueued
+    // immediately (SE-0417) and needs no cooperative-pool thread.
+    let done = DispatchSemaphore(value: 0)
+    scheduleOnTaskExecutor(virtualMachine.executor) { [self] in
+      makeEngineStateOnExecutor()
+      done.signal()
+    }
+    done.wait()
+  }
+
+  private nonisolated func openEngine() async {
+    if virtualMachine.isOnVMExecutor() {
+      makeEngineStateOnExecutor()
+      return
+    }
+    await runOnTaskExecutor(virtualMachine.executor) { [self] in
+      makeEngineStateOnExecutor()
+    }
+  }
+
+  /// Create the context, default scope and binding table. Engine work: the
+  /// caller runs on the VM executor.
+  private nonisolated func makeEngineStateOnExecutor() {
+    guard engineContext == nil else { return }
+    guard let contextBits = virtualMachine.makeContextOnExecutor(),
+      let contextRef = OpaquePointer(bitPattern: contextBits)
+    else {
+      preconditionFailure("QJSContext could not create a context from its runtime")
+    }
+    let defaultScope = QJSScopeCore(contextRef: contextRef)
+    let persistentBindings = QJSPersistentBindings(contextRef: contextRef)
+    QJSScopeStacks.push(defaultScope)
+
+    // The context data box exists before any engine call can run user code:
+    // synchronous scope witnesses reach the binding table through it, and the
+    // box remembers this actor as its unretained owner (raw callbacks).
+    let box = JSContextDataStorageBox()
+    QJSEngine.installContextDataStorageBox(box, in: contextRef)
+    box.bindContextOwner(self)
+    box.setData(persistentBindings, for: QJSPersistentBindingsKey.self)
+
+    self.engineContext = contextRef
+    self.defaultScope = defaultScope
+    self.persistentBindings = persistentBindings
+    QJSScopeStacks.bind(self, for: contextRef)
+  }
+
+  /// Register a self-owning input's engine references with the reverse owner.
+  /// Callable from any thread: the reference bits are captured before the
+  /// input becomes reachable.
+  package nonisolated func registerInput(atom: JSAtom?, contextBits: UInt) -> UInt64 {
+    let token = inputCounter.wrappingAdd(1, ordering: .relaxed).newValue
+    inputRecords.withLock {
+      $0[token] = InputRecord(atom: atom, contextBits: contextBits)
+    }
+    return token
+  }
+
+  /// Take a registered input's references back and release them. Engine work:
+  /// the caller schedules this on the VM executor.
+  package nonisolated func releaseInput(_ token: UInt64) {
+    guard let record = inputRecords.withLock({ $0.removeValue(forKey: token) }) else {
+      return
+    }
+    releaseInputRecord(record)
+  }
+
+  private nonisolated func releaseInputRecord(_ record: InputRecord) {
+    guard let context = OpaquePointer(bitPattern: record.contextBits) else { return }
+    quickJSUpdateStackTop(context)
+    if let atom = record.atom {
+      JS_FreeAtom(context, atom)
+    }
+    JS_FreeContext(context)
+  }
+
+  /// Free one released persistent binding. Engine work: the caller schedules
+  /// this on the VM executor.
+  package nonisolated func freePersistentValue(_ value: CQuickJSValue) {
+    let contextRef = contextRef
+    quickJSUpdateStackTop(contextRef)
+    JS_FreeValue(contextRef, value)
+  }
+
+  /// Isolated deinit (SE-0371): runs on the actor's VM executor, so the
+  /// engine-touching teardown never executes on a foreign thread.
   isolated deinit {
+    guard let contextRef = engineContext else { return }
     persistentBindings.close()
     defaultScope.drain()
-    let contextBits = UInt(bitPattern: contextRef)
-    let vmThread = self.vmThread
-    vmThread.runAndWait {
-      guard let context = OpaquePointer(bitPattern: contextBits) else { return }
-      QJSEngine.installContextDataStorageBox(nil, in: context)
+    QJSEngine.installContextDataStorageBox(nil, in: contextRef)
+    // Inputs that outlived the context: the reverse owner releases what they
+    // still hold before the context reference itself goes away.
+    let records = inputRecords.withLock { records -> [InputRecord] in
+      let all = Array(records.values)
+      records.removeAll()
+      return all
+    }
+    for record in records {
+      releaseInputRecord(record)
     }
     quickJSUpdateStackTop(contextRef)
     JS_FreeContext(contextRef)
@@ -233,7 +335,8 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     )
     return QJSPersistentHandle(
       identity: persistentBindings.mint(value.value),
-      registry: persistentBindings
+      registry: persistentBindings,
+      context: self
     )
   }
 
@@ -253,15 +356,15 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return QJSPropertyStringKey(
       atom: atom,
       contextRef: contextRef,
-      vmThread: vmThread
+      context: self
     )
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    QJSPreparedScript(
+    return QJSPreparedScript(
       source: source,
       contextRef: contextRef,
-      vmThread: vmThread
+      context: self
     )
   }
 
@@ -351,7 +454,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    QJSEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
+    return QJSEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
   }
 
   /// Package-internal data-box seam used by the cross-engine contract tests.
@@ -359,27 +462,19 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     QJSEngine.contextDataStorageBox(in: contextRef)
   }
 
-  package nonisolated func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) {
-    let contextBits = UInt(bitPattern: contextRef)
-    if let vmThread = QJSScopeStacks.vmThread(for: contextRef) {
-      vmThread.perform {
-        guard let contextRef = OpaquePointer(bitPattern: contextBits) else {
-          return
-        }
-        QJSEngine.installContextDataStorageBox(storage, in: contextRef)
-      }
-    } else {
-      QJSEngine.installContextDataStorageBox(storage, in: contextRef)
-    }
+  /// Installs are engine mutations; this stays a hop target for the tests
+  /// that swap the box from a foreign thread.
+  package func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) async {
+    QJSEngine.installContextDataStorageBox(storage, in: contextRef)
   }
 
   // MARK: - Identity
 
   public nonisolated static func == (lhs: QJSContext, rhs: QJSContext) -> Bool {
-    lhs.contextRef == rhs.contextRef
+    lhs === rhs
   }
 
   public nonisolated func hash(into hasher: inout Hasher) {
-    hasher.combine(UInt(bitPattern: contextRef))
+    hasher.combine(ObjectIdentifier(self))
   }
 }

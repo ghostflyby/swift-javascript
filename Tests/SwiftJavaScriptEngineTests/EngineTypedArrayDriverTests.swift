@@ -34,7 +34,7 @@ struct EngineTypedArrayDriverTests {
 
 private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let buffer = C.ArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: context)
@@ -112,7 +112,7 @@ private enum ArrayBufferAndTypedArrayBehavior: ScriptEngineAssertion {
 
 private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let buffer = C.ArrayBuffer(byteLength: 4, in: context)
@@ -149,7 +149,7 @@ private enum ArrayBufferCreatesZeroedStorageAndSupportsMutation: ScriptEngineAss
 
 private enum ArrayBufferCanCopyBytesAndWrapExistingJSValue: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let copied = C.ArrayBuffer(copying: [1, 2, 3, 4], in: context)
@@ -181,7 +181,7 @@ private enum ArrayBufferCanCopyBytesAndWrapExistingJSValue: ScriptEngineAssertio
 
 private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let typedArray = C.TypedArray(kind: .uint16Array, length: 4, in: context)
@@ -218,7 +218,7 @@ private enum TypedArrayCreatesStorageAndExposesBytes: ScriptEngineAssertion {
 
 private enum TypedArrayCanWrapArrayBufferSliceAndExistingJSValue: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let buffer = C.ArrayBuffer(

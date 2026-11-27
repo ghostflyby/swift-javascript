@@ -139,7 +139,7 @@ private struct SharedCodableUser: Codable, Equatable {
 
 private enum BuiltinCodableRoundtrip: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let key: StaticString = "number"
@@ -162,7 +162,7 @@ private enum BuiltinCodableRoundtrip: ScriptEngineAssertion {
 
 private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let user = SharedCodableUser(
@@ -191,7 +191,7 @@ private enum CodableConverterRoundtripDirectObjectGraph: ScriptEngineAssertion {
 
 private enum ConverterOverrideForPropertyReadWrite: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let key: StaticString = "flag"
@@ -236,7 +236,7 @@ private struct SurfaceTestArguments<C: JSContext>: JSArguments, ~Copyable {
 
 private enum ConverterOverrideForArgumentsRead: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let args = SurfaceTestArguments<C>(
@@ -252,7 +252,7 @@ private enum ConverterOverrideForArgumentsRead: ScriptEngineAssertion {
 
 private enum ConverterOverrideForArgumentsReadVariadic: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let args = SurfaceTestArguments<C>(
@@ -274,7 +274,7 @@ private enum ConverterOverrideForArgumentsReadVariadic: ScriptEngineAssertion {
 
 private enum StrictTryDecodeRejectsMismatchedType: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let stringValue = scope.persist(scope.makeString("x"))
@@ -291,7 +291,7 @@ private enum StrictTryDecodeRejectsMismatchedType: ScriptEngineAssertion {
 
 private enum StrictTryUnpackRejectsMismatchedType: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let args = SurfaceTestArguments<C>(
@@ -311,7 +311,7 @@ private enum StrictTryUnpackRejectsMismatchedType: ScriptEngineAssertion {
 
 private enum StrictTryEncodeCanFail: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let value = SharedFailingEncodeValue()
@@ -330,14 +330,14 @@ private enum StrictTryEncodeCanFail: ScriptEngineAssertion {
 /// engine instead of generically.
 private enum FunctionInitSupportsReturnAndErrorCoderJSC {
   static func run() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     await context.installCodedFunctionAndCheck()
   }
 }
 
 private enum FunctionInitSupportsReturnAndErrorCoderQJS {
   static func run() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     await context.installCodedFunctionAndCheck()
   }
 }

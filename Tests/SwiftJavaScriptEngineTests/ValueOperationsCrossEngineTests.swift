@@ -213,7 +213,7 @@ private func observeValueOperations<C: JSContext>(
 /// Run the whole observation inside one synchronous window of a real context
 /// actor, so neither branch leans on an engine-specific handle path.
 private func observeValueOperations<C: JSContext>(_: C.Type) async -> ValueOperationsObservation {
-  let context = C(virtualMachine: C.VirtualMachine())
+  let context = await makeContext(C.self)
   return await context.withInstantContext { scope in
     observeValueOperations(C.self, in: scope)
   }

@@ -99,20 +99,17 @@ import Testing
   QJSEngine.releaseRuntime(runtime)
 }
 
-@Test func packageVMThreadSeamsAreCallableAcrossTargets() {
-  let thread = VMThread()
-  let owner = thread.owner
-  _ = thread.executor
-  _ = thread.unownedExecutor
-  #expect(!thread.isIsolatingCurrentContext())
+@Test func packageVMSeamsAreCallableAcrossTargets() async {
+  let virtualMachine = await QJSVirtualMachine(.nonblocking)
+  let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
 
-  let answer = thread.runAndWait { 42 }
-  #expect(answer == 42)
-
-  thread.scheduleOnVMThread {}
-  thread.schedulePersistentCleanup {}
-  thread.perform {}
-  withExtendedLifetime(owner) {}
+  _ = virtualMachine.unownedExecutor
+  // Package-level actor seams: the data-box swap, the runtime bits, and the
+  // collection hook.
+  #expect(context.contextDataStorageBox() != nil)
+  await context.installContextDataStorageBox(nil)
+  _ = await virtualMachine.runtimeBits()
+  await virtualMachine.gc()
 }
 
 @Test func quickJSClassDefinitionRemainsAThinAlias() {

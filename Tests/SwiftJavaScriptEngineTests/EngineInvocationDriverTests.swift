@@ -69,7 +69,7 @@ struct EngineInvocationDriverTests {
 
 private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let function = scope.makeFunction(named: "bump") { c, _, arguments in
@@ -91,7 +91,7 @@ private enum MakeFunctionReturnsCallableValue: ScriptEngineAssertion {
 
 private enum JSValueCallSupportsThisAndArguments: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let functionResult = scope.evaluateScript("(function(a, b) { return this.base + a + b })")
@@ -132,7 +132,7 @@ private enum JSValueCallSupportsThisAndArguments: ScriptEngineAssertion {
 
 private enum JSValueConstructCreatesObject: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let constructorResult = scope.evaluateScript(
@@ -167,7 +167,7 @@ private enum JSValueConstructCreatesObject: ScriptEngineAssertion {
 
 private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let objectResult = scope.evaluateScript(
@@ -201,7 +201,7 @@ private enum JSValueInvokeMethodUsesReceiverAndSurfacesErrors: ScriptEngineAsser
 
 private enum NativeFunctionNamesAndExceptionsAreObservable: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let function = scope.makeFunction(named: "explode") { c, _, _ in
@@ -230,7 +230,7 @@ private enum NativeFunctionNamesAndExceptionsAreObservable: ScriptEngineAssertio
 
 private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let makeObject = scope.makeFunction(named: "makeNativeObject") { c, _, _ in
@@ -299,7 +299,7 @@ private enum NativeFunctionTransfersReturnedObjectsAndExceptions: ScriptEngineAs
 
 private enum ArrayDateAndInstanceOfPredicates: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let arrayResult = scope.evaluateScript("[1, 2, 3]")
@@ -336,7 +336,7 @@ private enum ArrayDateAndInstanceOfPredicates: ScriptEngineAssertion {
 
 private enum ValueEqualityOperators: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let oneNumber = scope.persist(scope.makeNumber(1))
@@ -360,7 +360,7 @@ private enum ValueEqualityOperators: ScriptEngineAssertion {
 
 private enum ValueObjectAndTypeHelpersWork: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let primitive = scope.persist(scope.makeNumber(42))
@@ -380,7 +380,7 @@ private enum ValueObjectAndTypeHelpersWork: ScriptEngineAssertion {
 
 private enum ObjectAndArrayInitializersCreateExpectedKinds: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let objectCallback: C.Value
@@ -430,7 +430,7 @@ private func runSurfaceFunctionCallbackEntry<C: JSContext>(
   _: C.Type
 ) async {
   let observations = SurfaceCallbackObservations()
-  let context = C(virtualMachine: C.VirtualMachine())
+  let context = await makeContext(C.self)
 
   await context.withInstantContext { scope in
     let callback: JSFunctionCallback<C.InstantContext> = {

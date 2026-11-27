@@ -11,24 +11,36 @@ import SwiftJavaScript
 /// A self-owning QuickJS property string key.
 ///
 /// Owns one atom reference (`JS_NewAtom` / `JS_FreeAtom`) and keeps the context
-/// that created it alive, so the key can outlive `QJSContext`. Release runs on
-/// the context's VM thread when it has one.
+/// that created it alive, so the key can outlive `QJSContext`. The context
+/// holds the reverse reference: an input still registered at context teardown
+/// is released there, and a live context takes the references back through its
+/// actor when the input dies first.
 public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = QJSContext
 
   package let atom: JSAtom
   private let contextBits: UInt
-  private let vmThread: VMThread?
+  private let inputToken: UInt64?
+  private let contextReference: QJSContextReference?
 
   package init(
     atom: JSAtom,
     contextRef: OpaquePointer,
-    vmThread: VMThread?
+    context: QJSContext?
   ) {
     self.atom = atom
     self.contextBits = UInt(bitPattern: contextRef)
-    self.vmThread = vmThread
     _ = JS_DupContext(contextRef)
+    if let context {
+      self.contextReference = QJSContextReference(context)
+      self.inputToken = context.registerInput(
+        atom: atom,
+        contextBits: UInt(bitPattern: contextRef)
+      )
+    } else {
+      self.contextReference = nil
+      self.inputToken = nil
+    }
   }
 
   /// The engine atom, validated against the context that created it.
@@ -44,19 +56,22 @@ public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
   }
 
   deinit {
-    let atom = self.atom
-    let contextBits = self.contextBits
-    let release: @Sendable () -> Void = {
-      guard let contextRef = OpaquePointer(bitPattern: contextBits) else { return }
-      quickJSUpdateStackTop(contextRef)
-      JS_FreeAtom(contextRef, atom)
-      JS_FreeContext(contextRef)
+    if let contextReference {
+      // A live context takes the references back here, on the VM executor; a
+      // dead one already released them at teardown.
+      guard let context = contextReference.value, let inputToken else { return }
+      let token = inputToken
+      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+        context.releaseInput(token)
+      }
+      return
     }
-    if let vmThread {
-      vmThread.perform(release)
-    } else {
-      release()
-    }
+    // Created without a context (a raw engine window): the creator owns the
+    // release, on the calling thread.
+    guard let context = OpaquePointer(bitPattern: contextBits) else { return }
+    quickJSUpdateStackTop(context)
+    JS_FreeAtom(context, atom)
+    JS_FreeContext(context)
   }
 }
 
@@ -70,17 +85,27 @@ public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
 
   package let source: String
   private let contextBits: UInt
-  private let vmThread: VMThread?
+  private let inputToken: UInt64?
+  private let contextReference: QJSContextReference?
 
   package init(
     source: String,
     contextRef: OpaquePointer,
-    vmThread: VMThread?
+    context: QJSContext?
   ) {
     self.source = source
     self.contextBits = UInt(bitPattern: contextRef)
-    self.vmThread = vmThread
     _ = JS_DupContext(contextRef)
+    if let context {
+      self.contextReference = QJSContextReference(context)
+      self.inputToken = context.registerInput(
+        atom: nil,
+        contextBits: UInt(bitPattern: contextRef)
+      )
+    } else {
+      self.contextReference = nil
+      self.inputToken = nil
+    }
   }
 
   /// The script source, validated against the context that compiled it.
@@ -96,16 +121,20 @@ public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
   }
 
   deinit {
-    let contextBits = self.contextBits
-    let release: @Sendable () -> Void = {
-      guard let contextRef = OpaquePointer(bitPattern: contextBits) else { return }
-      quickJSUpdateStackTop(contextRef)
-      JS_FreeContext(contextRef)
+    if let contextReference {
+      // A live context takes the references back here, on the VM executor; a
+      // dead one already released them at teardown.
+      guard let context = contextReference.value, let inputToken else { return }
+      let token = inputToken
+      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+        context.releaseInput(token)
+      }
+      return
     }
-    if let vmThread {
-      vmThread.perform(release)
-    } else {
-      release()
-    }
+    // Created without a context (a raw engine window): the creator owns the
+    // release, on the calling thread.
+    guard let context = OpaquePointer(bitPattern: contextBits) else { return }
+    quickJSUpdateStackTop(context)
+    JS_FreeContext(context)
   }
 }

@@ -417,15 +417,8 @@ private enum EngineBenchmarks {
     }
     let witnessDirect = monotonicNanos() - witnessDirectStart
 
-    let witnessHitStart = monotonicNanos()
-    for _ in 0..<reps {
-      for handle in handles {
-        if let value = scope.resolve(handle) {
-          checksum += value.toNumber()
-        }
-      }
-    }
-    let witnessHit = monotonicNanos() - witnessHitStart
+    let witnessHit = scopeResolveTiming(
+      scope: scope, handles: handles, reps: reps, checksum: &checksum)
 
     let actorHitStart = monotonicNanos()
     for _ in 0..<reps {
@@ -452,17 +445,8 @@ private enum EngineBenchmarks {
     let scope = context.makeScope()
     var misses = 0
 
-    let witnessStart = monotonicNanos()
-    for _ in 0..<reps {
-      for handle in dead {
-        if let value = scope.resolve(handle) {
-          _ = value
-        } else {
-          misses += 1
-        }
-      }
-    }
-    let witnessMiss = monotonicNanos() - witnessStart
+    let witnessMiss = scopeMissTiming(
+      scope: scope, dead: dead, reps: reps, misses: &misses)
 
     let actorStart = monotonicNanos()
     for _ in 0..<reps {
@@ -495,6 +479,45 @@ private enum EngineBenchmarks {
       invalidateMiss: invalidateMiss,
       misses: misses,
       discardedInvalidations: discardedInvalidations)
+  }
+
+  /// The scope-witness measurements are synchronous (`JSScope`'s resolve is
+  /// `noasync`), so they live in their own synchronous helpers rather than in
+  /// the async measurement functions.
+  private static func scopeResolveTiming<S: JSScope & ~Copyable>(
+    scope: borrowing S,
+    handles: [S.PersistentHandle],
+    reps: Int,
+    checksum: inout Double
+  ) -> UInt64 {
+    let start = monotonicNanos()
+    for _ in 0..<reps {
+      for handle in handles {
+        if let value = scope.resolve(handle) {
+          checksum += value.toNumber()
+        }
+      }
+    }
+    return monotonicNanos() - start
+  }
+
+  private static func scopeMissTiming<S: JSScope & ~Copyable>(
+    scope: borrowing S,
+    dead: [S.PersistentHandle],
+    reps: Int,
+    misses: inout Int
+  ) -> UInt64 {
+    let start = monotonicNanos()
+    for _ in 0..<reps {
+      for handle in dead {
+        if let value = scope.resolve(handle) {
+          _ = value
+        } else {
+          misses += 1
+        }
+      }
+    }
+    return monotonicNanos() - start
   }
 
   // MARK: Release

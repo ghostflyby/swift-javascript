@@ -171,14 +171,14 @@ private func surfaceContextResolves<C: JSContext>(
   _ contextType: C.Type,
   _ context: isolated C,
   _ handle: C.PersistentHandle
-) -> Bool {
+) async -> Bool {
   _ = contextType
-  return context.resolve(handle) != nil
+  return await context.resolve(handle) != nil
 }
 
 private enum PersistentHandleRoundTripsAcrossWindows: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     // Mint inside the callback window and carry only the Sendable handle out.
     let handle = await context.withInstantContext { scope in
@@ -205,7 +205,7 @@ private enum PersistentHandleRoundTripsAcrossWindows: ScriptEngineAssertion {
 
 private enum PersistentBindingSurvivesCollection: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     let handle = await context.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeNumber(41.5))
@@ -214,8 +214,8 @@ private enum PersistentBindingSurvivesCollection: ScriptEngineAssertion {
     // The binding's own root must keep the value alive with no scope holding
     // it. JSC collects here; QuickJS needs no collection hook (the binding
     // owns a duplicated reference).
+    stage3CollectGarbageIfSupported(context)
     let number = await context.withInstantContext { isolatedContext in
-      stage3CollectGarbageIfSupported(context)
       guard let value = isolatedContext.resolve(handle) else { return -1.0 }
       return value.toNumber()
     }
@@ -226,11 +226,11 @@ private enum PersistentBindingSurvivesCollection: ScriptEngineAssertion {
 private enum PersistentHandleIsContextLocal: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
     // Cross-context: same VM, different registry -> nil.
-    let first = C(virtualMachine: C.VirtualMachine())
+    let first = await makeContext(C.self)
     let handle = await first.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("local"))
     }
-    let second = C(virtualMachine: first.virtualMachine)
+    let second = await C(virtualMachine: first.virtualMachine, .nonblocking)
     let foreignResolved = await second.withInstantContext { scope in
       scope.resolve(handle) == nil
     }
@@ -238,7 +238,7 @@ private enum PersistentHandleIsContextLocal: ScriptEngineAssertion {
 
     // Container death: the surviving handle is a dead identity, not a
     // dangling reference.
-    var optionalContext: C? = C(virtualMachine: C.VirtualMachine())
+    var optionalContext: C? = await makeContext(C.self)
     let virtualMachine = optionalContext!.virtualMachine
     let dyingHandle = await optionalContext!.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("doomed"))
@@ -251,7 +251,7 @@ private enum PersistentHandleIsContextLocal: ScriptEngineAssertion {
     // the context was released, so a fresh context on the same VM works. The
     // settlement barrier already drained the VM executor, so this creation on
     // an idle VM is race-free.
-    let survivor = C(virtualMachine: virtualMachine)
+    let survivor = await C(virtualMachine: virtualMachine, .nonblocking)
     let roundTrip = await survivor.withInstantContext { scope -> Double in
       switch scope.evaluateScript("1 + 2") {
       case .value(let value):
@@ -268,11 +268,11 @@ private enum PersistentHandleIsContextLocal: ScriptEngineAssertion {
 
 private enum PersistentHandlesDoNotCrossContext: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let first = C(virtualMachine: C.VirtualMachine())
+    let first = await makeContext(C.self)
     // Same runtime, second context: registry IDs differ, so identities are
     // context-local even though the engines would accept cross-context values
     // inside one group/runtime (design §5.4/§6.2).
-    let second = C(virtualMachine: first.virtualMachine)
+    let second = await C(virtualMachine: first.virtualMachine, .nonblocking)
 
     let firstHandle = await first.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("first"))
@@ -320,7 +320,7 @@ private enum PersistentHandlesDoNotCrossContext: ScriptEngineAssertion {
 
 private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     // Live binding, but the synchronous registry access path (the context
     // data box) is removed. Scope-side resolution must return nil; the actor
@@ -335,18 +335,14 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
       Issue.record("C did not install a context data storage box")
       return
     }
-    await context.withInstantContext { _ in
-      contextHandle.installContextDataStorageBox(nil)
-    }
+    await contextHandle.installContextDataStorageBox(nil)
     let scopeWithoutBox = await context.withInstantContext { scope in
       scope.resolve(handle) == nil
     }
     let actorWithRegistry = await surfaceContextResolves(C.self, context, handle)
     #expect(scopeWithoutBox)
     #expect(actorWithRegistry)
-    await context.withInstantContext { _ in
-      contextHandle.installContextDataStorageBox(box)
-    }
+    await contextHandle.installContextDataStorageBox(box)
 
     // Dead identity: metadata dies immediately, independent of the pump.
     #expect(handle.invalidate())
@@ -358,7 +354,7 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
     // Container death: the surviving handle stays a dead identity, and a
     // rebuilt context on the same runtime cannot resolve it (registryID
     // mismatch). Neither operation dangles or crashes.
-    var dying: C? = C(virtualMachine: C.VirtualMachine())
+    var dying: C? = await makeContext(C.self)
     let virtualMachine = dying!.virtualMachine
     let dyingHandle = await dying!.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("doomed"))
@@ -369,7 +365,7 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
 
     // The settlement barrier has drained the VM executor, so this creation on
     // an idle VM is race-free.
-    let survivor = C(virtualMachine: virtualMachine)
+    let survivor = await C(virtualMachine: virtualMachine, .nonblocking)
     let survivorResolved = await survivor.withInstantContext { scope in
       scope.resolve(dyingHandle) == nil
     }
@@ -384,7 +380,7 @@ private enum PersistentHandleWithoutBinding: ScriptEngineAssertion {
 /// calling thread" for the posted swap.
 private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
 
     let handle = await context.withInstantContext { scope in
@@ -396,7 +392,7 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
       return
     }
 
-    engineRuntimeDriver(context)?.installContextDataStorageBox(nil)
+    await engineRuntimeDriver(context)?.installContextDataStorageBox(nil)
     await awaitPersistentHandleSettlement(C.self, on: virtualMachine)
     let scopeWithoutBox = await context.withInstantContext { scope in
       scope.resolve(handle) == nil
@@ -405,7 +401,7 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
     #expect(scopeWithoutBox)
     #expect(actorKeepsRegistry)
 
-    engineRuntimeDriver(context)?.installContextDataStorageBox(box)
+    await engineRuntimeDriver(context)?.installContextDataStorageBox(box)
     await awaitPersistentHandleSettlement(C.self, on: virtualMachine)
     let scopeRestored = await context.withInstantContext { scope in
       scope.resolve(handle) != nil
@@ -416,14 +412,14 @@ private enum PersistentHandleForeignThreadBoxSwap: ScriptEngineAssertion {
 
 private enum ContextsOnABusySharedVM: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let virtualMachine = C.VirtualMachine()
-    let resident = C(virtualMachine: virtualMachine)
+    let virtualMachine = await C.VirtualMachine(.nonblocking)
+    let resident = await C(virtualMachine: virtualMachine, .nonblocking)
 
     // The VM thread keeps working for the resident context in small jobs…
     async let churn: Void = keepBusy(C.self, resident, rounds: 200)
     // …while contexts are created and dropped from the test's thread.
     for _ in 0..<100 {
-      let shortLived = C(virtualMachine: virtualMachine)
+      let shortLived = await C(virtualMachine: virtualMachine, .nonblocking)
       _ = shortLived
     }
     await churn
@@ -456,7 +452,7 @@ private enum ContextsOnABusySharedVM: ScriptEngineAssertion {
 
 private enum SelfOwningInputsDroppedOffTheVMThread: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
 
     // Created on the VM thread, dropped here on the test's thread: each
@@ -484,7 +480,7 @@ private enum SelfOwningInputsDroppedOffTheVMThread: ScriptEngineAssertion {
 /// collection cannot take it away.
 private enum PersistentBindingSurvivesForcedCollection: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
 
     let handle = await context.withInstantContext { scope -> C.PersistentHandle in
@@ -508,8 +504,8 @@ private enum PersistentBindingSurvivesForcedCollection: ScriptEngineAssertion {
     // No scope holds the object when collection runs: only the binding's own
     // root (and, on JSC, the conservative stack scan of the live frame) can
     // keep the property readable.
+    await stage4CollectGarbage(context)
     let kind = await context.withInstantContext { scope -> String in
-      stage4CollectGarbage(context)
       guard let value = scope.resolve(handle) else { return "<nil>" }
       let property = value.getProperty("kind", in: scope)
       switch consume property {
@@ -531,7 +527,7 @@ private enum PersistentBindingSurvivesForcedCollection: ScriptEngineAssertion {
 /// design).
 private enum PersistentBindingReleasePermitsCollection: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
     let mintBox = PersistentHandleMintBox<C>()
 
@@ -567,9 +563,7 @@ private enum PersistentBindingReleasePermitsCollection: ScriptEngineAssertion {
 
     // The binding's duplicate keeps the object alive across a forced cycle
     // collection with no JS-visible strong reference.
-    await context.withInstantContext { _ in
-      stage4CollectGarbage(context)
-    }
+    await stage4CollectGarbage(context)
     let aliveKind = await context.withInstantContext { scope -> String in
       guard let value = scope.resolve(handle) else { return "<nil>" }
       let property = value.getProperty("kind", in: scope)
@@ -587,9 +581,7 @@ private enum PersistentBindingReleasePermitsCollection: ScriptEngineAssertion {
     // Two collection turns: the first may only reach the sweep phase that
     // frees the binding's last reference, the second clears the weak record.
     for _ in 0..<2 {
-      await context.withInstantContext { _ in
-        stage4CollectGarbage(context)
-      }
+      await stage4CollectGarbage(context)
     }
     let collected = await context.withInstantContext { scope -> Bool in
       let result = scope.evaluateScript(
@@ -615,7 +607,7 @@ private final class PersistentHandleMintBox<C: JSContext>: @unchecked Sendable {
 
 private enum PersistentHandleDeinitSettlement: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
 
     var handle: C.PersistentHandle? = await context.withInstantContext { scope in
@@ -653,7 +645,7 @@ private enum PersistentHandleDeinitSettlement: ScriptEngineAssertion {
 
 private enum PersistentHandleGeneration: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let virtualMachine = context.virtualMachine
 
     let first = await context.withInstantContext { scope in
@@ -700,7 +692,7 @@ private actor PersistentHandleMailbox<C: JSContext> {
 
 private enum PersistentHandleCrossesIsolation: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
     let handle = await context.withInstantContext { scope in
       scope.makePersistentHandle(scope.makeString("sendable"))
     }

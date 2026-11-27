@@ -137,7 +137,7 @@ struct EngineScopeContractTests {
 /// 已不再暴露 context handle。)
 private enum ContextDerivedScopeNestsPersistsAndResolves: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     let resolved = await context.withInstantContext { window -> String in
       let handle = window.makePersistentHandle(
@@ -181,7 +181,7 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
   static func run<C: JSContext>(_: C.Type) async {
     let observations = NestedCallbackObservations()
 
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { ic in
       // JS 中转层:relay 把收到的实参原样转发给 native inner。
@@ -242,7 +242,7 @@ private enum NestedCallbackUsesValueCreatedByOuterCallbackViaJSRelay: ScriptEngi
 /// 产生的值同样由默认 scope 承接(而非临时 scope 的 drain)。
 private enum DefaultScopeValueSurvivesNestedInstantScope: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { window in
       let durable = window.persist(window.makeString("durable"))
@@ -276,7 +276,7 @@ private enum DefaultScopeValueSurvivesNestedInstantScope: ScriptEngineAssertion 
 /// resumed window resolves it back to the original string.
 private enum ValueSurvivesAwaitWithinActor: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     let handle = await context.withInstantContext { window in
       window.makePersistentHandle(window.makeString("across-await"))

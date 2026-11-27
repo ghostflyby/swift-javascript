@@ -142,7 +142,7 @@ struct QJSValueOperationsTests {
         let key = QJSPropertyStringKey(
           atom: keyHandle,
           contextRef: context,
-          vmThread: nil
+          context: nil
         )
         let keyDidSet = object.setProperty(
           key,
@@ -318,7 +318,7 @@ struct QJSValueOperationsTests {
   func readsPropertyThroughTheIsolationDefaultOverload() async {
     // The `in:` default reads `#isolation`, so the *opened window* and the
     // actor must be the same context: use the concrete context's own handle.
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     let isolatedText = await isolatedNameRead(context.contextRef, on: context)
     #expect(isolatedText == "seven")
   }

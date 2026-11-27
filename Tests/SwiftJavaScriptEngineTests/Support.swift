@@ -19,12 +19,22 @@ enum ScriptEngine: String, CaseIterable, CustomStringConvertible, Sendable {
   }
 }
 
+/// A context on its own fresh VM, both created with the non-blocking
+/// initializer: tests run on the cooperative pool, where the blocking form
+/// would hold threads the initialization hop needs.
+func makeContext<C: SwiftJavaScript.JSContext>(_ contextType: C.Type) async -> C {
+  let virtualMachine = await C.VirtualMachine(.nonblocking)
+  return await C(virtualMachine: virtualMachine, .nonblocking)
+}
+
 /// Forces a collection on GC engines (JSC); reference-counted engines need
 /// no collection hook (the creation reference is already the root). Kept in
 /// this file so engine-agnostic contract tests do not import
 /// `JavaScriptCore` and collide with its ObjC `JSContext` names.
 func stage3CollectGarbageIfSupported<C: SwiftJavaScript.JSContext>(_ context: C) {
-  (context as? JSCContext)?.collectGarbage()
+  if let context = context as? JSCContext {
+    context.collectGarbage()
+  }
 }
 
 /// The two context-data-box hooks the contract tests drive without an actor
@@ -32,7 +42,7 @@ func stage3CollectGarbageIfSupported<C: SwiftJavaScript.JSContext>(_ context: C)
 /// names just the surface it needs instead of one engine's runtime driver.
 protocol ContextDataStorageBoxDriver: Sendable {
   func contextDataStorageBox() -> JSContextDataStorageBox?
-  func installContextDataStorageBox(_ storage: JSContextDataStorageBox?)
+  func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) async
 }
 
 extension JSCContext: ContextDataStorageBoxDriver {}
@@ -64,12 +74,12 @@ func engineRuntimeDriver<C: SwiftJavaScript.JSContext>(
 /// released QuickJS binding no longer does. JSC's C API has no host-side
 /// weak reference, so post-release collectability is only observable on the
 /// reference-counted engine; JSC covers the rooting half.
-func stage4CollectGarbage<C: SwiftJavaScript.JSContext>(_ context: C) {
+func stage4CollectGarbage<C: SwiftJavaScript.JSContext>(_ context: C) async {
   if let context = context as? JSCContext {
     context.collectGarbage()
   } else if let context = context as? QJSContext {
     // Reached only for a QuickJS context: the cast is exact.
-    context.virtualMachine.gc()
+    await context.virtualMachine.gc()
   }
 }
 

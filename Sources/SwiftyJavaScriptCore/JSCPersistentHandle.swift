@@ -1,3 +1,4 @@
+import JavaScriptCore
 import SwiftJavaScript
 
 /// A persistent, Sendable identity for a JavaScriptCore value bound in a
@@ -11,9 +12,10 @@ import SwiftJavaScript
 ///
 /// Lifecycle: minting claims and roots an independent
 /// reference, copying the handle only bumps ARC, and the last owner's release
-/// (or `invalidate()`) kills the identity immediately and schedules engine
-/// settlement on the VM's serial executor. The registry is weak so a surviving
-/// handle cannot keep the context alive.
+/// (or `invalidate()`) kills the identity immediately and settles the engine
+/// reference through the context actor. Both the registry and the context are
+/// weak, so a surviving handle cannot keep its context alive; the context's
+/// teardown releases bindings it still owns.
 public final class JSCPersistentHandle: SwiftJavaScript.JSPersistentHandle, Sendable {
   public let identity: JSPersistentHandleIdentity
 
@@ -22,21 +24,48 @@ public final class JSCPersistentHandle: SwiftJavaScript.JSPersistentHandle, Send
   /// "container death yields nil" unreachable.
   private let registryReference: JSCPersistentBindingsReference
 
+  /// Weak for the same reason: a surviving handle must not keep the context
+  /// alive. A dead context already released its bindings at teardown.
+  private let contextReference: JSCContextReference
+
   init(
     identity: JSPersistentHandleIdentity,
-    registry: JSCPersistentBindings
+    registry: JSCPersistentBindings,
+    context: JSCContext
   ) {
     self.identity = identity
     self.registryReference = JSCPersistentBindingsReference(registry)
+    self.contextReference = JSCContextReference(context)
   }
 
   @discardableResult
   public func invalidate() -> Bool {
-    registryReference.bindings?.release(identity) ?? false
+    guard let context = contextReference.value,
+      let ref = registryReference.bindings?.take(identity)
+    else {
+      return false
+    }
+    settle(ref, on: context)
+    return true
   }
 
   deinit {
-    _ = registryReference.bindings?.release(identity)
+    guard let context = contextReference.value,
+      let ref = registryReference.bindings?.take(identity)
+    else {
+      return
+    }
+    settle(ref, on: context)
+  }
+
+  /// Enqueue the unprotect on the VM executor. A task-executor-backed VM
+  /// enqueues immediately, so settlement keeps its position relative to the
+  /// caller's later engine work.
+  private func settle(_ ref: JSValueRef, on context: JSCContext) {
+    let refBits = UInt(bitPattern: ref)
+    scheduleOnSerialExecutor(context.virtualMachine.executor) {
+      context.unprotectPersistentValue(refBits)
+    }
   }
 
   public static func == (lhs: JSCPersistentHandle, rhs: JSCPersistentHandle) -> Bool {

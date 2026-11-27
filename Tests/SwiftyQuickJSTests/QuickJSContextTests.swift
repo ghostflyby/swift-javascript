@@ -18,8 +18,8 @@ import Testing
 /// thread and the actor installs the context data box. The persistent-handle
 /// coverage below also runs on the surface context.
 @Test func quickJSSurfaceVirtualMachineCreatesContexts() async {
-  let virtualMachine = QJSVirtualMachine()
-  let context = QJSContext(virtualMachine: virtualMachine)
+  let virtualMachine = await QJSVirtualMachine(.nonblocking)
+  let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
 
   #expect(context.virtualMachine == virtualMachine)
   #expect(context.contextDataStorageBox() != nil)
@@ -29,11 +29,12 @@ import Testing
   }
   #expect(text == "quickjs")
 
-  virtualMachine.gc()
+  await virtualMachine.gc()
 }
 
 @Test func quickJSValueHandleStoresHandleAndContextDirectly() async {
-  let context = QJSContext(virtualMachine: QJSVirtualMachine())
+  let context = await QJSContext(
+    virtualMachine: await QJSVirtualMachine(.nonblocking), .nonblocking)
 
   await context.withInstantContext { scope in
     let value = scope.makeNumber(42)
@@ -60,9 +61,9 @@ import Testing
 /// A leaked creation reference (the old +1) would keep the string and its
 /// allocation alive here; a double settlement would corrupt/free it twice.
 @Test func quickJSPersistTransferSettlesCreationReferenceExactlyOnce() async {
-  let virtualMachine = QJSVirtualMachine()
-  var context: QJSContext? = QJSContext(virtualMachine: virtualMachine)
-  let runtime = virtualMachine.runtimeRef
+  let virtualMachine = await QJSVirtualMachine(.nonblocking)
+  var context: QJSContext? = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
+  let runtime = OpaquePointer(bitPattern: await virtualMachine.runtimeBits())!
 
   var baseline = JSMemoryUsage()
   JS_ComputeMemoryUsage(runtime, &baseline)
@@ -134,9 +135,9 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
 /// "No growth" is the exact equality of the measured cycle — the leak
 /// detector is per-cycle growth, not first-touch allocation.
 @Test func quickJSPersistentHandleCycleReturnsAllocatorToBaseline() async {
-  let virtualMachine = QJSVirtualMachine()
-  var context: QJSContext? = QJSContext(virtualMachine: virtualMachine)
-  let runtime = virtualMachine.runtimeRef
+  let virtualMachine = await QJSVirtualMachine(.nonblocking)
+  var context: QJSContext? = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
+  let runtime = OpaquePointer(bitPattern: await virtualMachine.runtimeBits())!
   let bindings = 1000
 
   func mintCycle() async -> [QJSPersistentHandle] {

@@ -280,15 +280,15 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return QJSPropertyStringKey(
       atom: atom,
       contextRef: core.contextRef,
-      vmThread: QJSScopeStacks.vmThread(for: core.contextRef)
+      context: QJSScopeStacks.context(for: core.contextRef)
     )
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    QJSPreparedScript(
+    return QJSPreparedScript(
       source: source,
       contextRef: core.contextRef,
-      vmThread: QJSScopeStacks.vmThread(for: core.contextRef)
+      context: QJSScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -574,15 +574,15 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return QJSPropertyStringKey(
       atom: atom,
       contextRef: core.contextRef,
-      vmThread: QJSScopeStacks.vmThread(for: core.contextRef)
+      context: QJSScopeStacks.context(for: core.contextRef)
     )
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    QJSPreparedScript(
+    return QJSPreparedScript(
       source: source,
       contextRef: core.contextRef,
-      vmThread: QJSScopeStacks.vmThread(for: core.contextRef)
+      context: QJSScopeStacks.context(for: core.contextRef)
     )
   }
 
@@ -639,5 +639,12 @@ private func mintPersistentHandle(
       "JSPersistentHandle minting requires a hosted JSContext (no bindings installed)"
     )
   }
-  return QJSPersistentHandle(identity: bindings.mint(value), registry: bindings)
+  guard let context = QJSScopeStacks.context(for: core.contextRef) else {
+    preconditionFailure("JSPersistentHandle minting requires a live JSContext actor")
+  }
+  return QJSPersistentHandle(
+    identity: bindings.mint(value),
+    registry: bindings,
+    context: context
+  )
 }

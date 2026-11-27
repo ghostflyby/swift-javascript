@@ -36,7 +36,7 @@ struct EngineBufferSurfaceTests {
 
 private enum ArrayBufferSurfaceRoundTrip: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let buffer = C.ArrayBuffer(byteLength: 8, in: scope)
@@ -96,7 +96,7 @@ private enum ArrayBufferSurfaceRoundTrip: ScriptEngineAssertion {
 
 private enum TypedArraySurfaceExposesShape: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let typedArray = C.TypedArray(kind: .uint16Array, length: 4, in: scope)
@@ -142,7 +142,7 @@ private enum TypedArraySurfaceExposesShape: ScriptEngineAssertion {
 
 private enum TypedArraySurfaceSlicesNonZeroOffset: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let buffer = C.ArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
@@ -208,7 +208,7 @@ private enum TypedArraySurfaceSlicesNonZeroOffset: ScriptEngineAssertion {
 
 private enum BuffersWrapOnlyMatchingValues: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let wrappedBufferByteLength: Int?

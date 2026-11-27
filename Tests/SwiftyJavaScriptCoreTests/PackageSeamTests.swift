@@ -92,18 +92,14 @@ import Testing
   JSCEngine.releaseRuntime(runtime)
 }
 
-@Test func packageVMThreadSeamsAreCallableAcrossTargets() {
-  let thread = VMThread()
-  let owner = thread.owner
-  _ = thread.executor
-  _ = thread.unownedExecutor
-  #expect(!thread.isIsolatingCurrentContext())
+@Test func packageVMSeamsAreCallableAcrossTargets() async {
+  let virtualMachine = await JSCVirtualMachine(.nonblocking)
+  let context = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
 
-  let answer = thread.runAndWait { 42 }
-  #expect(answer == 42)
-
-  thread.scheduleOnVMThread {}
-  thread.schedulePersistentCleanup {}
-  thread.perform {}
-  withExtendedLifetime(owner) {}
+  _ = virtualMachine.unownedExecutor
+  // Package-level actor seams: the data-box swap, the collection hook, and
+  // the context's engine reference.
+  #expect(context.contextDataStorageBox() != nil)
+  await context.installContextDataStorageBox(nil)
+  await context.collectGarbage()
 }

@@ -93,8 +93,14 @@ public protocol JSContext: Actor, Hashable {
   where Class.Context == Self
 
   /// Create a context on `virtualMachine`, with its own engine context handle,
-  /// default scope, and persistent registry.
+  /// default scope, and persistent registry created during init. Blocks the
+  /// calling thread until the engine state exists (or runs inline when already
+  /// isolated on the VM executor).
   init(virtualMachine: VirtualMachine)
+
+  /// Non-blocking form: awaits engine-state creation on the VM executor
+  /// instead of blocking the calling thread.
+  init(virtualMachine: VirtualMachine, _ mode: JSInitMode) async
 
   /// The VM that owns the runtime this context runs on. Nonisolated because
   /// it is immutable identity.
@@ -112,7 +118,7 @@ public protocol JSContext: Actor, Hashable {
 
   /// Open a manual scope nested on this context's scope stack. The scope is
   /// born, used and drained inside this context's isolation — on the VM
-  /// thread — which is the witness guarantee its mint/resolve entry points
+  /// executor — which is the witness guarantee its mint/resolve entry points
   /// rely on.
   func makeScope() -> Scope
 

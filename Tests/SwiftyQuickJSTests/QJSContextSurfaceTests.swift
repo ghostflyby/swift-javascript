@@ -69,26 +69,26 @@ private func exerciseContextValueOperations(
 struct QJSContextSurfaceTests {
   @Test
   func createsAndTearsDownAContextOnItsVirtualMachine() async {
-    let virtualMachine = QJSVirtualMachine()
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
     do {
-      let context = QJSContext(virtualMachine: virtualMachine)
+      let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
       let window = await context.withInstantContext { scope in
         scope.makeNumber(21).toNumber() * 2
       }
       #expect(window == 42)
-      virtualMachine.gc()
+      await virtualMachine.gc()
     }
 
     // Dropping the context runs the isolated deinit (registry close →
     // default-scope drain → box clear → context release → stack pop) on the
     // VM thread; the VM stays usable afterwards.
-    let next = QJSContext(virtualMachine: virtualMachine)
+    let next = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
     #expect(next.virtualMachine == virtualMachine)
   }
 
   @Test
   func contextDataIsStoredInTheInstalledBox() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     #expect(context.contextDataStorageBox() != nil)
 
     await context.setData("payload", for: QJSContextSurfaceDataKey.self)
@@ -102,7 +102,7 @@ struct QJSContextSurfaceTests {
 
   @Test
   func defaultScopeKeepsContextValuesAliveAcrossWindows() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     let (durable, windowed) = await makeDurableValueAndWindowValue(on: context)
 
     // The window drained before this read; only the context default scope can
@@ -113,14 +113,14 @@ struct QJSContextSurfaceTests {
 
   @Test
   func manualScopePersistsIntoTheDefaultScope() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     let persisted = await makeScopePersistedValue(on: context)
     #expect(persisted == "persisted")
   }
 
   @Test
   func contextLevelOperationsSettleOnTheDefaultScope() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     let result = await exerciseContextValueOperations(on: context)
     #expect(result.read == 41)
     #expect(result.script == 42)
@@ -128,11 +128,11 @@ struct QJSContextSurfaceTests {
   }
 
   @Test
-  func hashableIdentityFollowsTheEngineHandles() {
-    let virtualMachine = QJSVirtualMachine()
-    let otherVirtualMachine = QJSVirtualMachine()
-    let context = QJSContext(virtualMachine: virtualMachine)
-    let sibling = QJSContext(virtualMachine: virtualMachine)
+  func hashableIdentityFollowsTheEngineHandles() async {
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
+    let otherVirtualMachine = await QJSVirtualMachine(.nonblocking)
+    let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
+    let sibling = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
 
     #expect(context == context)
     #expect(context.hashValue == context.hashValue)
@@ -148,11 +148,13 @@ struct QJSContextSurfaceTests {
   /// contract (two context handles plus a borrowed value token), so it lives
   /// on the concrete engine rather than in the generic engine tests.
   @Test
-  func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() {
-    let virtualMachine = QJSVirtualMachine()
+  func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() async {
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
     guard
-      let sourceContext = virtualMachine.makeContext(),
-      let targetContext = virtualMachine.makeContext(),
+      let sourceBits = await virtualMachine.makeContext(),
+      let targetBits = await virtualMachine.makeContext(),
+      let sourceContext = OpaquePointer(bitPattern: sourceBits),
+      let targetContext = OpaquePointer(bitPattern: targetBits),
       let value = QJSEngine.makeNumber(7, in: sourceContext)
     else {
       Issue.record("Expected same-VM context handles to be creatable")

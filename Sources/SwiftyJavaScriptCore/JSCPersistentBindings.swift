@@ -7,9 +7,11 @@ private let jscPersistentBindingsCounter = Atomic<UInt64>(0)
 /// JavaScriptCore's concrete persistent-binding table.
 ///
 /// JSC is GC-managed, so a live binding is a protected `JSValueRef`; release
-/// removes the slot metadata immediately and unprotects the reference on the
-/// VM thread. The table never outlives the context actor: `close()` runs in
-/// the actor's isolated deinit before the context itself is released.
+/// removes the slot metadata immediately and hands the reference to the
+/// context actor, which unprotects it on the VM executor. The table never
+/// outlives the context actor: `close()` runs in the actor's isolated deinit
+/// before the context itself is released, so a handle that outlives its
+/// context leaves nothing behind.
 final class JSCPersistentBindings: @unchecked Sendable {
   private struct Slot: @unchecked Sendable {
     var ref: JSValueRef?
@@ -26,15 +28,13 @@ final class JSCPersistentBindings: @unchecked Sendable {
 
   let id: UInt64
   private let contextRef: JSGlobalContextRef
-  private let vmThread: VMThread
   private let state = Mutex(State())
 
-  init(contextRef: JSGlobalContextRef, vmThread: VMThread) {
+  init(contextRef: JSGlobalContextRef) {
     self.id =
       0x4A53_4300_0000_0000
       | jscPersistentBindingsCounter.add(1, ordering: .relaxed).newValue
     self.contextRef = contextRef
-    self.vmThread = vmThread
   }
 
   func mint(_ ref: JSValueRef) -> JSPersistentHandleIdentity {
@@ -78,10 +78,12 @@ final class JSCPersistentBindings: @unchecked Sendable {
     }
   }
 
-  @discardableResult
-  func release(_ identity: JSPersistentHandleIdentity) -> Bool {
-    guard identity.registry == id else { return false }
-    let released: JSValueRef? = state.withLock { state in
+  /// Remove the slot synchronously and hand the protected reference to the
+  /// caller, who unprotects it on the VM executor. Returns nil for a dead,
+  /// foreign, or already-closed binding.
+  func take(_ identity: JSPersistentHandleIdentity) -> JSValueRef? {
+    guard identity.registry == id else { return nil }
+    return state.withLock { state in
       guard !state.closed,
         var entry = state.slots[identity.slot],
         entry.live,
@@ -99,20 +101,10 @@ final class JSCPersistentBindings: @unchecked Sendable {
       state.free.append(identity.slot)
       return ref
     }
-    guard let released else { return false }
-    let contextBits = UInt(bitPattern: contextRef)
-    let refBits = UInt(bitPattern: released)
-    vmThread.perform {
-      guard let contextRef = JSGlobalContextRef(bitPattern: contextBits),
-        let ref = JSValueRef(bitPattern: refBits)
-      else {
-        return
-      }
-      JSValueUnprotect(contextRef, ref)
-    }
-    return true
   }
 
+  /// Unprotect every live binding. Runs in the context's isolated deinit, on
+  /// the VM executor.
   func close() {
     let refs: [JSValueRef] = state.withLock { state in
       guard !state.closed else { return [] }
@@ -128,18 +120,8 @@ final class JSCPersistentBindings: @unchecked Sendable {
       }
       return collected
     }
-    guard !refs.isEmpty else { return }
-    let contextBits = UInt(bitPattern: contextRef)
-    let refBits = refs.map(UInt.init(bitPattern:))
-    vmThread.perform {
-      guard let contextRef = JSGlobalContextRef(bitPattern: contextBits) else {
-        return
-      }
-      for bits in refBits {
-        if let ref = JSValueRef(bitPattern: bits) {
-          JSValueUnprotect(contextRef, ref)
-        }
-      }
+    for ref in refs {
+      JSValueUnprotect(contextRef, ref)
     }
   }
 }

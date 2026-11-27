@@ -444,7 +444,7 @@ struct QJSScopeSurfaceTests {
   /// the default scope is the stack top again afterwards.
   @Test
   func instantWindowRestoresTheDefaultScopeFrame() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     let defaultFrame = QJSScopeStacks.top(
       of: context.contextRef)
 
@@ -466,7 +466,7 @@ struct QJSScopeSurfaceTests {
   /// engine must stay usable afterwards.
   @Test
   func invalidTypedArraySliceLeavesTheEngineUsable() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     await context.withInstantContext { scope in
       let buffer = QJSArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
       let rejected = QJSEngine.makeTypedArray(
@@ -493,7 +493,7 @@ struct QJSScopeSurfaceTests {
   /// surface, so its read/write/has/delete contract is asserted on the driver.
   @Test
   func valueKeyDriverReadsWritesHasAndDeletes() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     await context.withInstantContext { scope in
       let object: QJSValue
       switch scope.makeObject() {
@@ -551,7 +551,7 @@ struct QJSScopeSurfaceTests {
   /// down from the generic property tests.
   @Test
   func valueKeyDriverRespectsPropertyAttributes() async {
-    let context = QJSContext()
+    let context = await QJSContext(.nonblocking)
     await context.withInstantContext { scope in
       let object: QJSValue
       switch scope.makeObject() {

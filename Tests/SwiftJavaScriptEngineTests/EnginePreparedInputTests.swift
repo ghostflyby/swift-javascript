@@ -35,7 +35,7 @@ struct EnginePreparedInputTests {
 
 private enum PropertyStringKeyCanBeReused: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let object = context.makePersistentObject()
@@ -58,7 +58,7 @@ private enum PropertyStringKeyCanBeReused: ScriptEngineAssertion {
 
 private enum PropertyStringKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let object = context.makePersistentObject()
@@ -77,7 +77,7 @@ private enum PropertyStringKeyPreservesUTF16AndEmbeddedNUL: ScriptEngineAssertio
 
 private enum PropertyStringKeyCanCreateStringValue: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let text = "key_😀_\u{0}_tail"
@@ -91,7 +91,7 @@ private enum PropertyStringKeyCanCreateStringValue: ScriptEngineAssertion {
 
 private enum PreparedScriptCanBeReused: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let script = context.prepareScript(
@@ -119,7 +119,7 @@ extension JSValueScope where Self: ~Copyable {
 
 private enum SurfaceInputsSurviveTheCreatingWindow: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     // Minted inside one synchronous window; the wrappers own the context
     // reference that keeps them usable outside it.

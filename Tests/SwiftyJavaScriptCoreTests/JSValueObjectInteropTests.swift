@@ -3,7 +3,8 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 @Test func javaScriptCoreValueStoresRefAndContextDirectly() async {
-  let context = JSCContext(virtualMachine: JSCVirtualMachine())
+  let context = await JSCContext(
+    virtualMachine: await JSCVirtualMachine(.nonblocking), .nonblocking)
 
   await context.withInstantContext { scope in
     let value = scope.makeNumber(42)

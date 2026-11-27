@@ -45,9 +45,9 @@ struct EngineRuntimeDriverTests {
   func virtualMachineHashableAndIdentity(_ engine: ScriptEngine) async {
     switch engine {
     case .javaScriptCore:
-      runVirtualMachineHashableAndIdentity(JSCContext.self)
+      await runVirtualMachineHashableAndIdentity(JSCContext.self)
     case .quickJS:
-      runVirtualMachineHashableAndIdentity(QJSContext.self)
+      await runVirtualMachineHashableAndIdentity(QJSContext.self)
     }
   }
 
@@ -59,6 +59,17 @@ struct EngineRuntimeDriverTests {
     case .quickJS:
       await runContextHashableAndGlobalObject(QJSContext.self)
     }
+  }
+
+  @Test
+  func synchronousInitializersBlockUntilEngineStateExists() {
+    // Outside the cooperative pool the blocking initializers are the
+    // supported form: they return with the engine state already created.
+    let jscContext = JSCContext()
+    expectTrue(jscContext.contextDataStorageBox() != nil)
+
+    let qjsContext = QJSContext()
+    expectTrue(qjsContext.contextDataStorageBox() != nil)
   }
 
   @Test
@@ -79,7 +90,7 @@ private enum EngineContextDataKey: JSContextDataKey {
 
 private enum EvaluateScriptReturnsValueForValidScript: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let result = context.evaluateScript("1 + 2")
@@ -97,7 +108,7 @@ private enum EvaluateScriptReturnsValueForValidScript: ScriptEngineAssertion {
 
 private enum EvaluateScriptSupportsSourceURL: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let script = "40 + 2"
@@ -121,7 +132,7 @@ private enum EvaluateScriptSupportsSourceURL: ScriptEngineAssertion {
 
 private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { context in
       let result = context.evaluateScript("throw new Error('boom')", sourceURL: "inline://throw.js")
@@ -143,7 +154,7 @@ private enum EvaluateScriptReturnsExceptionForThrowingScript: ScriptEngineAssert
 
 private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.setData("actor", for: EngineContextDataKey.self)
     let instantValue: String? = await context.withInstantContext {
@@ -182,7 +193,7 @@ private enum ContextDataIsSharedWithInstantContextAndCallbacks: ScriptEngineAsse
 
 private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let answerKey: StaticString = "answer"
@@ -233,7 +244,7 @@ private enum InstantContextSupportsNativeModuleStyleGlobalHelpers: ScriptEngineA
 
 private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let countKey: StaticString = "count"
@@ -266,7 +277,7 @@ private enum ContextThinWrapsInstantContextGlobalHelpers: ScriptEngineAssertion 
 
 private enum ValueInitializersAndTypePredicates: ScriptEngineAssertion {
   static func run<C: JSContext>(_: C.Type) async {
-    let context = C(virtualMachine: C.VirtualMachine())
+    let context = await makeContext(C.self)
 
     await context.withInstantContext { scope in
       let undefined = scope.makeUndefined()
@@ -310,9 +321,9 @@ private enum ValueInitializersAndTypePredicates: ScriptEngineAssertion {
   }
 }
 
-private func runVirtualMachineHashableAndIdentity<C: JSContext>(_: C.Type) {
-  let vm1 = C.VirtualMachine()
-  let vm2 = C.VirtualMachine()
+private func runVirtualMachineHashableAndIdentity<C: JSContext>(_: C.Type) async {
+  let vm1 = await C.VirtualMachine(.nonblocking)
+  let vm2 = await C.VirtualMachine(.nonblocking)
 
   expectTrue(vm1 == vm1)
   expectTrue(vm1 != vm2)
@@ -320,9 +331,9 @@ private func runVirtualMachineHashableAndIdentity<C: JSContext>(_: C.Type) {
 }
 
 private func runContextHashableAndGlobalObject<C: JSContext>(_: C.Type) async {
-  let vm = C.VirtualMachine()
-  let context1 = C(virtualMachine: vm)
-  let context2 = C(virtualMachine: vm)
+  let vm = await C.VirtualMachine(.nonblocking)
+  let context1 = await C(virtualMachine: vm, .nonblocking)
+  let context2 = await C(virtualMachine: vm, .nonblocking)
 
   expectTrue(context1 == context1)
   expectTrue(context1 != context2)

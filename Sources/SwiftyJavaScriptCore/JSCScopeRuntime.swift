@@ -92,7 +92,9 @@ final class JSCScopeCore: @unchecked Sendable {
 
 private final class JSCScopeStack: @unchecked Sendable {
   var frames: [JSCScopeFrame] = []
-  var vmThread: VMThread?
+  /// Weak: the stack table is global, and an entry must never keep the
+  /// context actor alive.
+  weak var context: JSCContext?
 }
 
 private enum JSCScopeStackStorage {
@@ -122,17 +124,17 @@ enum JSCScopeStacks {
     }
   }
 
-  static func bind(_ vmThread: VMThread, for contextRef: JSGlobalContextRef) {
+  static func bind(_ context: JSCContext, for contextRef: JSGlobalContextRef) {
     let key = UInt(bitPattern: contextRef)
     JSCScopeStackStorage.state.withLock { stacks in
-      stacks[key]?.vmThread = vmThread
+      stacks[key]?.context = context
     }
   }
 
-  static func vmThread(for contextRef: JSGlobalContextRef) -> VMThread? {
+  static func context(for contextRef: JSGlobalContextRef) -> JSCContext? {
     let key = UInt(bitPattern: contextRef)
     return JSCScopeStackStorage.state.withLock { stacks in
-      stacks[key]?.vmThread
+      stacks[key]?.context
     }
   }
 

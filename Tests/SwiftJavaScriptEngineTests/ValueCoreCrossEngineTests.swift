@@ -170,7 +170,7 @@ private func record<V: SwiftJavaScript.JSValue & ~Copyable>(
 /// Run the whole observation inside one synchronous window of a real context
 /// actor, so neither branch leans on an engine-specific handle path.
 private func observeValueCore<C: JSContext>(_: C.Type) async -> ValueCoreObservation {
-  let context = C(virtualMachine: C.VirtualMachine())
+  let context = await makeContext(C.self)
   return await context.withInstantContext { scope in
     observeValueCore(C.self, in: scope)
   }

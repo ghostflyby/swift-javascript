@@ -72,9 +72,9 @@ import Testing
 // MARK: - Surface context/VM smoke (S8)
 
 @Test func javaScriptCoreSurfaceContextAndVirtualMachineSmoke() async {
-  let virtualMachine = JSCVirtualMachine()
-  let context = JSCContext(virtualMachine: virtualMachine)
-  let sibling = JSCContext(virtualMachine: virtualMachine)
+  let virtualMachine = await JSCVirtualMachine(.nonblocking)
+  let context = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
+  let sibling = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
 
   #expect(context.virtualMachine == virtualMachine)
   #expect(context.contextRef == context.contextRef)
@@ -106,7 +106,7 @@ import Testing
 // this test is the crash regression for the whole fallback path.
 
 @Test func javaScriptCoreMakeFunctionInsideCallbackDoesNotCrash() async {
-  let context = JSCContext()
+  let context = await JSCContext(.nonblocking)
 
   let result = await context.withInstantContext { scope in
     scope.installGlobalFunction(named: "outer") { callbackContext, _, _ in

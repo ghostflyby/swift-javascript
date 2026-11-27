@@ -1,5 +1,5 @@
-import Synchronization
 import SwiftJavaScript
+import Synchronization
 
 #if canImport(CQuickJSStatic)
   import CQuickJSStatic
@@ -129,7 +129,9 @@ final class QJSScopeCore: @unchecked Sendable {
 
 private final class QJSScopeStack: @unchecked Sendable {
   var frames: [QJSScopeFrame] = []
-  var vmThread: VMThread?
+  /// Weak: the stack table is global, and an entry must never keep the
+  /// context actor alive.
+  weak var context: QJSContext?
 }
 
 private enum QJSScopeStackStorage {
@@ -159,17 +161,17 @@ enum QJSScopeStacks {
     }
   }
 
-  static func bind(_ vmThread: VMThread, for contextRef: OpaquePointer) {
+  static func bind(_ context: QJSContext, for contextRef: OpaquePointer) {
     let key = UInt(bitPattern: contextRef)
     QJSScopeStackStorage.state.withLock { stacks in
-      stacks[key]?.vmThread = vmThread
+      stacks[key]?.context = context
     }
   }
 
-  static func vmThread(for contextRef: OpaquePointer) -> VMThread? {
+  static func context(for contextRef: OpaquePointer) -> QJSContext? {
     let key = UInt(bitPattern: contextRef)
     return QJSScopeStackStorage.state.withLock { stacks in
-      stacks[key]?.vmThread
+      stacks[key]?.context
     }
   }
 

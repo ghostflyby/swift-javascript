@@ -15,11 +15,11 @@ private let qjsPersistentBindingsCounter = Atomic<UInt64>(0)
 ///
 /// QuickJS is reference-counted, so a live binding owns one duplicated
 /// reference (`JS_DupValue`) and settlement is `JS_FreeValue` exactly once per
-/// slot: `release` clears the slot metadata under the lock and settles the
-/// captured reference on the VM thread; `close` settles every still-live slot
-/// inline, so a released slot can never be settled twice. The table never
-/// outlives the context actor: `close()` runs in the actor's isolated deinit
-/// before `JS_FreeContext`.
+/// slot: `take` clears the slot metadata under the lock and hands the captured
+/// reference to the context actor, which frees it on the VM executor; `close`
+/// settles every still-live slot inline, so a released slot can never be
+/// settled twice. The table never outlives the context actor: `close()` runs in
+/// the actor's isolated deinit before `JS_FreeContext`.
 final class QJSPersistentBindings: @unchecked Sendable {
   private struct Slot: @unchecked Sendable {
     var value: CQuickJSValue?
@@ -36,15 +36,13 @@ final class QJSPersistentBindings: @unchecked Sendable {
 
   let id: UInt64
   private let contextRef: OpaquePointer
-  private let vmThread: VMThread
   private let state = Mutex(State())
 
-  init(contextRef: OpaquePointer, vmThread: VMThread) {
+  init(contextRef: OpaquePointer) {
     self.id =
       0x514A_5300_0000_0000
       | qjsPersistentBindingsCounter.add(1, ordering: .relaxed).newValue
     self.contextRef = contextRef
-    self.vmThread = vmThread
   }
 
   /// Copy semantics: minting duplicates the borrowed value, so the source
@@ -94,14 +92,13 @@ final class QJSPersistentBindings: @unchecked Sendable {
     }
   }
 
-  /// Kill a binding and settle its owned reference on the VM thread. Any
-  /// thread; metadata only under the lock. Idempotent: a second call, a call
-  /// after `close()`, and a call for a mismatched generation all return
-  /// `false` and free nothing.
-  @discardableResult
-  func release(_ identity: JSPersistentHandleIdentity) -> Bool {
-    guard identity.registry == id else { return false }
-    let released: CQuickJSValue? = state.withLock { state in
+  /// Kill a binding synchronously and hand its owned reference to the caller,
+  /// who frees it on the VM executor. Any thread; metadata only under the
+  /// lock. Idempotent: a second call, a call after `close()`, and a call for a
+  /// mismatched generation all return `nil` and free nothing.
+  func take(_ identity: JSPersistentHandleIdentity) -> CQuickJSValue? {
+    guard identity.registry == id else { return nil }
+    return state.withLock { state in
       guard !state.closed,
         var entry = state.slots[identity.slot],
         entry.live,
@@ -119,12 +116,9 @@ final class QJSPersistentBindings: @unchecked Sendable {
       state.free.append(identity.slot)
       return value
     }
-    guard let released else { return false }
-    settle(released)
-    return true
   }
 
-  /// Settle every live binding inline. VM thread only; called from the host
+  /// Settle every live binding inline. VM executor only; called from the host
   /// context actor's isolated deinit before `JS_FreeContext`.
   func close() {
     let values: [CQuickJSValue] = state.withLock { state in
@@ -146,18 +140,6 @@ final class QJSPersistentBindings: @unchecked Sendable {
     quickJSUpdateStackTop(contextRef)
     for value in values {
       JS_FreeValue(contextRef, value)
-    }
-  }
-
-  /// Free one captured reference on the VM thread. Never inside the metadata
-  /// lock: `JS_FreeValue` can synchronously run a user finalizer that
-  /// re-enters `release`, and `Mutex` is not recursive.
-  private func settle(_ value: CQuickJSValue) {
-    let contextBits = UInt(bitPattern: contextRef)
-    vmThread.perform {
-      guard let context = OpaquePointer(bitPattern: contextBits) else { return }
-      quickJSUpdateStackTop(context)
-      JS_FreeValue(context, value)
     }
   }
 }

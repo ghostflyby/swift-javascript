@@ -63,9 +63,9 @@ private func exerciseContextValueOperations(
 struct JSCContextSurfaceTests {
   @Test
   func createsAndTearsDownAContextOnItsVirtualMachine() async {
-    let virtualMachine = JSCVirtualMachine()
+    let virtualMachine = await JSCVirtualMachine(.nonblocking)
     do {
-      let context = JSCContext(virtualMachine: virtualMachine)
+      let context = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
       let window = await context.withInstantContext { scope in
         scope.makeNumber(21).toNumber() * 2
       }
@@ -75,14 +75,14 @@ struct JSCContextSurfaceTests {
     // Dropping the context runs the isolated deinit (registry close →
     // default-scope drain → box clear → context release → stack pop) on the
     // VM thread; the VM stays usable afterwards.
-    let next = JSCContext(virtualMachine: virtualMachine)
+    let next = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
     #expect(next.virtualMachine == virtualMachine)
   }
 
   @Test
   func contextDataIsStoredInTheInstalledBox() async {
-    let context = JSCContext()
-    #expect(JSCEngine.contextDataStorageBox(in: context.contextRef) != nil)
+    let context = await JSCContext(.nonblocking)
+    #expect(context.contextDataStorageBox() != nil)
 
     await context.setData("payload", for: JSCContextSurfaceDataKey.self)
     let stored = await context.data(for: JSCContextSurfaceDataKey.self)
@@ -95,7 +95,7 @@ struct JSCContextSurfaceTests {
 
   @Test
   func defaultScopeKeepsContextValuesAliveAcrossWindows() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     let (durable, windowed) = await makeDurableValueAndWindowValue(on: context)
 
     // The window drained before this read; only the context default scope can
@@ -106,14 +106,14 @@ struct JSCContextSurfaceTests {
 
   @Test
   func manualScopePersistsIntoTheDefaultScope() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     let persisted = await makeScopePersistedValue(on: context)
     #expect(persisted == "persisted")
   }
 
   @Test
   func contextLevelOperationsSettleOnTheDefaultScope() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     let result = await exerciseContextValueOperations(on: context)
     #expect(result.read == 41)
     #expect(result.script == 42)
@@ -121,11 +121,11 @@ struct JSCContextSurfaceTests {
   }
 
   @Test
-  func hashableIdentityFollowsTheEngineHandles() {
-    let virtualMachine = JSCVirtualMachine()
-    let otherVirtualMachine = JSCVirtualMachine()
-    let context = JSCContext(virtualMachine: virtualMachine)
-    let sibling = JSCContext(virtualMachine: virtualMachine)
+  func hashableIdentityFollowsTheEngineHandles() async {
+    let virtualMachine = await JSCVirtualMachine(.nonblocking)
+    let otherVirtualMachine = await JSCVirtualMachine(.nonblocking)
+    let context = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
+    let sibling = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
 
     #expect(context == context)
     #expect(context.hashValue == context.hashValue)
@@ -141,11 +141,13 @@ struct JSCContextSurfaceTests {
   /// contract (two context handles plus a borrowed value token), so it lives
   /// on the concrete engine rather than in the generic engine tests.
   @Test
-  func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() {
-    let virtualMachine = JSCVirtualMachine()
+  func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() async {
+    let virtualMachine = await JSCVirtualMachine(.nonblocking)
     guard
-      let sourceContext = virtualMachine.makeContextHandle(),
-      let targetContext = virtualMachine.makeContextHandle(),
+      let sourceBits = await virtualMachine.makeContextHandle(),
+      let targetBits = await virtualMachine.makeContextHandle(),
+      let sourceContext = JSGlobalContextRef(bitPattern: sourceBits),
+      let targetContext = JSGlobalContextRef(bitPattern: targetBits),
       let value = JSCEngine.makeNumberValueHandle(7, sourceContext)
     else {
       Issue.record("Expected same-VM context handles to be creatable")

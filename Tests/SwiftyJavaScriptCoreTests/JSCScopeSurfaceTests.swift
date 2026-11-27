@@ -451,7 +451,7 @@ struct JSCScopeSurfaceTests {
   /// the default scope is the stack top again afterwards.
   @Test
   func instantWindowRestoresTheDefaultScopeFrame() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     let defaultFrame = JSCScopeStacks.top(of: context.contextRef)
 
     await context.withInstantContext { scope in
@@ -471,7 +471,7 @@ struct JSCScopeSurfaceTests {
   /// engine must stay usable afterwards.
   @Test
   func invalidTypedArraySliceLeavesTheEngineUsable() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     await context.withInstantContext { scope in
       let buffer = JSCArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
       let rejected = JSCEngine.makeTypedArrayHandle(
@@ -498,7 +498,7 @@ struct JSCScopeSurfaceTests {
   /// surface, so its read/write/has/delete contract is asserted on the driver.
   @Test
   func valueKeyDriverReadsWritesHasAndDeletes() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     await context.withInstantContext { scope in
       let object: JSCValue
       switch scope.makeObject() {
@@ -556,7 +556,7 @@ struct JSCScopeSurfaceTests {
   /// down from the generic property tests.
   @Test
   func valueKeyDriverRespectsPropertyAttributes() async {
-    let context = JSCContext()
+    let context = await JSCContext(.nonblocking)
     await context.withInstantContext { scope in
       let object: JSCValue
       switch scope.makeObject() {
