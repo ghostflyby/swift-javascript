@@ -28,6 +28,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// The context group's bit pattern, created during init (0 until then).
   private nonisolated let runtimeBits = Mutex<UInt>(0)
 
+  @available(*, noasync)
   public init() {
     let executor = DedicatedThreadExecutor()
     self.executor = executor
@@ -50,6 +51,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// engine access serialized, not pinned to a particular OS thread: any
   /// serial executor is safe. The executor is borrowed — this VM neither
   /// stops it nor waits for it.
+  @available(*, noasync)
   public init(executor: any SerialExecutor) {
     self.executor = executor
     self.ownedExecutor = nil

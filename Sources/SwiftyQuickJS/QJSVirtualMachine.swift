@@ -50,6 +50,7 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// Package-internal: lets tests observe that the migration notification ran.
   private nonisolated let migrationRefreshes = MigrationRefreshCounter()
 
+  @available(*, noasync)
   public init() {
     let executor = DedicatedThreadExecutor()
     self.executor = executor
@@ -71,6 +72,7 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// Run every context of this VM on a caller-supplied thread-affinity
   /// executor. The executor is borrowed — this VM neither stops it nor waits
   /// for it.
+  @available(*, noasync)
   public init(executor: any ThreadAffinityExecutor) {
     self.executor = executor
     self.ownedExecutor = nil

@@ -117,13 +117,13 @@ private enum EngineBenchmarks {
     reporter: Reporter
   ) async {
     _ = context
-    let virtualMachine = C.VirtualMachine()
+    let virtualMachine = await C.VirtualMachine(.nonblocking)
     let barrier = ExecutorBarrier(virtualMachine)
 
     // A resident context, so every sample context is a second context on a VM
     // that already hosts engine state — the shape hosts create, and the one
     // the §11 numbers were taken with.
-    var bootstrapBox: C? = C(virtualMachine: virtualMachine)
+    var bootstrapBox: C? = await C(virtualMachine: virtualMachine, .nonblocking)
 
     if BenchDebug.enabled {
       let start = monotonicNanos()
@@ -164,16 +164,14 @@ private enum EngineBenchmarks {
     await barrier.ping()
   }
 
-  /// Create a fresh context. The surface `init(virtualMachine:)` routes the
-  /// engine-side creation to the VM thread itself and waits for it, so the call
-  /// is safe from this cooperative thread; `bootstrap` only keeps the resident
-  /// context alive.
+  /// Create a fresh context without blocking this cooperative thread;
+  /// `bootstrap` only keeps the resident context alive.
   private static func makeContext<C: JSContext>(
     _ virtualMachine: C.VirtualMachine,
     via bootstrap: C
   ) async -> C {
     _ = bootstrap
-    return C(virtualMachine: virtualMachine)
+    return await C(virtualMachine: virtualMachine, .nonblocking)
   }
 
   // MARK: Allocation

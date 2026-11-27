@@ -96,6 +96,11 @@ public protocol JSContext: Actor, Hashable {
   /// default scope, and persistent registry created during init. Blocks the
   /// calling thread until the engine state exists (or runs inline when already
   /// isolated on the VM executor).
+  ///
+  /// Marked `noasync`: blocking on the concurrency runtime can starve the
+  /// cooperative pool the initialization hop needs. Use
+  /// `init(virtualMachine:_: JSInitMode)` from async contexts.
+  @available(*, noasync)
   init(virtualMachine: VirtualMachine)
 
   /// Non-blocking form: awaits engine-state creation on the VM executor

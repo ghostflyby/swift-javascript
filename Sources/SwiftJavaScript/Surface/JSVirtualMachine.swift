@@ -36,6 +36,11 @@ public protocol JSVirtualMachine: AnyObject, Sendable, Hashable {
   /// systems without `SerialExecutor.isIsolatingCurrentContext`) is treated as
   /// foreign, so the blocking form must not be called from one of that
   /// executor's own jobs; use `init(_: JSInitMode)` there.
+  ///
+  /// Marked `noasync`: blocking on the concurrency runtime can starve the
+  /// cooperative pool the initialization hop needs. Use `init(_: JSInitMode)`
+  /// from async contexts.
+  @available(*, noasync)
   init()
 
   /// Non-blocking form: awaits runtime creation on the VM executor instead of

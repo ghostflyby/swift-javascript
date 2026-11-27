@@ -68,6 +68,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   private nonisolated let inputRecords = Mutex<[UInt64: InputRecord]>([:])
   private nonisolated let inputCounter = Atomic<UInt64>(0)
 
+  @available(*, noasync)
   public init() {
     self.init(virtualMachine: QJSVirtualMachine())
   }
@@ -83,6 +84,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   /// already is that executor runs the work inline; otherwise it hops through
   /// a temporary `JSExecutorHop`: the synchronous form blocks this thread, the
   /// `JSInitMode.nonblocking` form awaits.
+  @available(*, noasync)
   public init(virtualMachine: QJSVirtualMachine) {
     self.virtualMachine = virtualMachine
     self.unownedExecutor = virtualMachine.unownedExecutor
