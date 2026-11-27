@@ -9,7 +9,7 @@
 /// types are stated once, on `JSContext`, so a generic window resolves them
 /// through its context; a signature taking an unrelated value view would need
 /// the window pinned to its context in both directions.
-public protocol JSValueDecodable: ~Copyable {
+public protocol JSValueDecodable: ~Copyable, SendableMetatype {
   init<C: JSInstantContext & ~Copyable>(
     value: borrowing C.Value,
     in context: borrowing C
@@ -34,7 +34,7 @@ extension JSValueDecodable where Self: ~Copyable {
 ///
 /// Signature: `decode`/`tryDecode<C: JSInstantContext & ~Copyable>(
 /// _ value: borrowing C.Value, in context: borrowing C)`.
-public protocol JSValueDecoder: ~Copyable {
+public protocol JSValueDecoder: ~Copyable, SendableMetatype {
   associatedtype SwiftType
 
   static func decode<C: JSInstantContext & ~Copyable>(

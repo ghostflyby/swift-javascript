@@ -52,7 +52,7 @@ extension QJSValue {
       }
       do {
         var index = 0
-        let typedArgs: (repeat each A) = try
+        let typedArgs: (repeat each A) =
           (repeat try decodeFunctionArgument(
             &index,
             type: (each A).self,
@@ -98,7 +98,7 @@ extension QJSValue {
       }
       do {
         var index = 0
-        let typedArgs: (repeat (each C).SwiftType) = try
+        let typedArgs: (repeat (each C).SwiftType) =
           (repeat try decodeFunctionArgument(
             &index,
             using: (each C).self,

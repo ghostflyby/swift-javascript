@@ -5,7 +5,7 @@
 // its `SwiftType`.
 
 /// A Swift value that can be encoded into a surface scope window.
-public protocol JSValueEncodable: ~Copyable {
+public protocol JSValueEncodable: ~Copyable, SendableMetatype {
   func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value
@@ -24,7 +24,7 @@ extension JSValueEncodable where Self: ~Copyable {
 }
 
 /// A surface converter: `SwiftType` to the engine's local value view.
-public protocol JSValueEncoder: ~Copyable {
+public protocol JSValueEncoder: ~Copyable, SendableMetatype {
   associatedtype SwiftType
 
   static func encode<C: JSValueScope & ~Copyable>(
