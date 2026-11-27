@@ -15,7 +15,6 @@ extension QJSEngine {
     arguments: [CQuickJSValue] = [],
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     var rawArguments = arguments
     let thisRawValue = thisValue ?? quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
@@ -35,7 +34,6 @@ extension QJSEngine {
     arguments: [CQuickJSValue] = [],
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     var rawArguments = arguments
     let result = rawArguments.withUnsafeMutableBufferPointer { buffer in
       JS_CallConstructor(context, constructor, Int32(buffer.count), buffer.baseAddress)
@@ -47,7 +45,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     return quickJSResult(for: JS_ToObject(context, value), in: context)
   }
 
@@ -63,7 +60,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     guard JS_IsObject(value) else {
       return false
     }
@@ -83,7 +79,6 @@ extension QJSEngine {
     constructor: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     let result = JS_IsInstanceOf(context, value, constructor)
     return result >= 0 ? result == 1 : nil
   }
@@ -93,7 +88,6 @@ extension QJSEngine {
     _ rhs: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     let result = JS_IsEqual(context, lhs, rhs)
     return result >= 0 ? result == 1 : nil
   }
@@ -103,7 +97,6 @@ extension QJSEngine {
     _ rhs: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     return JS_IsStrictEqual(context, lhs, rhs)
   }
 }

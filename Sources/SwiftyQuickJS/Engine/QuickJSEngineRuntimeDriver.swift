@@ -29,17 +29,21 @@ extension QJSEngine {
     guard let runtime = JS_NewRuntime() else {
       preconditionFailure("QuickJS could not create runtime")
     }
+    // QuickJS's default 1 MB stack budget can exceed the stack of the thread
+    // an executor runs on (a dedicated thread has roughly 512 KB), which lets
+    // real recursion overflow before the logical check fires. Keep the limit
+    // below that: stack top is recorded at runtime creation on the VM
+    // executor and refreshed only on thread hand-offs.
+    JS_SetMaxStackSize(runtime, 256 * 1024)
     return runtime
   }
 
   package static func releaseRuntime(_ runtime: OpaquePointer) {
-    JS_UpdateStackTop(runtime)
     JS_FreeRuntime(runtime)
   }
 
   package static func makeContext(in runtime: OpaquePointer) -> OpaquePointer? {
-    JS_UpdateStackTop(runtime)
-    return JS_NewContext(runtime)
+    JS_NewContext(runtime)
   }
 
   /// The runtime a context belongs to. Engine work: the caller runs on the VM
@@ -61,7 +65,6 @@ extension QJSEngine {
   package static func contextDataStorageBox(in context: OpaquePointer)
     -> JSContextDataStorageBox?
   {
-    quickJSUpdateStackTop(context)
     guard let opaque = JS_GetContextOpaque(context) else {
       return nil
     }
@@ -72,7 +75,6 @@ extension QJSEngine {
     _ storage: JSContextDataStorageBox?,
     in context: OpaquePointer
   ) {
-    quickJSUpdateStackTop(context)
     if let oldOpaque = JS_GetContextOpaque(context) {
       JS_SetContextOpaque(context, nil)
       _ = Unmanaged<JSContextDataStorageBox>.fromOpaque(oldOpaque).takeRetainedValue()
@@ -88,7 +90,6 @@ extension QJSEngine {
   /// object for its lifetime, so the duplicate is settled here and the raw
   /// value is handed to a non-owning local view.
   package static func globalObjectValue(_ context: OpaquePointer) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     let global = JS_GetGlobalObject(context)
     defer { JS_FreeValue(context, global) }
     return global
@@ -99,7 +100,6 @@ extension QJSEngine {
     callback: @escaping JSFunctionCallback<QJSInstantContext>,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     let callbackBox = Unmanaged.passRetained(
       Box(QuickJSFunctionCallbackStorage.surface(callback)))
     let function = name.withCString {
@@ -131,7 +131,6 @@ extension QJSEngine {
     startingLineNumber: Int32 = 1,
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue> {
-    quickJSUpdateStackTop(context)
     let fileName = sourceURL ?? "<eval>"
     let result = quickJSAdjustedSource(source, startingLineNumber: startingLineNumber)
       .withCCharPointer { sourcePointer, sourceCount in
@@ -177,7 +176,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool {
-    quickJSUpdateStackTop(context)
     return JS_ToBool(context, value) == 1
   }
 
@@ -185,7 +183,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Double {
-    quickJSUpdateStackTop(context)
     var result = 0.0
     let status = JS_ToFloat64(context, &result, value)
     return status == 0 ? result : .nan
@@ -204,7 +201,6 @@ extension QJSEngine {
     _ value: String,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     return value.withCString { JS_NewString(context, $0) }
   }
 
@@ -212,7 +208,6 @@ extension QJSEngine {
     _ value: String,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     return value.withCString { JS_NewSymbol(context, $0, false) }
   }
 
@@ -220,7 +215,6 @@ extension QJSEngine {
     _ value: Double,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     return JS_NewFloat64(context, value)
   }
 
@@ -246,14 +240,12 @@ extension QJSEngine {
   package static func makeObjectResult(
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     return quickJSResult(for: JS_NewObject(context), in: context)
   }
 
   package static func makeArrayResult(
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     return quickJSResult(for: JS_NewArray(context), in: context)
   }
 }
@@ -313,7 +305,6 @@ private func quickJSSurfaceFunctionCallback(
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
-  quickJSUpdateStackTop(contextRef)
   let scope = QJSInstantContext(contextRef: contextRef)
 
   guard

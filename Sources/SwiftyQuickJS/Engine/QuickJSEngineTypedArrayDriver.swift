@@ -18,7 +18,6 @@ extension QJSEngine {
     )?,
     deallocatorContext: UnsafeMutableRawPointer?
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     let opaque: UnsafeMutableRawPointer? =
       if let bytesDeallocator {
         Unmanaged.passRetained(
@@ -52,7 +51,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Int? {
-    quickJSUpdateStackTop(context)
     var size = 0
     guard JS_GetArrayBuffer(context, &size, value) != nil else {
       return nil
@@ -64,7 +62,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    quickJSUpdateStackTop(context)
     var size = 0
     let bytes = JS_GetArrayBuffer(context, &size, value)
     return (UnsafeMutableRawPointer(bytes), bytes == nil)
@@ -75,7 +72,6 @@ extension QJSEngine {
     kind: JSTypedArrayKind,
     length: Int
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     var arguments = [JS_NewFloat64(context, Double(length))]
     return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
   }
@@ -85,7 +81,6 @@ extension QJSEngine {
     kind: JSTypedArrayKind,
     arrayBuffer: CQuickJSValue
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     var arguments = [
       arrayBuffer,
       JS_NewFloat64(context, 0),
@@ -101,7 +96,6 @@ extension QJSEngine {
     byteOffset: Int,
     length: Int
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     var arguments = [
       arrayBuffer,
       JS_NewFloat64(context, Double(byteOffset)),
@@ -114,7 +108,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Int? {
-    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
@@ -139,7 +132,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Int? {
-    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
@@ -161,7 +153,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Int? {
-    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
@@ -184,7 +175,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0
@@ -205,7 +195,6 @@ extension QJSEngine {
     _ value: CQuickJSValue,
     in context: OpaquePointer
   ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    quickJSUpdateStackTop(context)
     var byteOffset = 0
     var byteLength = 0
     var bytesPerElement = 0

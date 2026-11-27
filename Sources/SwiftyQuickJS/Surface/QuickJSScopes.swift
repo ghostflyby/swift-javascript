@@ -198,7 +198,6 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     case .value(let created):
       return adoptCreated(created)
     case .exception(let thrown):
-      quickJSUpdateStackTop(core.contextRef)
       JS_FreeValue(core.contextRef, thrown)
       guard let undefined = QJSEngine.makeUndefined(in: core.contextRef) else {
         preconditionFailure("QJSInstantContext could not create an undefined value")
@@ -492,7 +491,6 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     case .value(let created):
       return adoptCreated(created)
     case .exception(let thrown):
-      quickJSUpdateStackTop(core.contextRef)
       JS_FreeValue(core.contextRef, thrown)
       guard let undefined = QJSEngine.makeUndefined(in: core.contextRef) else {
         preconditionFailure("QJSScope could not create an undefined value")

@@ -13,7 +13,6 @@ extension QJSEngine {
     _ value: String,
     in context: OpaquePointer
   ) -> JSAtom? {
-    quickJSUpdateStackTop(context)
     let atom = value.withCString { pointer in
       JS_NewAtomLen(context, pointer, value.utf8.count)
     }
@@ -24,7 +23,6 @@ extension QJSEngine {
     _ value: StaticString,
     in context: OpaquePointer
   ) -> JSAtom? {
-    quickJSUpdateStackTop(context)
     let atom = value.withUTF8Buffer { buffer in
       let pointer = buffer.baseAddress.map {
         UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self)
@@ -39,7 +37,6 @@ extension QJSEngine {
     fromAtom atom: JSAtom,
     in context: OpaquePointer
   ) -> CQuickJSValue? {
-    quickJSUpdateStackTop(context)
     return JS_AtomToString(context, atom)
   }
 
@@ -47,7 +44,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> [String]? {
-    quickJSUpdateStackTop(context)
     var propertyEnumPointer: UnsafeMutablePointer<JSPropertyEnum>?
     var propertyCount: UInt32 = 0
     let flags = Int32(JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY)
@@ -88,7 +84,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     return quickJSResult(for: JS_GetProperty(context, object, atom), in: context)
   }
 
@@ -119,7 +114,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     let atom = JS_ValueToAtom(context, key)
     guard atom != 0 else {
       return nil
@@ -133,7 +127,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> JSResult<CQuickJSValue>? {
-    quickJSUpdateStackTop(context)
     return quickJSResult(
       for: JS_GetPropertyUint32(context, object, index),
       in: context
@@ -147,7 +140,6 @@ extension QJSEngine {
     in context: OpaquePointer,
     attributes: JSHostMemberAttributes = .none
   ) -> Bool {
-    quickJSUpdateStackTop(context)
     let atom = JS_ValueToAtom(context, key)
     guard atom != 0 else {
       return false
@@ -162,7 +154,6 @@ extension QJSEngine {
     to value: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool {
-    quickJSUpdateStackTop(context)
     return JS_SetPropertyUint32(context, object, index, JS_DupValue(context, value))
       == 1
   }
@@ -172,7 +163,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     let result = JS_HasProperty(context, object, atom)
     return result >= 0 ? result == 1 : nil
   }
@@ -194,7 +184,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool? {
-    quickJSUpdateStackTop(context)
     let atom = JS_ValueToAtom(context, key)
     guard atom != 0 else {
       return nil
@@ -209,7 +198,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool {
-    quickJSUpdateStackTop(context)
     return JS_DeleteProperty(context, object, atom, Int32(JS_PROP_THROW)) == 1
   }
 
@@ -228,7 +216,6 @@ extension QJSEngine {
     on object: CQuickJSValue,
     in context: OpaquePointer
   ) -> Bool {
-    quickJSUpdateStackTop(context)
     let atom = JS_ValueToAtom(context, key)
     guard atom != 0 else {
       return false

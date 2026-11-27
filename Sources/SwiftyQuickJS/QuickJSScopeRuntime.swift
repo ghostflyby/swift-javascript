@@ -18,12 +18,6 @@ import Synchronization
 // context default frame without touching its count. The stack is keyed by the
 // raw context pointer.
 
-/// Refresh the runtime's recorded stack top before an engine call.
-@inline(__always)
-func quickJSUpdateStackTop(_ contextRef: OpaquePointer) {
-  JS_UpdateStackTop(JS_GetRuntime(contextRef))
-}
-
 /// Full-identity comparison of two QuickJS values: tag plus the complete
 /// 8-byte union payload. Comparing only `u.int32` truncates heap pointers to
 /// their low 32 bits, which lets two distinct live objects collide and
@@ -55,7 +49,6 @@ final class QJSScopeFrame: @unchecked Sendable {
 
   func drain() {
     guard !values.isEmpty else { return }
-    quickJSUpdateStackTop(contextRef)
     while let value = values.popLast() {
       JS_FreeValue(contextRef, value)
     }
@@ -100,7 +93,6 @@ final class QJSScopeCore: @unchecked Sendable {
   /// (`JS_DupValue`) and track the claimed reference. The borrowed identity is
   /// returned unchanged for the local view.
   func claimAndTrack(_ value: CQuickJSValue) -> CQuickJSValue {
-    quickJSUpdateStackTop(contextRef)
     frame.track(JS_DupValue(contextRef, value))
     return value
   }
@@ -114,7 +106,6 @@ final class QJSScopeCore: @unchecked Sendable {
     if let taken = frame.takeFirst(matching: { quickJSValueIdentityEquals($0, value) }) {
       target.track(taken)
     } else {
-      quickJSUpdateStackTop(contextRef)
       target.track(JS_DupValue(contextRef, value))
     }
   }

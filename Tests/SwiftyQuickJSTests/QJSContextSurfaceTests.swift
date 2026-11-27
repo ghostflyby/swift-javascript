@@ -146,24 +146,25 @@ struct QJSContextSurfaceTests {
   /// A value created on one context of a VM can be addressed through a
   /// sibling context handle of the same runtime. This is a raw driver
   /// contract (two context handles plus a borrowed value token), so it lives
-  /// on the concrete engine rather than in the generic engine tests.
+  /// on the concrete engine rather than in the generic engine tests. The
+  /// runtime is created here so every engine call runs on the thread that
+  /// recorded QuickJS's stack top.
   @Test
-  func valuesAreUsableAcrossContextsOfTheSameVirtualMachine() async {
-    let virtualMachine = await QJSVirtualMachine(.nonblocking)
+  func valuesAreUsableAcrossContextsOfTheSameRuntime() {
+    let runtime = QJSEngine.makeRuntime()
     guard
-      let sourceBits = await virtualMachine.makeContext(),
-      let targetBits = await virtualMachine.makeContext(),
-      let sourceContext = OpaquePointer(bitPattern: sourceBits),
-      let targetContext = OpaquePointer(bitPattern: targetBits),
+      let sourceContext = QJSEngine.makeContext(in: runtime),
+      let targetContext = QJSEngine.makeContext(in: runtime),
       let value = QJSEngine.makeNumber(7, in: sourceContext)
     else {
-      Issue.record("Expected same-VM context handles to be creatable")
+      Issue.record("Expected same-runtime context handles to be creatable")
       return
     }
     let borrowed = value
     defer {
       JS_FreeContext(targetContext)
       JS_FreeContext(sourceContext)
+      QJSEngine.releaseRuntime(runtime)
     }
 
     let isCompatible = QJSEngine.isContextCompatibleWith(sourceContext, targetContext)

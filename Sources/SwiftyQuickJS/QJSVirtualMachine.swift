@@ -152,7 +152,6 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// Force a QuickJS cycle collection on the VM executor.
   package func gc() {
     let runtime = runtimeHandleOnExecutor()
-    JS_UpdateStackTop(runtime)
     JS_RunGC(runtime)
   }
 

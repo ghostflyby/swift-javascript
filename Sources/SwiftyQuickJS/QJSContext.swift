@@ -171,7 +171,6 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   private nonisolated func releaseInputRecord(_ record: InputRecord) {
     guard let context = OpaquePointer(bitPattern: record.contextBits) else { return }
-    quickJSUpdateStackTop(context)
     if let atom = record.atom {
       JS_FreeAtom(context, atom)
     }
@@ -182,7 +181,6 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   /// this on the VM executor.
   package nonisolated func freePersistentValue(_ value: CQuickJSValue) {
     let contextRef = contextRef
-    quickJSUpdateStackTop(contextRef)
     JS_FreeValue(contextRef, value)
   }
 
@@ -203,7 +201,6 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     for record in records {
       releaseInputRecord(record)
     }
-    quickJSUpdateStackTop(contextRef)
     JS_FreeContext(contextRef)
     QJSScopeStacks.pop(for: contextRef)
   }
@@ -392,7 +389,6 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     case .value(let created):
       return adoptCreated(created)
     case .exception(let thrown):
-      quickJSUpdateStackTop(contextRef)
       JS_FreeValue(contextRef, thrown)
       guard let undefined = QJSEngine.makeUndefined(in: contextRef) else {
         preconditionFailure("QJSContext could not create an undefined value")

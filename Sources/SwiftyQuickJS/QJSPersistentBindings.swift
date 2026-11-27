@@ -71,7 +71,6 @@ final class QJSPersistentBindings: @unchecked Sendable {
         generation: entry.generation
       )
     }
-    quickJSUpdateStackTop(contextRef)
     _ = JS_DupValue(contextRef, value)
     return identity
   }
@@ -137,7 +136,6 @@ final class QJSPersistentBindings: @unchecked Sendable {
       return collected
     }
     guard !values.isEmpty else { return }
-    quickJSUpdateStackTop(contextRef)
     for value in values {
       JS_FreeValue(contextRef, value)
     }

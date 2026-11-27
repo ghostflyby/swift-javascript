@@ -69,7 +69,6 @@ public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
     // Created without a context (a raw engine window): the creator owns the
     // release, on the calling thread.
     guard let context = OpaquePointer(bitPattern: contextBits) else { return }
-    quickJSUpdateStackTop(context)
     JS_FreeAtom(context, atom)
     JS_FreeContext(context)
   }
@@ -134,7 +133,6 @@ public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
     // Created without a context (a raw engine window): the creator owns the
     // release, on the calling thread.
     guard let context = OpaquePointer(bitPattern: contextBits) else { return }
-    quickJSUpdateStackTop(context)
     JS_FreeContext(context)
   }
 }
