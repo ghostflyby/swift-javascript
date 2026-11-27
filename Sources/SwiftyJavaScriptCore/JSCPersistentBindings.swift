@@ -148,5 +148,5 @@ enum JSCPersistentBindingsKey: JSContextDataKey {
 func javaScriptCorePersistentBindings(
   for contextRef: JSGlobalContextRef
 ) -> JSCPersistentBindings? {
-  JSCEngine.contextDataStorageBox(in: contextRef)?.data(for: JSCPersistentBindingsKey.self)
+  javaScriptCoreContextDataStorageBox(in: contextRef)?.data(for: JSCPersistentBindingsKey.self)
 }

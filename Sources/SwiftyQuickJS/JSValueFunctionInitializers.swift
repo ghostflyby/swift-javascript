@@ -20,7 +20,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) {
     guard
-      let created = QJSEngine.makeFunction(
+      let created = quickJSMakeFunction(
         named: name,
         callback: callback,
         in: context.contextRef

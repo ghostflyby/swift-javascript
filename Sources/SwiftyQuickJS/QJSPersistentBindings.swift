@@ -162,5 +162,5 @@ enum QJSPersistentBindingsKey: JSContextDataKey {
 }
 
 func quickJSPersistentBindings(for contextRef: OpaquePointer) -> QJSPersistentBindings? {
-  QJSEngine.contextDataStorageBox(in: contextRef)?.data(for: QJSPersistentBindingsKey.self)
+  quickJSContextDataStorageBox(in: contextRef)?.data(for: QJSPersistentBindingsKey.self)
 }

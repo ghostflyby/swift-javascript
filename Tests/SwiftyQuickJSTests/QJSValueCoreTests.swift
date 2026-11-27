@@ -39,8 +39,8 @@ private func predicates<V: SwiftJavaScript.JSValue & ~Copyable>(
 @Suite
 struct QJSValueCoreTests {
   private func makeContext() -> (OpaquePointer, OpaquePointer) {
-    let runtime = QJSEngine.makeRuntime()
-    guard let context = QJSEngine.makeContext(in: runtime) else {
+    let runtime = quickJSMakeRuntime()
+    guard let context = JS_NewContext(runtime) else {
       preconditionFailure("QJSEngine could not create a context handle")
     }
     return (runtime, context)
@@ -50,7 +50,7 @@ struct QJSValueCoreTests {
     in context: OpaquePointer,
     on scope: borrowing QJSInstantContext
   ) -> QJSValue {
-    guard let result = QJSEngine.makeObjectResult(in: context) else {
+    guard let result = quickJSMakeObjectResult(in: context) else {
       preconditionFailure("QJSEngine could not create an object")
     }
     switch consume result {
@@ -68,7 +68,7 @@ struct QJSValueCoreTests {
     do {
       let scope = QJSInstantContext(contextRef: context)
 
-      let undefined = scope.adoptCreated(QJSEngine.makeUndefined(in: context)!)
+      let undefined = scope.adoptCreated(quickJSMakeUndefined(in: context)!)
       let undefinedType = undefined.type()
       let undefinedText = undefined.toString()
       let undefinedNumber = undefined.toNumber()
@@ -79,7 +79,7 @@ struct QJSValueCoreTests {
       #expect(!undefinedTruth)
       #expect(predicates(undefined) == [true, false, false, false, false, false, false, false])
 
-      let null = scope.adoptCreated(QJSEngine.makeNull(in: context)!)
+      let null = scope.adoptCreated(quickJSMakeNull(in: context)!)
       let nullType = null.type()
       let nullText = null.toString()
       let nullNumber = null.toNumber()
@@ -90,8 +90,8 @@ struct QJSValueCoreTests {
       #expect(!nullTruth)
       #expect(predicates(null) == [false, true, false, false, false, false, false, false])
 
-      let trueValue = scope.adoptCreated(QJSEngine.makeBoolean(true, in: context)!)
-      let falseValue = scope.adoptCreated(QJSEngine.makeBoolean(false, in: context)!)
+      let trueValue = scope.adoptCreated(quickJSMakeBoolean(true, in: context)!)
+      let falseValue = scope.adoptCreated(quickJSMakeBoolean(false, in: context)!)
       let trueType = trueValue.type()
       let trueText = trueValue.toString()
       let trueNumber = trueValue.toNumber()
@@ -104,12 +104,12 @@ struct QJSValueCoreTests {
       #expect(!falseTruth)
       #expect(predicates(trueValue) == [false, false, true, false, false, false, false, false])
 
-      let number = scope.adoptCreated(QJSEngine.makeNumber(42.5, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(42.5, in: context)!)
       let numberType = number.type()
       let numberText = number.toString()
       let numberValue = number.toNumber()
       let numberTruth = number.toBoolean()
-      let zero = scope.adoptCreated(QJSEngine.makeNumber(0, in: context)!)
+      let zero = scope.adoptCreated(quickJSMakeNumber(0, in: context)!)
       let zeroTruth = zero.toBoolean()
       #expect(numberType == .number)
       #expect(numberText == "42.5")
@@ -118,12 +118,12 @@ struct QJSValueCoreTests {
       #expect(!zeroTruth)
       #expect(predicates(number) == [false, false, false, true, false, false, false, false])
 
-      let string = scope.adoptCreated(QJSEngine.makeString("hello", in: context)!)
+      let string = scope.adoptCreated(quickJSMakeString("hello", in: context)!)
       let stringType = string.type()
       let stringText = string.toString()
       let stringNumber = string.toNumber()
       let stringTruth = string.toBoolean()
-      let empty = scope.adoptCreated(QJSEngine.makeString("", in: context)!)
+      let empty = scope.adoptCreated(quickJSMakeString("", in: context)!)
       let emptyTruth = empty.toBoolean()
       #expect(stringType == .string)
       #expect(stringText == "hello")
@@ -132,7 +132,7 @@ struct QJSValueCoreTests {
       #expect(!emptyTruth)
       #expect(predicates(string) == [false, false, false, false, true, false, false, false])
 
-      let symbol = scope.adoptCreated(QJSEngine.makeSymbol("surface", in: context)!)
+      let symbol = scope.adoptCreated(quickJSMakeSymbol("surface", in: context)!)
       let symbolType = symbol.type()
       let symbolTruth = symbol.toBoolean()
       #expect(symbolType == .symbol)
@@ -154,7 +154,7 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -163,10 +163,10 @@ struct QJSValueCoreTests {
     do {
       let scope = QJSInstantContext(contextRef: context)
 
-      let one = scope.adoptCreated(QJSEngine.makeNumber(1, in: context)!)
-      let oneAgain = scope.adoptCreated(QJSEngine.makeNumber(1, in: context)!)
-      let oneString = scope.adoptCreated(QJSEngine.makeString("1", in: context)!)
-      let two = scope.adoptCreated(QJSEngine.makeNumber(2, in: context)!)
+      let one = scope.adoptCreated(quickJSMakeNumber(1, in: context)!)
+      let oneAgain = scope.adoptCreated(quickJSMakeNumber(1, in: context)!)
+      let oneString = scope.adoptCreated(quickJSMakeString("1", in: context)!)
+      let two = scope.adoptCreated(quickJSMakeNumber(2, in: context)!)
 
       let strictlySame = one.strictlyEquals(oneAgain)
       let strictlyDifferentTypes = one.strictlyEquals(oneString)
@@ -177,8 +177,8 @@ struct QJSValueCoreTests {
       #expect(looselySame)
       #expect(!looselyDifferent)
 
-      let nan = scope.adoptCreated(QJSEngine.makeNumber(.nan, in: context)!)
-      let nanAgain = scope.adoptCreated(QJSEngine.makeNumber(.nan, in: context)!)
+      let nan = scope.adoptCreated(quickJSMakeNumber(.nan, in: context)!)
+      let nanAgain = scope.adoptCreated(quickJSMakeNumber(.nan, in: context)!)
       let nanStrictlyEqual = nan.strictlyEquals(nanAgain)
       let nanLooselyEqual = nan.looselyEquals(nanAgain)
       #expect(!nanStrictlyEqual)
@@ -201,7 +201,7 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -210,7 +210,7 @@ struct QJSValueCoreTests {
     do {
       let scope = QJSInstantContext(contextRef: context)
 
-      let number: QJSValue = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
+      let number: QJSValue = scope.adoptCreated(quickJSMakeNumber(7, in: context)!)
       let anchored: QJSValue = scope.anchorBorrowed(number.value)
       let anchoredMatches = anchored.strictlyEquals(number)
       #expect(anchoredMatches)
@@ -228,7 +228,7 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   /// The S4 identity note: `CQuickJSValue` equality must compare the whole
@@ -255,10 +255,10 @@ struct QJSValueCoreTests {
     do {
       let scope = QJSInstantContext(contextRef: context)
 
-      let number = scope.adoptCreated(QJSEngine.makeNumber(3.5, in: context)!)
-      let integer = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
-      let string = scope.adoptCreated(QJSEngine.makeString("hello", in: context)!)
-      let boolean = scope.adoptCreated(QJSEngine.makeBoolean(true, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(3.5, in: context)!)
+      let integer = scope.adoptCreated(quickJSMakeNumber(7, in: context)!)
+      let string = scope.adoptCreated(quickJSMakeString("hello", in: context)!)
+      let boolean = scope.adoptCreated(quickJSMakeBoolean(true, in: context)!)
 
       let decodedString = String(value: string, in: scope)
       let strictlyDecodedString = try String.tryDecode(string, in: scope)
@@ -308,7 +308,7 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   /// Slice 2: indexed access is a value-level requirement implemented by the
@@ -329,7 +329,7 @@ struct QJSValueCoreTests {
         Issue.record("index read of a fresh object returned an exception")
       }
 
-      let number = scope.adoptCreated(QJSEngine.makeNumber(9, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(9, in: context)!)
       let didSet = object.setProperty(at: 1, to: number, in: scope)
       let read = object.getProperty(at: 1, in: scope)
       let hasIndex = object.hasProperty("1", in: scope)
@@ -346,7 +346,7 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   /// Slice 2: `localValue` hands back the view of an arena-backed callback
@@ -365,6 +365,6 @@ struct QJSValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 }

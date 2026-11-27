@@ -12,8 +12,8 @@ import Testing
 // the receiving arena exactly once, so the scope drain settles each reference.
 
 private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
-  let runtime = JSCEngine.makeRuntime()
-  guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+  let runtime = JSContextGroupCreate()!
+  guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
     preconditionFailure("JSCEngine could not create a context handle")
   }
   return (runtime, context)
@@ -21,7 +21,7 @@ private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
 
 private func adoptObject(in scope: borrowing JSCInstantContext) -> JSCValue {
   let context = scope.contextRef
-  guard let result = JSCEngine.makeObjectResultHandle(context) else {
+  guard let result = javaScriptCoreMakeObjectResultHandle(context) else {
     preconditionFailure("JSCEngine could not create an object")
   }
   switch consume result {
@@ -38,8 +38,8 @@ private func adoptEvaluated(
   in scope: borrowing JSCInstantContext
 ) -> JSCValue {
   let context = scope.contextRef
-  guard let script = JSCEngine.makePreparedScriptHandle(source, in: context),
-    let result = JSCEngine.evaluatePreparedScriptResultHandle(
+  guard let script = javaScriptCoreMakePreparedScriptHandle(source, in: context),
+    let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
       script,
       context,
       sourceURL: nil,
@@ -61,7 +61,7 @@ private func adoptString(
   _ value: String,
   in scope: borrowing JSCInstantContext
 ) -> JSCValue {
-  guard let handle = JSCEngine.makeStringValueHandle(value, scope.contextRef) else {
+  guard let handle = javaScriptCoreMakeStringValueHandle(value, scope.contextRef) else {
     preconditionFailure("JSCEngine could not create a string")
   }
   return scope.adoptCreatedHandle(handle)
@@ -132,11 +132,11 @@ struct JSCValueOperationsTests {
       #expect(absentText == "undefined")
       #expect(names == ["name"])
 
-      guard let keyHandle = JSCEngine.makePropertyStringKeyHandle("count", in: context) else {
+      guard let keyHandle = javaScriptCoreMakePropertyStringKeyHandle("count", in: context) else {
         Issue.record("JSCEngine could not make a property key")
         return
       }
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(3, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(3, context)!)
       do {
         let key = JSCPropertyStringKey(
           stringRef: keyHandle,
@@ -186,7 +186,7 @@ struct JSCValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -216,7 +216,7 @@ struct JSCValueOperationsTests {
         in: scope
       )
       let methodText = describe(methodObject.invokeMethod("double", arguments: [], in: scope))
-      let argument = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(21, context)!)
+      let argument = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(21, context)!)
       let withArgumentText = describe(
         methodObject.invokeMethod("plus", arguments: [argument.asCallArgument()], in: scope)
       )
@@ -248,7 +248,7 @@ struct JSCValueOperationsTests {
       #expect(!typedIsArrayBuffer)
       #expect(!arrayIsTypedArray)
 
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(7, context)!)
       let boxed = value(number.toObject(in: scope))
       let boxedIsObject = boxed.isObject()
       #expect(boxedIsObject)
@@ -281,7 +281,7 @@ struct JSCValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -310,7 +310,7 @@ struct JSCValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test

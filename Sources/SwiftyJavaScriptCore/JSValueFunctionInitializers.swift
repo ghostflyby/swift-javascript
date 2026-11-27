@@ -19,7 +19,7 @@ extension JSCValue {
     in context: borrowing JSCInstantContext
   ) {
     guard
-      let ref = JSCEngine.makeFunctionValueHandle(
+      let ref = javaScriptCoreMakeFunctionValueHandle(
         named: name,
         callback: callback,
         in: context.contextRef

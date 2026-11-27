@@ -19,7 +19,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getStaticStringProperty(key, on: value, in: context.contextRef),
+      quickJSGetStaticStringProperty(key, on: value, in: context.contextRef),
       in: context
     )
   }
@@ -29,7 +29,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getProperty(
+      quickJSGetProperty(
         atom: key.borrowAtom(in: context.contextRef),
         on: value,
         in: context.contextRef
@@ -43,7 +43,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
+      quickJSGetIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
       in: context
     )
   }
@@ -56,7 +56,7 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.setStaticStringProperty(
+    quickJSSetStaticStringProperty(
       key,
       on: self.value,
       to: value.value,
@@ -71,7 +71,7 @@ extension QJSValue {
     attributes: JSHostMemberAttributes,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.setProperty(
+    quickJSSetProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: self.value,
       to: value.value,
@@ -85,7 +85,7 @@ extension QJSValue {
     to value: borrowing QJSValue,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.setIndexProperty(
+    quickJSSetIndexProperty(
       at: UInt32(index),
       on: self.value,
       to: value.value,
@@ -99,14 +99,14 @@ extension QJSValue {
     _ key: StaticString,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.deleteStaticStringProperty(key, on: value, in: context.contextRef)
+    quickJSDeleteStaticStringProperty(key, on: value, in: context.contextRef)
   }
 
   public func deleteProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.deleteProperty(
+    quickJSDeleteProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: value,
       in: context.contextRef
@@ -117,14 +117,14 @@ extension QJSValue {
     _ key: StaticString,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.hasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
+    quickJSHasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
   }
 
   public func hasProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.hasProperty(
+    quickJSHasProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: value,
       in: context.contextRef
@@ -132,7 +132,7 @@ extension QJSValue {
   }
 
   public func propertyNames(in context: borrowing QJSInstantContext) -> [String] {
-    QJSEngine.propertyNames(on: value, in: context.contextRef) ?? []
+    quickJSPropertyNames(on: value, in: context.contextRef) ?? []
   }
 
   // MARK: Calling and construction
@@ -142,7 +142,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.callFunction(
+      quickJSCallFunction(
         value,
         this: nil,
         arguments: arguments.map(\.value),
@@ -158,7 +158,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.callFunction(
+      quickJSCallFunction(
         value,
         this: thisValue.value,
         arguments: arguments.map(\.value),
@@ -173,7 +173,7 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.construct(
+      quickJSConstruct(
         value,
         arguments: arguments.map(\.value),
         in: context.contextRef
@@ -214,24 +214,24 @@ extension QJSValue {
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.toObject(value, in: context.contextRef),
+      quickJSToObject(value, in: context.contextRef),
       in: context
     )
   }
 
   public func isArray(in context: borrowing QJSInstantContext) -> Bool {
-    QJSEngine.isArray(value, in: context.contextRef) ?? false
+    quickJSIsArray(value, in: context.contextRef) ?? false
   }
 
   public func isDate(in context: borrowing QJSInstantContext) -> Bool {
-    QJSEngine.isDate(value, in: context.contextRef) ?? false
+    quickJSIsDate(value, in: context.contextRef) ?? false
   }
 
   public func isInstanceOf(
     _ constructor: borrowing QJSValue,
     in context: borrowing QJSInstantContext
   ) -> Bool {
-    QJSEngine.isInstanceOf(
+    quickJSIsInstanceOf(
       value,
       constructor: constructor.value,
       in: context.contextRef
@@ -239,11 +239,11 @@ extension QJSValue {
   }
 
   public func isArrayBuffer(in context: borrowing QJSInstantContext) -> Bool {
-    QJSEngine.isArrayBuffer(value, in: context.contextRef)
+    quickJSIsArrayBuffer(value, in: context.contextRef)
   }
 
   public func isTypedArray(in context: borrowing QJSInstantContext) -> Bool {
-    QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
+    quickJSTypedArrayKind(value, in: context.contextRef) != nil
   }
 }
 
@@ -263,7 +263,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getStaticStringProperty(key, on: value, in: context.contextRef),
+      quickJSGetStaticStringProperty(key, on: value, in: context.contextRef),
       in: context
     )
   }
@@ -273,7 +273,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getProperty(
+      quickJSGetProperty(
         atom: key.borrowAtom(in: context.contextRef),
         on: value,
         in: context.contextRef
@@ -287,7 +287,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.getIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
+      quickJSGetIndexProperty(at: UInt32(index), on: value, in: context.contextRef),
       in: context
     )
   }
@@ -300,7 +300,7 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.setStaticStringProperty(
+    quickJSSetStaticStringProperty(
       key,
       on: self.value,
       to: value.value,
@@ -315,7 +315,7 @@ extension QJSValue {
     attributes: JSHostMemberAttributes = .none,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.setProperty(
+    quickJSSetProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: self.value,
       to: value.value,
@@ -329,7 +329,7 @@ extension QJSValue {
     to value: borrowing QJSValue,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.setIndexProperty(
+    quickJSSetIndexProperty(
       at: UInt32(index),
       on: self.value,
       to: value.value,
@@ -343,14 +343,14 @@ extension QJSValue {
     _ key: StaticString,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.deleteStaticStringProperty(key, on: value, in: context.contextRef)
+    quickJSDeleteStaticStringProperty(key, on: value, in: context.contextRef)
   }
 
   public func deleteProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.deleteProperty(
+    quickJSDeleteProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: value,
       in: context.contextRef
@@ -361,14 +361,14 @@ extension QJSValue {
     _ key: StaticString,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.hasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
+    quickJSHasStaticStringProperty(key, on: value, in: context.contextRef) ?? false
   }
 
   public func hasProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.hasProperty(
+    quickJSHasProperty(
       atom: key.borrowAtom(in: context.contextRef),
       on: value,
       in: context.contextRef
@@ -376,31 +376,31 @@ extension QJSValue {
   }
 
   public func propertyNames(in context: isolated QJSContext = #isolation) -> [String] {
-    QJSEngine.propertyNames(on: value, in: context.contextRef) ?? []
+    quickJSPropertyNames(on: value, in: context.contextRef) ?? []
   }
 
   // MARK: Object conversion and classification
 
   public func toObject(in context: isolated QJSContext = #isolation) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.toObject(value, in: context.contextRef),
+      quickJSToObject(value, in: context.contextRef),
       in: context
     )
   }
 
   public func isArray(in context: isolated QJSContext = #isolation) -> Bool {
-    QJSEngine.isArray(value, in: context.contextRef) ?? false
+    quickJSIsArray(value, in: context.contextRef) ?? false
   }
 
   public func isDate(in context: isolated QJSContext = #isolation) -> Bool {
-    QJSEngine.isDate(value, in: context.contextRef) ?? false
+    quickJSIsDate(value, in: context.contextRef) ?? false
   }
 
   public func isInstanceOf(
     _ constructor: borrowing QJSValue,
     in context: isolated QJSContext = #isolation
   ) -> Bool {
-    QJSEngine.isInstanceOf(
+    quickJSIsInstanceOf(
       value,
       constructor: constructor.value,
       in: context.contextRef
@@ -408,11 +408,11 @@ extension QJSValue {
   }
 
   public func isArrayBuffer(in context: isolated QJSContext = #isolation) -> Bool {
-    QJSEngine.isArrayBuffer(value, in: context.contextRef)
+    quickJSIsArrayBuffer(value, in: context.contextRef)
   }
 
   public func isTypedArray(in context: isolated QJSContext = #isolation) -> Bool {
-    QJSEngine.typedArrayKind(value, in: context.contextRef) != nil
+    quickJSTypedArrayKind(value, in: context.contextRef) != nil
   }
 }
 
@@ -428,7 +428,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.callFunction(
+      quickJSCallFunction(
         value,
         this: nil,
         arguments: arguments.map(\.value),
@@ -444,7 +444,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.callFunction(
+      quickJSCallFunction(
         value,
         this: thisValue.value,
         arguments: arguments.map(\.value),
@@ -459,7 +459,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
-      QJSEngine.construct(
+      quickJSConstruct(
         value,
         arguments: arguments.map(\.value),
         in: context.contextRef
@@ -474,14 +474,14 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
-      QJSEngine.getStaticStringProperty(name, on: value, in: context.contextRef),
+      quickJSGetStaticStringProperty(name, on: value, in: context.contextRef),
       in: context
     ) {
     case .exception(let exception):
       return .exception(exception)
     case .value(let method):
       return bridgeQJSValueResult(
-        QJSEngine.callFunction(
+        quickJSCallFunction(
           method.value,
           this: value,
           arguments: arguments.map(\.value),
@@ -498,7 +498,7 @@ extension QJSValue {
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
-      QJSEngine.getProperty(
+      quickJSGetProperty(
         atom: name.borrowAtom(in: context.contextRef),
         on: value,
         in: context.contextRef
@@ -509,7 +509,7 @@ extension QJSValue {
       return .exception(exception)
     case .value(let method):
       return bridgeQJSValueResult(
-        QJSEngine.callFunction(
+        quickJSCallFunction(
           method.value,
           this: value,
           arguments: arguments.map(\.value),

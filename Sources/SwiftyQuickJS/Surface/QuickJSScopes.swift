@@ -69,7 +69,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> QJSValue {
-    guard let created = QJSEngine.makeString(value, in: core.contextRef) else {
+    guard let created = quickJSMakeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
     }
     return adoptCreated(created)
@@ -77,7 +77,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
-      let created = QJSEngine.makeStringValue(
+      let created = quickJSMakeStringValue(
         fromAtom: key.borrowAtom(in: core.contextRef),
         in: core.contextRef
       )
@@ -88,42 +88,42 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func makeNumber(_ value: Double) -> QJSValue {
-    guard let created = QJSEngine.makeNumber(value, in: core.contextRef) else {
+    guard let created = quickJSMakeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
     }
     return adoptCreated(created)
   }
 
   public func makeBoolean(_ value: Bool) -> QJSValue {
-    guard let created = QJSEngine.makeBoolean(value, in: core.contextRef) else {
+    guard let created = quickJSMakeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
     }
     return adoptCreated(created)
   }
 
   public func makeNull() -> QJSValue {
-    guard let created = QJSEngine.makeNull(in: core.contextRef) else {
+    guard let created = quickJSMakeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
     }
     return adoptCreated(created)
   }
 
   public func makeUndefined() -> QJSValue {
-    guard let created = QJSEngine.makeUndefined(in: core.contextRef) else {
+    guard let created = quickJSMakeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
     }
     return adoptCreated(created)
   }
 
   public func makeSymbol(_ value: String) -> QJSValue {
-    guard let created = QJSEngine.makeSymbol(value, in: core.contextRef) else {
+    guard let created = quickJSMakeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
     }
     return adoptCreated(created)
   }
 
   public func makeObject() -> JSResult<QJSValue> {
-    guard let result = QJSEngine.makeObjectResult(in: core.contextRef) else {
+    guard let result = quickJSMakeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
@@ -135,7 +135,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func makeArray() -> JSResult<QJSValue> {
-    guard let result = QJSEngine.makeArrayResult(in: core.contextRef) else {
+    guard let result = quickJSMakeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
@@ -175,18 +175,18 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Global object
 
   public func globalObjectValue() -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSInstantContext.globalObjectValue could not get global object")
     }
     return QJSValue(value: global, contextRef: core.contextRef)
   }
 
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSInstantContext.getGlobalProperty could not get global object")
     }
     guard
-      let result = QJSEngine.getStaticStringProperty(
+      let result = quickJSGetStaticStringProperty(
         key,
         on: global,
         in: core.contextRef
@@ -199,7 +199,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
       return adoptCreated(created)
     case .exception(let thrown):
       JS_FreeValue(core.contextRef, thrown)
-      guard let undefined = QJSEngine.makeUndefined(in: core.contextRef) else {
+      guard let undefined = quickJSMakeUndefined(in: core.contextRef) else {
         preconditionFailure("QJSInstantContext could not create an undefined value")
       }
       return adoptCreated(undefined)
@@ -211,8 +211,8 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else { return }
-    _ = QJSEngine.setStaticStringProperty(
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else { return }
+    _ = quickJSSetStaticStringProperty(
       key,
       on: global,
       to: value.value,
@@ -222,15 +222,15 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else { return }
-    _ = QJSEngine.deleteStaticStringProperty(key, on: global, in: core.contextRef)
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else { return }
+    _ = quickJSDeleteStaticStringProperty(key, on: global, in: core.contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       return false
     }
-    return QJSEngine.hasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
+    return quickJSHasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
   }
 
   public func makeFunction(
@@ -238,7 +238,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     callback: @escaping JSFunctionCallback<QJSInstantContext>
   ) -> QJSValue {
     guard
-      let created = QJSEngine.makeFunction(
+      let created = quickJSMakeFunction(
         named: name,
         callback: callback,
         in: core.contextRef
@@ -273,7 +273,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> QJSPropertyStringKey {
-    guard let atom = QJSEngine.makePropertyStringAtom(value, in: core.contextRef) else {
+    guard let atom = quickJSMakePropertyStringAtom(value, in: core.contextRef) else {
       preconditionFailure("makePropertyStringAtom could not create a key")
     }
     return QJSPropertyStringKey(
@@ -298,7 +298,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     sourceURL: String?,
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
-    let result = QJSEngine.evaluateScript(
+    let result = quickJSEvaluateScript(
       script.borrowSource(in: core.contextRef),
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
@@ -315,11 +315,11 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    QJSEngine.contextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
+    quickJSContextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    QJSEngine.contextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
+    quickJSContextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
   }
 }
 
@@ -379,7 +379,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> QJSValue {
-    guard let created = QJSEngine.makeString(value, in: core.contextRef) else {
+    guard let created = quickJSMakeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
     }
     return adoptCreated(created)
@@ -387,7 +387,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
-      let created = QJSEngine.makeStringValue(
+      let created = quickJSMakeStringValue(
         fromAtom: key.borrowAtom(in: core.contextRef),
         in: core.contextRef
       )
@@ -398,42 +398,42 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func makeNumber(_ value: Double) -> QJSValue {
-    guard let created = QJSEngine.makeNumber(value, in: core.contextRef) else {
+    guard let created = quickJSMakeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
     }
     return adoptCreated(created)
   }
 
   public func makeBoolean(_ value: Bool) -> QJSValue {
-    guard let created = QJSEngine.makeBoolean(value, in: core.contextRef) else {
+    guard let created = quickJSMakeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
     }
     return adoptCreated(created)
   }
 
   public func makeNull() -> QJSValue {
-    guard let created = QJSEngine.makeNull(in: core.contextRef) else {
+    guard let created = quickJSMakeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
     }
     return adoptCreated(created)
   }
 
   public func makeUndefined() -> QJSValue {
-    guard let created = QJSEngine.makeUndefined(in: core.contextRef) else {
+    guard let created = quickJSMakeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
     }
     return adoptCreated(created)
   }
 
   public func makeSymbol(_ value: String) -> QJSValue {
-    guard let created = QJSEngine.makeSymbol(value, in: core.contextRef) else {
+    guard let created = quickJSMakeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
     }
     return adoptCreated(created)
   }
 
   public func makeObject() -> JSResult<QJSValue> {
-    guard let result = QJSEngine.makeObjectResult(in: core.contextRef) else {
+    guard let result = quickJSMakeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
@@ -445,7 +445,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func makeArray() -> JSResult<QJSValue> {
-    guard let result = QJSEngine.makeArrayResult(in: core.contextRef) else {
+    guard let result = quickJSMakeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
@@ -468,18 +468,18 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Global object
 
   public func globalObjectValue() -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSScope.globalObjectValue could not get global object")
     }
     return QJSValue(value: global, contextRef: core.contextRef)
   }
 
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSScope.getGlobalProperty could not get global object")
     }
     guard
-      let result = QJSEngine.getStaticStringProperty(
+      let result = quickJSGetStaticStringProperty(
         key,
         on: global,
         in: core.contextRef
@@ -492,7 +492,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
       return adoptCreated(created)
     case .exception(let thrown):
       JS_FreeValue(core.contextRef, thrown)
-      guard let undefined = QJSEngine.makeUndefined(in: core.contextRef) else {
+      guard let undefined = quickJSMakeUndefined(in: core.contextRef) else {
         preconditionFailure("QJSScope could not create an undefined value")
       }
       return adoptCreated(undefined)
@@ -504,8 +504,8 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else { return }
-    _ = QJSEngine.setStaticStringProperty(
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else { return }
+    _ = quickJSSetStaticStringProperty(
       key,
       on: global,
       to: value.value,
@@ -515,15 +515,15 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else { return }
-    _ = QJSEngine.deleteStaticStringProperty(key, on: global, in: core.contextRef)
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else { return }
+    _ = quickJSDeleteStaticStringProperty(key, on: global, in: core.contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = QJSEngine.globalObjectValue(core.contextRef) else {
+    guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       return false
     }
-    return QJSEngine.hasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
+    return quickJSHasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
   }
 
   public func makeFunction(
@@ -531,7 +531,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     callback: @escaping JSFunctionCallback<QJSInstantContext>
   ) -> QJSValue {
     guard
-      let created = QJSEngine.makeFunction(
+      let created = quickJSMakeFunction(
         named: name,
         callback: callback,
         in: core.contextRef
@@ -566,7 +566,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> QJSPropertyStringKey {
-    guard let atom = QJSEngine.makePropertyStringAtom(value, in: core.contextRef) else {
+    guard let atom = quickJSMakePropertyStringAtom(value, in: core.contextRef) else {
       preconditionFailure("makePropertyStringAtom could not create a key")
     }
     return QJSPropertyStringKey(
@@ -591,7 +591,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     sourceURL: String?,
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
-    let result = QJSEngine.evaluateScript(
+    let result = quickJSEvaluateScript(
       script.borrowSource(in: core.contextRef),
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
@@ -608,11 +608,11 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    QJSEngine.contextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
+    quickJSContextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    QJSEngine.contextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
+    quickJSContextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
   }
 }
 

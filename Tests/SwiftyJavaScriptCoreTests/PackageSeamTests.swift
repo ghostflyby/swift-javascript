@@ -11,8 +11,8 @@ import Testing
 // consume.
 
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
-  let runtime = JSCEngine.makeRuntime()
-  guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+  let runtime = JSContextGroupCreate()!
+  guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
     Issue.record("JSCEngine could not create a context handle")
     return
   }
@@ -89,7 +89,7 @@ import Testing
   }
 
   JSGlobalContextRelease(context)
-  JSCEngine.releaseRuntime(runtime)
+  JSContextGroupRelease(runtime)
 }
 
 @Test func packageVMSeamsAreCallableAcrossTargets() async {

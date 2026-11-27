@@ -140,7 +140,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     // synchronous scope witnesses reach the binding table through it, and the
     // box remembers this actor as its unretained owner (raw callbacks).
     let box = JSContextDataStorageBox()
-    QJSEngine.installContextDataStorageBox(box, in: contextRef)
+    quickJSInstallContextDataStorageBox(box, in: contextRef)
     box.bindContextOwner(self)
     box.setData(persistentBindings, for: QJSPersistentBindingsKey.self)
 
@@ -191,7 +191,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     guard let contextRef = engineContext else { return }
     persistentBindings.close()
     defaultScope.drain()
-    QJSEngine.installContextDataStorageBox(nil, in: contextRef)
+    quickJSInstallContextDataStorageBox(nil, in: contextRef)
     // Inputs that outlived the context: the reverse owner releases what they
     // still hold before the context reference itself goes away.
     let records = inputRecords.withLock { records -> [InputRecord] in
@@ -238,7 +238,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> QJSValue {
-    guard let created = QJSEngine.makeString(value, in: contextRef) else {
+    guard let created = quickJSMakeString(value, in: contextRef) else {
       preconditionFailure("makeString failed")
     }
     return adoptCreated(created)
@@ -246,7 +246,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
-      let created = QJSEngine.makeStringValue(
+      let created = quickJSMakeStringValue(
         fromAtom: key.borrowAtom(in: contextRef),
         in: contextRef
       )
@@ -257,35 +257,35 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   public func makeNumber(_ value: Double) -> QJSValue {
-    guard let created = QJSEngine.makeNumber(value, in: contextRef) else {
+    guard let created = quickJSMakeNumber(value, in: contextRef) else {
       preconditionFailure("makeNumber failed")
     }
     return adoptCreated(created)
   }
 
   public func makeBoolean(_ value: Bool) -> QJSValue {
-    guard let created = QJSEngine.makeBoolean(value, in: contextRef) else {
+    guard let created = quickJSMakeBoolean(value, in: contextRef) else {
       preconditionFailure("makeBoolean failed")
     }
     return adoptCreated(created)
   }
 
   public func makeNull() -> QJSValue {
-    guard let created = QJSEngine.makeNull(in: contextRef) else {
+    guard let created = quickJSMakeNull(in: contextRef) else {
       preconditionFailure("makeNull failed")
     }
     return adoptCreated(created)
   }
 
   public func makeUndefined() -> QJSValue {
-    guard let created = QJSEngine.makeUndefined(in: contextRef) else {
+    guard let created = quickJSMakeUndefined(in: contextRef) else {
       preconditionFailure("makeUndefined failed")
     }
     return adoptCreated(created)
   }
 
   public func makeObject() -> QJSValue {
-    guard let result = QJSEngine.makeObjectResult(in: contextRef) else {
+    guard let result = quickJSMakeObjectResult(in: contextRef) else {
       preconditionFailure("makeObjectResult failed")
     }
     switch consume result {
@@ -297,7 +297,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   public func makeArray() -> QJSValue {
-    guard let result = QJSEngine.makeArrayResult(in: contextRef) else {
+    guard let result = quickJSMakeArrayResult(in: contextRef) else {
       preconditionFailure("makeArrayResult failed")
     }
     switch consume result {
@@ -315,7 +315,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     callback: @escaping JSFunctionCallback<QJSInstantContext>
   ) -> QJSValue {
     guard
-      let created = QJSEngine.makeFunction(
+      let created = quickJSMakeFunction(
         named: name,
         callback: callback,
         in: contextRef
@@ -350,7 +350,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> QJSPropertyStringKey {
-    guard let atom = QJSEngine.makePropertyStringAtom(value, in: contextRef) else {
+    guard let atom = quickJSMakePropertyStringAtom(value, in: contextRef) else {
       preconditionFailure("makePropertyStringAtom could not create a key")
     }
     return QJSPropertyStringKey(
@@ -371,7 +371,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // MARK: - Global object
 
   public func globalObjectValue() -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(contextRef) else {
+    guard let global = quickJSGlobalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.globalObjectValue could not get global object")
     }
     return QJSValue(value: global, contextRef: contextRef)
@@ -380,10 +380,10 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   /// Read a global property. A failed read is reported as `undefined`: the
   /// engine's exception reference is settled instead of being dropped.
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
-    guard let global = QJSEngine.globalObjectValue(contextRef) else {
+    guard let global = quickJSGlobalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.getGlobalProperty could not get global object")
     }
-    guard let result = QJSEngine.getStaticStringProperty(key, on: global, in: contextRef) else {
+    guard let result = quickJSGetStaticStringProperty(key, on: global, in: contextRef) else {
       preconditionFailure("QJSContext.getGlobalProperty returned nil")
     }
     switch consume result {
@@ -391,7 +391,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
       return adoptCreated(created)
     case .exception(let thrown):
       JS_FreeValue(contextRef, thrown)
-      guard let undefined = QJSEngine.makeUndefined(in: contextRef) else {
+      guard let undefined = quickJSMakeUndefined(in: contextRef) else {
         preconditionFailure("QJSContext could not create an undefined value")
       }
       return adoptCreated(undefined)
@@ -403,8 +403,8 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = QJSEngine.globalObjectValue(contextRef) else { return }
-    _ = QJSEngine.setStaticStringProperty(
+    guard let global = quickJSGlobalObjectValue(contextRef) else { return }
+    _ = quickJSSetStaticStringProperty(
       key,
       on: global,
       to: value.value,
@@ -414,15 +414,15 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = QJSEngine.globalObjectValue(contextRef) else { return }
-    _ = QJSEngine.deleteStaticStringProperty(key, on: global, in: contextRef)
+    guard let global = quickJSGlobalObjectValue(contextRef) else { return }
+    _ = quickJSDeleteStaticStringProperty(key, on: global, in: contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = QJSEngine.globalObjectValue(contextRef) else {
+    guard let global = quickJSGlobalObjectValue(contextRef) else {
       return false
     }
-    return QJSEngine.hasStaticStringProperty(key, on: global, in: contextRef) ?? false
+    return quickJSHasStaticStringProperty(key, on: global, in: contextRef) ?? false
   }
 
   // MARK: - Scripts
@@ -432,7 +432,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     sourceURL: String?,
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
-    let result = QJSEngine.evaluateScript(
+    let result = quickJSEvaluateScript(
       script.borrowSource(in: contextRef),
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
@@ -449,22 +449,22 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    QJSEngine.contextDataStorageBox(in: contextRef)?.setData(value, for: key)
+    quickJSContextDataStorageBox(in: contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    return QJSEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
+    return quickJSContextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
   }
 
   /// Package-internal data-box seam used by the cross-engine contract tests.
   package nonisolated func contextDataStorageBox() -> JSContextDataStorageBox? {
-    QJSEngine.contextDataStorageBox(in: contextRef)
+    quickJSContextDataStorageBox(in: contextRef)
   }
 
   /// Installs are engine mutations; this stays a hop target for the tests
   /// that swap the box from a foreign thread.
   package func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) async {
-    QJSEngine.installContextDataStorageBox(storage, in: contextRef)
+    quickJSInstallContextDataStorageBox(storage, in: contextRef)
   }
 
   // MARK: - Identity

@@ -88,7 +88,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   private nonisolated func makeRuntimeOnExecutor() {
     runtimeBits.withLock { bits in
       guard bits == 0 else { return }
-      bits = UInt(bitPattern: JSCEngine.makeRuntime())
+      bits = UInt(bitPattern: JSContextGroupCreate())
     }
   }
 
@@ -103,7 +103,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// shared runtime.
   package nonisolated func makeContextHandleOnExecutor() -> UInt? {
     guard
-      let contextRef = JSCEngine.makeBorrowedContextHandleFromRuntime(
+      let contextRef = javaScriptCoreMakeBorrowedContextHandleFromRuntime(
         in: runtimeHandleOnExecutor()
       )
     else {
@@ -171,7 +171,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   isolated deinit {
     let bits = runtimeBits.withLock { $0 }
     if let runtime = JSContextGroupRef(bitPattern: bits) {
-      JSCEngine.releaseRuntime(runtime)
+      JSContextGroupRelease(runtime)
     }
     if let ownedExecutor {
       // The last reference can drop on the VM thread itself: a context's

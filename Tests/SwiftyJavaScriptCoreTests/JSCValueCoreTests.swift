@@ -32,8 +32,8 @@ private func predicates<V: SwiftJavaScript.JSValue & ~Copyable>(
 @Suite
 struct JSCValueCoreTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
-    let runtime = JSCEngine.makeRuntime()
-    guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    let runtime = JSContextGroupCreate()!
+    guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
       preconditionFailure("JSCEngine could not create a context handle")
     }
     return (runtime, context)
@@ -43,14 +43,14 @@ struct JSCValueCoreTests {
     in context: JSGlobalContextRef,
     on scope: borrowing JSCInstantContext
   ) -> JSCValue {
-    guard let result = JSCEngine.makeObjectResultHandle(context) else {
+    guard let result = javaScriptCoreMakeObjectResultHandle(context) else {
       preconditionFailure("JSCEngine could not create an object")
     }
     switch consume result {
     case .value(let handle):
       return scope.adoptCreatedHandle(handle)
     case .exception(let handle):
-      
+
       preconditionFailure("JSCEngine object creation returned an exception")
     }
   }
@@ -61,7 +61,7 @@ struct JSCValueCoreTests {
     do {
       let scope = JSCInstantContext(contextRef: context)
 
-      let undefined = scope.adoptCreatedHandle(JSCEngine.makeUndefinedValueHandle(context)!)
+      let undefined = scope.adoptCreatedHandle(javaScriptCoreMakeUndefinedValueHandle(context)!)
       let undefinedType = undefined.type()
       let undefinedText = undefined.toString()
       let undefinedNumber = undefined.toNumber()
@@ -72,7 +72,7 @@ struct JSCValueCoreTests {
       #expect(!undefinedTruth)
       #expect(predicates(undefined) == [true, false, false, false, false, false, false, false])
 
-      let null = scope.adoptCreatedHandle(JSCEngine.makeNullValueHandle(context)!)
+      let null = scope.adoptCreatedHandle(javaScriptCoreMakeNullValueHandle(context)!)
       let nullType = null.type()
       let nullText = null.toString()
       let nullNumber = null.toNumber()
@@ -83,8 +83,9 @@ struct JSCValueCoreTests {
       #expect(!nullTruth)
       #expect(predicates(null) == [false, true, false, false, false, false, false, false])
 
-      let trueValue = scope.adoptCreatedHandle(JSCEngine.makeBooleanValueHandle(true, context)!)
-      let falseValue = scope.adoptCreatedHandle(JSCEngine.makeBooleanValueHandle(false, context)!)
+      let trueValue = scope.adoptCreatedHandle(javaScriptCoreMakeBooleanValueHandle(true, context)!)
+      let falseValue = scope.adoptCreatedHandle(
+        javaScriptCoreMakeBooleanValueHandle(false, context)!)
       let trueType = trueValue.type()
       let trueText = trueValue.toString()
       let trueNumber = trueValue.toNumber()
@@ -97,12 +98,12 @@ struct JSCValueCoreTests {
       #expect(!falseTruth)
       #expect(predicates(trueValue) == [false, false, true, false, false, false, false, false])
 
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(42.5, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(42.5, context)!)
       let numberType = number.type()
       let numberText = number.toString()
       let numberValue = number.toNumber()
       let numberTruth = number.toBoolean()
-      let zero = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(0, context)!)
+      let zero = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(0, context)!)
       let zeroTruth = zero.toBoolean()
       #expect(numberType == .number)
       #expect(numberText == "42.5")
@@ -111,12 +112,12 @@ struct JSCValueCoreTests {
       #expect(!zeroTruth)
       #expect(predicates(number) == [false, false, false, true, false, false, false, false])
 
-      let string = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("hello", context)!)
+      let string = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("hello", context)!)
       let stringType = string.type()
       let stringText = string.toString()
       let stringNumber = string.toNumber()
       let stringTruth = string.toBoolean()
-      let empty = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("", context)!)
+      let empty = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("", context)!)
       let emptyTruth = empty.toBoolean()
       #expect(stringType == .string)
       #expect(stringText == "hello")
@@ -125,7 +126,8 @@ struct JSCValueCoreTests {
       #expect(!emptyTruth)
       #expect(predicates(string) == [false, false, false, false, true, false, false, false])
 
-      let symbol = scope.adoptCreatedHandle(JSCEngine.makeSymbolValueHandle("surface", context)!)
+      let symbol = scope.adoptCreatedHandle(
+        javaScriptCoreMakeSymbolValueHandle("surface", context)!)
       let symbolType = symbol.type()
       let symbolTruth = symbol.toBoolean()
       #expect(symbolType == .symbol)
@@ -156,7 +158,7 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -165,10 +167,10 @@ struct JSCValueCoreTests {
     do {
       let scope = JSCInstantContext(contextRef: context)
 
-      let one = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(1, context)!)
-      let oneAgain = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(1, context)!)
-      let oneString = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("1", context)!)
-      let two = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(2, context)!)
+      let one = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(1, context)!)
+      let oneAgain = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(1, context)!)
+      let oneString = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("1", context)!)
+      let two = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(2, context)!)
 
       let strictlySame = one.strictlyEquals(oneAgain)
       let strictlyDifferentTypes = one.strictlyEquals(oneString)
@@ -179,8 +181,8 @@ struct JSCValueCoreTests {
       #expect(looselySame)
       #expect(!looselyDifferent)
 
-      let nan = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(.nan, context)!)
-      let nanAgain = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(.nan, context)!)
+      let nan = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(.nan, context)!)
+      let nanAgain = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(.nan, context)!)
       let nanStrictlyEqual = nan.strictlyEquals(nanAgain)
       let nanLooselyEqual = nan.looselyEquals(nanAgain)
       #expect(!nanStrictlyEqual)
@@ -202,7 +204,7 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -211,7 +213,8 @@ struct JSCValueCoreTests {
     do {
       let scope = JSCInstantContext(contextRef: context)
 
-      let number: JSCValue = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
+      let number: JSCValue = scope.adoptCreatedHandle(
+        javaScriptCoreMakeNumberValueHandle(7, context)!)
       let anchored: JSCValue = scope.anchorBorrowedHandle(number.ref)
       let anchoredMatches = anchored.strictlyEquals(number)
       #expect(anchoredMatches)
@@ -236,7 +239,7 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -245,10 +248,10 @@ struct JSCValueCoreTests {
     do {
       let scope = JSCInstantContext(contextRef: context)
 
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(3.5, context)!)
-      let integer = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
-      let string = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("hello", context)!)
-      let boolean = scope.adoptCreatedHandle(JSCEngine.makeBooleanValueHandle(true, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(3.5, context)!)
+      let integer = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(7, context)!)
+      let string = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("hello", context)!)
+      let boolean = scope.adoptCreatedHandle(javaScriptCoreMakeBooleanValueHandle(true, context)!)
 
       let decodedString = String(value: string, in: scope)
       let strictlyDecodedString = try String.tryDecode(string, in: scope)
@@ -298,7 +301,7 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   /// Slice 2: indexed access is a value-level requirement implemented by the
@@ -319,7 +322,7 @@ struct JSCValueCoreTests {
         Issue.record("index read of a fresh object returned an exception")
       }
 
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(9, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(9, context)!)
       let didSet = object.setProperty(at: 1, to: number, in: scope)
       let read = object.getProperty(at: 1, in: scope)
       let hasIndex = object.hasProperty("1", in: scope)
@@ -336,7 +339,7 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   /// Slice 2: `localValue` hands back the view of an arena-backed callback
@@ -355,6 +358,6 @@ struct JSCValueCoreTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 }

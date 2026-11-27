@@ -48,7 +48,7 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
     in contextRef: JSGlobalContextRef
   ) -> JSStringRef {
     precondition(
-      JSCEngine.isPropertyStringKeyHandleCompatibleWithContext(stringRef, in: contextRef),
+      javaScriptCoreIsPropertyStringKeyHandleCompatibleWithContext(stringRef, in: contextRef),
       "JSCPropertyStringKey can only be used with the context that created it"
     )
     return stringRef
@@ -120,7 +120,7 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
     in contextRef: JSGlobalContextRef
   ) -> JSStringRef {
     precondition(
-      JSCEngine.isPreparedScriptHandleCompatibleWithContext(scriptRef, in: contextRef),
+      javaScriptCoreIsPreparedScriptHandleCompatibleWithContext(scriptRef, in: contextRef),
       "JSCPreparedScript can only be used with the context that compiled it"
     )
     return scriptRef

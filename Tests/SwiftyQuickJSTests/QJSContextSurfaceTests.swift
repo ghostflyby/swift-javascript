@@ -151,11 +151,11 @@ struct QJSContextSurfaceTests {
   /// recorded QuickJS's stack top.
   @Test
   func valuesAreUsableAcrossContextsOfTheSameRuntime() {
-    let runtime = QJSEngine.makeRuntime()
+    let runtime = quickJSMakeRuntime()
     guard
-      let sourceContext = QJSEngine.makeContext(in: runtime),
-      let targetContext = QJSEngine.makeContext(in: runtime),
-      let value = QJSEngine.makeNumber(7, in: sourceContext)
+      let sourceContext = JS_NewContext(runtime),
+      let targetContext = JS_NewContext(runtime),
+      let value = quickJSMakeNumber(7, in: sourceContext)
     else {
       Issue.record("Expected same-runtime context handles to be creatable")
       return
@@ -164,11 +164,11 @@ struct QJSContextSurfaceTests {
     defer {
       JS_FreeContext(targetContext)
       JS_FreeContext(sourceContext)
-      QJSEngine.releaseRuntime(runtime)
+      JS_FreeRuntime(runtime)
     }
 
-    let isCompatible = QJSEngine.isContextCompatibleWith(sourceContext, targetContext)
-    let targetValue = QJSEngine.toNumber(borrowed, in: targetContext)
+    let isCompatible = JS_GetRuntime(sourceContext) == JS_GetRuntime(targetContext)
+    let targetValue = quickJSToNumber(borrowed, in: targetContext)
     JS_FreeValue(sourceContext, value)
 
     #expect(isCompatible)

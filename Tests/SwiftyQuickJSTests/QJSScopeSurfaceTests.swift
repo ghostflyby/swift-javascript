@@ -3,6 +3,12 @@ import Testing
 @testable import SwiftJavaScript
 @testable import SwiftyQuickJS
 
+#if canImport(CQuickJSStatic)
+  import CQuickJSStatic
+#elseif canImport(CQuickJSDynamic)
+  import CQuickJSDynamic
+#endif
+
 // MARK: - QuickJS surface scopes (S7)
 //
 // Mirror of `JSCScopeSurfaceTests` on the reference-counted engine. The
@@ -27,8 +33,8 @@ private enum QJSScopeDataKey: JSContextDataKey {
 @Suite
 struct QJSScopeSurfaceTests {
   private func makeContext() -> (OpaquePointer, OpaquePointer) {
-    let runtime = QJSEngine.makeRuntime()
-    guard let context = QJSEngine.makeContext(in: runtime) else {
+    let runtime = quickJSMakeRuntime()
+    guard let context = JS_NewContext(runtime) else {
       preconditionFailure("QJSEngine could not create a context handle")
     }
     return (runtime, context)
@@ -422,7 +428,7 @@ struct QJSScopeSurfaceTests {
     _ = runtime
     // A bare engine context has no host-installed storage box; install one to
     // exercise the scope's data pass-through.
-    QJSEngine.installContextDataStorageBox(JSContextDataStorageBox(), in: context)
+    quickJSInstallContextDataStorageBox(JSContextDataStorageBox(), in: context)
     let scope = QJSInstantContext(contextRef: context)
 
     scope.setData("shared", for: QJSScopeDataKey.self)
@@ -469,7 +475,7 @@ struct QJSScopeSurfaceTests {
     let context = await QJSContext(.nonblocking)
     await context.withInstantContext { scope in
       let buffer = QJSArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
-      let rejected = QJSEngine.makeTypedArray(
+      let rejected = quickJSMakeTypedArray(
         in: scope.contextRef,
         kind: .uint16Array,
         arrayBuffer: buffer.withValue { $0.value },
@@ -508,7 +514,7 @@ struct QJSScopeSurfaceTests {
       let stored = scope.persist(scope.makeString("abc"))
       let contextHandle = scope.contextRef
 
-      let wrote = QJSEngine.setValueProperty(
+      let wrote = quickJSSetValueProperty(
         key.value,
         on: object.value,
         to: stored.value,
@@ -516,10 +522,10 @@ struct QJSScopeSurfaceTests {
         attributes: .none
       )
       let has =
-        QJSEngine.hasValueProperty(
+        quickJSHasValueProperty(
           key.value, on: object.value, in: contextHandle) ?? false
       let readIsString: Bool
-      if let result = QJSEngine.getValueProperty(
+      if let result = quickJSGetValueProperty(
         key.value, on: object.value, in: contextHandle)
       {
         switch consume result {
@@ -533,10 +539,10 @@ struct QJSScopeSurfaceTests {
       } else {
         readIsString = false
       }
-      let deleted = QJSEngine.deleteValueProperty(
+      let deleted = quickJSDeleteValueProperty(
         key.value, on: object.value, in: contextHandle)
       let hasAfterDelete =
-        QJSEngine.hasValueProperty(
+        quickJSHasValueProperty(
           key.value, on: object.value, in: contextHandle) ?? true
 
       #expect(wrote)
@@ -566,14 +572,14 @@ struct QJSScopeSurfaceTests {
       let lockedKey = scope.persist(scope.makeString("locked"))
       let seven = scope.persist(scope.makeNumber(7))
       let nine = scope.persist(scope.makeNumber(9))
-      _ = QJSEngine.setValueProperty(
+      _ = quickJSSetValueProperty(
         lockedKey.value,
         on: object.value,
         to: seven.value,
         in: contextHandle,
         attributes: .readOnly
       )
-      _ = QJSEngine.setValueProperty(
+      _ = quickJSSetValueProperty(
         lockedKey.value,
         on: object.value,
         to: nine.value,
@@ -583,7 +589,7 @@ struct QJSScopeSurfaceTests {
 
       let hiddenKey = scope.persist(scope.makeString("hidden"))
       let hiddenValue = scope.persist(scope.makeNumber(1))
-      _ = QJSEngine.setValueProperty(
+      _ = quickJSSetValueProperty(
         hiddenKey.value,
         on: object.value,
         to: hiddenValue.value,
@@ -593,7 +599,7 @@ struct QJSScopeSurfaceTests {
 
       let pinnedKey = scope.persist(scope.makeString("pinned"))
       let pinnedValue = scope.persist(scope.makeNumber(2))
-      _ = QJSEngine.setValueProperty(
+      _ = quickJSSetValueProperty(
         pinnedKey.value,
         on: object.value,
         to: pinnedValue.value,
@@ -602,7 +608,7 @@ struct QJSScopeSurfaceTests {
       )
 
       let lockedNumber: Double?
-      if let result = QJSEngine.getValueProperty(
+      if let result = quickJSGetValueProperty(
         lockedKey.value, on: object.value, in: contextHandle)
       {
         switch consume result {

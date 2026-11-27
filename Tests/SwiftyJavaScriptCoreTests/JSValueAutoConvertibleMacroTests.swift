@@ -4,8 +4,8 @@ import Testing
 @testable import SwiftyJavaScriptCore
 
 private func makeMacroHandles() -> (runtime: JSContextGroupRef, contextRef: JSGlobalContextRef) {
-  let runtime = JSCEngine.makeRuntime()
-  guard let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime)
+  let runtime = JSContextGroupCreate()!
+  guard let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime)
   else {
     preconditionFailure("JSCEngine could not create a context handle")
   }

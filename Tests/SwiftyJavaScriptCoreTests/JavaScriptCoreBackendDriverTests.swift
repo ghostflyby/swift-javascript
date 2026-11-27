@@ -35,9 +35,9 @@ import Testing
   )
   #expect(staticFunction.name == "fn")
 
-  let runtime = JSCEngine.makeRuntime()
+  let runtime = JSContextGroupCreate()!
   guard
-    let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime)
+    let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime)
   else {
     Issue.record("expected runtime handle to create context handle")
     return
@@ -58,7 +58,7 @@ import Testing
   #expect(madeValue.type() == .undefined)
 
   JSGlobalContextRelease(contextHandle)
-  JSCEngine.releaseRuntime(runtime)
+  JSContextGroupRelease(runtime)
 }
 
 // MARK: - Surface context/VM smoke (S8)
@@ -156,9 +156,9 @@ import Testing
 // so the owning path needs no fallback at all.
 
 @Test func javaScriptCoreContextBorrowReturnsNilWithoutBoundOwner() {
-  let runtimeHandle = JSCEngine.makeRuntime()
+  let runtimeHandle = JSContextGroupCreate()!
   guard
-    let contextHandle = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtimeHandle)
+    let contextHandle = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtimeHandle)
   else {
     Issue.record("expected runtime handle to create context handle")
     return
@@ -168,5 +168,5 @@ import Testing
   #expect(javaScriptCoreSurfaceFunctionClass(for: contextHandle) != nil)
 
   JSGlobalContextRelease(contextHandle)
-  JSCEngine.releaseRuntime(runtimeHandle)
+  JSContextGroupRelease(runtimeHandle)
 }

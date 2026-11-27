@@ -18,8 +18,8 @@ import Testing
 // arena drain instead of being a no-op.
 
 @Test func packageSurfaceScopeSeamsAreCallableAcrossTargets() {
-  let runtime = QJSEngine.makeRuntime()
-  guard let context = QJSEngine.makeContext(in: runtime) else {
+  let runtime = quickJSMakeRuntime()
+  guard let context = JS_NewContext(runtime) else {
     Issue.record("QJSEngine could not create a context")
     return
   }
@@ -96,7 +96,7 @@ import Testing
   }
 
   JS_FreeContext(context)
-  QJSEngine.releaseRuntime(runtime)
+  JS_FreeRuntime(runtime)
 }
 
 @Test func packageVMSeamsAreCallableAcrossTargets() async {

@@ -180,8 +180,8 @@ private func awaitQuickJSSettlement(on virtualMachine: QJSVirtualMachine) async 
 }
 
 private func makeQuickJSClassContext() -> (OpaquePointer, OpaquePointer) {
-  let runtime = QJSEngine.makeRuntime()
-  guard let context = QJSEngine.makeContext(in: runtime) else {
+  let runtime = quickJSMakeRuntime()
+  guard let context = JS_NewContext(runtime) else {
     preconditionFailure("QJSEngine could not create a context handle")
   }
   return (runtime, context)
@@ -483,7 +483,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
 
   do {
     let context = QJSInstantContext(contextRef: secondHandle)
-    guard QJSEngine.runtimeRef(for: context.contextRef) != nil else {
+    guard quickJSRuntimeRef(for: context.contextRef) != nil else {
       Issue.record("Expected QuickJS runtime handle")
       return
     }

@@ -151,14 +151,14 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     }
     let defaultScope = JSCScopeCore(contextRef: contextRef, rootsArenaValues: true)
     let persistentBindings = JSCPersistentBindings(contextRef: contextRef)
-    let propertyNamesFunction = JSCEngine.makePropertyNamesFunction(in: contextRef)
+    let propertyNamesFunction = javaScriptCoreMakePropertyNamesFunction(in: contextRef)
     JSCScopeStacks.push(defaultScope)
 
     // The context data box exists before any engine call can run user code:
     // synchronous scope witnesses reach the binding table through it, and the
     // box remembers this actor as its unretained owner (raw callbacks).
     let box = JSContextDataStorageBox()
-    JSCEngine.installContextDataStorageBox(box, in: contextRef)
+    javaScriptCoreInstallContextDataStorageBox(box, in: contextRef)
     box.bindContextOwner(self)
     box.setData(persistentBindings, for: JSCPersistentBindingsKey.self)
 
@@ -211,7 +211,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     guard let contextRef = engineContext else { return }
     persistentBindings.close()
     defaultScope.drain()
-    JSCEngine.installContextDataStorageBox(nil, in: contextRef)
+    javaScriptCoreInstallContextDataStorageBox(nil, in: contextRef)
     // Inputs that outlived the context: the reverse owner releases what they
     // still hold before the context reference itself goes away.
     let records = inputRecords.withLock { records -> [InputRecord] in
@@ -258,7 +258,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> JSCValue {
-    guard let ref = JSCEngine.makeStringValueHandle(value, contextRef) else {
+    guard let ref = javaScriptCoreMakeStringValueHandle(value, contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
     return adoptCreatedHandle(ref)
@@ -266,7 +266,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
 
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
-      let ref = JSCEngine.makeStringValueHandle(
+      let ref = javaScriptCoreMakeStringValueHandle(
         fromPropertyStringKey: key.borrowString(in: contextRef),
         in: contextRef
       )
@@ -277,35 +277,35 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   }
 
   public func makeNumber(_ value: Double) -> JSCValue {
-    guard let ref = JSCEngine.makeNumberValueHandle(value, contextRef) else {
+    guard let ref = javaScriptCoreMakeNumberValueHandle(value, contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeBoolean(_ value: Bool) -> JSCValue {
-    guard let ref = JSCEngine.makeBooleanValueHandle(value, contextRef) else {
+    guard let ref = javaScriptCoreMakeBooleanValueHandle(value, contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeNull() -> JSCValue {
-    guard let ref = JSCEngine.makeNullValueHandle(contextRef) else {
+    guard let ref = javaScriptCoreMakeNullValueHandle(contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeUndefined() -> JSCValue {
-    guard let ref = JSCEngine.makeUndefinedValueHandle(contextRef) else {
+    guard let ref = javaScriptCoreMakeUndefinedValueHandle(contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeObject() -> JSCValue {
-    guard let result = JSCEngine.makeObjectResultHandle(contextRef) else {
+    guard let result = javaScriptCoreMakeObjectResultHandle(contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
@@ -317,7 +317,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   }
 
   public func makeArray() -> JSCValue {
-    guard let result = JSCEngine.makeArrayResultHandle(contextRef) else {
+    guard let result = javaScriptCoreMakeArrayResultHandle(contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
@@ -335,7 +335,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     callback: @escaping JSFunctionCallback<JSCInstantContext>
   ) -> JSCValue {
     guard
-      let ref = JSCEngine.makeFunctionValueHandle(
+      let ref = javaScriptCoreMakeFunctionValueHandle(
         named: name,
         callback: callback,
         in: contextRef
@@ -372,7 +372,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> JSCPropertyStringKey {
-    guard let stringRef = JSCEngine.makePropertyStringKeyHandle(value, in: contextRef) else {
+    guard let stringRef = javaScriptCoreMakePropertyStringKeyHandle(value, in: contextRef) else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
     return JSCPropertyStringKey(
@@ -383,7 +383,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
-    guard let scriptRef = JSCEngine.makePreparedScriptHandle(source, in: contextRef) else {
+    guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
     return JSCPreparedScript(
@@ -396,7 +396,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   // MARK: - Global object
 
   public func globalObjectValue() -> JSCValue {
-    guard let ref = JSCEngine.globalObjectValueHandle(contextRef) else {
+    guard let ref = javaScriptCoreGlobalObjectValueHandle(contextRef) else {
       preconditionFailure("JSCContext.globalObjectValue could not get global object")
     }
     return JSCValue(ref: ref, contextRef: contextRef)
@@ -405,11 +405,11 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   /// Read a global property. A failed read is reported as `undefined`: the
   /// engine's exception reference is settled instead of being dropped.
   public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
-    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(contextRef) else {
       preconditionFailure("JSCContext.getGlobalProperty could not get global object")
     }
     guard
-      let result = JSCEngine.getStaticStringPropertyHandle(key, on: global, in: contextRef)
+      let result = javaScriptCoreGetStaticStringPropertyHandle(key, on: global, in: contextRef)
     else {
       preconditionFailure("JSCContext.getGlobalProperty returned nil")
     }
@@ -417,7 +417,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     case .value(let ref):
       return adoptCreatedHandle(ref)
     case .exception:
-      guard let undefined = JSCEngine.makeUndefinedValueHandle(contextRef) else {
+      guard let undefined = javaScriptCoreMakeUndefinedValueHandle(contextRef) else {
         preconditionFailure("JSCContext could not create an undefined value")
       }
       return adoptCreatedHandle(undefined)
@@ -429,8 +429,8 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else { return }
-    _ = JSCEngine.setStaticStringPropertyHandle(
+    guard let global = javaScriptCoreGlobalObjectValueHandle(contextRef) else { return }
+    _ = javaScriptCoreSetStaticStringPropertyHandle(
       key,
       on: global,
       to: value.ref,
@@ -440,15 +440,15 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else { return }
-    _ = JSCEngine.deleteStaticStringPropertyHandle(key, on: global, in: contextRef)
+    guard let global = javaScriptCoreGlobalObjectValueHandle(contextRef) else { return }
+    _ = javaScriptCoreDeleteStaticStringPropertyHandle(key, on: global, in: contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = JSCEngine.globalObjectValueHandle(contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(contextRef) else {
       return false
     }
-    return JSCEngine.hasStaticStringPropertyHandle(key, on: global, in: contextRef) ?? false
+    return javaScriptCoreHasStaticStringPropertyHandle(key, on: global, in: contextRef) ?? false
   }
 
   // MARK: - Scripts
@@ -459,7 +459,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     startingLineNumber: Int32
   ) -> JSResult<JSCValue> {
     guard
-      let result = JSCEngine.evaluatePreparedScriptResultHandle(
+      let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
         script.borrowScript(in: contextRef),
         contextRef,
         sourceURL: sourceURL,
@@ -479,22 +479,22 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    JSCEngine.contextDataStorageBox(in: contextRef)?.setData(value, for: key)
+    javaScriptCoreContextDataStorageBox(in: contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    return JSCEngine.contextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
+    return javaScriptCoreContextDataStorageBox(in: contextRef)?.data(for: key) ?? K.defaultValue
   }
 
   /// Package-internal data-box seam used by the cross-engine contract tests.
   package nonisolated func contextDataStorageBox() -> JSContextDataStorageBox? {
-    JSCEngine.contextDataStorageBox(in: contextRef)
+    javaScriptCoreContextDataStorageBox(in: contextRef)
   }
 
   /// Installs are engine mutations; this stays a hop target for the tests
   /// that swap the box from a foreign thread.
   package func installContextDataStorageBox(_ storage: JSContextDataStorageBox?) async {
-    JSCEngine.installContextDataStorageBox(storage, in: contextRef)
+    javaScriptCoreInstallContextDataStorageBox(storage, in: contextRef)
   }
 
   // MARK: - Identity

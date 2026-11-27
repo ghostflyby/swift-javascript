@@ -57,7 +57,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> JSCValue {
-    guard let ref = JSCEngine.makeStringValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeStringValueHandle(value, core.contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
     return adoptCreatedHandle(ref)
@@ -65,7 +65,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
-      let ref = JSCEngine.makeStringValueHandle(
+      let ref = javaScriptCoreMakeStringValueHandle(
         fromPropertyStringKey: key.borrowString(in: core.contextRef),
         in: core.contextRef
       )
@@ -76,42 +76,42 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func makeNumber(_ value: Double) -> JSCValue {
-    guard let ref = JSCEngine.makeNumberValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeNumberValueHandle(value, core.contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeBoolean(_ value: Bool) -> JSCValue {
-    guard let ref = JSCEngine.makeBooleanValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeBooleanValueHandle(value, core.contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeNull() -> JSCValue {
-    guard let ref = JSCEngine.makeNullValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreMakeNullValueHandle(core.contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeUndefined() -> JSCValue {
-    guard let ref = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreMakeUndefinedValueHandle(core.contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeSymbol(_ value: String) -> JSCValue {
-    guard let ref = JSCEngine.makeSymbolValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeSymbolValueHandle(value, core.contextRef) else {
       preconditionFailure("makeSymbolValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeObject() -> JSResult<JSCValue> {
-    guard let result = JSCEngine.makeObjectResultHandle(core.contextRef) else {
+    guard let result = javaScriptCoreMakeObjectResultHandle(core.contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
@@ -123,7 +123,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func makeArray() -> JSResult<JSCValue> {
-    guard let result = JSCEngine.makeArrayResultHandle(core.contextRef) else {
+    guard let result = javaScriptCoreMakeArrayResultHandle(core.contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
@@ -163,18 +163,18 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Global object
 
   public func globalObjectValue() -> JSCValue {
-    guard let ref = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       preconditionFailure("JSCInstantContext.globalObjectValue could not get global object")
     }
     return JSCValue(ref: ref, contextRef: core.contextRef)
   }
 
   public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       preconditionFailure("JSCInstantContext.getGlobalProperty could not get global object")
     }
     guard
-      let result = JSCEngine.getStaticStringPropertyHandle(
+      let result = javaScriptCoreGetStaticStringPropertyHandle(
         key,
         on: global,
         in: core.contextRef
@@ -186,7 +186,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     case .value(let ref):
       return adoptCreatedHandle(ref)
     case .exception(let ref):
-      guard let undefined = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
+      guard let undefined = javaScriptCoreMakeUndefinedValueHandle(core.contextRef) else {
         preconditionFailure("JSCInstantContext could not create an undefined value")
       }
       return adoptCreatedHandle(undefined)
@@ -198,8 +198,8 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else { return }
-    _ = JSCEngine.setStaticStringPropertyHandle(
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else { return }
+    _ = javaScriptCoreSetStaticStringPropertyHandle(
       key,
       on: global,
       to: value.ref,
@@ -209,15 +209,15 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else { return }
-    _ = JSCEngine.deleteStaticStringPropertyHandle(key, on: global, in: core.contextRef)
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else { return }
+    _ = javaScriptCoreDeleteStaticStringPropertyHandle(key, on: global, in: core.contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       return false
     }
-    return JSCEngine.hasStaticStringPropertyHandle(key, on: global, in: core.contextRef)
+    return javaScriptCoreHasStaticStringPropertyHandle(key, on: global, in: core.contextRef)
       ?? false
   }
 
@@ -226,7 +226,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     callback: @escaping JSFunctionCallback<JSCInstantContext>
   ) -> JSCValue {
     guard
-      let ref = JSCEngine.makeFunctionValueHandle(
+      let ref = javaScriptCoreMakeFunctionValueHandle(
         named: name,
         callback: callback,
         in: core.contextRef
@@ -262,7 +262,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> JSCPropertyStringKey {
-    guard let stringRef = JSCEngine.makePropertyStringKeyHandle(value, in: core.contextRef)
+    guard let stringRef = javaScriptCoreMakePropertyStringKeyHandle(value, in: core.contextRef)
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
@@ -274,7 +274,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
-    guard let scriptRef = JSCEngine.makePreparedScriptHandle(source, in: core.contextRef) else {
+    guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
     return JSCPreparedScript(
@@ -292,7 +292,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     startingLineNumber: Int32
   ) -> JSResult<JSCValue> {
     guard
-      let result = JSCEngine.evaluatePreparedScriptResultHandle(
+      let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
         script.borrowScript(in: core.contextRef),
         core.contextRef,
         sourceURL: sourceURL,
@@ -312,11 +312,11 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    JSCEngine.contextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
+    javaScriptCoreContextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    JSCEngine.contextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
+    javaScriptCoreContextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
   }
 }
 
@@ -378,7 +378,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Value factories
 
   public func makeString(_ value: String) -> JSCValue {
-    guard let ref = JSCEngine.makeStringValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeStringValueHandle(value, core.contextRef) else {
       preconditionFailure("makeStringValueHandle failed")
     }
     return adoptCreatedHandle(ref)
@@ -386,7 +386,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
-      let ref = JSCEngine.makeStringValueHandle(
+      let ref = javaScriptCoreMakeStringValueHandle(
         fromPropertyStringKey: key.borrowString(in: core.contextRef),
         in: core.contextRef
       )
@@ -397,42 +397,42 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func makeNumber(_ value: Double) -> JSCValue {
-    guard let ref = JSCEngine.makeNumberValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeNumberValueHandle(value, core.contextRef) else {
       preconditionFailure("makeNumberValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeBoolean(_ value: Bool) -> JSCValue {
-    guard let ref = JSCEngine.makeBooleanValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeBooleanValueHandle(value, core.contextRef) else {
       preconditionFailure("makeBooleanValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeNull() -> JSCValue {
-    guard let ref = JSCEngine.makeNullValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreMakeNullValueHandle(core.contextRef) else {
       preconditionFailure("makeNullValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeUndefined() -> JSCValue {
-    guard let ref = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreMakeUndefinedValueHandle(core.contextRef) else {
       preconditionFailure("makeUndefinedValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeSymbol(_ value: String) -> JSCValue {
-    guard let ref = JSCEngine.makeSymbolValueHandle(value, core.contextRef) else {
+    guard let ref = javaScriptCoreMakeSymbolValueHandle(value, core.contextRef) else {
       preconditionFailure("makeSymbolValueHandle failed")
     }
     return adoptCreatedHandle(ref)
   }
 
   public func makeObject() -> JSResult<JSCValue> {
-    guard let result = JSCEngine.makeObjectResultHandle(core.contextRef) else {
+    guard let result = javaScriptCoreMakeObjectResultHandle(core.contextRef) else {
       preconditionFailure("makeObjectResultHandle failed")
     }
     switch consume result {
@@ -444,7 +444,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func makeArray() -> JSResult<JSCValue> {
-    guard let result = JSCEngine.makeArrayResultHandle(core.contextRef) else {
+    guard let result = javaScriptCoreMakeArrayResultHandle(core.contextRef) else {
       preconditionFailure("makeArrayResultHandle failed")
     }
     switch consume result {
@@ -467,18 +467,18 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Global object
 
   public func globalObjectValue() -> JSCValue {
-    guard let ref = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let ref = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       preconditionFailure("JSCScope.globalObjectValue could not get global object")
     }
     return JSCValue(ref: ref, contextRef: core.contextRef)
   }
 
   public func getGlobalProperty(forKey key: StaticString) -> JSCValue {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       preconditionFailure("JSCScope.getGlobalProperty could not get global object")
     }
     guard
-      let result = JSCEngine.getStaticStringPropertyHandle(
+      let result = javaScriptCoreGetStaticStringPropertyHandle(
         key,
         on: global,
         in: core.contextRef
@@ -490,7 +490,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     case .value(let ref):
       return adoptCreatedHandle(ref)
     case .exception(let ref):
-      guard let undefined = JSCEngine.makeUndefinedValueHandle(core.contextRef) else {
+      guard let undefined = javaScriptCoreMakeUndefinedValueHandle(core.contextRef) else {
         preconditionFailure("JSCScope could not create an undefined value")
       }
       return adoptCreatedHandle(undefined)
@@ -502,8 +502,8 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     forKey key: StaticString,
     with attributes: JSHostMemberAttributes
   ) {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else { return }
-    _ = JSCEngine.setStaticStringPropertyHandle(
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else { return }
+    _ = javaScriptCoreSetStaticStringPropertyHandle(
       key,
       on: global,
       to: value.ref,
@@ -513,15 +513,15 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func deleteGlobalProperty(forKey key: StaticString) {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else { return }
-    _ = JSCEngine.deleteStaticStringPropertyHandle(key, on: global, in: core.contextRef)
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else { return }
+    _ = javaScriptCoreDeleteStaticStringPropertyHandle(key, on: global, in: core.contextRef)
   }
 
   public func hasGlobalProperty(_ key: StaticString) -> Bool {
-    guard let global = JSCEngine.globalObjectValueHandle(core.contextRef) else {
+    guard let global = javaScriptCoreGlobalObjectValueHandle(core.contextRef) else {
       return false
     }
-    return JSCEngine.hasStaticStringPropertyHandle(key, on: global, in: core.contextRef)
+    return javaScriptCoreHasStaticStringPropertyHandle(key, on: global, in: core.contextRef)
       ?? false
   }
 
@@ -530,7 +530,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     callback: @escaping JSFunctionCallback<JSCInstantContext>
   ) -> JSCValue {
     guard
-      let ref = JSCEngine.makeFunctionValueHandle(
+      let ref = javaScriptCoreMakeFunctionValueHandle(
         named: name,
         callback: callback,
         in: core.contextRef
@@ -566,7 +566,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Self-owning inputs
 
   public func makePropertyStringKey(_ value: String) -> JSCPropertyStringKey {
-    guard let stringRef = JSCEngine.makePropertyStringKeyHandle(value, in: core.contextRef)
+    guard let stringRef = javaScriptCoreMakePropertyStringKeyHandle(value, in: core.contextRef)
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
@@ -578,7 +578,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
-    guard let scriptRef = JSCEngine.makePreparedScriptHandle(source, in: core.contextRef) else {
+    guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
     return JSCPreparedScript(
@@ -596,7 +596,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     startingLineNumber: Int32
   ) -> JSResult<JSCValue> {
     guard
-      let result = JSCEngine.evaluatePreparedScriptResultHandle(
+      let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
         script.borrowScript(in: core.contextRef),
         core.contextRef,
         sourceURL: sourceURL,
@@ -616,11 +616,11 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   // MARK: - Context data
 
   public func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type) {
-    JSCEngine.contextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
+    javaScriptCoreContextDataStorageBox(in: core.contextRef)?.setData(value, for: key)
   }
 
   public func data<K: JSContextDataKey>(for key: K.Type) -> K.Value? {
-    JSCEngine.contextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
+    javaScriptCoreContextDataStorageBox(in: core.contextRef)?.data(for: key) ?? K.defaultValue
   }
 }
 

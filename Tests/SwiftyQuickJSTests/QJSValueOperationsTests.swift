@@ -19,8 +19,8 @@ import Testing
 // too rather than drop the handle.
 
 private func makeContext() -> (OpaquePointer, OpaquePointer) {
-  let runtime = QJSEngine.makeRuntime()
-  guard let context = QJSEngine.makeContext(in: runtime) else {
+  let runtime = quickJSMakeRuntime()
+  guard let context = JS_NewContext(runtime) else {
     preconditionFailure("QJSEngine could not create a context")
   }
   return (runtime, context)
@@ -28,7 +28,7 @@ private func makeContext() -> (OpaquePointer, OpaquePointer) {
 
 private func adoptObject(in scope: borrowing QJSInstantContext) -> QJSValue {
   let context = scope.contextRef
-  guard let result = QJSEngine.makeObjectResult(in: context) else {
+  guard let result = quickJSMakeObjectResult(in: context) else {
     preconditionFailure("QJSEngine could not create an object")
   }
   switch consume result {
@@ -62,7 +62,7 @@ private func adoptString(
   _ value: String,
   in scope: borrowing QJSInstantContext
 ) -> QJSValue {
-  guard let created = QJSEngine.makeString(value, in: scope.contextRef) else {
+  guard let created = quickJSMakeString(value, in: scope.contextRef) else {
     preconditionFailure("QJSEngine could not create a string")
   }
   return scope.adoptCreated(created)
@@ -133,11 +133,11 @@ struct QJSValueOperationsTests {
       #expect(absentText == "undefined")
       #expect(names == ["name"])
 
-      guard let keyHandle = QJSEngine.makePropertyStringAtom("count", in: context) else {
+      guard let keyHandle = quickJSMakePropertyStringAtom("count", in: context) else {
         Issue.record("QJSEngine could not make a property key")
         return
       }
-      let number = scope.adoptCreated(QJSEngine.makeNumber(3, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(3, in: context)!)
       do {
         let key = QJSPropertyStringKey(
           atom: keyHandle,
@@ -187,7 +187,7 @@ struct QJSValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -217,7 +217,7 @@ struct QJSValueOperationsTests {
         in: scope
       )
       let methodText = describe(methodObject.invokeMethod("double", arguments: [], in: scope))
-      let argument = scope.adoptCreated(QJSEngine.makeNumber(21, in: context)!)
+      let argument = scope.adoptCreated(quickJSMakeNumber(21, in: context)!)
       let withArgumentText = describe(
         methodObject.invokeMethod("plus", arguments: [argument.asCallArgument()], in: scope)
       )
@@ -249,7 +249,7 @@ struct QJSValueOperationsTests {
       #expect(!typedIsArrayBuffer)
       #expect(!arrayIsTypedArray)
 
-      let number = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(7, in: context)!)
       let boxed = value(number.toObject(in: scope))
       let boxedIsObject = boxed.isObject()
       #expect(boxedIsObject)
@@ -282,7 +282,7 @@ struct QJSValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -311,7 +311,7 @@ struct QJSValueOperationsTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test

@@ -125,7 +125,7 @@ extension QJSInstantContext {
     definition: QJSClassDefinition,
     identity: ObjectIdentifier
   ) -> QJSClass {
-    let runtime = QJSEngine.runtimeRef(for: contextRef)
+    let runtime = quickJSRuntimeRef(for: contextRef)
     let key = QuickJSClassCacheKey(identity: identity, runtime: UInt(bitPattern: runtime))
     return quickJSClassCache.value(forKey: key) {
       // Only the ID and the record are created here. Registering the engine
@@ -187,7 +187,7 @@ extension QJSInstantContext {
     guard classID != JS_INVALID_CLASS_ID else {
       return nil
     }
-    let runtime = QJSEngine.runtimeRef(for: contextRef)
+    let runtime = quickJSRuntimeRef(for: contextRef)
     guard
       quickJSClassRegistry.definition(
         for: QuickJSClassRegistryKey(runtime: UInt(bitPattern: runtime), classID: classID)
@@ -218,7 +218,7 @@ private func registerClassIfNeeded(
   _ jsClass: QJSClass, in context: OpaquePointer
 ) {
   let classID = jsClass.classID
-  let runtimeHandle = QJSEngine.runtimeRef(for: context)
+  let runtimeHandle = quickJSRuntimeRef(for: context)
   guard jsClass.runtimeRef == nil || jsClass.runtimeRef == runtimeHandle else {
     return
   }
@@ -266,7 +266,7 @@ private func jsClassDefinition(
   _ jsClass: QJSClass,
   in context: OpaquePointer
 ) -> QJSClassDefinition? {
-  let runtime = QJSEngine.runtimeRef(for: context)
+  let runtime = quickJSRuntimeRef(for: context)
   return QJSEngine.classDefinition(
     for: jsClass.classID,
     runtimeRef: jsClass.runtimeRef,
@@ -282,7 +282,7 @@ private func quickJSClassDefinition(
   guard classID != JS_INVALID_CLASS_ID else {
     return nil
   }
-  let runtime = QJSEngine.runtimeRef(for: contextRef)
+  let runtime = quickJSRuntimeRef(for: contextRef)
   return quickJSClassRegistry.definition(
     for: QuickJSClassRegistryKey(runtime: UInt(bitPattern: runtime), classID: classID)
   )

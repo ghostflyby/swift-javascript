@@ -21,8 +21,8 @@ import Testing
 @Suite
 struct QJSCallbackSurfaceTests {
   private func makeContext() -> (OpaquePointer, OpaquePointer) {
-    let runtime = QJSEngine.makeRuntime()
-    guard let context = QJSEngine.makeContext(in: runtime) else {
+    let runtime = quickJSMakeRuntime()
+    guard let context = JS_NewContext(runtime) else {
       preconditionFailure("QJSEngine could not create a context")
     }
     return (runtime, context)
@@ -34,9 +34,9 @@ struct QJSCallbackSurfaceTests {
     do {
       let scope = QJSInstantContext(contextRef: context)
 
-      let text = scope.adoptCreated(QJSEngine.makeString("seven", in: context)!)
-      let twinText = scope.adoptCreated(QJSEngine.makeString("seven", in: context)!)
-      let number = scope.adoptCreated(QJSEngine.makeNumber(7, in: context)!)
+      let text = scope.adoptCreated(quickJSMakeString("seven", in: context)!)
+      let twinText = scope.adoptCreated(quickJSMakeString("seven", in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(7, in: context)!)
 
       let value = QJSValue(value: text.value, contextRef: context)
       let twin = QJSValue(value: twinText.value, contextRef: context)
@@ -67,7 +67,7 @@ struct QJSCallbackSurfaceTests {
       #expect(scope.contextRef == context)
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -75,8 +75,8 @@ struct QJSCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = QJSInstantContext(contextRef: context)
-      let text = scope.adoptCreated(QJSEngine.makeString("alpha", in: context)!)
-      let number = scope.adoptCreated(QJSEngine.makeNumber(41, in: context)!)
+      let text = scope.adoptCreated(quickJSMakeString("alpha", in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(41, in: context)!)
       let handles = [text.value, number.value]
 
       let arguments = QJSCallbackArguments(count: handles.count) { index in
@@ -100,7 +100,7 @@ struct QJSCallbackSurfaceTests {
       #expect(throwingResult == "alpha")
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -108,7 +108,7 @@ struct QJSCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = QJSInstantContext(contextRef: context)
-      let number = scope.adoptCreated(QJSEngine.makeNumber(3, in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(3, in: context)!)
       let arguments = QJSCallbackArguments(count: 1) { _ in number.value }
 
       do {
@@ -130,7 +130,7 @@ struct QJSCallbackSurfaceTests {
       }
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 
   @Test
@@ -138,8 +138,8 @@ struct QJSCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = QJSInstantContext(contextRef: context)
-      let number = scope.adoptCreated(QJSEngine.makeNumber(1, in: context)!)
-      let text = scope.adoptCreated(QJSEngine.makeString("two", in: context)!)
+      let number = scope.adoptCreated(quickJSMakeNumber(1, in: context)!)
+      let text = scope.adoptCreated(quickJSMakeString("two", in: context)!)
       let handles = [number.value, text.value]
 
       let arguments = QJSArguments(count: handles.count) { index, _ in
@@ -155,6 +155,6 @@ struct QJSCallbackSurfaceTests {
       #expect(strict.1 == "two")
     }
     JS_FreeContext(context)
-    QJSEngine.releaseRuntime(runtime)
+    JS_FreeRuntime(runtime)
   }
 }

@@ -49,32 +49,32 @@ public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
   // MARK: - Classification and conversion
 
   public func type() -> SwiftJavaScript.JSType {
-    guard let valueType = JSCEngine.valueTypeForHandle(ref, in: contextRef) else {
+    guard let valueType = javaScriptCoreValueTypeForHandle(ref, in: contextRef) else {
       preconditionFailure("JSCValue.type() could not query value type")
     }
     return valueType
   }
 
   public func toString() -> String {
-    JSCEngine.toStringForHandle(ref, in: contextRef) ?? ""
+    javaScriptCoreToStringForHandle(ref, in: contextRef) ?? ""
   }
 
   public func toNumber() -> Double {
-    JSCEngine.toNumberForHandle(ref, in: contextRef)
+    javaScriptCoreToNumberForHandle(ref, in: contextRef)
   }
 
   public func toBoolean() -> Bool {
-    JSCEngine.toBooleanForHandle(ref, in: contextRef)
+    javaScriptCoreToBooleanForHandle(ref, in: contextRef)
   }
 
   // MARK: - Equality
 
   public func looselyEquals(_ other: borrowing JSCValue) -> Bool {
-    JSCEngine.looselyEqualsHandle(ref, other.ref, in: contextRef) ?? false
+    javaScriptCoreLooselyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 
   public func strictlyEquals(_ other: borrowing JSCValue) -> Bool {
-    JSCEngine.strictlyEqualsHandle(ref, other.ref, in: contextRef) ?? false
+    javaScriptCoreStrictlyEqualsHandle(ref, other.ref, in: contextRef) ?? false
   }
 }
 

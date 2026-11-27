@@ -8,245 +8,243 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
-extension QJSEngine {
-  package static func makeArrayBufferWithBytesNoCopy(
-    in context: OpaquePointer,
-    bytes: UnsafeMutableRawPointer?,
-    byteLength: Int,
-    bytesDeallocator: (
-      @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-    )?,
-    deallocatorContext: UnsafeMutableRawPointer?
-  ) -> CQuickJSValue? {
-    let opaque: UnsafeMutableRawPointer? =
-      if let bytesDeallocator {
-        Unmanaged.passRetained(
-          QuickJSArrayBufferDeallocatorBox(
-            deallocator: bytesDeallocator,
-            context: deallocatorContext
-          )
-        ).toOpaque()
-      } else {
-        nil
-      }
-    let value = JS_NewArrayBuffer(
-      context,
-      bytes?.assumingMemoryBound(to: UInt8.self),
-      byteLength,
-      quickJSArrayBufferFree,
-      opaque,
-      false
-    )
-    if JS_IsException(value) {
-      quickJSClearPendingException(in: context)
-      if let opaque {
-        _ = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
-      }
-      return nil
+package func quickJSMakeArrayBufferWithBytesNoCopy(
+  in context: OpaquePointer,
+  bytes: UnsafeMutableRawPointer?,
+  byteLength: Int,
+  bytesDeallocator: (
+    @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+  )?,
+  deallocatorContext: UnsafeMutableRawPointer?
+) -> CQuickJSValue? {
+  let opaque: UnsafeMutableRawPointer? =
+    if let bytesDeallocator {
+      Unmanaged.passRetained(
+        QuickJSArrayBufferDeallocatorBox(
+          deallocator: bytesDeallocator,
+          context: deallocatorContext
+        )
+      ).toOpaque()
+    } else {
+      nil
     }
-    return value
-  }
-
-  package static func arrayBufferByteLength(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> Int? {
-    var size = 0
-    guard JS_GetArrayBuffer(context, &size, value) != nil else {
-      return nil
+  let value = JS_NewArrayBuffer(
+    context,
+    bytes?.assumingMemoryBound(to: UInt8.self),
+    byteLength,
+    quickJSArrayBufferFree,
+    opaque,
+    false
+  )
+  if JS_IsException(value) {
+    quickJSClearPendingException(in: context)
+    if let opaque {
+      _ = Unmanaged<QuickJSArrayBufferDeallocatorBox>.fromOpaque(opaque).takeRetainedValue()
     }
-    return size
+    return nil
   }
+  return value
+}
 
-  package static func arrayBufferBytesPtr(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    var size = 0
-    let bytes = JS_GetArrayBuffer(context, &size, value)
-    return (UnsafeMutableRawPointer(bytes), bytes == nil)
+package func quickJSArrayBufferByteLength(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> Int? {
+  var size = 0
+  guard JS_GetArrayBuffer(context, &size, value) != nil else {
+    return nil
   }
+  return size
+}
 
-  package static func makeTypedArray(
-    in context: OpaquePointer,
-    kind: JSTypedArrayKind,
-    length: Int
-  ) -> CQuickJSValue? {
-    var arguments = [JS_NewFloat64(context, Double(length))]
-    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+package func quickJSArrayBufferBytesPtr(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+  var size = 0
+  let bytes = JS_GetArrayBuffer(context, &size, value)
+  return (UnsafeMutableRawPointer(bytes), bytes == nil)
+}
+
+package func quickJSMakeTypedArray(
+  in context: OpaquePointer,
+  kind: JSTypedArrayKind,
+  length: Int
+) -> CQuickJSValue? {
+  var arguments = [JS_NewFloat64(context, Double(length))]
+  return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+}
+
+package func quickJSMakeTypedArray(
+  in context: OpaquePointer,
+  kind: JSTypedArrayKind,
+  arrayBuffer: CQuickJSValue
+) -> CQuickJSValue? {
+  var arguments = [
+    arrayBuffer,
+    JS_NewFloat64(context, 0),
+    quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
+  ]
+  return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+}
+
+package func quickJSMakeTypedArray(
+  in context: OpaquePointer,
+  kind: JSTypedArrayKind,
+  arrayBuffer: CQuickJSValue,
+  byteOffset: Int,
+  length: Int
+) -> CQuickJSValue? {
+  var arguments = [
+    arrayBuffer,
+    JS_NewFloat64(context, Double(byteOffset)),
+    JS_NewFloat64(context, Double(length)),
+  ]
+  return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+}
+
+package func quickJSTypedArrayLength(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> Int? {
+  var byteOffset = 0
+  var byteLength = 0
+  var bytesPerElement = 0
+  let buffer = JS_GetTypedArrayBuffer(
+    context,
+    value,
+    &byteOffset,
+    &byteLength,
+    &bytesPerElement
+  )
+  guard !JS_IsException(buffer) else {
+    return nil
   }
-
-  package static func makeTypedArray(
-    in context: OpaquePointer,
-    kind: JSTypedArrayKind,
-    arrayBuffer: CQuickJSValue
-  ) -> CQuickJSValue? {
-    var arguments = [
-      arrayBuffer,
-      JS_NewFloat64(context, 0),
-      quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED)),
-    ]
-    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+  JS_FreeValue(context, buffer)
+  guard bytesPerElement > 0 else {
+    return nil
   }
+  return byteLength / bytesPerElement
+}
 
-  package static func makeTypedArray(
-    in context: OpaquePointer,
-    kind: JSTypedArrayKind,
-    arrayBuffer: CQuickJSValue,
-    byteOffset: Int,
-    length: Int
-  ) -> CQuickJSValue? {
-    var arguments = [
-      arrayBuffer,
-      JS_NewFloat64(context, Double(byteOffset)),
-      JS_NewFloat64(context, Double(length)),
-    ]
-    return quickJSMakeTypedArray(in: context, kind: kind, arguments: &arguments)
+package func quickJSTypedArrayByteLength(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> Int? {
+  var byteOffset = 0
+  var byteLength = 0
+  var bytesPerElement = 0
+  let buffer = JS_GetTypedArrayBuffer(
+    context,
+    value,
+    &byteOffset,
+    &byteLength,
+    &bytesPerElement
+  )
+  guard !JS_IsException(buffer) else {
+    return nil
   }
+  JS_FreeValue(context, buffer)
+  return byteLength
+}
 
-  package static func typedArrayLength(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> Int? {
-    var byteOffset = 0
-    var byteLength = 0
-    var bytesPerElement = 0
-    let buffer = JS_GetTypedArrayBuffer(
-      context,
-      value,
-      &byteOffset,
-      &byteLength,
-      &bytesPerElement
-    )
-    guard !JS_IsException(buffer) else {
-      return nil
-    }
-    JS_FreeValue(context, buffer)
-    guard bytesPerElement > 0 else {
-      return nil
-    }
-    return byteLength / bytesPerElement
+package func quickJSTypedArrayByteOffset(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> Int? {
+  var byteOffset = 0
+  var byteLength = 0
+  var bytesPerElement = 0
+  let buffer = JS_GetTypedArrayBuffer(
+    context,
+    value,
+    &byteOffset,
+    &byteLength,
+    &bytesPerElement
+  )
+  guard !JS_IsException(buffer) else {
+    return nil
   }
+  JS_FreeValue(context, buffer)
+  return byteOffset
+}
 
-  package static func typedArrayByteLength(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> Int? {
-    var byteOffset = 0
-    var byteLength = 0
-    var bytesPerElement = 0
-    let buffer = JS_GetTypedArrayBuffer(
-      context,
-      value,
-      &byteOffset,
-      &byteLength,
-      &bytesPerElement
-    )
-    guard !JS_IsException(buffer) else {
-      return nil
-    }
-    JS_FreeValue(context, buffer)
-    return byteLength
+/// A new owning reference to the backing buffer.
+package func quickJSTypedArrayBuffer(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> CQuickJSValue? {
+  var byteOffset = 0
+  var byteLength = 0
+  var bytesPerElement = 0
+  let buffer = JS_GetTypedArrayBuffer(
+    context,
+    value,
+    &byteOffset,
+    &byteLength,
+    &bytesPerElement
+  )
+  guard !JS_IsException(buffer) else {
+    return nil
   }
+  return buffer
+}
 
-  package static func typedArrayByteOffset(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> Int? {
-    var byteOffset = 0
-    var byteLength = 0
-    var bytesPerElement = 0
-    let buffer = JS_GetTypedArrayBuffer(
-      context,
-      value,
-      &byteOffset,
-      &byteLength,
-      &bytesPerElement
-    )
-    guard !JS_IsException(buffer) else {
-      return nil
-    }
-    JS_FreeValue(context, buffer)
-    return byteOffset
+package func quickJSTypedArrayBytesPtr(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
+  var byteOffset = 0
+  var byteLength = 0
+  var bytesPerElement = 0
+  let buffer = JS_GetTypedArrayBuffer(
+    context,
+    value,
+    &byteOffset,
+    &byteLength,
+    &bytesPerElement
+  )
+  guard !JS_IsException(buffer) else {
+    return (nil, true)
   }
+  defer { JS_FreeValue(context, buffer) }
+  return quickJSArrayBufferBytesPtr(buffer, in: context)
+}
 
-  /// A new owning reference to the backing buffer.
-  package static func typedArrayBuffer(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> CQuickJSValue? {
-    var byteOffset = 0
-    var byteLength = 0
-    var bytesPerElement = 0
-    let buffer = JS_GetTypedArrayBuffer(
-      context,
-      value,
-      &byteOffset,
-      &byteLength,
-      &bytesPerElement
-    )
-    guard !JS_IsException(buffer) else {
-      return nil
-    }
-    return buffer
-  }
+package func quickJSIsArrayBuffer(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> Bool {
+  _ = context
+  return JS_IsArrayBuffer(value)
+}
 
-  package static func typedArrayBytesPtr(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> (bytes: UnsafeMutableRawPointer?, hadException: Bool) {
-    var byteOffset = 0
-    var byteLength = 0
-    var bytesPerElement = 0
-    let buffer = JS_GetTypedArrayBuffer(
-      context,
-      value,
-      &byteOffset,
-      &byteLength,
-      &bytesPerElement
-    )
-    guard !JS_IsException(buffer) else {
-      return (nil, true)
-    }
-    defer { JS_FreeValue(context, buffer) }
-    return arrayBufferBytesPtr(buffer, in: context)
-  }
-
-  package static func isArrayBuffer(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> Bool {
-    _ = context
-    return JS_IsArrayBuffer(value)
-  }
-
-  package static func typedArrayKind(
-    _ value: CQuickJSValue,
-    in context: OpaquePointer
-  ) -> JSTypedArrayKind? {
-    _ = context
-    switch JS_GetTypedArrayType(value) {
-    case 1:
-      return .int8Array
-    case 2:
-      return .uint8Array
-    case 0:
-      return .uint8ClampedArray
-    case 3:
-      return .int16Array
-    case 4:
-      return .uint16Array
-    case 5:
-      return .int32Array
-    case 6:
-      return .uint32Array
-    case 10:
-      return .float32Array
-    case 11:
-      return .float64Array
-    default:
-      return nil
-    }
+package func quickJSTypedArrayKind(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> JSTypedArrayKind? {
+  _ = context
+  switch JS_GetTypedArrayType(value) {
+  case 1:
+    return .int8Array
+  case 2:
+    return .uint8Array
+  case 0:
+    return .uint8ClampedArray
+  case 3:
+    return .int16Array
+  case 4:
+    return .uint16Array
+  case 5:
+    return .int32Array
+  case 6:
+    return .uint32Array
+  case 10:
+    return .float32Array
+  case 11:
+    return .float64Array
+  default:
+    return nil
   }
 }
 

@@ -102,7 +102,7 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   private nonisolated func makeRuntimeOnExecutor() {
     runtimeBox.withLock { bits in
       guard bits == 0 else { return }
-      let runtime = QJSEngine.makeRuntime()
+      let runtime = quickJSMakeRuntime()
       bits = UInt(bitPattern: runtime)
       registerMigrationHook(runtime)
     }
@@ -140,7 +140,7 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// `UInt` is the Sendable form of an engine reference.
   package nonisolated func makeContextOnExecutor() -> UInt? {
     let runtime = runtimeHandleOnExecutor()
-    guard let context = QJSEngine.makeContext(in: runtime) else { return nil }
+    guard let context = JS_NewContext(runtime) else { return nil }
     return UInt(bitPattern: context)
   }
 
@@ -196,7 +196,7 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
     migrationHook?.remove()
     let bits = runtimeBox.withLock { $0 }
     if let runtime = OpaquePointer(bitPattern: bits) {
-      QJSEngine.releaseRuntime(runtime)
+      JS_FreeRuntime(runtime)
       removeQuickJSClassRecords(in: runtime)
     }
     if let ownedExecutor {

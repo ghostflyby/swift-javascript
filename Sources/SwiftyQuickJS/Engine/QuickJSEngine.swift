@@ -13,6 +13,17 @@ import SwiftJavaScript
 
 public enum QJSEngine: Sendable {}
 
+extension QJSEngine {
+  package static let capabilities = JSEngineCapabilities(
+    supportsBigInt: true,
+    supportsSymbol: true,
+    supportsExternalArrayBuffer: true,
+    supportsHostObjects: true,
+    supportsESModules: false,
+    supportsPromiseJobQueueControl: false
+  )
+}
+
 /// Map one engine result to the core `JSResult`: an exception engine value is
 /// replaced by the pending exception it carries.
 func quickJSResult(

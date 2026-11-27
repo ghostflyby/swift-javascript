@@ -54,32 +54,32 @@ public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   // MARK: - Classification and conversion
 
   public func type() -> JSType {
-    guard let valueType = QJSEngine.valueType(value) else {
+    guard let valueType = quickJSValueType(value) else {
       preconditionFailure("QJSValue.type() could not query value type")
     }
     return valueType
   }
 
   public func toString() -> String {
-    QJSEngine.toString(value, in: contextRef) ?? ""
+    quickJSToString(value, in: contextRef) ?? ""
   }
 
   public func toNumber() -> Double {
-    QJSEngine.toNumber(value, in: contextRef)
+    quickJSToNumber(value, in: contextRef)
   }
 
   public func toBoolean() -> Bool {
-    QJSEngine.toBoolean(value, in: contextRef)
+    quickJSToBoolean(value, in: contextRef)
   }
 
   // MARK: - Equality
 
   public func looselyEquals(_ other: borrowing QJSValue) -> Bool {
-    QJSEngine.looselyEquals(value, other.value, in: contextRef) ?? false
+    quickJSLooselyEquals(value, other.value, in: contextRef) ?? false
   }
 
   public func strictlyEquals(_ other: borrowing QJSValue) -> Bool {
-    QJSEngine.strictlyEquals(value, other.value, in: contextRef) ?? false
+    quickJSStrictlyEquals(value, other.value, in: contextRef) ?? false
   }
 }
 

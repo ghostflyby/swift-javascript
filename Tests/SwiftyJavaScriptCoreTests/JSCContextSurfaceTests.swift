@@ -148,7 +148,7 @@ struct JSCContextSurfaceTests {
       let targetBits = await virtualMachine.makeContextHandle(),
       let sourceContext = JSGlobalContextRef(bitPattern: sourceBits),
       let targetContext = JSGlobalContextRef(bitPattern: targetBits),
-      let value = JSCEngine.makeNumberValueHandle(7, sourceContext)
+      let value = javaScriptCoreMakeNumberValueHandle(7, sourceContext)
     else {
       Issue.record("Expected same-VM context handles to be creatable")
       return
@@ -159,8 +159,9 @@ struct JSCContextSurfaceTests {
       JSGlobalContextRelease(sourceContext)
     }
 
-    let isCompatible = JSCEngine.isContextCompatibleWith(sourceContext, targetContext)
-    let targetValue = JSCEngine.toNumberForHandle(borrowed, in: targetContext)
+    let isCompatible =
+      JSContextGetGroup(sourceContext) == JSContextGetGroup(targetContext)
+    let targetValue = javaScriptCoreToNumberForHandle(borrowed, in: targetContext)
 
     #expect(isCompatible)
     #expect(targetValue == 7)

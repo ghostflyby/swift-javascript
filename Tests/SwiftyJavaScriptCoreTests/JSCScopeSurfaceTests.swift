@@ -30,8 +30,8 @@ private enum JSCScopeDataKey: JSContextDataKey {
 @Suite
 struct JSCScopeSurfaceTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
-    let runtime = JSCEngine.makeRuntime()
-    guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    let runtime = JSContextGroupCreate()!
+    guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
       preconditionFailure("JSCEngine could not create a context handle")
     }
     return (runtime, context)
@@ -429,7 +429,7 @@ struct JSCScopeSurfaceTests {
     _ = runtime
     // A bare engine context has no host-installed storage box; install one to
     // exercise the scope's data pass-through.
-    JSCEngine.installContextDataStorageBox(JSContextDataStorageBox(), in: context)
+    javaScriptCoreInstallContextDataStorageBox(JSContextDataStorageBox(), in: context)
     let scope = JSCInstantContext(contextRef: context)
 
     scope.setData("shared", for: JSCScopeDataKey.self)
@@ -474,7 +474,7 @@ struct JSCScopeSurfaceTests {
     let context = await JSCContext(.nonblocking)
     await context.withInstantContext { scope in
       let buffer = JSCArrayBuffer(copying: [10, 20, 30, 40, 50, 60], in: scope)
-      let rejected = JSCEngine.makeTypedArrayHandle(
+      let rejected = javaScriptCoreMakeTypedArrayHandle(
         in: scope.contextRef,
         kind: .uint16Array,
         arrayBuffer: buffer.withValue { $0.ref },
@@ -513,7 +513,7 @@ struct JSCScopeSurfaceTests {
       let stored = scope.persist(scope.makeString("abc"))
       let contextHandle = scope.contextRef
 
-      let wrote = JSCEngine.setValuePropertyHandle(
+      let wrote = javaScriptCoreSetValuePropertyHandle(
         key.ref,
         on: object.ref,
         to: stored.ref,
@@ -521,10 +521,10 @@ struct JSCScopeSurfaceTests {
         attributes: .none
       )
       let has =
-        JSCEngine.hasValuePropertyHandle(
+        javaScriptCoreHasValuePropertyHandle(
           key.ref, on: object.ref, in: contextHandle) ?? false
       let readIsString: Bool
-      if let result = JSCEngine.getValuePropertyHandle(
+      if let result = javaScriptCoreGetValuePropertyHandle(
         key.ref, on: object.ref, in: contextHandle)
       {
         switch consume result {
@@ -538,10 +538,10 @@ struct JSCScopeSurfaceTests {
       } else {
         readIsString = false
       }
-      let deleted = JSCEngine.deleteValuePropertyHandle(
+      let deleted = javaScriptCoreDeleteValuePropertyHandle(
         key.ref, on: object.ref, in: contextHandle)
       let hasAfterDelete =
-        JSCEngine.hasValuePropertyHandle(
+        javaScriptCoreHasValuePropertyHandle(
           key.ref, on: object.ref, in: contextHandle) ?? true
 
       #expect(wrote)
@@ -571,14 +571,14 @@ struct JSCScopeSurfaceTests {
       let lockedKey = scope.persist(scope.makeString("locked"))
       let seven = scope.persist(scope.makeNumber(7))
       let nine = scope.persist(scope.makeNumber(9))
-      _ = JSCEngine.setValuePropertyHandle(
+      _ = javaScriptCoreSetValuePropertyHandle(
         lockedKey.ref,
         on: object.ref,
         to: seven.ref,
         in: contextHandle,
         attributes: .readOnly
       )
-      _ = JSCEngine.setValuePropertyHandle(
+      _ = javaScriptCoreSetValuePropertyHandle(
         lockedKey.ref,
         on: object.ref,
         to: nine.ref,
@@ -588,7 +588,7 @@ struct JSCScopeSurfaceTests {
 
       let hiddenKey = scope.persist(scope.makeString("hidden"))
       let hiddenValue = scope.persist(scope.makeNumber(1))
-      _ = JSCEngine.setValuePropertyHandle(
+      _ = javaScriptCoreSetValuePropertyHandle(
         hiddenKey.ref,
         on: object.ref,
         to: hiddenValue.ref,
@@ -598,7 +598,7 @@ struct JSCScopeSurfaceTests {
 
       let pinnedKey = scope.persist(scope.makeString("pinned"))
       let pinnedValue = scope.persist(scope.makeNumber(2))
-      _ = JSCEngine.setValuePropertyHandle(
+      _ = javaScriptCoreSetValuePropertyHandle(
         pinnedKey.ref,
         on: object.ref,
         to: pinnedValue.ref,
@@ -607,7 +607,7 @@ struct JSCScopeSurfaceTests {
       )
 
       let lockedNumber: Double?
-      if let result = JSCEngine.getValuePropertyHandle(
+      if let result = javaScriptCoreGetValuePropertyHandle(
         lockedKey.ref, on: object.ref, in: contextHandle)
       {
         switch consume result {

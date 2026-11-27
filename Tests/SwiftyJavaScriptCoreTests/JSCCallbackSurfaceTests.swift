@@ -15,8 +15,8 @@ import Testing
 @Suite
 struct JSCCallbackSurfaceTests {
   private func makeContext() -> (JSContextGroupRef, JSGlobalContextRef) {
-    let runtime = JSCEngine.makeRuntime()
-    guard let context = JSCEngine.makeBorrowedContextHandleFromRuntime(in: runtime) else {
+    let runtime = JSContextGroupCreate()!
+    guard let context = javaScriptCoreMakeBorrowedContextHandleFromRuntime(in: runtime) else {
       preconditionFailure("JSCEngine could not create a context handle")
     }
     return (runtime, context)
@@ -28,9 +28,10 @@ struct JSCCallbackSurfaceTests {
     do {
       let scope = JSCInstantContext(contextRef: context)
 
-      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("seven", context)!)
-      let twinText = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("seven", context)!)
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(7, context)!)
+      let text = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("seven", context)!)
+      let twinText = scope.adoptCreatedHandle(
+        javaScriptCoreMakeStringValueHandle("seven", context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(7, context)!)
 
       let value = JSCValue(ref: text.ref, contextRef: context)
       let twin = JSCValue(ref: twinText.ref, contextRef: context)
@@ -61,7 +62,7 @@ struct JSCCallbackSurfaceTests {
       #expect(scope.contextRef == context)
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -69,8 +70,8 @@ struct JSCCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = JSCInstantContext(contextRef: context)
-      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("alpha", context)!)
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(41, context)!)
+      let text = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("alpha", context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(41, context)!)
       let handles = [text.ref, number.ref]
 
       let arguments = JSCCallbackArguments(count: handles.count) { index in
@@ -94,7 +95,7 @@ struct JSCCallbackSurfaceTests {
       #expect(throwingResult == "alpha")
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -102,7 +103,7 @@ struct JSCCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = JSCInstantContext(contextRef: context)
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(3, context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(3, context)!)
       let arguments = JSCCallbackArguments(count: 1) { _ in number.ref }
 
       do {
@@ -124,7 +125,7 @@ struct JSCCallbackSurfaceTests {
       }
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 
   @Test
@@ -132,8 +133,8 @@ struct JSCCallbackSurfaceTests {
     let (runtime, context) = makeContext()
     do {
       let scope = JSCInstantContext(contextRef: context)
-      let number = scope.adoptCreatedHandle(JSCEngine.makeNumberValueHandle(1, context)!)
-      let text = scope.adoptCreatedHandle(JSCEngine.makeStringValueHandle("two", context)!)
+      let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(1, context)!)
+      let text = scope.adoptCreatedHandle(javaScriptCoreMakeStringValueHandle("two", context)!)
       let handles = [number.ref, text.ref]
 
       let arguments = JSCArguments(count: handles.count) { index, _ in
@@ -157,7 +158,7 @@ struct JSCCallbackSurfaceTests {
       #expect(strictlyConverted.1 == "TWO")
     }
     JSGlobalContextRelease(context)
-    JSCEngine.releaseRuntime(runtime)
+    JSContextGroupRelease(runtime)
   }
 }
 
