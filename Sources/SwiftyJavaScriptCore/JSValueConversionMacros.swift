@@ -351,7 +351,7 @@ public macro JSClassFunctionError(_ encoder: any JSValueEncoder.Type) =
   )
 
 /// Generates a JavaScriptCore-specific `JSCAutoClassDefinition`
-/// (`JSEngineClassDefinition<JSCEngine, JSCClassParentDescriptor,
+/// (`JSEngineClassDefinition<JSCContext, JSCClassParentDescriptor,
 /// JSPropertyNameAccumulatorRef>`) and a `JSClassValueConvertible` conformance for a
 /// Swift class.
 ///

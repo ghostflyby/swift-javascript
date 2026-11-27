@@ -1,9 +1,9 @@
 import Foundation
 import JavaScriptCore
+import SwiftyJavaScriptCore
 import Testing
 
 @testable import SwiftJavaScript
-import SwiftyJavaScriptCore
 
 private func makeTestClass() -> JSCClass {
   var definition = kJSClassDefinitionEmpty
@@ -13,11 +13,11 @@ private func makeTestClass() -> JSCClass {
 @Test func classDefinitionProjectsHostTypeDescriptor() {
   let parentClass = makeTestClass()
 
-  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
+  var definition = JSEngineClassDefinition<JSCContext, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
-    JSStaticValue<JSCEngine>(
+    JSStaticValue<JSCContext>(
       name: "version",
       attributes: [.readOnly, .dontDelete],
       getProperty: { _, _ in fatalError("descriptor projection does not invoke callbacks") },
@@ -25,7 +25,7 @@ private func makeTestClass() -> JSCClass {
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction<JSCEngine>(
+    JSStaticFunction<JSCContext>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
@@ -33,14 +33,22 @@ private func makeTestClass() -> JSCClass {
   ]
   definition.initialize = { _, _ in }
   definition.hasProperty = { _, _, name in name == "version" }
-  definition.getProperty = { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.getProperty = { _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
   definition.setProperty = { _, _, _, _ in nil }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
-  definition.callAsConstructor = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.callAsFunction = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
+  definition.callAsConstructor = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
   definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.convertToType = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
   definition.finalize = { _ in }
 
   let descriptor = definition.hostTypeDescriptor(
@@ -76,10 +84,10 @@ private func makeTestClass() -> JSCClass {
 }
 
 @Test func classDefinitionProjectsHostDescriptorBindings() {
-  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
+  var definition = JSEngineClassDefinition<JSCContext, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "BackendProjected"
   definition.staticValues = [
-    JSStaticValue<JSCEngine>(
+    JSStaticValue<JSCContext>(
       name: "version",
       attributes: .readOnly,
       getProperty: { _, _ in fatalError("descriptor projection does not invoke callbacks") },
@@ -87,21 +95,29 @@ private func makeTestClass() -> JSCClass {
     )
   ]
   definition.staticFunctions = [
-    JSStaticFunction<JSCEngine>(
+    JSStaticFunction<JSCContext>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
     )
   ]
-  definition.getProperty = { _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.getProperty = { _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
   definition.setProperty = { _, _, _, _ in nil }
   definition.hasProperty = { _, _, _ in true }
   definition.deleteProperty = { _, _, _ in true }
   definition.getPropertyNames = { _, _, _ in }
-  definition.callAsFunction = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
-  definition.callAsConstructor = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.callAsFunction = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
+  definition.callAsConstructor = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
   definition.hasInstance = { _, _, _ in false }
-  definition.convertToType = { _, _, _, _ in fatalError("descriptor projection does not invoke callbacks") }
+  definition.convertToType = { _, _, _, _ in
+    fatalError("descriptor projection does not invoke callbacks")
+  }
 
   let descriptor = definition.hostTypeDescriptor(parentName: nil)
 
@@ -120,7 +136,7 @@ private func makeTestClass() -> JSCClass {
 }
 
 @Test func classNameMutationStillBuildsClass() {
-  var definition = JSEngineClassDefinition<JSCEngine, JSCClass, JSPropertyNameAccumulatorRef>()
+  var definition = JSEngineClassDefinition<JSCContext, JSCClass, JSPropertyNameAccumulatorRef>()
   definition.className = "A"
   definition.className = "B"
   definition.className = "C"

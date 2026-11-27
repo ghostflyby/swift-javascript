@@ -41,6 +41,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   public typealias Class = QJSClass
   public typealias PropertyStringKey = QJSPropertyStringKey
   public typealias PreparedScript = QJSPreparedScript
+  public typealias ClassPropertyNameAccumulator = Never
 
   /// The raw QuickJS context, created during init on the VM executor and never
   /// reassigned. Package-internal: it must not appear in a public signature.

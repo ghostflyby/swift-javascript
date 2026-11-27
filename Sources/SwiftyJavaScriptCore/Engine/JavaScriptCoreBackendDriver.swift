@@ -7,8 +7,14 @@ enum JavaScriptCoreObjectLookup {
   case exception(JSValueRef)
 }
 
-public enum JSCEngine: Sendable {
-  public typealias Engine = JSCEngine
+public enum JSCEngine: Sendable {}
+
+extension JSCEngine {
+  package static func contextGroupBits(
+    for context: JSGlobalContextRef
+  ) -> UInt? {
+    UInt(bitPattern: JSContextGetGroup(context))
+  }
 }
 
 private struct JavaScriptCoreSharedStringRef: @unchecked Sendable {

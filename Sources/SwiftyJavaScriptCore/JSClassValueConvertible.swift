@@ -3,7 +3,7 @@ import JavaScriptCore
 
 private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNativeClassBacking<
   SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine,
+    JSCContext,
     JSCClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >,
@@ -13,23 +13,23 @@ private typealias JSClassAutoNativeClassBacking = SwiftJavaScript.JSClassAutoNat
 
 private typealias JSClassAutoObjectStorage = SwiftJavaScript.JSClassAutoObjectStorage<
   SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine,
+    JSCContext,
     JSCClassParentDescriptor,
     JSPropertyNameAccumulatorRef
   >
 >
 
 public typealias JSCClassParentDescriptor = SwiftJavaScript.JSClassParentDescriptor<
-  JSCEngine,
+  JSCContext,
   JSPropertyNameAccumulatorRef
 >
 
-public typealias JSCStaticValue = SwiftJavaScript.JSStaticValue<JSCEngine>
+public typealias JSCStaticValue = SwiftJavaScript.JSStaticValue<JSCContext>
 
-public typealias JSCStaticFunction = SwiftJavaScript.JSStaticFunction<JSCEngine>
+public typealias JSCStaticFunction = SwiftJavaScript.JSStaticFunction<JSCContext>
 
 public typealias JSCAutoClassDefinition = SwiftJavaScript.JSEngineClassDefinition<
-  JSCEngine,
+  JSCContext,
   JSCClassParentDescriptor,
   JSPropertyNameAccumulatorRef
 >
@@ -83,42 +83,28 @@ private func makeJavaScriptCoreAutoJSClass(
   )
 }
 
-extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
-  public typealias Value = JSCValue
-  public typealias InstantContext = JSCInstantContext
-  public typealias Arguments = JSCArguments
-  public typealias Class = JSCClass
-  public typealias ClassPropertyNameAccumulator = JSPropertyNameAccumulatorRef
-
-  public static func makeClass(
+extension JSCInstantContext {
+  public func makeClass(
     definition: JSCAutoClassDefinition,
-    identity: ObjectIdentifier,
-    in context: borrowing JSCInstantContext
+    identity: ObjectIdentifier
   ) -> JSCClass {
-    guard let runtime = contextGroupBits(for: context.contextRef) else {
+    guard let runtime = JSCEngine.contextGroupBits(for: contextRef) else {
       preconditionFailure("JavaScriptCore context has no context group")
     }
     let key = JavaScriptCoreClassCacheKey(identity: identity, runtime: runtime)
     return jsClassRegistry.value(forKey: key) {
-      makeJavaScriptCoreAutoJSClass(definition: definition, in: context)
+      makeJavaScriptCoreAutoJSClass(definition: definition, in: self)
     }
   }
 
-  package static func contextGroupBits(
-    for context: JSGlobalContextRef
-  ) -> UInt? {
-    UInt(bitPattern: JSContextGetGroup(context))
-  }
-
-  public static func makeHostObject(
+  public func makeHostObject(
     of jsClass: JSCClass,
-    privateData: UnsafeMutableRawPointer,
-    in context: borrowing JSCInstantContext
+    privateData: UnsafeMutableRawPointer
   ) -> JSCValue? {
     switch makeJavaScriptCoreObjectResultHandle(
       of: jsClass.ref,
       privateData: privateData,
-      in: context.contextRef
+      in: contextRef
     ) {
     case .value(let object):
       // The host object belongs to the encoding scope's synchronous window:
@@ -126,7 +112,7 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
       // on the context default scope instead would keep the object alive (and
       // its finalizer unfired) until the context dies, even after JavaScript
       // drops every reference to it.
-      return context.adoptCreatedHandle(object)
+      return adoptCreatedHandle(object)
     case .exception:
       // JavaScriptCore is GC-managed: the failure path owns nothing to
       // settle, and the private data stays with the caller.
@@ -134,12 +120,9 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
     }
   }
 
-  public static func hostObjectPrivateData(
-    of value: borrowing JSCValue,
-    in context: borrowing JSCInstantContext
-  ) -> UnsafeMutableRawPointer? {
+  public func hostObjectPrivateData(of value: borrowing JSCValue) -> UnsafeMutableRawPointer? {
     switch javaScriptCorePrivateData(
-      from: value.ref, in: context.contextRef
+      from: value.ref, in: contextRef
     ) {
     case .value(let data):
       return data
@@ -147,7 +130,6 @@ extension JSCEngine: SwiftJavaScript.JSEngineClassBridgeDriver {
       return nil
     }
   }
-
 }
 
 // The value-level convenience entries live on the concrete value view (S11):
@@ -160,7 +142,7 @@ extension JSCValue {
     in context: borrowing JSCInstantContext
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JSCEngine, T.ParentClass == JSCClassParentDescriptor,
+    T.Context == JSCContext, T.ParentClass == JSCClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -172,7 +154,7 @@ extension JSCValue {
     in context: isolated JSCContext = #isolation
   ) throws(JSValueConversionError) -> T
   where
-    T.Engine == JSCEngine, T.ParentClass == JSCClassParentDescriptor,
+    T.Context == JSCContext, T.ParentClass == JSCClassParentDescriptor,
     T.PropertyNameAccumulator == JSPropertyNameAccumulatorRef
   {
     _ = type
@@ -298,7 +280,7 @@ private func withAutoStaticValueCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    SwiftJavaScript.JSStaticValue<JSCEngine>,
+    SwiftJavaScript.JSStaticValue<JSCContext>,
     borrowing JSCInstantContext,
     borrowing JSCValue
   ) -> R
@@ -329,7 +311,7 @@ private func withAutoStaticFunctionCallbackInput<R>(
   function: JSObjectRef?,
   thisObject: JSObjectRef?,
   _ body: (
-    SwiftJavaScript.JSStaticFunction<JSCEngine>,
+    SwiftJavaScript.JSStaticFunction<JSCContext>,
     borrowing JSCInstantContext,
     borrowing JSCValue
   ) ->
@@ -363,7 +345,7 @@ private func withAutoStaticFunctionCallbackInput<R>(
 }
 
 private func autoStaticSetPropertyCallbackResult(
-  valueDefinition: SwiftJavaScript.JSStaticValue<JSCEngine>,
+  valueDefinition: SwiftJavaScript.JSStaticValue<JSCContext>,
   context: borrowing JSCInstantContext,
   thisValue: borrowing JSCValue,
   newValue: borrowing JSCValue,

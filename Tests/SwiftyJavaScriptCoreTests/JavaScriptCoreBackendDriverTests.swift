@@ -8,8 +8,8 @@ import Testing
 @Test func javaScriptCoreFacadeThinAliasesAndSurfaceFactoriesSmoke() {
   func acceptAutoDefinition(
     _ definition: SwiftJavaScript.JSEngineClassDefinition<
-      JSCEngine,
-      SwiftJavaScript.JSClassParentDescriptor<JSCEngine, JSPropertyNameAccumulatorRef>,
+      JSCContext,
+      SwiftJavaScript.JSClassParentDescriptor<JSCContext, JSPropertyNameAccumulatorRef>,
       JSPropertyNameAccumulatorRef
     >
   ) -> String? {
@@ -45,16 +45,8 @@ import Testing
   do {
     let context = JSCInstantContext(contextRef: contextHandle)
     let identity = ObjectIdentifier(JSCAutoClassDefinition.self)
-    let madeClass = JSCEngine.makeClass(
-      definition: definition,
-      identity: identity,
-      in: context
-    )
-    let cachedClass: JSCClass = JSCEngine.makeClass(
-      definition: definition,
-      identity: identity,
-      in: context
-    )
+    let madeClass = context.makeClass(definition: definition, identity: identity)
+    let cachedClass: JSCClass = context.makeClass(definition: definition, identity: identity)
     #expect(madeClass == cachedClass)
   }
 

@@ -36,6 +36,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   public typealias Class = JSCClass
   public typealias PropertyStringKey = JSCPropertyStringKey
   public typealias PreparedScript = JSCPreparedScript
+  public typealias ClassPropertyNameAccumulator = JSPropertyNameAccumulatorRef
 
   /// The raw JavaScriptCore context handle, created during init on the VM
   /// executor and never reassigned. Package-internal: it must not appear in a

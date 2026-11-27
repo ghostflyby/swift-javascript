@@ -10,8 +10,8 @@ import Synchronization
 #endif
 
 public typealias QJSClassDefinition = JSEngineClassDefinition<
-  QJSEngine,
-  JSClassParentDescriptor<QJSEngine, Never>,
+  QJSContext,
+  JSClassParentDescriptor<QJSContext, Never>,
   Never
 >
 
@@ -120,19 +120,12 @@ private struct QuickJSClassObjectContextRegistry: Sendable, ~Copyable {
 
 private let quickJSClassObjectContextRegistry = QuickJSClassObjectContextRegistry()
 
-extension QJSEngine: JSEngineClassBridgeDriver {
-  public typealias Value = QJSValue
-  public typealias InstantContext = QJSInstantContext
-  public typealias Arguments = QJSArguments
-  public typealias Class = QJSClass
-  public typealias ClassPropertyNameAccumulator = Never
-
-  public static func makeClass(
+extension QJSInstantContext {
+  public func makeClass(
     definition: QJSClassDefinition,
-    identity: ObjectIdentifier,
-    in context: borrowing QJSInstantContext
+    identity: ObjectIdentifier
   ) -> QJSClass {
-    let runtime = QJSEngine.runtimeRef(for: context.contextRef)
+    let runtime = QJSEngine.runtimeRef(for: contextRef)
     let key = QuickJSClassCacheKey(identity: identity, runtime: UInt(bitPattern: runtime))
     return quickJSClassCache.value(forKey: key) {
       // Only the ID and the record are created here. Registering the engine
@@ -145,7 +138,7 @@ extension QJSEngine: JSEngineClassBridgeDriver {
 
       let record = QuickJSClassRecord(
         definition: definition,
-        parentClass: definition.parentClass?.jsClass(in: context)
+        parentClass: definition.parentClass?.jsClass(in: self)
       )
       quickJSClassRegistry.record(
         record,
@@ -159,12 +152,10 @@ extension QJSEngine: JSEngineClassBridgeDriver {
     }
   }
 
-  public static func makeHostObject(
+  public func makeHostObject(
     of jsClass: QJSClass,
-    privateData: UnsafeMutableRawPointer,
-    in context: borrowing QJSInstantContext
+    privateData: UnsafeMutableRawPointer
   ) -> QJSValue? {
-    let contextRef = context.contextRef
     guard let definition = jsClassDefinition(jsClass, in: contextRef) else {
       return nil
     }
@@ -188,14 +179,10 @@ extension QJSEngine: JSEngineClassBridgeDriver {
     initializeClassObject(object, definition: definition, in: contextRef)
     installStaticValueMembers(on: object, definition: definition, in: contextRef)
     installStaticFunctionMembers(on: object, definition: definition, in: contextRef)
-    return context.adoptCreated(object)
+    return adoptCreated(object)
   }
 
-  public static func hostObjectPrivateData(
-    of value: borrowing QJSValue,
-    in context: borrowing QJSInstantContext
-  ) -> UnsafeMutableRawPointer? {
-    let contextRef = context.contextRef
+  public func hostObjectPrivateData(of value: borrowing QJSValue) -> UnsafeMutableRawPointer? {
     let classID = JS_GetClassID(value.value)
     guard classID != JS_INVALID_CLASS_ID else {
       return nil
@@ -210,7 +197,9 @@ extension QJSEngine: JSEngineClassBridgeDriver {
     }
     return JS_GetOpaque2(contextRef, value.value, classID)
   }
+}
 
+extension QJSEngine {
   package static func classDefinition(
     for classID: JSClassID,
     runtimeRef: OpaquePointer?,
@@ -547,15 +536,15 @@ private func installStaticFunctionMembers(
 }
 
 private final class QuickJSStaticValueBox: @unchecked Sendable {
-  let value: JSStaticValue<QJSEngine>
+  let value: JSStaticValue<QJSContext>
 
-  init(_ value: JSStaticValue<QJSEngine>) {
+  init(_ value: JSStaticValue<QJSContext>) {
     self.value = value
   }
 }
 
 private func quickJSStaticValueGetter(
-  _ value: JSStaticValue<QJSEngine>,
+  _ value: JSStaticValue<QJSContext>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticValueBox(value))
@@ -577,7 +566,7 @@ private func quickJSStaticValueGetter(
 }
 
 private func quickJSStaticValueSetter(
-  _ value: JSStaticValue<QJSEngine>,
+  _ value: JSStaticValue<QJSContext>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticValueBox(value))
@@ -662,15 +651,15 @@ private func quickJSStaticValueFinalizer(_ opaque: UnsafeMutableRawPointer?) {
 }
 
 private final class QuickJSStaticFunctionBox: @unchecked Sendable {
-  let function: JSStaticFunction<QJSEngine>
+  let function: JSStaticFunction<QJSContext>
 
-  init(_ function: JSStaticFunction<QJSEngine>) {
+  init(_ function: JSStaticFunction<QJSContext>) {
     self.function = function
   }
 }
 
 private func quickJSStaticFunctionValue(
-  _ function: JSStaticFunction<QJSEngine>,
+  _ function: JSStaticFunction<QJSContext>,
   in contextRef: OpaquePointer
 ) -> CQuickJSValue {
   let box = Unmanaged.passRetained(QuickJSStaticFunctionBox(function))

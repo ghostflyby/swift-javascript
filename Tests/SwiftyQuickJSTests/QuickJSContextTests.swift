@@ -188,8 +188,8 @@ private func makeQuickJSClassContext() -> (OpaquePointer, OpaquePointer) {
 }
 
 private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = QJSEngine
-  typealias ParentClass = JSClassParentDescriptor<QJSEngine, Never>
+  typealias Context = QJSContext
+  typealias ParentClass = JSClassParentDescriptor<QJSContext, Never>
   typealias PropertyNameAccumulator = Never
   typealias ClassDefinition = QJSClassDefinition
 
@@ -268,8 +268,8 @@ private final class QuickJSExportedNode: JSClassValueConvertible, @unchecked Sen
 }
 
 private final class QuickJSStaticMemberNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = QJSEngine
-  typealias ParentClass = JSClassParentDescriptor<QJSEngine, Never>
+  typealias Context = QJSContext
+  typealias ParentClass = JSClassParentDescriptor<QJSContext, Never>
   typealias PropertyNameAccumulator = Never
   typealias ClassDefinition = QJSClassDefinition
 
@@ -330,8 +330,8 @@ private final class QuickJSStaticMemberNode: JSClassValueConvertible, @unchecked
 private let quickJSLifecycleEvents = Mutex<[String]>([])
 
 private final class QuickJSLifecycleNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = QJSEngine
-  typealias ParentClass = JSClassParentDescriptor<QJSEngine, Never>
+  typealias Context = QJSContext
+  typealias ParentClass = JSClassParentDescriptor<QJSContext, Never>
   typealias PropertyNameAccumulator = Never
   typealias ClassDefinition = QJSClassDefinition
 
@@ -353,8 +353,8 @@ private final class QuickJSLifecycleNode: JSClassValueConvertible, @unchecked Se
 }
 
 private final class QuickJSRuntimeParentNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = QJSEngine
-  typealias ParentClass = JSClassParentDescriptor<QJSEngine, Never>
+  typealias Context = QJSContext
+  typealias ParentClass = JSClassParentDescriptor<QJSContext, Never>
   typealias PropertyNameAccumulator = Never
   typealias ClassDefinition = QJSClassDefinition
 
@@ -366,8 +366,8 @@ private final class QuickJSRuntimeParentNode: JSClassValueConvertible, @unchecke
 }
 
 private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = QJSEngine
-  typealias ParentClass = JSClassParentDescriptor<QJSEngine, Never>
+  typealias Context = QJSContext
+  typealias ParentClass = JSClassParentDescriptor<QJSContext, Never>
   typealias PropertyNameAccumulator = Never
   typealias ClassDefinition = QJSClassDefinition
 
@@ -448,7 +448,7 @@ private final class QuickJSRuntimeChildNode: JSClassValueConvertible, @unchecked
     do {
       let encoded = try QuickJSRuntimeChildNode.tryEncode(
         QuickJSRuntimeChildNode(), in: context)
-      let privateData = QJSEngine.hostObjectPrivateData(of: encoded, in: context)
+      let privateData = context.hostObjectPrivateData(of: encoded)
       let storage = privateData.map {
         Unmanaged<JSClassAutoObjectStorage<QJSClassDefinition>>
           .fromOpaque($0)

@@ -69,7 +69,7 @@ package struct JSClassCallbackInstallationPlan: Sendable {
 }
 
 public protocol JSClassDefinition: Sendable {
-  associatedtype Engine: JSEngineClassBridgeDriver
+  associatedtype Context: JSContext
   associatedtype ParentClass: Sendable
   associatedtype PropertyNameAccumulator
 
@@ -77,41 +77,41 @@ public protocol JSClassDefinition: Sendable {
   var attributes: JSClassAttributes { get set }
   var className: String? { get set }
   var parentClass: ParentClass? { get set }
-  var staticValues: [JSStaticValue<Engine>] { get set }
-  var staticFunctions: [JSStaticFunction<Engine>] { get set }
-  var initialize: (@Sendable (borrowing Engine.Value, borrowing Engine.InstantContext) -> Void)?
+  var staticValues: [JSStaticValue<Context>] { get set }
+  var staticFunctions: [JSStaticFunction<Context>] { get set }
+  var initialize: (@Sendable (borrowing Context.Value, borrowing Context.InstantContext) -> Void)?
   { get set }
-  var finalize: (@Sendable (borrowing Engine.Value) -> Void)? { get set }
+  var finalize: (@Sendable (borrowing Context.Value) -> Void)? { get set }
   var hasProperty:
     (
-      @Sendable (borrowing Engine.InstantContext, borrowing Engine.Value, String)
+      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
         -> Bool
     )?
   { get set }
   var getProperty:
     (
-      @Sendable (borrowing Engine.InstantContext, borrowing Engine.Value, String)
-        -> JSResult<Engine.Value>
+      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
+        -> JSResult<Context.Value>
     )?
   { get set }
   var setProperty:
     (
       @Sendable (
-        borrowing Engine.InstantContext, borrowing Engine.Value, String,
-        borrowing Engine.Value
-      ) -> Engine.Value?
+        borrowing Context.InstantContext, borrowing Context.Value, String,
+        borrowing Context.Value
+      ) -> Context.Value?
     )?
   { get set }
   var deleteProperty:
     (
-      @Sendable (borrowing Engine.InstantContext, borrowing Engine.Value, String)
+      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
         -> Bool
     )?
   { get set }
   var getPropertyNames:
     (
       @Sendable (
-        borrowing Engine.InstantContext, inout Engine.Value,
+        borrowing Context.InstantContext, inout Context.Value,
         PropertyNameAccumulator
       ) -> Void
     )?
@@ -119,37 +119,37 @@ public protocol JSClassDefinition: Sendable {
   var callAsFunction:
     (
       @Sendable (
-        borrowing Engine.InstantContext,
-        inout Engine.Value,
-        inout Engine.Value,
-        borrowing Engine.Arguments
-      ) -> Engine.Value
+        borrowing Context.InstantContext,
+        inout Context.Value,
+        inout Context.Value,
+        borrowing Context.Arguments
+      ) -> Context.Value
     )?
   { get set }
   var callAsConstructor:
     (
       @Sendable (
-        borrowing Engine.InstantContext,
-        inout Engine.Value,
-        inout Engine.Value,
-        borrowing Engine.Arguments
-      ) -> Engine.Value
+        borrowing Context.InstantContext,
+        inout Context.Value,
+        inout Context.Value,
+        borrowing Context.Arguments
+      ) -> Context.Value
     )?
   { get set }
   var hasInstance:
     (
       @Sendable (
-        borrowing Engine.InstantContext, inout Engine.Value,
-        inout Engine.Value
+        borrowing Context.InstantContext, inout Context.Value,
+        inout Context.Value
       ) -> Bool
     )?
   { get set }
   var convertToType:
     (
       @Sendable (
-        borrowing Engine.InstantContext, inout Engine.Value, JSType,
-        inout Engine.Value
-      ) -> Engine.Value
+        borrowing Context.InstantContext, inout Context.Value, JSType,
+        inout Context.Value
+      ) -> Context.Value
     )?
   { get set }
 }
@@ -166,7 +166,7 @@ public struct JSClassDefinitionMetadata<ParentClass: Sendable>: Sendable {
 }
 
 public struct JSClassParentDescriptor<
-  E: JSEngineClassBridgeDriver,
+  E: JSContext,
   PropertyNameAccumulator
 >: Sendable, Hashable {
   private let typeID: ObjectIdentifier
@@ -215,12 +215,12 @@ public struct JSClassParentDescriptor<
 }
 
 extension JSClassParentDescriptor
-where E: JSEngineClassBridgeDriver, PropertyNameAccumulator == E.ClassPropertyNameAccumulator {
+where E: JSContext, PropertyNameAccumulator == E.ClassPropertyNameAccumulator {
   public static func `for`<Parent: JSClassValueConvertible>(
     _ parent: Parent.Type
   ) -> Self
   where
-    Parent.Engine == E,
+    Parent.Context == E,
     Parent.ParentClass == Self,
     Parent.PropertyNameAccumulator == PropertyNameAccumulator,
     Parent.ClassDefinition == JSEngineClassDefinition<E, Self, PropertyNameAccumulator>
@@ -259,7 +259,7 @@ package struct JSClassDefinitionLookup<Definition: JSClassDefinition> {
   package func inheritedStaticValue(
     named name: String,
     in definition: Definition
-  ) -> JSStaticValue<Definition.Engine>? {
+  ) -> JSStaticValue<Definition.Context>? {
     if let value = definition.staticValues.first(where: { $0.name == name }) {
       return value
     }
@@ -274,7 +274,7 @@ package struct JSClassDefinitionLookup<Definition: JSClassDefinition> {
   package func inheritedStaticFunction(
     named name: String,
     in definition: Definition
-  ) -> JSStaticFunction<Definition.Engine>? {
+  ) -> JSStaticFunction<Definition.Context>? {
     if let function = definition.staticFunctions.first(where: { $0.name == name }) {
       return function
     }
@@ -288,7 +288,7 @@ package struct JSClassDefinitionLookup<Definition: JSClassDefinition> {
 }
 
 package typealias JSEngineClassDefinitionLookup<
-  E: JSEngineClassBridgeDriver,
+  E: JSContext,
   ParentClass: Sendable,
   PropertyNameAccumulator
 > = JSClassDefinitionLookup<
@@ -372,7 +372,7 @@ extension JSClassDefinition {
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> Self?
-  ) -> JSStaticValue<Engine>? {
+  ) -> JSStaticValue<Context>? {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
       JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .inheritedStaticValue(named: name, in: self)
@@ -383,7 +383,7 @@ extension JSClassDefinition {
     named name: String,
     resolvingParentDefinition resolveParentDefinition:
       (ParentClass) -> Self?
-  ) -> JSStaticFunction<Engine>? {
+  ) -> JSStaticFunction<Context>? {
     withoutActuallyEscaping(resolveParentDefinition) { escapingResolveParentDefinition in
       JSClassDefinitionLookup(resolveParentDefinition: escapingResolveParentDefinition)
         .inheritedStaticFunction(named: name, in: self)
@@ -391,42 +391,41 @@ extension JSClassDefinition {
   }
 
   package func dynamicPropertyValue(
-    in context: borrowing Engine.InstantContext,
-    on thisValue: borrowing Engine.Value,
+    in context: borrowing Context.InstantContext,
+    on thisValue: borrowing Context.Value,
     forKey key: String
-  ) -> JSResult<Engine.Value> {
+  ) -> JSResult<Context.Value> {
     getProperty?(context, thisValue, key)
       ?? .value(context.persist(context.makeUndefined()))
   }
 
   package func setDynamicPropertyException(
-    in context: borrowing Engine.InstantContext,
-    on thisValue: borrowing Engine.Value,
+    in context: borrowing Context.InstantContext,
+    on thisValue: borrowing Context.Value,
     forKey key: String,
-    to newValue: borrowing Engine.Value
-  ) -> Engine.Value? {
+    to newValue: borrowing Context.Value
+  ) -> Context.Value? {
     setProperty?(context, thisValue, key, newValue)
   }
 
   package func hasDynamicProperty(
-    in context: borrowing Engine.InstantContext,
-    on thisValue: borrowing Engine.Value,
+    in context: borrowing Context.InstantContext,
+    on thisValue: borrowing Context.Value,
     forKey key: String
   ) -> Bool {
     hasProperty?(context, thisValue, key) ?? false
   }
 
   package func deleteDynamicProperty(
-    in context: borrowing Engine.InstantContext,
-    on thisValue: borrowing Engine.Value,
+    in context: borrowing Context.InstantContext,
+    on thisValue: borrowing Context.Value,
     forKey key: String
   ) -> Bool {
     deleteProperty?(context, thisValue, key) ?? false
   }
 }
 
-public struct JSEngineClassBehavior<E: JSEngineClassBridgeDriver, PropertyNameAccumulator>: Sendable
-{
+public struct JSEngineClassBehavior<E: JSContext, PropertyNameAccumulator>: Sendable {
   public var staticValues: [JSStaticValue<E>] = []
 
   public var staticFunctions: [JSStaticFunction<E>] = []
@@ -510,11 +509,14 @@ public struct JSEngineClassBehavior<E: JSEngineClassBridgeDriver, PropertyNameAc
 }
 
 public struct JSEngineClassDefinition<
-  E: JSEngineClassBridgeDriver, ParentClass: Sendable, PropertyNameAccumulator
+  E: JSContext, ParentClass: Sendable, PropertyNameAccumulator
 >:
   JSClassDefinition,
   Sendable
 {
+  /// The context this definition's classes live in.
+  public typealias Context = E
+
   public var definition: JSClassDefinitionMetadata<ParentClass> = .init()
   public var behavior: JSEngineClassBehavior<E, PropertyNameAccumulator> = .init()
 

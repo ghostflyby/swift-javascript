@@ -51,7 +51,7 @@ final class JSCMacroMethodNode {
 }
 
 private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendable {
-  typealias Engine = JSCEngine
+  typealias Context = JSCContext
   typealias ParentClass = JSCClassParentDescriptor
   typealias PropertyNameAccumulator = JSPropertyNameAccumulatorRef
   typealias ClassDefinition = JSCAutoClassDefinition
@@ -91,7 +91,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 }
 
 @Test func staticValueAndFunctionStorage() {
-  let staticValue = SwiftJavaScript.JSStaticValue<JSCEngine>(
+  let staticValue = SwiftJavaScript.JSStaticValue<JSCContext>(
     name: "value",
     attributes: .readOnly,
     getProperty: { context, _ in
@@ -102,7 +102,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
     }
   )
 
-  let staticFunction = SwiftJavaScript.JSStaticFunction<JSCEngine>(
+  let staticFunction = SwiftJavaScript.JSStaticFunction<JSCContext>(
     name: "fn",
     attributes: .dontEnum,
     callAsFunction: { context, _, _ in
@@ -118,7 +118,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 
 @Test func classDefinitionDefaultsAndClassCreation() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
 
   #expect(definition.version == 0)
@@ -140,7 +140,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 
 @Test func classDefinitionCallbacksAreSettable() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
 
   definition.initialize = { _, _ in }
@@ -178,20 +178,20 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 
 @Test func classDefinitionFullWiringSmoke() {
   var base = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
   base.className = "Base"
   let baseClass = JSCClass(defination: base)
 
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.version = 0
   definition.attributes = .noAutomaticPrototype
   definition.className = "FullWired"
   definition.parentClass = baseClass
   definition.staticValues = [
-    SwiftJavaScript.JSStaticValue<JSCEngine>(
+    SwiftJavaScript.JSStaticValue<JSCContext>(
       name: "version",
       attributes: .readOnly,
       getProperty: { context, _ in
@@ -203,7 +203,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
     )
   ]
   definition.staticFunctions = [
-    SwiftJavaScript.JSStaticFunction<JSCEngine>(
+    SwiftJavaScript.JSStaticFunction<JSCContext>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in
@@ -242,7 +242,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 
 @Test func classNameMutationStillBuildsClass() {
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "A"
   definition.className = "B"
@@ -258,18 +258,18 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
 
 @Test func classDefinitionProjectsHostTypeDescriptor() {
   var parentDefinition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
   parentDefinition.className = "BaseType"
   let parentClass = JSCClass(defination: parentDefinition)
 
   var definition = SwiftJavaScript.JSEngineClassDefinition<
-    JSCEngine, JSCClass, JSPropertyNameAccumulatorRef
+    JSCContext, JSCClass, JSPropertyNameAccumulatorRef
   >()
   definition.className = "ProjectedType"
   definition.parentClass = parentClass
   definition.staticValues = [
-    SwiftJavaScript.JSStaticValue<JSCEngine>(
+    SwiftJavaScript.JSStaticValue<JSCContext>(
       name: "version",
       attributes: [.readOnly, .dontDelete],
       getProperty: { context, _ in
@@ -281,7 +281,7 @@ private final class JSCExportedNode: JSClassValueConvertible, @unchecked Sendabl
     )
   ]
   definition.staticFunctions = [
-    SwiftJavaScript.JSStaticFunction<JSCEngine>(
+    SwiftJavaScript.JSStaticFunction<JSCContext>(
       name: "ping",
       attributes: .dontEnum,
       callAsFunction: { context, _, _ in

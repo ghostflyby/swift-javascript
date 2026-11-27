@@ -91,6 +91,32 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
     startingLineNumber: Int32
   ) -> JSResult<Value>
 
+  // MARK: - Class materialization
+
+  /// Get or create this engine's class for `identity`. The cache key is
+  /// `(identity, context's runtime)`: one Swift type reuses one engine class
+  /// per runtime.
+  func makeClass(
+    definition: JSEngineClassDefinition<
+      Context,
+      JSClassParentDescriptor<Context, Context.ClassPropertyNameAccumulator>,
+      Context.ClassPropertyNameAccumulator
+    >,
+    identity: ObjectIdentifier
+  ) -> Context.Class
+
+  /// Create a host object for `jsClass`, adopting its creation reference onto
+  /// this window's arena. `nil` means the engine settled the failure path's
+  /// reference itself.
+  func makeHostObject(
+    of jsClass: Context.Class,
+    privateData: UnsafeMutableRawPointer
+  ) -> Value?
+
+  /// Read the Swift-side private data of a host object. `nil` means the value
+  /// was not created by this engine's class system.
+  func hostObjectPrivateData(of value: borrowing Value) -> UnsafeMutableRawPointer?
+
   // MARK: - Context data
 
   func setData<K: JSContextDataKey>(_ value: K.Value?, for key: K.Type)

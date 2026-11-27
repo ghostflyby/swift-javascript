@@ -92,6 +92,9 @@ public protocol JSContext: Actor, Hashable {
   associatedtype Class: JSClass
   where Class.Context == Self
 
+  /// The engine type handed to class property-name enumeration callbacks.
+  associatedtype ClassPropertyNameAccumulator
+
   /// Create a context on `virtualMachine`, with its own engine context handle,
   /// default scope, and persistent registry created during init. Blocks the
   /// calling thread until the engine state exists (or runs inline when already

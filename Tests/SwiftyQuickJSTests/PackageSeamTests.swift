@@ -115,8 +115,8 @@ import Testing
 @Test func quickJSClassDefinitionRemainsAThinAlias() {
   func acceptCoreDefinition(
     _ definition: JSEngineClassDefinition<
-      QJSEngine,
-      JSClassParentDescriptor<QJSEngine, Never>,
+      QJSContext,
+      JSClassParentDescriptor<QJSContext, Never>,
       Never
     >
   ) -> String? {

@@ -48,7 +48,7 @@ extension JSCClass: Hashable {
 }
 
 typealias JSCClassDefinitionModel = SwiftJavaScript.JSEngineClassDefinition<
-  JSCEngine,
+  JSCContext,
   JSCClass,
   JSPropertyNameAccumulatorRef
 >
@@ -59,7 +59,7 @@ typealias JSCManualNativeClassBacking = SwiftJavaScript.JSClassManualNativeClass
 
 extension SwiftJavaScript.JSEngineClassDefinition
 where
-  E == JSCEngine,
+  E == JSCContext,
   ParentClass == JSCClass,
   PropertyNameAccumulator == JSPropertyNameAccumulatorRef
 {
@@ -104,7 +104,7 @@ func resolveJavaScriptCoreParentClassDefinition(_ parentClass: JSCClass)
 
 func javaScriptCoreClassDefinitionLookup()
   -> SwiftJavaScript.JSEngineClassDefinitionLookup<
-    JSCEngine,
+    JSCContext,
     JSCClass,
     JSPropertyNameAccumulatorRef
   >
@@ -350,7 +350,7 @@ private func withJavaScriptCoreStaticValueCallbackInput<R>(
   object: JSObjectRef?,
   propertyName: JSStringRef?,
   _ body: (
-    SwiftJavaScript.JSStaticValue<JSCEngine>,
+    SwiftJavaScript.JSStaticValue<JSCContext>,
     borrowing JSCInstantContext,
     borrowing JSCValue
   ) -> R
@@ -382,7 +382,7 @@ private func withJavaScriptCoreStaticFunctionCallbackInput<R>(
   function: JSObjectRef?,
   thisObject: JSObjectRef?,
   _ body: (
-    SwiftJavaScript.JSStaticFunction<JSCEngine>,
+    SwiftJavaScript.JSStaticFunction<JSCContext>,
     borrowing JSCInstantContext,
     borrowing JSCValue
   ) -> R
@@ -1021,7 +1021,7 @@ extension JSCClass {
 
   public convenience init(
     defination: SwiftJavaScript.JSEngineClassDefinition<
-      JSCEngine,
+      JSCContext,
       JSCClass,
       JSPropertyNameAccumulatorRef
     >
