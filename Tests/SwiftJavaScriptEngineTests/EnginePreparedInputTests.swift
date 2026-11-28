@@ -24,9 +24,9 @@ struct EnginePreparedInputTests {
     await engine.run(PreparedScriptCanBeReused.self)
   }
 
-  /// The surface inputs own the engine context and can outlive the synchronous
-  /// window that created them: both are minted in one window, carried across
-  /// the actor hop, and used in a later window.
+  /// The surface inputs own their engine representation and can outlive the
+  /// synchronous window that created them: both are minted in one window,
+  /// carried across the actor hop, and used in a later window.
   @Test(arguments: ScriptEngine.allCases)
   func surfaceInputsSurviveTheCreatingWindow(_ engine: ScriptEngine) async {
     await engine.run(SurfaceInputsSurviveTheCreatingWindow.self)

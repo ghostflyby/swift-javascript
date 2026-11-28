@@ -81,6 +81,9 @@ struct QJSContextFreeValueTests {
     let small = QJSValue(number: 0.000001).toString()
     let subnormal = QJSValue(number: Double.leastNonzeroMagnitude).toString()
     let roundedInteger = QJSValue(number: 1000000000000000128.0).toString()
+    let negativeFraction = QJSValue(number: -42.5).toString()
+    let negativeTiny = QJSValue(number: -1e-7).toString()
+    let negativeLarge = QJSValue(number: -1.234e21).toString()
     let infinity = QJSValue(number: Double.infinity).toString()
     let negativeInfinity = QJSValue(number: -Double.infinity).toString()
     let nan = QJSValue(number: Double.nan).toString()
@@ -92,6 +95,9 @@ struct QJSContextFreeValueTests {
     #expect(small == "0.000001")
     #expect(subnormal == "5e-324")
     #expect(roundedInteger == "1000000000000000100")
+    #expect(negativeFraction == "-42.5")
+    #expect(negativeTiny == "-1e-7")
+    #expect(negativeLarge == "-1.234e+21")
     #expect(infinity == "Infinity")
     #expect(negativeInfinity == "-Infinity")
     #expect(nan == "NaN")
@@ -263,7 +269,8 @@ struct QJSContextFreeValueTests {
   func numberTextMatchesEngineConversion() async {
     let values: [Double] = [
       0.1, 1e16, 1e20, 1e21, 1e-6, 1e-7, 5e-324,
-      1_000_000_000_000_000_128, -0.0, 42.5, .nan, .infinity,
+      1_000_000_000_000_000_128, -0.0, 42.5, -42.5, -1e-7, -1.234e21,
+      .nan, .infinity,
     ]
     let virtualMachine = await QJSVirtualMachine(.nonblocking)
     let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
@@ -328,6 +335,7 @@ struct QJSContextFreeValueTests {
     }
     let direct = QJSPreparedScript(source: "40 + 2")
     first = nil
+    await firstVirtualMachine.gc()
 
     let results = await second.withInstantContext { scope -> (Double, Double) in
       let preparedResult = scope.evaluateScript(

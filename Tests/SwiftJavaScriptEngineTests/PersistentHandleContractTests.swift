@@ -122,8 +122,9 @@ struct PersistentHandleContractTests {
     await engine.run(ContextsOnABusySharedVM.self)
   }
 
-  /// Prepared scripts and property keys retain the engine context and can
-  /// die on any thread; their release is routed to the VM thread.
+  /// Prepared scripts and property keys are self-owning and may die on any
+  /// thread. QuickJS routes atom settlement through the VM thread;
+  /// JavaScriptCore releases its context-free `JSStringRef` directly.
   @Test(arguments: ScriptEngine.allCases)
   func selfOwningInputsDroppedOffTheVMThreadReleaseCleanly(_ engine: ScriptEngine) async {
     await engine.run(SelfOwningInputsDroppedOffTheVMThread.self)

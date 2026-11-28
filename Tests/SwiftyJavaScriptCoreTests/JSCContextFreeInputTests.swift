@@ -98,6 +98,7 @@ struct JSCContextFreeInputTests {
     let key = await first!.makePropertyStringKey("survivor")
     let script = await first!.prepareScript("40 + 2")
     first = nil
+    await awaitExecutorDrain(virtualMachine)
 
     let second = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
     let keyText = await second.withInstantContext { scope -> String in
@@ -153,4 +154,27 @@ struct JSCContextFreeInputTests {
     #expect(firstMadeObject)
     #expect(secondMadeObject)
   }
+}
+
+/// FIFO sentinel on the VM executor: pinging after dropping the minting
+/// context observes its asynchronously scheduled isolated deinit.
+private actor JSCExecutorDrain {
+  nonisolated let unownedExecutor: UnownedSerialExecutor
+  private var pings = 0
+
+  init(_ virtualMachine: JSCVirtualMachine) {
+    self.unownedExecutor = virtualMachine.unownedExecutor
+  }
+
+  func ping() {
+    pings &+= 1
+  }
+
+  func pingCount() -> Int { pings }
+}
+
+private func awaitExecutorDrain(_ virtualMachine: JSCVirtualMachine) async {
+  let drain = JSCExecutorDrain(virtualMachine)
+  await drain.ping()
+  _ = await drain.pingCount()
 }

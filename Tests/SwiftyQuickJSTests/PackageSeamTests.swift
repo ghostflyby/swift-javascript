@@ -50,8 +50,8 @@ import Testing
     let functionIsObject = function.isObject()
     #expect(functionIsObject)
 
-    // Self-owning inputs retain the engine context; they must die before the
-    // test's context and runtime references are released.
+    // The key retains the engine context; the script is source-only. Both are
+    // self-owning and may be dropped before the raw runtime references.
     do {
       let key = scope.makePropertyStringKey("seamKey")
       let fromKeyText = scope.makeString(from: key).toString()
