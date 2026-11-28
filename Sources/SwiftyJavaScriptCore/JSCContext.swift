@@ -1,10 +1,9 @@
 import Dispatch
 import JavaScriptCore
 import SwiftJavaScript
-import Synchronization
 
-/// A weak, Sendable view of a context actor for non-actor owners (persistent
-/// handles, self-owning inputs): their deinit must not keep the context alive.
+/// A weak, Sendable view of a context actor for persistent handles: their
+/// deinit must not keep the context alive.
 final class JSCContextReference: @unchecked Sendable {
   weak var value: JSCContext?
 
@@ -57,16 +56,6 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   private nonisolated(unsafe) var defaultScope: JSCScopeCore!
   /// The persistent-binding table, created with the engine state.
   private nonisolated(unsafe) var persistentBindings: JSCPersistentBindings!
-
-  /// Engine references owned by self-owning inputs, keyed by token. The
-  /// context is the reverse owner: whatever is still registered at teardown
-  /// is released there, so an input that outlives its context leaks nothing.
-  private struct InputRecord {
-    let stringBits: UInt
-    let contextBits: UInt
-  }
-  private nonisolated let inputRecords = Mutex<[UInt64: InputRecord]>([:])
-  private nonisolated let inputCounter = Atomic<UInt64>(0)
 
   @available(*, noasync)
   public init() {
@@ -152,35 +141,6 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     JSCScopeStacks.bind(self, for: contextRef)
   }
 
-  /// Register a self-owning input's engine references with the reverse owner.
-  /// Callable from any thread: the reference bits are captured before the
-  /// input becomes reachable.
-  package nonisolated func registerInput(stringBits: UInt, contextBits: UInt) -> UInt64 {
-    let token = inputCounter.wrappingAdd(1, ordering: .relaxed).newValue
-    inputRecords.withLock {
-      $0[token] = InputRecord(stringBits: stringBits, contextBits: contextBits)
-    }
-    return token
-  }
-
-  /// Take a registered input's references back and release them. Engine work:
-  /// the caller schedules this on the VM executor.
-  package nonisolated func releaseInput(_ token: UInt64) {
-    guard let record = inputRecords.withLock({ $0.removeValue(forKey: token) }) else {
-      return
-    }
-    releaseInputRecord(record)
-  }
-
-  private nonisolated func releaseInputRecord(_ record: InputRecord) {
-    if let stringRef = JSStringRef(bitPattern: record.stringBits) {
-      JSStringRelease(stringRef)
-    }
-    if let contextRef = JSGlobalContextRef(bitPattern: record.contextBits) {
-      JSGlobalContextRelease(contextRef)
-    }
-  }
-
   /// Unprotect one released persistent binding. Engine work: the caller
   /// schedules this on the VM executor.
   package nonisolated func unprotectPersistentValue(_ refBits: UInt) {
@@ -195,16 +155,6 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     persistentBindings.close()
     defaultScope.drain()
     javaScriptCoreInstallContextDataStorageBox(nil, in: contextRef)
-    // Inputs that outlived the context: the reverse owner releases what they
-    // still hold before the context reference itself goes away.
-    let records = inputRecords.withLock { records -> [InputRecord] in
-      let all = Array(records.values)
-      records.removeAll()
-      return all
-    }
-    for record in records {
-      releaseInputRecord(record)
-    }
     JSGlobalContextRelease(contextRef)
     JSCScopeStacks.pop(for: contextRef)
   }
@@ -358,22 +308,14 @@ public actor JSCContext: SwiftJavaScript.JSContext {
     guard let stringRef = javaScriptCoreMakePropertyStringKeyHandle(value, in: contextRef) else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
-    return JSCPropertyStringKey(
-      stringRef: stringRef,
-      contextRef: contextRef,
-      context: self
-    )
+    return JSCPropertyStringKey(stringRef: stringRef)
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
     guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
-    return JSCPreparedScript(
-      scriptRef: scriptRef,
-      contextRef: contextRef,
-      context: self
-    )
+    return JSCPreparedScript(scriptRef: scriptRef)
   }
 
   // MARK: - Global object

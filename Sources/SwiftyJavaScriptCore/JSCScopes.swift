@@ -266,22 +266,14 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
-    return JSCPropertyStringKey(
-      stringRef: stringRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPropertyStringKey(stringRef: stringRef)
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
     guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
-    return JSCPreparedScript(
-      scriptRef: scriptRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPreparedScript(scriptRef: scriptRef)
   }
 
   // MARK: - Scripts
@@ -570,22 +562,14 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
-    return JSCPropertyStringKey(
-      stringRef: stringRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPropertyStringKey(stringRef: stringRef)
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
     guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
-    return JSCPreparedScript(
-      scriptRef: scriptRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPreparedScript(scriptRef: scriptRef)
   }
 
   // MARK: - Scripts

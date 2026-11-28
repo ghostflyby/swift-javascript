@@ -132,9 +132,10 @@ public protocol JSContext: Actor, Hashable {
 
   // MARK: - Persistent bindings
 
-  /// Mint a persistent binding for one value of this context. Minting takes an
-  /// independent reference (claim + explicit root); the source value stays
-  /// valid for the rest of its window.
+  /// Mint a persistent binding for one value of this context, or for a
+  /// context-free immediate value. Minting takes an independent reference
+  /// (claim + explicit root); the source value stays valid for the rest of its
+  /// window.
   func makePersistentHandle(
     _ value: borrowing Value
   ) -> PersistentHandle

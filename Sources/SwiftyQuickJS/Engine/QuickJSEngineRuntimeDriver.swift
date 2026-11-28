@@ -267,10 +267,9 @@ package func quickJSImmediateLooselyEquals(
     return nil
   }
   if lhsTag == JS_TAG_NULL || lhsTag == JS_TAG_UNDEFINED {
-    if rhsTag == JS_TAG_NULL || rhsTag == JS_TAG_UNDEFINED {
-      return lhsTag != rhsTag
-    }
-    return false
+    // `null == undefined`, `null == null` and `undefined == undefined` are
+    // all true; neither is loosely equal to any other immediate.
+    return rhsTag == JS_TAG_NULL || rhsTag == JS_TAG_UNDEFINED
   }
   if rhsTag == JS_TAG_NULL || rhsTag == JS_TAG_UNDEFINED {
     return false

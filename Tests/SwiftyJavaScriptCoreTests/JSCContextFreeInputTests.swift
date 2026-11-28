@@ -87,6 +87,36 @@ struct JSCContextFreeInputTests {
     #expect(thirdSum == 42)
   }
 
+  /// A key/script minted through a context is still self-owning: the wrapper
+  /// owns its `JSStringRef`, not the context, so it remains valid after the
+  /// minting actor dies.
+  @Test
+  func contextMintedInputsSurviveTheMintingContext() async {
+    let virtualMachine = await JSCVirtualMachine(.nonblocking)
+    var first: JSCContext? = await JSCContext(
+      virtualMachine: virtualMachine, .nonblocking)
+    let key = await first!.makePropertyStringKey("survivor")
+    let script = await first!.prepareScript("40 + 2")
+    first = nil
+
+    let second = await JSCContext(virtualMachine: virtualMachine, .nonblocking)
+    let keyText = await second.withInstantContext { scope -> String in
+      scope.makeString(from: key).toString()
+    }
+    let sum = await second.withInstantContext { scope -> Double in
+      let result = scope.evaluateScript(script, sourceURL: nil, startingLineNumber: 1)
+      switch consume result {
+      case .value(let value):
+        return value.toNumber()
+      case .exception:
+        return .nan
+      }
+    }
+
+    #expect(keyText == "survivor")
+    #expect(sum == 42)
+  }
+
   /// A manual class is materialized with `JSClassCreate`, which takes no
   /// context. The resulting class ref is process-wide and can create host
   /// objects in contexts of different VMs.

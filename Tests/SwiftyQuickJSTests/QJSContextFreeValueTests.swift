@@ -62,21 +62,36 @@ struct QJSContextFreeValueTests {
     #expect(integerType == .number)
     #expect(integerText == "42")
     #expect(integerValue == 42)
+
+    let numberIsArray = number.isArray()
+    let numberIsArrayBuffer = number.isArrayBuffer()
+    let numberIsTypedArray = number.isTypedArray()
+    #expect(!numberIsArray)
+    #expect(!numberIsArrayBuffer)
+    #expect(!numberIsTypedArray)
   }
 
   @Test
   func numberTextMatchesECMAScriptFormatting() {
     let negativeZero = QJSValue(number: -0.0).toString()
+    let decimalAtSixteen = QJSValue(number: 1e16).toString()
+    let decimalAtTwenty = QJSValue(number: 1e20).toString()
     let large = QJSValue(number: 1e21).toString()
     let tiny = QJSValue(number: 1e-7).toString()
     let small = QJSValue(number: 0.000001).toString()
+    let subnormal = QJSValue(number: Double.leastNonzeroMagnitude).toString()
+    let roundedInteger = QJSValue(number: 1000000000000000128.0).toString()
     let infinity = QJSValue(number: Double.infinity).toString()
     let negativeInfinity = QJSValue(number: -Double.infinity).toString()
     let nan = QJSValue(number: Double.nan).toString()
     #expect(negativeZero == "0")
+    #expect(decimalAtSixteen == "10000000000000000")
+    #expect(decimalAtTwenty == "100000000000000000000")
     #expect(large == "1e+21")
     #expect(tiny == "1e-7")
     #expect(small == "0.000001")
+    #expect(subnormal == "5e-324")
+    #expect(roundedInteger == "1000000000000000100")
     #expect(infinity == "Infinity")
     #expect(negativeInfinity == "-Infinity")
     #expect(nan == "NaN")
@@ -103,8 +118,11 @@ struct QJSContextFreeValueTests {
     let nanStrictlyEqualsNan = nan.strictlyEquals(otherNan)
     let nanLooselyEqualsNan = nan.looselyEquals(otherNan)
     let nullLooselyEqualsUndefined = null.looselyEquals(undefined)
+    let undefinedLooselyEqualsNull = undefined.looselyEquals(null)
     let nullStrictlyEqualsUndefined = null.strictlyEquals(undefined)
     let nullLooselyEqualsZero = null.looselyEquals(QJSValue(number: 0))
+    let nullLooselyEqualsItself = null.looselyEquals(null)
+    let undefinedLooselyEqualsItself = undefined.looselyEquals(undefined)
     #expect(intStrictlyEqualsDouble)
     #expect(intLooselyEqualsDouble)
     #expect(!intStrictlyEqualsTwo)
@@ -114,8 +132,11 @@ struct QJSContextFreeValueTests {
     #expect(!nanStrictlyEqualsNan)
     #expect(!nanLooselyEqualsNan)
     #expect(nullLooselyEqualsUndefined)
+    #expect(undefinedLooselyEqualsNull)
     #expect(!nullStrictlyEqualsUndefined)
     #expect(!nullLooselyEqualsZero)
+    #expect(nullLooselyEqualsItself)
+    #expect(undefinedLooselyEqualsItself)
   }
 
   @Test
@@ -210,6 +231,58 @@ struct QJSContextFreeValueTests {
   }
 
   @Test
+  func contextFreeValuesCompareWithContextBoundValues() async {
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
+    let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
+
+    await context.withInstantContext { scope in
+      let boundNull = scope.makeNull()
+      let boundUndefined = scope.makeUndefined()
+      let boundOne = scope.makeNumber(1)
+      let constantNull = QJSValue.null
+      let constantUndefined = QJSValue.undefined
+      let constantOne = QJSValue(number: 1)
+
+      let nullForward = constantNull.looselyEquals(boundNull)
+      let nullReverse = boundNull.looselyEquals(constantNull)
+      let undefinedForward = constantUndefined.looselyEquals(boundUndefined)
+      let undefinedReverse = boundUndefined.looselyEquals(constantUndefined)
+      let numberForward = constantOne.strictlyEquals(boundOne)
+      let numberReverse = boundOne.strictlyEquals(constantOne)
+
+      #expect(nullForward)
+      #expect(nullReverse)
+      #expect(undefinedForward)
+      #expect(undefinedReverse)
+      #expect(numberForward)
+      #expect(numberReverse)
+    }
+  }
+
+  @Test
+  func numberTextMatchesEngineConversion() async {
+    let values: [Double] = [
+      0.1, 1e16, 1e20, 1e21, 1e-6, 1e-7, 5e-324,
+      1_000_000_000_000_000_128, -0.0, 42.5, .nan, .infinity,
+    ]
+    let virtualMachine = await QJSVirtualMachine(.nonblocking)
+    let context = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
+
+    await context.withInstantContext { scope in
+      for value in values {
+        let constantText = QJSValue(number: value).toString()
+        let engineText = scope.makeNumber(value).toString()
+        #expect(constantText == engineText)
+      }
+
+      let constantReciprocal = 1.0 / QJSValue(number: -0.0).toNumber()
+      let engineReciprocal = 1.0 / scope.makeNumber(-0.0).toNumber()
+      #expect(constantReciprocal == -Double.infinity)
+      #expect(engineReciprocal == -Double.infinity)
+    }
+  }
+
+  @Test
   func propertyKeysWorkAcrossContextsOfTheSameRuntime() async {
     let virtualMachine = await QJSVirtualMachine(.nonblocking)
     let first = await QJSContext(virtualMachine: virtualMachine, .nonblocking)
@@ -246,13 +319,15 @@ struct QJSContextFreeValueTests {
   func preparedScriptsWorkAcrossVirtualMachines() async {
     let firstVirtualMachine = await QJSVirtualMachine(.nonblocking)
     let secondVirtualMachine = await QJSVirtualMachine(.nonblocking)
-    let first = await QJSContext(virtualMachine: firstVirtualMachine, .nonblocking)
+    var first: QJSContext? = await QJSContext(
+      virtualMachine: firstVirtualMachine, .nonblocking)
     let second = await QJSContext(virtualMachine: secondVirtualMachine, .nonblocking)
 
-    let prepared = await first.withInstantContext { scope in
+    let prepared = await first!.withInstantContext { scope in
       scope.prepareScript("40 + 2")
     }
     let direct = QJSPreparedScript(source: "40 + 2")
+    first = nil
 
     let results = await second.withInstantContext { scope -> (Double, Double) in
       let preparedResult = scope.evaluateScript(

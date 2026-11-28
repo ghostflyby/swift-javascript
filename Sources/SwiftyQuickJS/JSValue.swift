@@ -40,8 +40,9 @@ public struct QJSCallArgument: SwiftJavaScript.JSCallArgument {
 /// explicitly, and the value-level conversions fall back to their ECMAScript
 /// meanings for immediates.
 ///
-/// Base classification, conversion, and equality route directly to the
-/// `QuickJS` statics over the raw value and context.
+/// Context-bound classification, conversion, and equality route to the
+/// `QuickJS` statics; immediate values use tag-level paths that need no
+/// context.
 public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   public typealias Context = QJSContext
   public typealias InstantContext = QJSInstantContext
