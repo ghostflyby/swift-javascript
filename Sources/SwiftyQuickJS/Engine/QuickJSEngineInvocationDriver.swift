@@ -47,12 +47,16 @@ package func quickJSToObject(
   return quickJSResult(for: JS_ToObject(context, value), in: context)
 }
 
+package func quickJSIsArray(_ value: CQuickJSValue) -> Bool {
+  JS_IsArray(value)
+}
+
 package func quickJSIsArray(
   _ value: CQuickJSValue,
   in context: OpaquePointer
 ) -> Bool? {
   _ = context
-  return JS_IsArray(value)
+  return quickJSIsArray(value)
 }
 
 package func quickJSIsDate(

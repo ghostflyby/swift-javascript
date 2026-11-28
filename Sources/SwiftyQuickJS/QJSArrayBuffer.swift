@@ -96,7 +96,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     guard
       let length = quickJSArrayBufferByteLength(
         value.value,
-        in: value.contextRef
+        in: value.requiredContextRef
       )
     else {
       preconditionFailure("Failed to read ArrayBuffer byteLength")
@@ -112,7 +112,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = quickJSArrayBufferBytesPtr(value.value, in: value.contextRef)
+    let access = quickJSArrayBufferBytesPtr(value.value, in: value.requiredContextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access ArrayBuffer bytes")
     }
@@ -123,7 +123,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = quickJSArrayBufferBytesPtr(value.value, in: value.contextRef)
+    let access = quickJSArrayBufferBytesPtr(value.value, in: value.requiredContextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable ArrayBuffer bytes")
     }
@@ -223,7 +223,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var kind: JSTypedArrayKind {
     guard
-      let kind = quickJSTypedArrayKind(value.value, in: value.contextRef)
+      let kind = quickJSTypedArrayKind(value.value, in: value.requiredContextRef)
     else {
       preconditionFailure("Wrapped value is not a TypedArray")
     }
@@ -232,7 +232,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   public var length: Int {
     guard
-      let length = quickJSTypedArrayLength(value.value, in: value.contextRef)
+      let length = quickJSTypedArrayLength(value.value, in: value.requiredContextRef)
     else {
       preconditionFailure("Failed to read TypedArray length")
     }
@@ -243,7 +243,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     guard
       let byteLength = quickJSTypedArrayByteLength(
         value.value,
-        in: value.contextRef
+        in: value.requiredContextRef
       )
     else {
       preconditionFailure("Failed to read TypedArray byteLength")
@@ -255,7 +255,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     guard
       let byteOffset = quickJSTypedArrayByteOffset(
         value.value,
-        in: value.contextRef
+        in: value.requiredContextRef
       )
     else {
       preconditionFailure("Failed to read TypedArray byteOffset")
@@ -266,7 +266,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
   /// QuickJS returns a new reference to the backing buffer, so the wrapper
   /// adopts it into the context default scope exactly once.
   public var buffer: QJSArrayBuffer {
-    let contextRef = value.contextRef
+    let contextRef = value.requiredContextRef
     guard
       let bufferValue = quickJSTypedArrayBuffer(value.value, in: contextRef)
     else {
@@ -290,7 +290,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = quickJSTypedArrayBytesPtr(value.value, in: value.contextRef)
+    let access = quickJSTypedArrayBytesPtr(value.value, in: value.requiredContextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access TypedArray bytes")
     }
@@ -304,7 +304,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     _ body: (UnsafeMutableRawBufferPointer) -> R
   ) -> R {
     let byteLength = self.byteLength
-    let access = quickJSTypedArrayBytesPtr(value.value, in: value.contextRef)
+    let access = quickJSTypedArrayBytesPtr(value.value, in: value.requiredContextRef)
     guard !access.hadException else {
       preconditionFailure("Failed to access mutable TypedArray bytes")
     }

@@ -66,7 +66,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = javaScriptCoreMakeStringValueHandle(
-        fromPropertyStringKey: key.borrowString(in: core.contextRef),
+        fromPropertyStringKey: key.stringRef,
         in: core.contextRef
       )
     else {
@@ -266,22 +266,14 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
-    return JSCPropertyStringKey(
-      stringRef: stringRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPropertyStringKey(stringRef: stringRef)
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
     guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
-    return JSCPreparedScript(
-      scriptRef: scriptRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPreparedScript(scriptRef: scriptRef)
   }
 
   // MARK: - Scripts
@@ -293,7 +285,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   ) -> JSResult<JSCValue> {
     guard
       let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
-        script.borrowScript(in: core.contextRef),
+        script.scriptRef,
         core.contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
@@ -387,7 +379,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = javaScriptCoreMakeStringValueHandle(
-        fromPropertyStringKey: key.borrowString(in: core.contextRef),
+        fromPropertyStringKey: key.stringRef,
         in: core.contextRef
       )
     else {
@@ -570,22 +562,14 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     else {
       preconditionFailure("makePropertyStringKeyHandle could not create key")
     }
-    return JSCPropertyStringKey(
-      stringRef: stringRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPropertyStringKey(stringRef: stringRef)
   }
 
   public func prepareScript(_ source: String) -> JSCPreparedScript {
     guard let scriptRef = javaScriptCoreMakePreparedScriptHandle(source, in: core.contextRef) else {
       preconditionFailure("makePreparedScriptHandle could not create script")
     }
-    return JSCPreparedScript(
-      scriptRef: scriptRef,
-      contextRef: core.contextRef,
-      context: JSCScopeStacks.context(for: core.contextRef)
-    )
+    return JSCPreparedScript(scriptRef: scriptRef)
   }
 
   // MARK: - Scripts
@@ -597,7 +581,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   ) -> JSResult<JSCValue> {
     guard
       let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
-        script.borrowScript(in: core.contextRef),
+        script.scriptRef,
         core.contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber

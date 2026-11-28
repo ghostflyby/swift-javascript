@@ -211,19 +211,19 @@ package func quickJSTypedArrayBytesPtr(
   return quickJSArrayBufferBytesPtr(buffer, in: context)
 }
 
+package func quickJSIsArrayBuffer(_ value: CQuickJSValue) -> Bool {
+  JS_IsArrayBuffer(value)
+}
+
 package func quickJSIsArrayBuffer(
   _ value: CQuickJSValue,
   in context: OpaquePointer
 ) -> Bool {
   _ = context
-  return JS_IsArrayBuffer(value)
+  return quickJSIsArrayBuffer(value)
 }
 
-package func quickJSTypedArrayKind(
-  _ value: CQuickJSValue,
-  in context: OpaquePointer
-) -> JSTypedArrayKind? {
-  _ = context
+package func quickJSTypedArrayKind(_ value: CQuickJSValue) -> JSTypedArrayKind? {
   switch JS_GetTypedArrayType(value) {
   case 1:
     return .int8Array
@@ -246,6 +246,14 @@ package func quickJSTypedArrayKind(
   default:
     return nil
   }
+}
+
+package func quickJSTypedArrayKind(
+  _ value: CQuickJSValue,
+  in context: OpaquePointer
+) -> JSTypedArrayKind? {
+  _ = context
+  return quickJSTypedArrayKind(value)
 }
 
 private func quickJSMakeTypedArray(

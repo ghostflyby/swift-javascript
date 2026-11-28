@@ -169,6 +169,199 @@ package func quickJSToString(
   quickJSString(value, in: context)
 }
 
+// MARK: - Context-free immediate conversion
+//
+// These helpers are the conversion path for values created without a context.
+// They return nil for tags whose conversion needs the engine (strings,
+// objects, symbols and bigints); a context-free value never carries those
+// tags.
+
+package func quickJSImmediateToBoolean(_ value: CQuickJSValue) -> Bool? {
+  switch Int(value.tag) {
+  case JS_TAG_UNDEFINED, JS_TAG_NULL:
+    return false
+  case JS_TAG_BOOL, JS_TAG_INT:
+    return value.u.int32 != 0
+  case JS_TAG_FLOAT64:
+    let number = value.u.float64
+    return !number.isNaN && number != 0
+  default:
+    return nil
+  }
+}
+
+package func quickJSImmediateToNumber(_ value: CQuickJSValue) -> Double? {
+  switch Int(value.tag) {
+  case JS_TAG_UNDEFINED:
+    return .nan
+  case JS_TAG_NULL:
+    return 0
+  case JS_TAG_BOOL, JS_TAG_INT:
+    return Double(value.u.int32)
+  case JS_TAG_FLOAT64:
+    return value.u.float64
+  default:
+    return nil
+  }
+}
+
+package func quickJSImmediateToString(_ value: CQuickJSValue) -> String? {
+  switch Int(value.tag) {
+  case JS_TAG_UNDEFINED:
+    return "undefined"
+  case JS_TAG_NULL:
+    return "null"
+  case JS_TAG_BOOL:
+    return value.u.int32 != 0 ? "true" : "false"
+  case JS_TAG_INT:
+    return String(value.u.int32)
+  case JS_TAG_FLOAT64:
+    return quickJSNumberString(value.u.float64)
+  default:
+    return nil
+  }
+}
+
+package func quickJSImmediateStrictlyEquals(
+  _ lhs: CQuickJSValue,
+  _ rhs: CQuickJSValue
+) -> Bool? {
+  let lhsTag = Int(lhs.tag)
+  let rhsTag = Int(rhs.tag)
+  guard quickJSIsImmediateTag(lhsTag), quickJSIsImmediateTag(rhsTag) else {
+    return nil
+  }
+  switch lhsTag {
+  case JS_TAG_UNDEFINED, JS_TAG_NULL:
+    return lhsTag == rhsTag
+  case JS_TAG_BOOL:
+    return rhsTag == JS_TAG_BOOL && lhs.u.int32 == rhs.u.int32
+  case JS_TAG_INT:
+    if rhsTag == JS_TAG_INT {
+      return lhs.u.int32 == rhs.u.int32
+    }
+    if rhsTag == JS_TAG_FLOAT64 {
+      return Double(lhs.u.int32) == rhs.u.float64
+    }
+    return false
+  case JS_TAG_FLOAT64:
+    if rhsTag == JS_TAG_FLOAT64 {
+      return lhs.u.float64 == rhs.u.float64
+    }
+    if rhsTag == JS_TAG_INT {
+      return lhs.u.float64 == Double(rhs.u.int32)
+    }
+    return false
+  default:
+    return false
+  }
+}
+
+package func quickJSImmediateLooselyEquals(
+  _ lhs: CQuickJSValue,
+  _ rhs: CQuickJSValue
+) -> Bool? {
+  let lhsTag = Int(lhs.tag)
+  let rhsTag = Int(rhs.tag)
+  guard quickJSIsImmediateTag(lhsTag), quickJSIsImmediateTag(rhsTag) else {
+    return nil
+  }
+  if lhsTag == JS_TAG_NULL || lhsTag == JS_TAG_UNDEFINED {
+    // `null == undefined`, `null == null` and `undefined == undefined` are
+    // all true; neither is loosely equal to any other immediate.
+    return rhsTag == JS_TAG_NULL || rhsTag == JS_TAG_UNDEFINED
+  }
+  if rhsTag == JS_TAG_NULL || rhsTag == JS_TAG_UNDEFINED {
+    return false
+  }
+  if lhsTag == rhsTag {
+    return quickJSImmediateStrictlyEquals(lhs, rhs)
+  }
+  // Different immediate tags other than null/undefined compare through their
+  // numeric values (booleans become 0/1; int and float compare numerically).
+  guard
+    let lhsNumber = quickJSImmediateToNumber(lhs),
+    let rhsNumber = quickJSImmediateToNumber(rhs)
+  else {
+    return false
+  }
+  return lhsNumber == rhsNumber
+}
+
+private func quickJSIsImmediateTag(_ tag: Int) -> Bool {
+  tag == JS_TAG_INT || tag == JS_TAG_BOOL || tag == JS_TAG_NULL
+    || tag == JS_TAG_UNDEFINED || tag == JS_TAG_FLOAT64
+}
+
+/// ECMAScript `Number::toString` for a finite double, used only for
+/// context-free values; a context-bound value delegates to QuickJS.
+private func quickJSNumberString(_ value: Double) -> String {
+  if value.isNaN { return "NaN" }
+  if value == 0 { return "0" }
+  if value.isInfinite { return value < 0 ? "-Infinity" : "Infinity" }
+  if value < 0 { return "-" + quickJSNumberString(-value) }
+
+  let description = value.description
+  var mantissa = description
+  var exponent = 0
+  if let exponentIndex = description.firstIndex(where: { $0 == "e" || $0 == "E" }) {
+    mantissa = String(description[..<exponentIndex])
+    exponent = Int(description[description.index(after: exponentIndex)...])!
+  }
+
+  var digits = ""
+  var n = 0
+  if let dotIndex = mantissa.firstIndex(of: ".") {
+    let integerPart = mantissa[..<dotIndex]
+    let fractionPart = mantissa[mantissa.index(after: dotIndex)...]
+    if integerPart == "0" {
+      var leadingZeros = 0
+      var index = fractionPart.startIndex
+      while index < fractionPart.endIndex && fractionPart[index] == "0" {
+        leadingZeros += 1
+        index = fractionPart.index(after: index)
+      }
+      digits = String(fractionPart[index...])
+      n = -leadingZeros
+    } else {
+      digits = String(integerPart) + String(fractionPart)
+      n = integerPart.count
+    }
+    if exponent != 0 {
+      n = exponent + 1
+    }
+  } else {
+    digits = mantissa
+    n = description.count
+    if exponent != 0 {
+      n = exponent + 1
+    }
+  }
+
+  while digits.count > 1 && digits.last == "0" {
+    digits.removeLast()
+  }
+  let digitCount = digits.count
+  if digitCount <= n && n <= 21 {
+    return digits + String(repeating: "0", count: n - digitCount)
+  }
+  if 0 < n && n <= 21 {
+    let splitIndex = digits.index(digits.startIndex, offsetBy: n)
+    return String(digits[..<splitIndex]) + "." + String(digits[splitIndex...])
+  }
+  if -6 < n && n <= 0 {
+    return "0." + String(repeating: "0", count: -n) + digits
+  }
+  let first = digits.first!
+  let rest = digits.dropFirst()
+  let scientificExponent = n - 1
+  let exponentText =
+    scientificExponent >= 0 ? "+\(scientificExponent)" : "\(scientificExponent)"
+  return rest.isEmpty
+    ? "\(first)e\(exponentText)"
+    : "\(first).\(rest)e\(exponentText)"
+}
+
 // MARK: - Creation factories (one owned reference each)
 
 package func quickJSMakeString(
@@ -185,30 +378,57 @@ package func quickJSMakeSymbol(
   return value.withCString { JS_NewSymbol(context, $0, false) }
 }
 
+/// A number is an immediate: no engine call and no allocation.
+package func quickJSMakeNumber(_ value: Double) -> CQuickJSValue {
+  CQuickJSValue(u: JSValueUnion(float64: value), tag: Int64(JS_TAG_FLOAT64))
+}
+
+/// An integer is an immediate; the tag follows `JS_NewInt64`: `INT` while the
+/// value fits in 32 bits, `FLOAT64` otherwise.
+package func quickJSMakeNumber(_ value: some BinaryInteger) -> CQuickJSValue {
+  if let int32 = Int32(exactly: value) {
+    return CQuickJSValue(u: JSValueUnion(int32: int32), tag: Int64(JS_TAG_INT))
+  }
+  return quickJSMakeNumber(Double(value))
+}
+
 package func quickJSMakeNumber(
   _ value: Double,
   in context: OpaquePointer
 ) -> CQuickJSValue? {
-  return JS_NewFloat64(context, value)
+  _ = context
+  return quickJSMakeNumber(value)
 }
 
 /// A boolean is an immediate: no engine call and no allocation.
+package func quickJSMakeBoolean(_ value: Bool) -> CQuickJSValue {
+  CQuickJSValue(u: .init(int32: Int32(value ? 1 : 0)), tag: Int64(JS_TAG_BOOL))
+}
+
 package func quickJSMakeBoolean(
   _ value: Bool,
   in context: OpaquePointer
 ) -> CQuickJSValue? {
   _ = context
-  return CQuickJSValue(u: .init(int32: Int32(value ? 1 : 0)), tag: Int64(JS_TAG_BOOL))
+  return quickJSMakeBoolean(value)
+}
+
+package func quickJSMakeNull() -> CQuickJSValue {
+  quickJSImmediateValue(tag: Int32(JS_TAG_NULL))
 }
 
 package func quickJSMakeNull(in context: OpaquePointer) -> CQuickJSValue? {
   _ = context
-  return quickJSImmediateValue(tag: Int32(JS_TAG_NULL))
+  return quickJSMakeNull()
+}
+
+package func quickJSMakeUndefined() -> CQuickJSValue {
+  quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
 }
 
 package func quickJSMakeUndefined(in context: OpaquePointer) -> CQuickJSValue? {
   _ = context
-  return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
+  return quickJSMakeUndefined()
 }
 
 package func quickJSMakeObjectResult(

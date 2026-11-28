@@ -37,7 +37,8 @@ public protocol JSScope: JSValueScope, ~Copyable {
 
   // MARK: - Persistent bindings
 
-  /// Mint a persistent binding from a value created in this scope.
+  /// Mint a persistent binding from a value created in this scope, or from a
+  /// context-free immediate value.
   @available(*, noasync)
   func makePersistentHandle(
     _ value: borrowing Value

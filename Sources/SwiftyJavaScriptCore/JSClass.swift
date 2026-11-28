@@ -1019,6 +1019,12 @@ extension JSCClass {
     self.init(classRef: ref)
   }
 
+  /// Materialize a manual class without a context.
+  ///
+  /// `JSClassCreate` is context-free: the class definition is a process-wide,
+  /// refcounted object, and host objects can be created from it through any
+  /// context. (Auto classes created by `JSCInstantContext.makeClass` remain
+  /// runtime-bound because their parent resolution and cache are per runtime.)
   public convenience init(
     defination: SwiftJavaScript.JSEngineClassDefinition<
       JSCContext,

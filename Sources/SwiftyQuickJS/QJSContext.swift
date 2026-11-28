@@ -61,9 +61,9 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   /// Engine references owned by self-owning inputs, keyed by token. The
   /// context is the reverse owner: whatever is still registered at teardown
-  /// is released there, so an input that outlives its context leaks nothing.
+  /// is released there, so a key that outlives its context leaks nothing.
   private struct InputRecord {
-    let atom: JSAtom?
+    let atom: JSAtom
     let contextBits: UInt
   }
   private nonisolated let inputRecords = Mutex<[UInt64: InputRecord]>([:])
@@ -153,7 +153,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   /// Register a self-owning input's engine references with the reverse owner.
   /// Callable from any thread: the reference bits are captured before the
   /// input becomes reachable.
-  package nonisolated func registerInput(atom: JSAtom?, contextBits: UInt) -> UInt64 {
+  package nonisolated func registerInput(atom: JSAtom, contextBits: UInt) -> UInt64 {
     let token = inputCounter.wrappingAdd(1, ordering: .relaxed).newValue
     inputRecords.withLock {
       $0[token] = InputRecord(atom: atom, contextBits: contextBits)
@@ -172,9 +172,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   private nonisolated func releaseInputRecord(_ record: InputRecord) {
     guard let context = OpaquePointer(bitPattern: record.contextBits) else { return }
-    if let atom = record.atom {
-      JS_FreeAtom(context, atom)
-    }
+    JS_FreeAtom(context, record.atom)
     JS_FreeContext(context)
   }
 
@@ -330,8 +328,8 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   public func makePersistentHandle(_ value: borrowing QJSValue) -> QJSPersistentHandle {
     precondition(
-      value.contextRef == contextRef,
-      "JSPersistentHandle can only be minted for values of its own context"
+      value.contextRef == nil || value.contextRef == contextRef,
+      "JSPersistentHandle can only be minted for context-free values or values of its own context"
     )
     return QJSPersistentHandle(
       identity: persistentBindings.mint(value.value),
@@ -361,11 +359,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    return QJSPreparedScript(
-      source: source,
-      contextRef: contextRef,
-      context: self
-    )
+    return QJSPreparedScript(source: source)
   }
 
   // MARK: - Global object
@@ -433,7 +427,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
     let result = quickJSEvaluateScript(
-      script.borrowSource(in: contextRef),
+      script.source,
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
       in: contextRef

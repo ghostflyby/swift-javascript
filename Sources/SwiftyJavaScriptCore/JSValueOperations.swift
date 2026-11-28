@@ -29,7 +29,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return bridgeJSCValueResult(
       javaScriptCoreGetPropertyStringKeyHandle(
-        key.borrowString(in: contextRef),
+        key.stringRef,
         on: ref, in: contextRef),
       in: context
     )
@@ -69,7 +69,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreSetPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref,
       to: value.ref,
       in: contextRef, attributes: attributes
@@ -102,7 +102,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreDeletePropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref, in: contextRef)
   }
 
@@ -119,7 +119,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreHasPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref, in: contextRef) ?? false
   }
 
@@ -258,7 +258,7 @@ extension JSCValue {
     let contextRef = context.contextRef
     return bridgeJSCValueResult(
       javaScriptCoreGetPropertyStringKeyHandle(
-        key.borrowString(in: contextRef),
+        key.stringRef,
         on: ref, in: contextRef),
       in: context
     )
@@ -298,7 +298,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreSetPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref,
       to: value.ref,
       in: contextRef, attributes: attributes
@@ -331,7 +331,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreDeletePropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref, in: contextRef)
   }
 
@@ -348,7 +348,7 @@ extension JSCValue {
   ) -> Bool {
     let contextRef = context.contextRef
     return javaScriptCoreHasPropertyStringKeyHandle(
-      key.borrowString(in: contextRef),
+      key.stringRef,
       on: ref, in: contextRef) ?? false
   }
 
@@ -465,7 +465,7 @@ extension JSCValue {
   ) -> JSResult<JSCValue> {
     switch bridgeJSCValueResult(
       javaScriptCoreGetPropertyStringKeyHandle(
-        name.borrowString(in: context.contextRef),
+        name.stringRef,
         on: ref, in: context.contextRef),
       in: context
     ) {

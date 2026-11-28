@@ -70,8 +70,9 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
 
   // MARK: - Persistent bindings
 
-  /// Mint a persistent binding for a value created in this window. Requires a
-  /// hosted `JSContext`: the registry is reached through the context data box.
+  /// Mint a persistent binding for a value created in this window, or for a
+  /// context-free immediate value. Requires a hosted `JSContext`: the registry
+  /// is reached through the context data box.
   @available(*, noasync)
   func makePersistentHandle(
     _ value: borrowing Value

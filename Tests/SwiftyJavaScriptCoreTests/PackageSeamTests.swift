@@ -43,8 +43,8 @@ import Testing
     let functionIsObject = function.isObject()
     #expect(functionIsObject)
 
-    // Self-owning inputs retain the engine context; they must die before the
-    // test's context and runtime references are released.
+    // Self-owning inputs own their engine string; they are independent of the
+    // raw context and runtime references below.
     do {
       let key = scope.makePropertyStringKey("seamKey")
       let fromKeyText = scope.makeString(from: key).toString()

@@ -138,11 +138,7 @@ struct JSCValueOperationsTests {
       }
       let number = scope.adoptCreatedHandle(javaScriptCoreMakeNumberValueHandle(3, context)!)
       do {
-        let key = JSCPropertyStringKey(
-          stringRef: keyHandle,
-          contextRef: context,
-          context: nil
-        )
+        let key = JSCPropertyStringKey(stringRef: keyHandle)
         let keyDidSet = object.setProperty(
           key,
           to: number,
