@@ -61,7 +61,7 @@ public struct QJSPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
       // dead one already released them at teardown.
       guard let context = contextReference.value, let inputToken else { return }
       let token = inputToken
-      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+      scheduleOnTaskExecutor(context.virtualMachine.executor) {
         context.releaseInput(token)
       }
       return
@@ -125,7 +125,7 @@ public struct QJSPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
       // dead one already released them at teardown.
       guard let context = contextReference.value, let inputToken else { return }
       let token = inputToken
-      scheduleOnSerialExecutor(context.virtualMachine.executor) {
+      scheduleOnTaskExecutor(context.virtualMachine.executor) {
         context.releaseInput(token)
       }
       return

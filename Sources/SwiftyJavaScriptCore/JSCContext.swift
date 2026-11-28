@@ -84,8 +84,8 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   }
 
   /// Build the engine state during init, on the VM executor. A caller that
-  /// already is that executor runs the work inline; otherwise it hops through
-  /// a temporary `JSExecutorHop`: the synchronous form blocks this thread, the
+  /// already is that executor runs the work inline; otherwise the work is
+  /// enqueued on the executor: the synchronous form blocks this thread, the
   /// `JSInitMode.nonblocking` form awaits.
   @available(*, noasync)
   public init(virtualMachine: JSCVirtualMachine) {
@@ -106,19 +106,9 @@ public actor JSCContext: SwiftJavaScript.JSContext {
       return
     }
     let done = DispatchSemaphore(value: 0)
-    if let taskExecutor = virtualMachine.executor as? any TaskExecutor {
-      scheduleOnTaskExecutor(taskExecutor) { [self] in
-        makeEngineStateOnExecutor()
-        done.signal()
-      }
-    } else {
-      let hop = JSExecutorHop(executor: virtualMachine.executor)
-      Task { [self] in
-        await hop.run {
-          makeEngineStateOnExecutor()
-        }
-        done.signal()
-      }
+    scheduleOnTaskExecutor(virtualMachine.executor) { [self] in
+      makeEngineStateOnExecutor()
+      done.signal()
     }
     done.wait()
   }
@@ -128,14 +118,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
       makeEngineStateOnExecutor()
       return
     }
-    if let taskExecutor = virtualMachine.executor as? any TaskExecutor {
-      await runOnTaskExecutor(taskExecutor) { [self] in
-        makeEngineStateOnExecutor()
-      }
-      return
-    }
-    let hop = JSExecutorHop(executor: virtualMachine.executor)
-    await hop.run { [self] in
+    await runOnTaskExecutor(virtualMachine.executor) { [self] in
       makeEngineStateOnExecutor()
     }
   }

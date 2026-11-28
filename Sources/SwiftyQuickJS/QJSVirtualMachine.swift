@@ -107,8 +107,8 @@ public actor QJSVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   }
 
   /// Create the runtime if it does not exist yet. Engine work: the caller runs
-  /// on the VM executor — inline when `isOnVMExecutor()`, or through
-  /// `JSExecutorHop` otherwise.
+  /// on the VM executor — inline when `isOnVMExecutor()`, or scheduled on the
+  /// executor otherwise.
   private nonisolated func makeRuntimeOnExecutor() {
     runtimeBox.withLock { bits in
       guard bits == 0 else { return }

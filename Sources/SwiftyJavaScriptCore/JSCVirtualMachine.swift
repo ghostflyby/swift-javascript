@@ -29,18 +29,22 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
 
   /// The executor every context of this VM runs on. Package-internal so a
   /// context's initializer can hop onto it.
-  package nonisolated let executor: any SerialExecutor
+  ///
+  /// JavaScriptCore schedules delayed work through the thread's run loop, so
+  /// the executor must service one (`RunLoopServicingExecutor`); a plain
+  /// serial or thread-bound executor without a run loop is not enough.
+  package nonisolated let executor: any RunLoopServicingExecutor
 
-  /// The dedicated thread this VM created; nil when the executor is
+  /// The dedicated run-loop thread this VM created; nil when the executor is
   /// caller-supplied, whose lifetime belongs to the embedder.
-  private let ownedExecutor: DedicatedThreadExecutor?
+  private let ownedExecutor: RunLoopThreadExecutor?
 
   /// The context group's bit pattern, created during init (0 until then).
   private nonisolated let runtimeBits = Mutex<UInt>(0)
 
   @available(*, noasync)
   public init() {
-    let executor = DedicatedThreadExecutor()
+    let executor = RunLoopThreadExecutor()
     self.executor = executor
     self.ownedExecutor = executor
     self.unownedExecutor = executor.asUnownedSerialExecutor()
@@ -48,53 +52,46 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   }
 
   public init(_ mode: JSInitMode) async {
-    let executor = DedicatedThreadExecutor()
+    let executor = RunLoopThreadExecutor()
     self.executor = executor
     self.ownedExecutor = executor
     self.unownedExecutor = executor.asUnownedSerialExecutor()
     await openRuntime()
   }
 
-  /// Run every context of this VM on a caller-supplied serial executor.
+  /// Run every context of this VM on a caller-supplied run-loop-servicing
+  /// executor.
   ///
-  /// JavaScriptCore locks its context group internally, so the VM only needs
-  /// engine access serialized, not pinned to a particular OS thread: any
-  /// serial executor is safe. The executor is borrowed — this VM neither
-  /// stops it nor waits for it.
+  /// JavaScriptCore locks its context group internally, but delayed work and
+  /// collection completion are driven by the bound thread's run loop, so the
+  /// executor must keep that run loop serviced (a dedicated
+  /// `RunLoopThreadExecutor`, or the host's main run loop). The executor is
+  /// borrowed — this VM neither stops it nor waits for it.
   @available(*, noasync)
-  public init(executor: any SerialExecutor) {
+  public init(executor: any RunLoopServicingExecutor) {
     self.executor = executor
     self.ownedExecutor = nil
     self.unownedExecutor = executor.asUnownedSerialExecutor()
     openRuntimeSynchronously()
   }
 
-  public init(executor: any SerialExecutor, _ mode: JSInitMode) async {
+  public init(executor: any RunLoopServicingExecutor, _ mode: JSInitMode) async {
     self.executor = executor
     self.ownedExecutor = nil
     self.unownedExecutor = executor.asUnownedSerialExecutor()
     await openRuntime()
   }
 
-  /// Whether the caller is isolated with respect to this VM's executor.
-  ///
-  /// Executors that cannot answer (no thread identity) are treated as foreign:
-  /// the initializer then posts the engine work instead of running it inline.
+  /// Whether the caller is isolated with respect to this VM's executor. A
+  /// run-loop-servicing executor is thread-bound, so it answers with thread
+  /// identity on every supported platform.
   package nonisolated func isOnVMExecutor() -> Bool {
-    // Thread-affine executors answer through the package's thread-identity
-    // extension on every supported platform.
-    if let affinity = executor as? any ThreadAffinityExecutor {
-      return affinity.isIsolatingCurrentContext() == true
-    }
-    if #available(macOS 26.0, *) {
-      return executor.isIsolatingCurrentContext() == true
-    }
-    return false
+    executor.isIsolatingCurrentContext() == true
   }
 
   /// Create the context group if it does not exist yet. Engine work: the
   /// caller runs on the VM executor — inline when `isOnVMExecutor()`, or
-  /// through `JSExecutorHop` otherwise.
+  /// scheduled on the executor otherwise.
   private nonisolated func makeRuntimeOnExecutor() {
     runtimeBits.withLock { bits in
       guard bits == 0 else { return }
@@ -131,29 +128,18 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
   /// otherwise enqueue on the executor and block the caller until the engine
   /// work completed.
   ///
-  /// The task-executor path enqueues immediately (SE-0417) and needs no
-  /// cooperative-pool thread; only a plain serial executor falls back to the
-  /// hop task, which is why callers on the concurrency runtime should prefer
-  /// the non-blocking initializer.
+  /// The job is enqueued immediately (SE-0417) and needs no cooperative-pool
+  /// thread, which is why the blocking form also works off the concurrency
+  /// runtime.
   private nonisolated func openRuntimeSynchronously() {
     if isOnVMExecutor() {
       makeRuntimeOnExecutor()
       return
     }
     let done = DispatchSemaphore(value: 0)
-    if let taskExecutor = executor as? any TaskExecutor {
-      scheduleOnTaskExecutor(taskExecutor) { [self] in
-        makeRuntimeOnExecutor()
-        done.signal()
-      }
-    } else {
-      let hop = JSExecutorHop(executor: executor)
-      Task { [self] in
-        await hop.run {
-          makeRuntimeOnExecutor()
-        }
-        done.signal()
-      }
+    scheduleOnTaskExecutor(executor) { [self] in
+      makeRuntimeOnExecutor()
+      done.signal()
     }
     done.wait()
   }
@@ -164,14 +150,7 @@ public actor JSCVirtualMachine: SwiftJavaScript.JSVirtualMachine {
       makeRuntimeOnExecutor()
       return
     }
-    if let taskExecutor = executor as? any TaskExecutor {
-      await runOnTaskExecutor(taskExecutor) { [self] in
-        makeRuntimeOnExecutor()
-      }
-      return
-    }
-    let hop = JSExecutorHop(executor: executor)
-    await hop.run { [self] in
+    await runOnTaskExecutor(executor) { [self] in
       makeRuntimeOnExecutor()
     }
   }
