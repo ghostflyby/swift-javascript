@@ -66,7 +66,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = javaScriptCoreMakeStringValueHandle(
-        fromPropertyStringKey: key.borrowString(in: core.contextRef),
+        fromPropertyStringKey: key.stringRef,
         in: core.contextRef
       )
     else {
@@ -293,7 +293,7 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   ) -> JSResult<JSCValue> {
     guard
       let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
-        script.borrowScript(in: core.contextRef),
+        script.scriptRef,
         core.contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber
@@ -387,7 +387,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = javaScriptCoreMakeStringValueHandle(
-        fromPropertyStringKey: key.borrowString(in: core.contextRef),
+        fromPropertyStringKey: key.stringRef,
         in: core.contextRef
       )
     else {
@@ -597,7 +597,7 @@ public struct JSCScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   ) -> JSResult<JSCValue> {
     guard
       let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
-        script.borrowScript(in: core.contextRef),
+        script.scriptRef,
         core.contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber

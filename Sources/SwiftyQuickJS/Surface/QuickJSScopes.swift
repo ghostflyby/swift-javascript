@@ -284,11 +284,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    return QJSPreparedScript(
-      source: source,
-      contextRef: core.contextRef,
-      context: QJSScopeStacks.context(for: core.contextRef)
-    )
+    return QJSPreparedScript(source: source)
   }
 
   // MARK: - Scripts
@@ -299,7 +295,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
     let result = quickJSEvaluateScript(
-      script.borrowSource(in: core.contextRef),
+      script.source,
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
       in: core.contextRef
@@ -577,11 +573,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   public func prepareScript(_ source: String) -> QJSPreparedScript {
-    return QJSPreparedScript(
-      source: source,
-      contextRef: core.contextRef,
-      context: QJSScopeStacks.context(for: core.contextRef)
-    )
+    return QJSPreparedScript(source: source)
   }
 
   // MARK: - Scripts
@@ -592,7 +584,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     startingLineNumber: Int32
   ) -> JSResult<QJSValue> {
     let result = quickJSEvaluateScript(
-      script.borrowSource(in: core.contextRef),
+      script.source,
       sourceURL: sourceURL,
       startingLineNumber: startingLineNumber,
       in: core.contextRef
@@ -625,12 +617,12 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 @available(*, noasync)
 private func mintPersistentHandle(
   _ value: CQuickJSValue,
-  of contextRef: OpaquePointer,
+  of contextRef: OpaquePointer?,
   on core: borrowing QJSScopeCore
 ) -> QJSPersistentHandle {
   precondition(
-    contextRef == core.contextRef,
-    "JSPersistentHandle can only be minted for values of its own context"
+    contextRef == nil || contextRef == core.contextRef,
+    "JSPersistentHandle can only be minted for context-free values or values of its own context"
   )
   guard let bindings = quickJSPersistentBindings(for: core.contextRef) else {
     preconditionFailure(

@@ -7,7 +7,12 @@ import SwiftJavaScript
 /// it, so the key can outlive `JSCContext`/`JSCInstantContext`. The context
 /// holds the reverse reference: an input still registered at context teardown
 /// is released there, and a live context takes the references back through its
-/// actor when the input dies first.
+/// actor when the input dies first. A key that outlives its actor is therefore
+/// no longer valid for use.
+///
+/// A `JSStringRef` is context-free, so the key carries no context-affinity
+/// guard; `stringRef` is read directly. The `init(_:)` form creates the key
+/// without any context and owns just the string.
 public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendable, ~Copyable {
   public typealias Context = JSCContext
 
@@ -20,15 +25,24 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
     JSStringRef(bitPattern: stringBits)!
   }
 
+  /// Create a key without a context. `JSStringRef` is context-free, so the
+  /// key owns only the string and can be used with any context.
+  public init(_ value: String) {
+    let stringRef = JSStringCreateWithCFString(value as CFString)!
+    self.init(stringRef: stringRef, contextRef: nil, context: nil)
+  }
+
   package init(
     stringRef: JSStringRef,
-    contextRef: JSGlobalContextRef,
+    contextRef: JSGlobalContextRef?,
     context: JSCContext?
   ) {
     self.stringBits = UInt(bitPattern: stringRef)
-    self.contextBits = UInt(bitPattern: contextRef)
-    _ = JSGlobalContextRetain(contextRef)
-    if let context {
+    self.contextBits = contextRef.map(UInt.init(bitPattern:)) ?? 0
+    if let contextRef {
+      _ = JSGlobalContextRetain(contextRef)
+    }
+    if let context, let contextRef {
       self.contextReference = JSCContextReference(context)
       self.inputToken = context.registerInput(
         stringBits: UInt(bitPattern: stringRef),
@@ -38,20 +52,6 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
       self.contextReference = nil
       self.inputToken = nil
     }
-  }
-
-  /// The engine key reference, validated against the context that created it.
-  /// Package-internal: the protocol surface no longer names engine handles,
-  /// but the compatibility precondition stays on every engine-internal use
-  /// (do not replace it with a field read).
-  package borrowing func borrowString(
-    in contextRef: JSGlobalContextRef
-  ) -> JSStringRef {
-    precondition(
-      javaScriptCoreIsPropertyStringKeyHandleCompatibleWithContext(stringRef, in: contextRef),
-      "JSCPropertyStringKey can only be used with the context that created it"
-    )
-    return stringRef
   }
 
   deinit {
@@ -79,7 +79,9 @@ public struct JSCPropertyStringKey: SwiftJavaScript.JSPropertyStringKey, Sendabl
 /// A self-owning JavaScriptCore prepared script.
 ///
 /// JavaScriptCore caches the script as a `JSStringRef`; the wrapper owns that
-/// reference and a context reference, exactly like `JSCPropertyStringKey`.
+/// reference plus, when it was created through a context, the context
+/// reference used for settlement. The `init(source:)` form creates the script
+/// without a context and owns just the string.
 public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Copyable {
   public typealias Context = JSCContext
 
@@ -92,15 +94,25 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
     JSStringRef(bitPattern: scriptBits)!
   }
 
+  /// Create a script without a context. JavaScriptCore caches source text in
+  /// a context-free `JSStringRef`, so the script can be evaluated by any
+  /// context.
+  public init(source: String) {
+    let scriptRef = JSStringCreateWithCFString(source as CFString)!
+    self.init(scriptRef: scriptRef, contextRef: nil, context: nil)
+  }
+
   package init(
     scriptRef: JSStringRef,
-    contextRef: JSGlobalContextRef,
+    contextRef: JSGlobalContextRef?,
     context: JSCContext?
   ) {
     self.scriptBits = UInt(bitPattern: scriptRef)
-    self.contextBits = UInt(bitPattern: contextRef)
-    _ = JSGlobalContextRetain(contextRef)
-    if let context {
+    self.contextBits = contextRef.map(UInt.init(bitPattern:)) ?? 0
+    if let contextRef {
+      _ = JSGlobalContextRetain(contextRef)
+    }
+    if let context, let contextRef {
       self.contextReference = JSCContextReference(context)
       self.inputToken = context.registerInput(
         stringBits: UInt(bitPattern: scriptRef),
@@ -110,20 +122,6 @@ public struct JSCPreparedScript: SwiftJavaScript.JSPreparedScript, Sendable, ~Co
       self.contextReference = nil
       self.inputToken = nil
     }
-  }
-
-  /// The engine script reference, validated against the context that compiled
-  /// it. Package-internal: the protocol surface no longer names engine
-  /// handles, but the compatibility precondition stays on every
-  /// engine-internal use (do not replace it with a field read).
-  package borrowing func borrowScript(
-    in contextRef: JSGlobalContextRef
-  ) -> JSStringRef {
-    precondition(
-      javaScriptCoreIsPreparedScriptHandleCompatibleWithContext(scriptRef, in: contextRef),
-      "JSCPreparedScript can only be used with the context that compiled it"
-    )
-    return scriptRef
   }
 
   deinit {

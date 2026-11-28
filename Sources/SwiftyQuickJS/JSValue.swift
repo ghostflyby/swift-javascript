@@ -33,6 +33,13 @@ public struct QJSCallArgument: SwiftJavaScript.JSCallArgument {
 /// reference is owned by the scope arena that adopted or anchored the value;
 /// this view owns nothing and its `deinit` releases nothing.
 ///
+/// QuickJS encodes undefined, null, booleans, integers and doubles as
+/// immediate values: creating and comparing them does not touch a runtime.
+/// The context-free initializers therefore produce values with no context
+/// (`contextRef == nil`); operations that need an engine context take one
+/// explicitly, and the value-level conversions fall back to their ECMAScript
+/// meanings for immediates.
+///
 /// Base classification, conversion, and equality route directly to the
 /// `QuickJS` statics over the raw value and context.
 public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
@@ -40,11 +47,23 @@ public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   public typealias InstantContext = QJSInstantContext
 
   package let value: CQuickJSValue
-  package let contextRef: OpaquePointer
+  /// The context this view was created under; `nil` for a context-free
+  /// immediate value.
+  package let contextRef: OpaquePointer?
 
-  package init(value: CQuickJSValue, contextRef: OpaquePointer) {
+  package init(value: CQuickJSValue, contextRef: OpaquePointer?) {
     self.value = value
     self.contextRef = contextRef
+  }
+
+  /// The context an engine operation must run under. Values created through a
+  /// scope always carry one; only context-free immediates may lack it, and
+  /// they never reach an operation that requires a context.
+  package var requiredContextRef: OpaquePointer {
+    guard let contextRef else {
+      preconditionFailure("QJSValue operation requires an engine context")
+    }
+    return contextRef
   }
 
   public func asCallArgument() -> QJSCallArgument {
@@ -61,25 +80,72 @@ public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   }
 
   public func toString() -> String {
-    quickJSToString(value, in: contextRef) ?? ""
+    if let contextRef {
+      return quickJSToString(value, in: contextRef) ?? ""
+    }
+    guard let text = quickJSImmediateToString(value) else {
+      preconditionFailure("QJSValue.toString() requires an engine context")
+    }
+    return text
   }
 
   public func toNumber() -> Double {
-    quickJSToNumber(value, in: contextRef)
+    if let contextRef {
+      return quickJSToNumber(value, in: contextRef)
+    }
+    guard let number = quickJSImmediateToNumber(value) else {
+      preconditionFailure("QJSValue.toNumber() requires an engine context")
+    }
+    return number
   }
 
   public func toBoolean() -> Bool {
-    quickJSToBoolean(value, in: contextRef)
+    if let contextRef {
+      return quickJSToBoolean(value, in: contextRef)
+    }
+    guard let truth = quickJSImmediateToBoolean(value) else {
+      preconditionFailure("QJSValue.toBoolean() requires an engine context")
+    }
+    return truth
+  }
+
+  // MARK: - Context-free classification
+  //
+  // QuickJS answers these from the value's class/tag alone, so they are
+  // available without a context window.
+
+  public func isArray() -> Bool {
+    quickJSIsArray(value)
+  }
+
+  public func isArrayBuffer() -> Bool {
+    quickJSIsArrayBuffer(value)
+  }
+
+  public func isTypedArray() -> Bool {
+    quickJSTypedArrayKind(value) != nil
   }
 
   // MARK: - Equality
 
   public func looselyEquals(_ other: borrowing QJSValue) -> Bool {
-    quickJSLooselyEquals(value, other.value, in: contextRef) ?? false
+    if let contextRef = contextRef ?? other.contextRef {
+      return quickJSLooselyEquals(value, other.value, in: contextRef) ?? false
+    }
+    guard let result = quickJSImmediateLooselyEquals(value, other.value) else {
+      preconditionFailure("QJSValue.looselyEquals requires an engine context")
+    }
+    return result
   }
 
   public func strictlyEquals(_ other: borrowing QJSValue) -> Bool {
-    quickJSStrictlyEquals(value, other.value, in: contextRef) ?? false
+    if let contextRef = contextRef ?? other.contextRef {
+      return quickJSStrictlyEquals(value, other.value, in: contextRef) ?? false
+    }
+    guard let result = quickJSImmediateStrictlyEquals(value, other.value) else {
+      preconditionFailure("QJSValue.strictlyEquals requires an engine context")
+    }
+    return result
   }
 }
 

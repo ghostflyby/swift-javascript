@@ -250,7 +250,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   public func makeString(from key: borrowing JSCPropertyStringKey) -> JSCValue {
     guard
       let ref = javaScriptCoreMakeStringValueHandle(
-        fromPropertyStringKey: key.borrowString(in: contextRef),
+        fromPropertyStringKey: key.stringRef,
         in: contextRef
       )
     else {
@@ -443,7 +443,7 @@ public actor JSCContext: SwiftJavaScript.JSContext {
   ) -> JSResult<JSCValue> {
     guard
       let result = javaScriptCoreEvaluatePreparedScriptResultHandle(
-        script.borrowScript(in: contextRef),
+        script.scriptRef,
         contextRef,
         sourceURL: sourceURL,
         startingLineNumber: startingLineNumber

@@ -97,7 +97,7 @@ struct QJSScopeSurfaceTests {
       let inner = QJSInstantContext(contextRef: context)
       let persisted = inner.persist(inner.makeString("kept"))
       persistedHandle = persisted.value
-      persistedContext = persisted.contextRef
+      persistedContext = persisted.requiredContextRef
       let inside = persisted.toString()
       #expect(inside == "kept")
     }

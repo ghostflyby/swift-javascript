@@ -89,15 +89,6 @@ package func javaScriptCoreMakePreparedScriptHandle(
   return scriptRef
 }
 
-package func javaScriptCoreIsPreparedScriptHandleCompatibleWithContext(
-  _ script: JSStringRef,
-  in context: JSGlobalContextRef
-) -> Bool {
-  _ = script
-  _ = context
-  return true
-}
-
 package func javaScriptCoreEvaluatePreparedScriptResultHandle(
   _ script: JSStringRef,
   _ context: JSGlobalContextRef,

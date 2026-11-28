@@ -21,15 +21,6 @@ package func javaScriptCoreMakePropertyStringKeyHandle(
   return keyRef
 }
 
-package func javaScriptCoreIsPropertyStringKeyHandleCompatibleWithContext(
-  _ key: JSStringRef,
-  in context: JSGlobalContextRef
-) -> Bool {
-  _ = key
-  _ = context
-  return true
-}
-
 package func javaScriptCoreMakeStringValueHandle(
   fromPropertyStringKey key: JSStringRef,
   in context: JSGlobalContextRef
