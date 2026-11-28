@@ -63,7 +63,7 @@ public final class JSCPersistentHandle: SwiftJavaScript.JSPersistentHandle, Send
   /// caller's later engine work.
   private func settle(_ ref: JSValueRef, on context: JSCContext) {
     let refBits = UInt(bitPattern: ref)
-    scheduleOnSerialExecutor(context.virtualMachine.executor) {
+    scheduleOnTaskExecutor(context.virtualMachine.executor) {
       context.unprotectPersistentValue(refBits)
     }
   }

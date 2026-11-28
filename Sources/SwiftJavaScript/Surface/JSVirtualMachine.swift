@@ -9,9 +9,12 @@
 ///
 /// Engines require different executor guarantees, loosest first:
 ///
-/// - Any `SerialExecutor`: engines that serialize engine access internally.
-///   JavaScriptCore locks its context group, so its VM accepts any serial
-///   executor.
+/// - Any `RunLoopServicingExecutor`: engines that serialize engine access
+///   internally but schedule delayed work through the bound thread's run
+///   loop. JavaScriptCore locks its context group, yet its timers, delayed
+///   tasks and collection completion need the run loop to keep being
+///   serviced, so its VM requires a thread-bound executor that services one
+///   (a dedicated run-loop thread, or the host's main run loop).
 /// - Any `ThreadAffinityExecutor`: engines whose stack bookkeeping needs a
 ///   known current OS thread — a thread-bound executor, or a migrating one
 ///   whose thread hand-offs the engine observes. QuickJS refreshes its

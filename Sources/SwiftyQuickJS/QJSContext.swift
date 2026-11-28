@@ -82,8 +82,8 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   }
 
   /// Build the engine state during init, on the VM executor. A caller that
-  /// already is that executor runs the work inline; otherwise it hops through
-  /// a temporary `JSExecutorHop`: the synchronous form blocks this thread, the
+  /// already is that executor runs the work inline; otherwise the work is
+  /// enqueued on the executor: the synchronous form blocks this thread, the
   /// `JSInitMode.nonblocking` form awaits.
   @available(*, noasync)
   public init(virtualMachine: QJSVirtualMachine) {

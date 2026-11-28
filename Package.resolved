@@ -1,5 +1,5 @@
 {
-  "originHash" : "5fe2e45e481fbfab1638e4806e3754a83bc34805d44568b76b979086bef127f5",
+  "originHash" : "240ee79b27c48e92e9647cda444c05856d2254105d78f86fac4250043817e76f",
   "pins" : [
     {
       "identity" : "swift-collections",
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ghostflyby/swift-thread-affinity-executor.git",
       "state" : {
-        "revision" : "647081ad69014fe54cec81b8eb360d1f036c3dad",
-        "version" : "0.2.0"
+        "revision" : "b359b4a411ddfb150e0164d76d7efe577fda3323",
+        "version" : "0.3.0"
       }
     }
   ],

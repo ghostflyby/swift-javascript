@@ -48,7 +48,7 @@ public final class QJSPersistentHandle: SwiftJavaScript.JSPersistentHandle, Send
   /// it enqueues immediately and settlement keeps its position relative to the
   /// caller's later engine work.
   private func settle(_ value: CQuickJSValue, on context: QJSContext) {
-    scheduleOnSerialExecutor(context.virtualMachine.executor) {
+    scheduleOnTaskExecutor(context.virtualMachine.executor) {
       context.freePersistentValue(value)
     }
   }
