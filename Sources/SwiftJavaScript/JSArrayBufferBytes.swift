@@ -73,6 +73,7 @@ package func allocateArrayBufferBytes(
 /// core helper then releases them. Implementations must not call the
 /// deallocator on the rejection path — that would release the bytes twice.
 package protocol JSArrayBufferHostScope: JSInstantContext, ~Copyable {
+  @_lifetime(borrow self)
   func adoptArrayBufferBytesNoCopy(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,
@@ -92,6 +93,7 @@ package protocol JSArrayBufferHostScope: JSInstantContext, ~Copyable {
 /// took the bytes, so this releases the allocation here — exactly once — and
 /// returns `nil`; the caller reports the failure. On success the engine adopts
 /// the creation reference exactly once on the calling window's arena.
+@_lifetime(borrow context)
 package func adoptArrayBufferBytesNoCopy<C: JSArrayBufferHostScope & ~Copyable>(
   _ bytes: UnsafeMutableRawPointer?,
   byteLength: Int,

@@ -5,15 +5,15 @@
 /// Shape and byte access are implemented by the engine: only its own value type
 /// can read the array's kind/offset and overlay `byteOffset` on its backing
 /// pointer.
-public protocol JSTypedArray: ~Copyable {
+public protocol JSTypedArray: ~Copyable, ~Escapable {
   /// The context this typed array belongs to.
   associatedtype Context: JSContext
-  associatedtype Value: JSValue & ~Copyable
+  associatedtype Value: JSValue & ~Copyable & ~Escapable
   where Value == Context.Value
   associatedtype InstantContext: JSInstantContext & ~Copyable
   where InstantContext == Context.InstantContext
   /// The buffer type this array views.
-  associatedtype Buffer: JSArrayBuffer & ~Copyable
+  associatedtype Buffer: JSArrayBuffer & ~Copyable & ~Escapable
   where Buffer == Context.ArrayBuffer
 
   /// Borrow the underlying value view. The typed array's arena keeps the
@@ -23,6 +23,7 @@ public protocol JSTypedArray: ~Copyable {
   // MARK: - Construction
 
   /// Create a zero-filled typed array of `length` elements.
+  @_lifetime(borrow context)
   init(kind: JSTypedArrayKind, length: Int, in context: borrowing InstantContext)
 
   /// Create a typed array view over an existing buffer.
@@ -30,6 +31,7 @@ public protocol JSTypedArray: ~Copyable {
   /// `length == nil` covers the rest of the buffer from `byteOffset`. The
   /// element count is computed in core, so both engines derive the same slice
   /// for a non-zero offset.
+  @_lifetime(borrow context)
   init(
     kind: JSTypedArrayKind,
     buffer: borrowing Buffer,
@@ -41,6 +43,7 @@ public protocol JSTypedArray: ~Copyable {
   /// Wrap an existing value that the engine classifies as a typed array. The
   /// wrapped reference is anchored on the calling window's arena (`nil` when
   /// `value` is not a typed array).
+  @_lifetime(borrow context)
   init?(value: borrowing Value, in context: borrowing InstantContext)
 
   // MARK: - Shape
@@ -52,7 +55,8 @@ public protocol JSTypedArray: ~Copyable {
 
   /// The buffer this array views. The engine adopts the engine-returned buffer
   /// reference into the context default scope once.
-  var buffer: Buffer { get }
+  @_lifetime(borrow self)
+  func buffer() -> Buffer
 
   // MARK: - Bytes
 
@@ -71,8 +75,9 @@ public protocol JSTypedArray: ~Copyable {
 // The engine reports kind/length/byteLength/byteOffset and the bytes itself;
 // core only supplies the argument completion that needs no engine access.
 
-extension JSTypedArray where Self: ~Copyable {
+extension JSTypedArray where Self: ~Copyable & ~Escapable {
   /// Create a typed array that views the whole buffer.
+  @_lifetime(borrow context)
   public init(
     kind: JSTypedArrayKind,
     buffer: borrowing Buffer,

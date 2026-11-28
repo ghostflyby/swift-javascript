@@ -22,6 +22,11 @@ public struct JSCInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   package var contextRef: JSGlobalContextRef { core.contextRef }
 
+  @_lifetime(borrow self)
+  public func value(from argument: borrowing JSCCallArgument) -> JSCValue {
+    JSCValue(ref: argument.ref, contextRef: contextRef)
+  }
+
   package init(contextRef: JSGlobalContextRef) {
     self.core = JSCScopeCore(contextRef: contextRef, rootsArenaValues: false)
     JSCScopeStacks.push(core)

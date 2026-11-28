@@ -48,6 +48,7 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
   }
 
+  @_lifetime(borrow context)
   public static func encode<C: JSValueScope & ~Copyable>(
     _ value: T,
     in context: borrowing C
@@ -59,6 +60,7 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<C: JSValueScope & ~Copyable>(
     _ value: T,
     in context: borrowing C
@@ -81,10 +83,7 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
 
     let node = try JSCodableNode.fromJSONObject(jsonObject)
-    return try context.withInstantWindow {
-      window throws(JSValueConversionError) in
-      try jsValueFromSurfaceNode(node, in: context, window: window)
-    }
+    return try jsValueFromSurfaceNode(node, in: context)
   }
 
   // MARK: - Value to node
@@ -170,10 +169,10 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
 
   // MARK: - Node to value
 
+  @_lifetime(borrow context)
   private static func jsValueFromSurfaceNode<C: JSValueScope & ~Copyable>(
     _ node: JSCodableNode,
-    in context: borrowing C,
-    window: borrowing C.Context.InstantContext
+    in context: borrowing C
   ) throws(JSValueConversionError) -> C.Value {
     switch node {
     case .null:
@@ -194,13 +193,11 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
       }
       let arrayValue = context.persist(arrayCallback)
       for (index, item) in array.enumerated() {
-        let encoded = try jsValueFromSurfaceNode(
-          item,
-          in: context,
-          window: window
-        )
-        guard arrayValue.setProperty(at: index, to: encoded, in: window) else {
-          throw .codable("array element write failed at index \(index)")
+        let encoded = try jsValueFromSurfaceNode(item, in: context)
+        try context.withInstantWindow { window throws(JSValueConversionError) in
+          guard arrayValue.setProperty(at: index, to: encoded, in: window) else {
+            throw .codable("array element write failed at index \(index)")
+          }
         }
       }
       return arrayValue
@@ -211,21 +208,19 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
       }
       let objectValue = context.persist(objectCallback)
       for (key, value) in object {
-        let encoded = try jsValueFromSurfaceNode(
-          value,
-          in: context,
-          window: window
-        )
-        let propertyStringKey = window.makePropertyStringKey(key)
-        guard
-          objectValue.setProperty(
-            propertyStringKey,
-            to: encoded,
-            attributes: .none,
-            in: window
-          )
-        else {
-          throw .codable("object property write failed for key \(key)")
+        let encoded = try jsValueFromSurfaceNode(value, in: context)
+        try context.withInstantWindow { window throws(JSValueConversionError) in
+          let propertyStringKey = window.makePropertyStringKey(key)
+          guard
+            objectValue.setProperty(
+              propertyStringKey,
+              to: encoded,
+              attributes: .none,
+              in: window
+            )
+          else {
+            throw .codable("object property write failed for key \(key)")
+          }
         }
       }
       return objectValue
@@ -234,6 +229,7 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
 
   // MARK: - Property reads
 
+  @_lifetime(borrow window)
   private static func readSurfaceStringProperty<C: JSInstantContext & ~Copyable>(
     _ contextType: C.Type,
     _ key: String,
@@ -251,6 +247,7 @@ extension JSCodableValueConverter: JSValueDecoder, JSValueEncoder {
     }
   }
 
+  @_lifetime(borrow window)
   private static func readSurfaceIndexProperty<C: JSInstantContext & ~Copyable>(
     _ contextType: C.Type,
     _ index: Int,

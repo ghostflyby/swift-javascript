@@ -8,6 +8,7 @@ import SwiftJavaScript
   import CQuickJSSystem
 #endif
 
+@_lifetime(borrow context)
 package func quickJSCallFunction(
   _ function: CQuickJSValue,
   this thisValue: CQuickJSValue? = nil,
@@ -28,6 +29,7 @@ package func quickJSCallFunction(
   return quickJSResult(for: result, in: context)
 }
 
+@_lifetime(borrow context)
 package func quickJSConstruct(
   _ constructor: CQuickJSValue,
   arguments: [CQuickJSValue] = [],
@@ -40,6 +42,7 @@ package func quickJSConstruct(
   return quickJSResult(for: result, in: context)
 }
 
+@_lifetime(borrow context)
 package func quickJSToObject(
   _ value: CQuickJSValue,
   in context: OpaquePointer

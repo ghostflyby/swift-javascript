@@ -22,12 +22,14 @@ public protocol JSClassValueConvertible: AnyObject {
   ) throws(JSValueConversionError) -> Self
   where C == Context.InstantContext
 
+  @_lifetime(borrow context)
   static func encode<C: JSInstantContext & ~Copyable>(
     _ value: Self,
     in context: borrowing C
   ) -> C.Value
   where C == Context.InstantContext
 
+  @_lifetime(borrow context)
   static func tryEncode<C: JSInstantContext & ~Copyable>(
     _ value: Self,
     in context: borrowing C
@@ -48,6 +50,7 @@ extension JSClassValueConvertible {
     }
   }
 
+  @_lifetime(borrow context)
   public static func encode<C: JSInstantContext & ~Copyable>(
     _ value: Self,
     in context: borrowing C
@@ -134,6 +137,7 @@ where
     return instance
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<C: JSInstantContext & ~Copyable>(
     _ value: Self,
     in context: borrowing C
@@ -191,6 +195,7 @@ public enum JSClassValueConverter<T: JSClassValueConvertible> {
     try T.tryDecode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func encode<C: JSInstantContext & ~Copyable>(
     _ value: T,
     in context: borrowing C
@@ -199,6 +204,7 @@ public enum JSClassValueConverter<T: JSClassValueConvertible> {
     T.encode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<C: JSInstantContext & ~Copyable>(
     _ value: T,
     in context: borrowing C

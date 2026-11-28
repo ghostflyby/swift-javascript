@@ -41,7 +41,9 @@ let package = Package(
         // actor's dedicated VM thread, so the default-scope drain
         // (JSValueUnprotect / JS_FreeValue) never touches the engine from
         // a foreign thread. Tracked in TODO 2.5 until the feature ships.
-        .enableExperimentalFeature("IsolatedDeinit")
+        .enableExperimentalFeature("IsolatedDeinit"),
+        // Experimental non-escapable value views: `~Escapable` + `@_lifetime`.
+        .enableExperimentalFeature("Lifetimes"),
       ]
     ),
     .target(
@@ -50,6 +52,9 @@ let package = Package(
         "SwiftJavaScript",
         "SwiftyJavaScriptCoreMacrosPlugin",
         .product(name: "ThreadAffinityExecutor", package: "swift-thread-affinity-executor"),
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     .target(
@@ -58,6 +63,9 @@ let package = Package(
         "SwiftJavaScript",
         .product(name: "CQuickJSStatic", package: "Swift-CQuickJS"),
         .product(name: "ThreadAffinityExecutor", package: "swift-thread-affinity-executor"),
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     .macro(
@@ -74,6 +82,9 @@ let package = Package(
       name: "SwiftJavaScriptTests",
       dependencies: [
         "SwiftJavaScript"
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     .testTarget(
@@ -82,6 +93,9 @@ let package = Package(
         "SwiftJavaScript",
         "SwiftyJavaScriptCore",
         "SwiftyQuickJS",
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     .testTarget(
@@ -90,12 +104,18 @@ let package = Package(
         "SwiftyJavaScriptCore",
         "SwiftyJavaScriptCoreMacrosPlugin",
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     .testTarget(
       name: "SwiftyQuickJSTests",
       dependencies: [
         "SwiftyQuickJS"
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
       ]
     ),
     // Stage 4 calibration harness (`docs/PERSISTENT_HANDLE_DESIGN.md` §8.4/§11).
@@ -107,7 +127,10 @@ let package = Package(
         "SwiftyJavaScriptCore",
         "SwiftyQuickJS",
       ],
-      path: "Benchmarks/PersistentHandleBenchmarks"
+      path: "Benchmarks/PersistentHandleBenchmarks",
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes")
+      ]
     ),
   ]
 )

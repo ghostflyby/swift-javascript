@@ -152,6 +152,7 @@ extension QJSInstantContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeHostObject(
     of jsClass: QJSClass,
     privateData: UnsafeMutableRawPointer

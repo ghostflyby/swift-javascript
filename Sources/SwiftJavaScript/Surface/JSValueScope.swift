@@ -9,27 +9,37 @@
 public protocol JSValueScope: ~Copyable {
   /// The context this scope belongs to.
   associatedtype Context: JSContext
-  associatedtype Value: JSValue & ~Copyable
+  associatedtype Value: JSValue & ~Copyable & ~Escapable
   where Value == Context.Value
   associatedtype PropertyStringKey: JSPropertyStringKey & ~Copyable
   where PropertyStringKey == Context.PropertyStringKey
 
   // MARK: Value factories
 
+  @_lifetime(borrow self)
   func makeString(_ value: String) -> Value
+  @_lifetime(borrow self)
   func makeString(from key: borrowing PropertyStringKey) -> Value
+  @_lifetime(borrow self)
   func makeNumber(_ value: Double) -> Value
+  @_lifetime(borrow self)
   func makeBoolean(_ value: Bool) -> Value
+  @_lifetime(borrow self)
   func makeNull() -> Value
+  @_lifetime(borrow self)
   func makeUndefined() -> Value
+  @_lifetime(borrow self)
   func makeSymbol(_ value: String) -> Value
+  @_lifetime(borrow self)
   func makeObject() -> JSResult<Value>
+  @_lifetime(borrow self)
   func makeArray() -> JSResult<Value>
 
   // MARK: Persistence
 
   /// Transfer the value's owned reference into the context default scope and
   /// return a view valid beyond this window.
+  @_lifetime(borrow self)
   func persist(_ value: borrowing Value) -> Value
 
   /// The local value view of a value that is already backed by this window's
@@ -37,6 +47,7 @@ public protocol JSValueScope: ~Copyable {
   /// no claim, no ledger entry. The view is only valid while the source arena
   /// is alive, so it is confined to the synchronous window that produced it.
   @available(*, noasync)
+  @_lifetime(borrow self)
   func localValue(_ value: borrowing Value) -> Value
 
   // MARK: Value window
@@ -67,6 +78,7 @@ public protocol JSValueScope: ~Copyable {
 }
 
 extension JSValueScope where Self: ~Copyable {
+  @_lifetime(borrow self)
   public func makeNumber(_ value: some BinaryInteger) -> Value {
     makeNumber(Double(value))
   }

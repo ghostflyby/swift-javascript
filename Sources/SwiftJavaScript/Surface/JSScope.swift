@@ -16,7 +16,9 @@ public protocol JSScope: JSValueScope, ~Copyable {
 
   // MARK: - Global object
 
+  @_lifetime(borrow self)
   func globalObjectValue() -> Value
+  @_lifetime(borrow self)
   func getGlobalProperty(forKey key: StaticString) -> Value
   func setGlobalProperty(
     _ value: borrowing Value,
@@ -25,6 +27,7 @@ public protocol JSScope: JSValueScope, ~Copyable {
   )
   func deleteGlobalProperty(forKey key: StaticString)
   func hasGlobalProperty(_ key: StaticString) -> Bool
+  @_lifetime(borrow self)
   func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<InstantContext>
@@ -46,11 +49,13 @@ public protocol JSScope: JSValueScope, ~Copyable {
 
   /// Resolve a handle into a local view anchored on this scope's arena.
   @available(*, noasync)
+  @_lifetime(borrow self)
   func resolve(_ handle: PersistentHandle) -> Value?
 
   // MARK: - Self-owning inputs and scripts
 
   func prepareScript(_ source: String) -> PreparedScript
+  @_lifetime(borrow self)
   func evaluateScript(
     _ script: borrowing PreparedScript,
     sourceURL: String?,
@@ -100,6 +105,7 @@ extension JSScope where Self: ~Copyable {
   }
 
   /// Evaluate `script` through a prepared script wrapped in this scope.
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: String,
     sourceURL: String? = nil,

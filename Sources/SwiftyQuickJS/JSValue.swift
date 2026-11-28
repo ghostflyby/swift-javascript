@@ -43,7 +43,7 @@ public struct QJSCallArgument: SwiftJavaScript.JSCallArgument {
 /// Context-bound classification, conversion, and equality route to the
 /// `QuickJS` statics; immediate values use tag-level paths that need no
 /// context.
-public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
+public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable, ~Escapable {
   public typealias Context = QJSContext
   public typealias InstantContext = QJSInstantContext
 
@@ -52,9 +52,16 @@ public struct QJSValue: SwiftJavaScript.JSValue, ~Copyable {
   /// immediate value.
   package let contextRef: OpaquePointer?
 
+  @_lifetime(borrow contextRef)
   package init(value: CQuickJSValue, contextRef: OpaquePointer?) {
     self.value = value
     self.contextRef = contextRef
+  }
+
+  @_lifetime(borrow context)
+  package init(value: CQuickJSValue, in context: borrowing QJSInstantContext) {
+    self.value = value
+    self.contextRef = context.contextRef
   }
 
   /// The context an engine operation must run under. Values created through a

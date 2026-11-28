@@ -99,6 +99,7 @@ package func quickJSMakeFunction(
 /// Evaluate `source` with the global eval type. A prepared script only
 /// carries the source text and the context that compiled it, so the driver
 /// takes the text directly.
+@_lifetime(borrow context)
 package func quickJSEvaluateScript(
   _ source: String,
   sourceURL: String? = nil,
@@ -507,12 +508,12 @@ private func quickJSSurfaceFunctionCallback(
     return quickJSImmediateValue(tag: Int32(JS_TAG_UNDEFINED))
   }
 
-  let thisValue = QJSValue(value: thisValueRef, contextRef: contextRef)
+  let thisArgument = QJSCallArgument(value: thisValueRef)
 
   let result = quickJSWithArguments(
     arguments, count: Int(argumentCount)
   ) { args in
-    callback(scope, thisValue, args)
+    callback(scope, thisArgument, args)
   }
 
   if result.isException {

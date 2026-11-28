@@ -14,6 +14,7 @@ import SwiftJavaScript
 extension QJSValue {
   // MARK: Property reads
 
+  @_lifetime(borrow context)
   public func getProperty(
     _ key: StaticString,
     in context: borrowing QJSInstantContext
@@ -24,6 +25,7 @@ extension QJSValue {
     )
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: borrowing QJSInstantContext
@@ -38,6 +40,7 @@ extension QJSValue {
     )
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     at index: Int,
     in context: borrowing QJSInstantContext
@@ -137,54 +140,58 @@ extension QJSValue {
 
   // MARK: Calling and construction
 
+  @_lifetime(borrow context)
   public func call(
-    arguments: [QJSCallArgument],
+    arguments: Span<QJSCallArgument>,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSCallFunction(
         value,
         this: nil,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func call(
     this thisValue: borrowing QJSValue,
-    arguments: [QJSCallArgument],
+    arguments: Span<QJSCallArgument>,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSCallFunction(
         value,
         this: thisValue.value,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func construct(
-    arguments: [QJSCallArgument],
+    arguments: Span<QJSCallArgument>,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSConstruct(
         value,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func invokeMethod(
     _ name: StaticString,
-    arguments: [QJSCallArgument],
+    arguments: Span<QJSCallArgument>,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     switch getProperty(name, in: context) {
@@ -195,9 +202,10 @@ extension QJSValue {
     }
   }
 
+  @_lifetime(borrow context)
   public func invokeMethod(
     _ name: borrowing QJSPropertyStringKey,
-    arguments: [QJSCallArgument],
+    arguments: Span<QJSCallArgument>,
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
     switch getProperty(name, in: context) {
@@ -210,6 +218,7 @@ extension QJSValue {
 
   // MARK: Object conversion and classification
 
+  @_lifetime(borrow context)
   public func toObject(
     in context: borrowing QJSInstantContext
   ) -> JSResult<QJSValue> {
@@ -258,6 +267,7 @@ extension QJSValue {
 extension QJSValue {
   // MARK: Property reads
 
+  @_lifetime(borrow context)
   public func getProperty(
     _ key: StaticString,
     in context: isolated QJSContext = #isolation
@@ -268,6 +278,7 @@ extension QJSValue {
     )
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     _ key: borrowing QJSPropertyStringKey,
     in context: isolated QJSContext = #isolation
@@ -282,6 +293,7 @@ extension QJSValue {
     )
   }
 
+  @_lifetime(borrow context)
   public func getProperty(
     at index: Int,
     in context: isolated QJSContext = #isolation
@@ -381,6 +393,7 @@ extension QJSValue {
 
   // MARK: Object conversion and classification
 
+  @_lifetime(borrow context)
   public func toObject(in context: isolated QJSContext = #isolation) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSToObject(value, in: context.contextRef),
@@ -423,54 +436,58 @@ extension QJSValue {
 // they outlive the call itself.
 
 extension QJSValue {
+  @_lifetime(borrow context)
   public func call(
-    arguments: [QJSCallArgument] = [],
+    arguments: Span<QJSCallArgument> = Span(),
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSCallFunction(
         value,
         this: nil,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func call(
     this thisValue: borrowing QJSValue,
-    arguments: [QJSCallArgument] = [],
+    arguments: Span<QJSCallArgument> = Span(),
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSCallFunction(
         value,
         this: thisValue.value,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func construct(
-    arguments: [QJSCallArgument] = [],
+    arguments: Span<QJSCallArgument> = Span(),
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     bridgeQJSValueResult(
       quickJSConstruct(
         value,
-        arguments: arguments.map(\.value),
+        arguments: quickJSRawArguments(arguments),
         in: context.contextRef
       ),
       in: context
     )
   }
 
+  @_lifetime(borrow context)
   public func invokeMethod(
     _ name: StaticString,
-    arguments: [QJSCallArgument] = [],
+    arguments: Span<QJSCallArgument> = Span(),
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
@@ -484,7 +501,7 @@ extension QJSValue {
         quickJSCallFunction(
           method.value,
           this: value,
-          arguments: arguments.map(\.value),
+          arguments: quickJSRawArguments(arguments),
           in: context.contextRef
         ),
         in: context
@@ -492,9 +509,10 @@ extension QJSValue {
     }
   }
 
+  @_lifetime(borrow context)
   public func invokeMethod(
     _ name: borrowing QJSPropertyStringKey,
-    arguments: [QJSCallArgument] = [],
+    arguments: Span<QJSCallArgument> = Span(),
     in context: isolated QJSContext = #isolation
   ) -> JSResult<QJSValue> {
     switch bridgeQJSValueResult(
@@ -512,7 +530,7 @@ extension QJSValue {
         quickJSCallFunction(
           method.value,
           this: value,
-          arguments: arguments.map(\.value),
+          arguments: quickJSRawArguments(arguments),
           in: context.contextRef
         ),
         in: context
@@ -528,8 +546,20 @@ extension QJSValue {
 // exception path included. The adoption target belongs to the engine, so this
 // helper lives with it.
 
+private func quickJSRawArguments(
+  _ arguments: Span<QJSCallArgument>
+) -> [CQuickJSValue] {
+  var values: [CQuickJSValue] = []
+  values.reserveCapacity(arguments.count)
+  for index in 0..<arguments.count {
+    values.append(arguments[index].value)
+  }
+  return values
+}
+
+@_lifetime(borrow context)
 private func bridgeQJSValueResult(
-  _ result: JSResult<CQuickJSValue>?,
+  _ result: consuming JSResult<CQuickJSValue>?,
   in context: borrowing QJSInstantContext
 ) -> JSResult<QJSValue> {
   guard let result else {
@@ -543,8 +573,9 @@ private func bridgeQJSValueResult(
   }
 }
 
+@_lifetime(borrow context)
 private func bridgeQJSValueResult(
-  _ result: JSResult<CQuickJSValue>?,
+  _ result: consuming JSResult<CQuickJSValue>?,
   in context: isolated QJSContext
 ) -> JSResult<QJSValue> {
   guard let result else {

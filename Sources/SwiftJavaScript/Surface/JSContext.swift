@@ -32,7 +32,7 @@
 public protocol JSContext: Actor, Hashable {
   associatedtype VirtualMachine: JSVirtualMachine
   where VirtualMachine.Context == Self
-  associatedtype Value: JSValue & ~Copyable
+  associatedtype Value: JSValue & ~Copyable & ~Escapable
   where
     Value.Context == Self,
     Value.InstantContext == InstantContext
@@ -72,12 +72,12 @@ public protocol JSContext: Actor, Hashable {
   where PropertyStringKey.Context == Self
   associatedtype PreparedScript: JSPreparedScript & ~Copyable
   where PreparedScript.Context == Self
-  associatedtype ArrayBuffer: JSArrayBuffer & ~Copyable
+  associatedtype ArrayBuffer: JSArrayBuffer & ~Copyable & ~Escapable
   where
     ArrayBuffer.Context == Self,
     ArrayBuffer.Value == Value,
     ArrayBuffer.InstantContext == InstantContext
-  associatedtype TypedArray: JSTypedArray & ~Copyable
+  associatedtype TypedArray: JSTypedArray & ~Copyable & ~Escapable
   where
     TypedArray.Context == Self,
     TypedArray.Value == Value,
@@ -142,22 +142,32 @@ public protocol JSContext: Actor, Hashable {
 
   /// Resolve a handle into a local view anchored on the context default scope.
   /// Returns `nil` for a dead, foreign, or already-closed binding.
+  @_lifetime(borrow self)
   func resolve(_ handle: PersistentHandle) -> Value?
 
   // MARK: - Value factories
 
+  @_lifetime(borrow self)
   func makeString(_ value: String) -> Value
+  @_lifetime(borrow self)
   func makeString(from key: borrowing PropertyStringKey) -> Value
+  @_lifetime(borrow self)
   func makeNumber(_ value: Double) -> Value
+  @_lifetime(borrow self)
   func makeBoolean(_ value: Bool) -> Value
+  @_lifetime(borrow self)
   func makeNull() -> Value
+  @_lifetime(borrow self)
   func makeUndefined() -> Value
+  @_lifetime(borrow self)
   func makeObject() -> Value
+  @_lifetime(borrow self)
   func makeArray() -> Value
   func makePropertyStringKey(_ value: String) -> PropertyStringKey
 
   /// Create a function value with the engine's surface callback signature.
   /// Its creation reference is adopted by the context default scope.
+  @_lifetime(borrow self)
   func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<InstantContext>
@@ -165,7 +175,9 @@ public protocol JSContext: Actor, Hashable {
 
   // MARK: - Global object
 
+  @_lifetime(borrow self)
   func globalObjectValue() -> Value
+  @_lifetime(borrow self)
   func getGlobalProperty(forKey key: StaticString) -> Value
   func setGlobalProperty(
     _ value: borrowing Value,
@@ -185,6 +197,7 @@ public protocol JSContext: Actor, Hashable {
   // MARK: - Self-owning inputs and scripts
 
   func prepareScript(_ source: String) -> PreparedScript
+  @_lifetime(borrow self)
   func evaluateScript(
     _ script: borrowing PreparedScript,
     sourceURL: String?,
@@ -204,6 +217,7 @@ extension JSContext {
     body(globalObjectValue())
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: some BinaryInteger) -> Value {
     makeNumber(Double(value))
   }
@@ -215,6 +229,7 @@ extension JSContext {
 
   /// Evaluate `script` through a prepared-script handle, the same path the
   /// prepared-script overload takes.
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: String,
     sourceURL: String? = nil,

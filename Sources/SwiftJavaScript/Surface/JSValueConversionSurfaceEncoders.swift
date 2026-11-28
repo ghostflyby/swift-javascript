@@ -6,16 +6,19 @@
 
 /// A Swift value that can be encoded into a surface scope window.
 public protocol JSValueEncodable: ~Copyable, SendableMetatype {
+  @_lifetime(borrow context)
   func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value
 
+  @_lifetime(borrow context)
   func tryEncodeSurface<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) throws(JSValueConversionError) -> C.Value
 }
 
 extension JSValueEncodable where Self: ~Copyable {
+  @_lifetime(borrow context)
   public func tryEncodeSurface<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) throws(JSValueConversionError) -> C.Value {
@@ -27,11 +30,13 @@ extension JSValueEncodable where Self: ~Copyable {
 public protocol JSValueEncoder: ~Copyable, SendableMetatype {
   associatedtype SwiftType
 
+  @_lifetime(borrow context)
   static func encode<C: JSValueScope & ~Copyable>(
     _ value: SwiftType,
     in context: borrowing C
   ) -> C.Value
 
+  @_lifetime(borrow context)
   static func tryEncode<C: JSValueScope & ~Copyable>(
     _ value: SwiftType,
     in context: borrowing C
@@ -39,6 +44,7 @@ public protocol JSValueEncoder: ~Copyable, SendableMetatype {
 }
 
 extension JSValueEncoder where Self: ~Copyable {
+  @_lifetime(borrow context)
   public static func tryEncode<C: JSValueScope & ~Copyable>(
     _ value: SwiftType,
     in context: borrowing C
@@ -73,6 +79,7 @@ public enum JSDefaultConverter<T: JSValueDecodable & JSValueEncodable>:
     try T.tryDecode(value, in: context)
   }
 
+  @_lifetime(borrow context)
   public static func encode<C: JSValueScope & ~Copyable>(
     _ value: T,
     in context: borrowing C
@@ -80,6 +87,7 @@ public enum JSDefaultConverter<T: JSValueDecodable & JSValueEncodable>:
     value.toSurfaceValue(in: context)
   }
 
+  @_lifetime(borrow context)
   public static func tryEncode<C: JSValueScope & ~Copyable>(
     _ value: T,
     in context: borrowing C
@@ -156,6 +164,7 @@ extension JSScope where Self: ~Copyable {
 // MARK: - Built-in witnesses
 
 extension Bool: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value {
@@ -164,6 +173,7 @@ extension Bool: JSValueEncodable {
 }
 
 extension Double: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value {
@@ -172,6 +182,7 @@ extension Double: JSValueEncodable {
 }
 
 extension Int32: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value {
@@ -180,6 +191,7 @@ extension Int32: JSValueEncodable {
 }
 
 extension UInt32: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value {
@@ -188,6 +200,7 @@ extension UInt32: JSValueEncodable {
 }
 
 extension String: JSValueEncodable {
+  @_lifetime(borrow context)
   public func toSurfaceValue<C: JSValueScope & ~Copyable>(
     in context: borrowing C
   ) -> C.Value {

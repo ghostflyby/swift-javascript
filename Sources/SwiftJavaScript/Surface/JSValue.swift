@@ -8,10 +8,13 @@
 /// the value was created in or promoted to, so copying a view is a pure
 /// identity copy and dropping it performs no release.
 ///
+/// Values are local views: `~Escapable` ties their use to the scope or context
+/// that produced them, so they cannot be stored or returned past that domain.
+///
 /// The protocol names only what a value needs — the context it belongs to and
 /// its scope, each an alias of the context's. A value's operations return the
 /// context's value type.
-public protocol JSValue: ~Copyable {
+public protocol JSValue: ~Copyable, ~Escapable {
   /// The context this value belongs to.
   associatedtype Context: JSContext
   /// The synchronous scope this value is addressed in.
@@ -54,17 +57,20 @@ public protocol JSValue: ~Copyable {
 
   // MARK: - Property access (S5)
 
+  @_lifetime(borrow context)
   func getProperty(
     _ key: StaticString,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func getProperty(
     _ key: borrowing InstantContext.PropertyStringKey,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
   /// Read the element at `index` (engine `getIndexPropertyHandle`).
+  @_lifetime(borrow context)
   func getProperty(
     at index: Int,
     in context: borrowing InstantContext
@@ -120,34 +126,40 @@ public protocol JSValue: ~Copyable {
   /// Call the value as a function. Arguments are value-level tokens
   /// (`asCallArgument()`); the caller keeps their source arenas alive across
   /// the synchronous call.
+  @_lifetime(borrow context)
   func call(
-    arguments: [Context.CallArgument],
+    arguments: Span<Context.CallArgument>,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func call(
     this thisValue: borrowing Self,
-    arguments: [Context.CallArgument],
+    arguments: Span<Context.CallArgument>,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func construct(
-    arguments: [Context.CallArgument],
+    arguments: Span<Context.CallArgument>,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func invokeMethod(
     _ name: StaticString,
-    arguments: [Context.CallArgument],
+    arguments: Span<Context.CallArgument>,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func invokeMethod(
     _ name: borrowing InstantContext.PropertyStringKey,
-    arguments: [Context.CallArgument],
+    arguments: Span<Context.CallArgument>,
     in context: borrowing InstantContext
   ) -> JSResult<Context.Value>
 
+  @_lifetime(borrow context)
   func toObject(in context: borrowing InstantContext) -> JSResult<Context.Value>
 
   func isArray(in context: borrowing InstantContext) -> Bool
@@ -167,7 +179,7 @@ public protocol JSValue: ~Copyable {
 // The predicates are expressed in terms of `type()`, so an engine that
 // classifies values correctly gets all eight for free. Every other operation
 // is implemented by the engine's value type against its own context driver.
-extension JSValue where Self: ~Copyable {
+extension JSValue where Self: ~Copyable & ~Escapable {
   public func isUndefined() -> Bool { type() == .undefined }
   public func isNull() -> Bool { type() == .null }
   public func isBoolean() -> Bool { type() == .boolean }

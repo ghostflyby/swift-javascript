@@ -68,6 +68,7 @@ package func quickJSPropertyNames(
   }
 }
 
+@_lifetime(borrow context)
 package func quickJSGetStaticStringProperty(
   _ key: StaticString,
   on object: CQuickJSValue,
@@ -78,6 +79,7 @@ package func quickJSGetStaticStringProperty(
   }
 }
 
+@_lifetime(borrow context)
 package func quickJSGetProperty(
   atom: JSAtom,
   on object: CQuickJSValue,
@@ -108,6 +110,7 @@ package func quickJSSetProperty(
   quickJSDefineProperty(atom, on: object, to: value, in: context, attributes: attributes)
 }
 
+@_lifetime(borrow context)
 package func quickJSGetValueProperty(
   _ key: CQuickJSValue,
   on object: CQuickJSValue,
@@ -121,6 +124,7 @@ package func quickJSGetValueProperty(
   return quickJSResult(for: JS_GetProperty(context, object, atom), in: context)
 }
 
+@_lifetime(borrow context)
 package func quickJSGetIndexProperty(
   at index: UInt32,
   on object: CQuickJSValue,
@@ -223,7 +227,8 @@ package func quickJSDeleteValueProperty(
   return JS_DeleteProperty(context, object, atom, Int32(JS_PROP_THROW)) == 1
 }
 
-private func quickJSWithPropertyStringAtom<R>(
+@_lifetime(borrow context)
+private func quickJSWithPropertyStringAtom<R: ~Copyable & ~Escapable>(
   _ value: String,
   in context: OpaquePointer,
   _ body: (JSAtom) -> R
@@ -238,7 +243,8 @@ private func quickJSWithPropertyStringAtom<R>(
   return body(atom)
 }
 
-private func quickJSWithPropertyStringAtom<R>(
+@_lifetime(borrow context)
+private func quickJSWithPropertyStringAtom<R: ~Copyable & ~Escapable>(
   _ value: StaticString,
   in context: OpaquePointer,
   _ body: (JSAtom) -> R

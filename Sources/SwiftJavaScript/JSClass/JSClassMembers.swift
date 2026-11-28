@@ -4,13 +4,13 @@ public protocol JSStaticValueDefinition: Sendable {
   var name: String { get }
   var attributes: JSPropertyAttributes { get }
   var getProperty:
-    @Sendable (borrowing Context.InstantContext, borrowing Context.Value)
-      -> JSResult<Context.Value>
+    @Sendable (borrowing Context.InstantContext, Context.CallArgument)
+      -> Context.CallbackReturn
   { get }
   var setProperty:
     @Sendable (
-      borrowing Context.InstantContext, borrowing Context.Value, borrowing Context.Value
-    ) -> JSResult<Context.Value>
+      borrowing Context.InstantContext, Context.CallArgument, Context.CallArgument
+    ) -> Context.CallbackReturn?
   { get }
 }
 
@@ -21,8 +21,8 @@ public protocol JSStaticFunctionDefinition: Sendable {
   var attributes: JSPropertyAttributes { get }
   var callAsFunction:
     @Sendable (
-      borrowing Context.InstantContext, borrowing Context.Value, borrowing Context.Arguments
-    ) -> JSResult<Context.Value>
+      borrowing Context.InstantContext, Context.CallArgument, borrowing Context.Arguments
+    ) -> Context.CallbackReturn
   { get }
 }
 
@@ -52,20 +52,20 @@ public struct JSStaticValue<E: JSContext>: JSStaticValueDefinition, Sendable {
   public let name: String
   public let attributes: JSPropertyAttributes
   public let getProperty:
-    @Sendable (borrowing E.InstantContext, borrowing E.Value)
-      -> JSResult<E.Value>
+    @Sendable (borrowing E.InstantContext, E.CallArgument)
+      -> E.CallbackReturn
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     getProperty:
       @escaping @Sendable (
-        borrowing E.InstantContext, borrowing E.Value
-      ) -> JSResult<E.Value>,
+        borrowing E.InstantContext, E.CallArgument
+      ) -> E.CallbackReturn,
     setProperty:
       @escaping @Sendable (
-        borrowing E.InstantContext, borrowing E.Value, borrowing E.Value
-      ) -> JSResult<E.Value>
+        borrowing E.InstantContext, E.CallArgument, E.CallArgument
+      ) -> E.CallbackReturn?
   ) {
     self.name = name
     self.attributes = attributes
@@ -74,8 +74,8 @@ public struct JSStaticValue<E: JSContext>: JSStaticValueDefinition, Sendable {
   }
   public let setProperty:
     @Sendable (
-      borrowing E.InstantContext, borrowing E.Value, borrowing E.Value
-    ) -> JSResult<E.Value>
+      borrowing E.InstantContext, E.CallArgument, E.CallArgument
+    ) -> E.CallbackReturn?
 }
 
 public struct JSStaticFunction<E: JSContext>: JSStaticFunctionDefinition, Sendable {
@@ -85,16 +85,16 @@ public struct JSStaticFunction<E: JSContext>: JSStaticFunctionDefinition, Sendab
   public let attributes: JSPropertyAttributes
   public let callAsFunction:
     @Sendable (
-      borrowing E.InstantContext, borrowing E.Value, borrowing E.Arguments
-    ) -> JSResult<E.Value>
+      borrowing E.InstantContext, E.CallArgument, borrowing E.Arguments
+    ) -> E.CallbackReturn
 
   public init(
     name: String,
     attributes: JSPropertyAttributes,
     callAsFunction:
       @escaping @Sendable (
-        borrowing E.InstantContext, borrowing E.Value, borrowing E.Arguments
-      ) -> JSResult<E.Value>
+        borrowing E.InstantContext, E.CallArgument, borrowing E.Arguments
+      ) -> E.CallbackReturn
   ) {
     self.name = name
     self.attributes = attributes
@@ -109,17 +109,17 @@ extension JSStaticValueDefinition {
 
   package func propertyValue(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value
-  ) -> JSResult<Context.Value> {
+    on thisValue: Context.CallArgument
+  ) -> Context.CallbackReturn {
     getProperty(context, thisValue)
   }
 
   package func setPropertyException(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
-    to newValue: borrowing Context.Value
-  ) -> Context.Value? {
-    takeExceptionValue(setProperty(context, thisValue, newValue))
+    on thisValue: Context.CallArgument,
+    to newValue: Context.CallArgument
+  ) -> Context.CallbackReturn? {
+    setProperty(context, thisValue, newValue)
   }
 
   public func hostPropertyDescriptor(
@@ -142,9 +142,9 @@ extension JSStaticFunctionDefinition {
 
   package func callResult(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
+    on thisValue: Context.CallArgument,
     with arguments: borrowing Context.Arguments
-  ) -> JSResult<Context.Value> {
+  ) -> Context.CallbackReturn {
     callAsFunction(context, thisValue, arguments)
   }
 

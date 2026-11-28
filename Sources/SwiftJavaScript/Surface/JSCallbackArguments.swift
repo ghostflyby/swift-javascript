@@ -5,7 +5,7 @@
 public protocol JSCallbackArguments: ~Copyable {
   /// The context this argument view belongs to.
   associatedtype Context: JSContext
-  associatedtype Value: JSValue & ~Copyable
+  associatedtype Value: JSValue & ~Copyable & ~Escapable
   where Value == Context.Value
   /// The callback window whose argument frame backs these values.
   associatedtype InstantContext: JSInstantContext & ~Copyable
