@@ -13,6 +13,7 @@ import SwiftJavaScript
 
 /// Map one engine result to the core `JSResult`: an exception engine value is
 /// replaced by the pending exception it carries.
+@_lifetime(borrow contextRef)
 func quickJSResult(
   for result: CQuickJSValue,
   in contextRef: OpaquePointer

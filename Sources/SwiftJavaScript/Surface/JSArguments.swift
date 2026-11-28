@@ -5,7 +5,7 @@
 public protocol JSArguments: ~Copyable {
   /// The context this argument view belongs to.
   associatedtype Context: JSContext
-  associatedtype Value: JSValue & ~Copyable
+  associatedtype Value: JSValue & ~Copyable & ~Escapable
   where Value == Context.Value
   /// The scope arguments are decoded in.
   associatedtype InstantContext: JSInstantContext & ~Copyable

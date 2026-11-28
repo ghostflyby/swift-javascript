@@ -13,6 +13,7 @@ import SwiftJavaScript
 extension JSCValue {
   // MARK: Plain function callback
 
+  @_lifetime(borrow context)
   public init(
     name: String,
     callback: @escaping JSFunctionCallback<JSCInstantContext>,
@@ -33,6 +34,7 @@ extension JSCValue {
 
   // MARK: Typed function (decodable arguments, encodable return/error)
 
+  @_lifetime(borrow context)
   public init<
     each A: JSValueDecodable,
     R: JSValueEncodable,
@@ -75,6 +77,7 @@ extension JSCValue {
 
   // MARK: Coder-based typed function
 
+  @_lifetime(borrow context)
   public init<
     each C: JSValueDecoder,
     RCoder: JSValueEncoder,

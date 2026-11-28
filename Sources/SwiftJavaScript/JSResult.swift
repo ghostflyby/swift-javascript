@@ -1,9 +1,7 @@
-public enum JSResult<Value: ~Copyable>: ~Copyable {
+public enum JSResult<Value: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   case value(Value)
   case exception(Value)
 }
-
-extension JSResult: Copyable where Value: Copyable {}
 
 extension JSResult {
   public var isException: Bool {
@@ -17,7 +15,8 @@ extension JSResult {
 
 }
 
-package func takeExceptionValue<Value: ~Copyable>(
+@_lifetime(copy result)
+package func takeExceptionValue<Value: ~Copyable & ~Escapable>(
   _ result: consuming JSResult<Value>
 ) -> Value? {
   switch consume result {

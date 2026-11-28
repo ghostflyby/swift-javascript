@@ -130,46 +130,46 @@ extension JSCValue {
   // MARK: Calling and construction
 
   public func call(
-    arguments: [JSCCallArgument],
+    arguments: Span<JSCCallArgument>,
     in context: borrowing JSCInstantContext
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreCallFunctionHandle(
         ref,
         this: nil,
-        argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func call(
     this thisValue: borrowing JSCValue,
-    arguments: [JSCCallArgument],
+    arguments: Span<JSCCallArgument>,
     in context: borrowing JSCInstantContext
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreCallFunctionHandle(
         ref,
         this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func construct(
-    arguments: [JSCCallArgument],
+    arguments: Span<JSCCallArgument>,
     in context: borrowing JSCInstantContext
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreConstructHandle(
-        ref, argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        ref, argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func invokeMethod(
     _ name: StaticString,
-    arguments: [JSCCallArgument],
+    arguments: Span<JSCCallArgument>,
     in context: borrowing JSCInstantContext
   ) -> JSResult<JSCValue> {
     switch getProperty(name, in: context) {
@@ -182,7 +182,7 @@ extension JSCValue {
 
   public func invokeMethod(
     _ name: borrowing JSCPropertyStringKey,
-    arguments: [JSCCallArgument],
+    arguments: Span<JSCCallArgument>,
     in context: borrowing JSCInstantContext
   ) -> JSResult<JSCValue> {
     switch getProperty(name, in: context) {
@@ -399,46 +399,46 @@ extension JSCValue {
 
 extension JSCValue {
   public func call(
-    arguments: [JSCCallArgument] = [],
+    arguments: Span<JSCCallArgument> = Span(),
     in context: isolated JSCContext = #isolation
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreCallFunctionHandle(
         ref,
         this: nil,
-        argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func call(
     this thisValue: borrowing JSCValue,
-    arguments: [JSCCallArgument] = [],
+    arguments: Span<JSCCallArgument> = Span(),
     in context: isolated JSCContext = #isolation
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreCallFunctionHandle(
         ref,
         this: thisValue.ref,
-        argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func construct(
-    arguments: [JSCCallArgument] = [],
+    arguments: Span<JSCCallArgument> = Span(),
     in context: isolated JSCContext = #isolation
   ) -> JSResult<JSCValue> {
     bridgeJSCValueResult(
       javaScriptCoreConstructHandle(
-        ref, argumentHandles: arguments.map(\.ref), in: context.contextRef),
+        ref, argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
       in: context
     )
   }
 
   public func invokeMethod(
     _ name: StaticString,
-    arguments: [JSCCallArgument] = [],
+    arguments: Span<JSCCallArgument> = Span(),
     in context: isolated JSCContext = #isolation
   ) -> JSResult<JSCValue> {
     switch bridgeJSCValueResult(
@@ -452,7 +452,7 @@ extension JSCValue {
         javaScriptCoreCallFunctionHandle(
           method.ref,
           this: ref,
-          argumentHandles: arguments.map(\.ref), in: context.contextRef),
+          argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
         in: context
       )
     }
@@ -460,7 +460,7 @@ extension JSCValue {
 
   public func invokeMethod(
     _ name: borrowing JSCPropertyStringKey,
-    arguments: [JSCCallArgument] = [],
+    arguments: Span<JSCCallArgument> = Span(),
     in context: isolated JSCContext = #isolation
   ) -> JSResult<JSCValue> {
     switch bridgeJSCValueResult(
@@ -476,7 +476,7 @@ extension JSCValue {
         javaScriptCoreCallFunctionHandle(
           method.ref,
           this: ref,
-          argumentHandles: arguments.map(\.ref), in: context.contextRef),
+          argumentHandles: javaScriptCoreRawArguments(arguments), in: context.contextRef),
         in: context
       )
     }
@@ -489,6 +489,17 @@ extension JSCValue {
 // ref onto the calling arena exactly once — the exception path included.
 // The adoption target belongs to the engine, so this helper lives with it (the
 // former core bridge is gone).
+
+private func javaScriptCoreRawArguments(
+  _ arguments: Span<JSCCallArgument>
+) -> [JSValueRef] {
+  var references: [JSValueRef] = []
+  references.reserveCapacity(arguments.count)
+  for index in 0..<arguments.count {
+    references.append(arguments[index].ref)
+  }
+  return references
+}
 
 private func bridgeJSCValueResult(
   _ result: JSResult<JSValueRef>?,

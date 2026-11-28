@@ -6,6 +6,7 @@ import JavaScriptCore
 // callbacks now hand `JSResult<JSCValue>` to the private ABI.
 
 extension JSResult where Value == JSCValue {
+  @_lifetime(borrow self)
   borrowing func toPrivateResult() -> JSResult<JSValueRef> {
     switch self {
     case .value(let v):

@@ -9,7 +9,7 @@ import SwiftJavaScript
 // access, and the arena adoption.
 
 /// The JavaScriptCore ArrayBuffer wrapper.
-public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
+public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable, ~Escapable {
   public typealias Context = JSCContext
   public typealias Value = JSCValue
   public typealias InstantContext = JSCInstantContext
@@ -120,7 +120,7 @@ public struct JSCArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
 }
 
 /// The JavaScriptCore TypedArray wrapper.
-public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
+public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable, ~Escapable {
   public typealias Context = JSCContext
   public typealias Value = JSCValue
   public typealias InstantContext = JSCInstantContext
@@ -249,7 +249,8 @@ public struct JSCTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   /// JavaScriptCore returns the buffer as an unprotected object reference, so
   /// the wrapper adopts it into the context default scope exactly once.
-  public var buffer: JSCArrayBuffer {
+  @_lifetime(borrow self)
+  public func buffer() -> JSCArrayBuffer {
     let contextRef = value.contextRef
     guard
       let bufferRef = javaScriptCoreTypedArrayBufferForHandle(value.ref, in: contextRef)

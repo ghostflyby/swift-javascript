@@ -30,16 +30,23 @@ public struct JSCCallArgument: SwiftJavaScript.JSCallArgument {
 /// Base classification, conversion, and equality route directly to the
 /// `JavaScriptCore` statics over the raw `JSValueRef` and `JSGlobalContextRef`;
 /// the property/invocation/typed-array surface is added by S5.
-public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable {
+public struct JSCValue: SwiftJavaScript.JSValue, ~Copyable, ~Escapable {
   public typealias Context = JSCContext
   public typealias InstantContext = JSCInstantContext
 
   package let ref: JSValueRef
   package let contextRef: JSGlobalContextRef
 
+  @_lifetime(borrow contextRef)
   package init(ref: JSValueRef, contextRef: JSGlobalContextRef) {
     self.ref = ref
     self.contextRef = contextRef
+  }
+
+  @_lifetime(borrow context)
+  package init(ref: JSValueRef, in context: borrowing JSCInstantContext) {
+    self.ref = ref
+    self.contextRef = context.contextRef
   }
 
   public func asCallArgument() -> JSCCallArgument {

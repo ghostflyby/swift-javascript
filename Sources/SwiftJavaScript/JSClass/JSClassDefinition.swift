@@ -79,39 +79,40 @@ public protocol JSClassDefinition: Sendable {
   var parentClass: ParentClass? { get set }
   var staticValues: [JSStaticValue<Context>] { get set }
   var staticFunctions: [JSStaticFunction<Context>] { get set }
-  var initialize: (@Sendable (borrowing Context.Value, borrowing Context.InstantContext) -> Void)?
+  var initialize:
+    (@Sendable (Context.CallArgument, borrowing Context.InstantContext) -> Void)?
   { get set }
-  var finalize: (@Sendable (borrowing Context.Value) -> Void)? { get set }
+  var finalize: (@Sendable (Context.CallArgument) -> Void)? { get set }
   var hasProperty:
     (
-      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
+      @Sendable (borrowing Context.InstantContext, Context.CallArgument, String)
         -> Bool
     )?
   { get set }
   var getProperty:
     (
-      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
-        -> JSResult<Context.Value>
+      @Sendable (borrowing Context.InstantContext, Context.CallArgument, String)
+        -> Context.CallbackReturn
     )?
   { get set }
   var setProperty:
     (
       @Sendable (
-        borrowing Context.InstantContext, borrowing Context.Value, String,
-        borrowing Context.Value
-      ) -> Context.Value?
+        borrowing Context.InstantContext, Context.CallArgument, String,
+        Context.CallArgument
+      ) -> Context.CallbackReturn?
     )?
   { get set }
   var deleteProperty:
     (
-      @Sendable (borrowing Context.InstantContext, borrowing Context.Value, String)
+      @Sendable (borrowing Context.InstantContext, Context.CallArgument, String)
         -> Bool
     )?
   { get set }
   var getPropertyNames:
     (
       @Sendable (
-        borrowing Context.InstantContext, inout Context.Value,
+        borrowing Context.InstantContext, inout Context.CallArgument,
         PropertyNameAccumulator
       ) -> Void
     )?
@@ -120,36 +121,36 @@ public protocol JSClassDefinition: Sendable {
     (
       @Sendable (
         borrowing Context.InstantContext,
-        inout Context.Value,
-        inout Context.Value,
+        inout Context.CallArgument,
+        inout Context.CallArgument,
         borrowing Context.Arguments
-      ) -> Context.Value
+      ) -> Context.CallbackReturn
     )?
   { get set }
   var callAsConstructor:
     (
       @Sendable (
         borrowing Context.InstantContext,
-        inout Context.Value,
-        inout Context.Value,
+        inout Context.CallArgument,
+        inout Context.CallArgument,
         borrowing Context.Arguments
-      ) -> Context.Value
+      ) -> Context.CallbackReturn
     )?
   { get set }
   var hasInstance:
     (
       @Sendable (
-        borrowing Context.InstantContext, inout Context.Value,
-        inout Context.Value
+        borrowing Context.InstantContext, inout Context.CallArgument,
+        inout Context.CallArgument
       ) -> Bool
     )?
   { get set }
   var convertToType:
     (
       @Sendable (
-        borrowing Context.InstantContext, inout Context.Value, JSType,
-        inout Context.Value
-      ) -> Context.Value
+        borrowing Context.InstantContext, inout Context.CallArgument, JSType,
+        inout Context.CallArgument
+      ) -> Context.CallbackReturn
     )?
   { get set }
 }
@@ -392,25 +393,27 @@ extension JSClassDefinition {
 
   package func dynamicPropertyValue(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
+    on thisValue: Context.CallArgument,
     forKey key: String
-  ) -> JSResult<Context.Value> {
-    getProperty?(context, thisValue, key)
-      ?? .value(context.persist(context.makeUndefined()))
+  ) -> Context.CallbackReturn {
+    if let value = getProperty?(context, thisValue, key) {
+      return value
+    }
+    return context.return(context.persist(context.makeUndefined()))
   }
 
   package func setDynamicPropertyException(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
+    on thisValue: Context.CallArgument,
     forKey key: String,
-    to newValue: borrowing Context.Value
-  ) -> Context.Value? {
+    to newValue: Context.CallArgument
+  ) -> Context.CallbackReturn? {
     setProperty?(context, thisValue, key, newValue)
   }
 
   package func hasDynamicProperty(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
+    on thisValue: Context.CallArgument,
     forKey key: String
   ) -> Bool {
     hasProperty?(context, thisValue, key) ?? false
@@ -418,7 +421,7 @@ extension JSClassDefinition {
 
   package func deleteDynamicProperty(
     in context: borrowing Context.InstantContext,
-    on thisValue: borrowing Context.Value,
+    on thisValue: Context.CallArgument,
     forKey key: String
   ) -> Bool {
     deleteProperty?(context, thisValue, key) ?? false
@@ -430,39 +433,40 @@ public struct JSEngineClassBehavior<E: JSContext, PropertyNameAccumulator>: Send
 
   public var staticFunctions: [JSStaticFunction<E>] = []
 
-  public var initialize: (@Sendable (borrowing E.Value, borrowing E.InstantContext) -> Void)? = nil
+  public var initialize:
+    (@Sendable (E.CallArgument, borrowing E.InstantContext) -> Void)? = nil
 
-  public var finalize: (@Sendable (borrowing E.Value) -> Void)? = nil
+  public var finalize: (@Sendable (E.CallArgument) -> Void)? = nil
 
   public var hasProperty:
-    (@Sendable (borrowing E.InstantContext, borrowing E.Value, String) -> Bool)? =
+    (@Sendable (borrowing E.InstantContext, E.CallArgument, String) -> Bool)? =
       nil
 
   public var getProperty:
     (
-      @Sendable (borrowing E.InstantContext, borrowing E.Value, String)
-        -> JSResult<E.Value>
+      @Sendable (borrowing E.InstantContext, E.CallArgument, String)
+        -> E.CallbackReturn
     )? =
       nil
 
   public var setProperty:
     (
       @Sendable (
-        borrowing E.InstantContext, borrowing E.Value, String,
-        borrowing E.Value
+        borrowing E.InstantContext, E.CallArgument, String,
+        E.CallArgument
       )
-        -> E.Value?
+        -> E.CallbackReturn?
     )? =
       nil
 
   public var deleteProperty:
-    (@Sendable (borrowing E.InstantContext, borrowing E.Value, String) -> Bool)? =
+    (@Sendable (borrowing E.InstantContext, E.CallArgument, String) -> Bool)? =
       nil
 
   public var getPropertyNames:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, PropertyNameAccumulator
+        borrowing E.InstantContext, inout E.CallArgument, PropertyNameAccumulator
       ) -> Void
     )? =
       nil
@@ -471,26 +475,26 @@ public struct JSEngineClassBehavior<E: JSContext, PropertyNameAccumulator>: Send
     (
       @Sendable (
         borrowing E.InstantContext,
-        inout E.Value,
-        inout E.Value,
+        inout E.CallArgument,
+        inout E.CallArgument,
         borrowing E.Arguments
-      ) -> E.Value
+      ) -> E.CallbackReturn
     )? = nil
 
   public var callAsConstructor:
     (
       @Sendable (
         borrowing E.InstantContext,
-        inout E.Value,
-        inout E.Value,
+        inout E.CallArgument,
+        inout E.CallArgument,
         borrowing E.Arguments
-      ) -> E.Value
+      ) -> E.CallbackReturn
     )? = nil
 
   public var hasInstance:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, inout E.Value
+        borrowing E.InstantContext, inout E.CallArgument, inout E.CallArgument
       )
         -> Bool
     )? =
@@ -499,9 +503,10 @@ public struct JSEngineClassBehavior<E: JSContext, PropertyNameAccumulator>: Send
   public var convertToType:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, JSType, inout E.Value
+        borrowing E.InstantContext, inout E.CallArgument, JSType,
+        inout E.CallArgument
       )
-        -> E.Value
+        -> E.CallbackReturn
     )? =
       nil
 
@@ -552,19 +557,20 @@ public struct JSEngineClassDefinition<
     set { behavior.staticFunctions = newValue }
   }
 
-  public var initialize: (@Sendable (borrowing E.Value, borrowing E.InstantContext) -> Void)?
+  public var initialize:
+    (@Sendable (E.CallArgument, borrowing E.InstantContext) -> Void)?
   {
     get { behavior.initialize }
     set { behavior.initialize = newValue }
   }
 
-  public var finalize: (@Sendable (borrowing E.Value) -> Void)? {
+  public var finalize: (@Sendable (E.CallArgument) -> Void)? {
     get { behavior.finalize }
     set { behavior.finalize = newValue }
   }
 
   public var hasProperty:
-    (@Sendable (borrowing E.InstantContext, borrowing E.Value, String) -> Bool)?
+    (@Sendable (borrowing E.InstantContext, E.CallArgument, String) -> Bool)?
   {
     get { behavior.hasProperty }
     set { behavior.hasProperty = newValue }
@@ -572,8 +578,8 @@ public struct JSEngineClassDefinition<
 
   public var getProperty:
     (
-      @Sendable (borrowing E.InstantContext, borrowing E.Value, String)
-        -> JSResult<E.Value>
+      @Sendable (borrowing E.InstantContext, E.CallArgument, String)
+        -> E.CallbackReturn
     )?
   {
     get { behavior.getProperty }
@@ -583,10 +589,10 @@ public struct JSEngineClassDefinition<
   public var setProperty:
     (
       @Sendable (
-        borrowing E.InstantContext, borrowing E.Value, String,
-        borrowing E.Value
+        borrowing E.InstantContext, E.CallArgument, String,
+        E.CallArgument
       )
-        -> E.Value?
+        -> E.CallbackReturn?
     )?
   {
     get { behavior.setProperty }
@@ -594,7 +600,7 @@ public struct JSEngineClassDefinition<
   }
 
   public var deleteProperty:
-    (@Sendable (borrowing E.InstantContext, borrowing E.Value, String) -> Bool)?
+    (@Sendable (borrowing E.InstantContext, E.CallArgument, String) -> Bool)?
   {
     get { behavior.deleteProperty }
     set { behavior.deleteProperty = newValue }
@@ -603,7 +609,7 @@ public struct JSEngineClassDefinition<
   public var getPropertyNames:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, PropertyNameAccumulator
+        borrowing E.InstantContext, inout E.CallArgument, PropertyNameAccumulator
       ) -> Void
     )?
   {
@@ -615,10 +621,10 @@ public struct JSEngineClassDefinition<
     (
       @Sendable (
         borrowing E.InstantContext,
-        inout E.Value,
-        inout E.Value,
+        inout E.CallArgument,
+        inout E.CallArgument,
         borrowing E.Arguments
-      ) -> E.Value
+      ) -> E.CallbackReturn
     )?
   {
     get { behavior.callAsFunction }
@@ -629,10 +635,10 @@ public struct JSEngineClassDefinition<
     (
       @Sendable (
         borrowing E.InstantContext,
-        inout E.Value,
-        inout E.Value,
+        inout E.CallArgument,
+        inout E.CallArgument,
         borrowing E.Arguments
-      ) -> E.Value
+      ) -> E.CallbackReturn
     )?
   {
     get { behavior.callAsConstructor }
@@ -642,7 +648,7 @@ public struct JSEngineClassDefinition<
   public var hasInstance:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, inout E.Value
+        borrowing E.InstantContext, inout E.CallArgument, inout E.CallArgument
       )
         -> Bool
     )?
@@ -654,9 +660,10 @@ public struct JSEngineClassDefinition<
   public var convertToType:
     (
       @Sendable (
-        borrowing E.InstantContext, inout E.Value, JSType, inout E.Value
+        borrowing E.InstantContext, inout E.CallArgument, JSType,
+        inout E.CallArgument
       )
-        -> E.Value
+        -> E.CallbackReturn
     )?
   {
     get { behavior.convertToType }

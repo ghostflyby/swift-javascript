@@ -34,6 +34,11 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   package var contextRef: OpaquePointer { core.contextRef }
 
+  @_lifetime(borrow self)
+  public func value(from argument: borrowing QJSCallArgument) -> QJSValue {
+    QJSValue(value: argument.value, contextRef: contextRef)
+  }
+
   package init(contextRef: OpaquePointer) {
     self.core = QJSScopeCore(contextRef: contextRef)
     QJSScopeStacks.push(core)
@@ -46,28 +51,33 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Ledger primitives
 
+  @_lifetime(borrow self)
   package func adoptCreated(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.trackCreated(value), contextRef: core.contextRef)
   }
 
+  @_lifetime(borrow self)
   package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.claimAndTrack(value), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
+  @_lifetime(borrow self)
   public func persist(_ value: borrowing QJSValue) -> QJSValue {
     core.transferToDefaultFrame(value.value)
     return QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
+  @_lifetime(borrow self)
   public func localValue(_ value: borrowing QJSValue) -> QJSValue {
     QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
+  @_lifetime(borrow self)
   public func makeString(_ value: String) -> QJSValue {
     guard let created = quickJSMakeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
@@ -75,6 +85,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
       let created = quickJSMakeStringValue(
@@ -87,6 +98,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: Double) -> QJSValue {
     guard let created = quickJSMakeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
@@ -94,6 +106,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeBoolean(_ value: Bool) -> QJSValue {
     guard let created = quickJSMakeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
@@ -101,6 +114,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNull() -> QJSValue {
     guard let created = quickJSMakeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
@@ -108,6 +122,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeUndefined() -> QJSValue {
     guard let created = quickJSMakeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
@@ -115,6 +130,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeSymbol(_ value: String) -> QJSValue {
     guard let created = quickJSMakeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
@@ -122,6 +138,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeObject() -> JSResult<QJSValue> {
     guard let result = quickJSMakeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
@@ -134,6 +151,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeArray() -> JSResult<QJSValue> {
     guard let result = quickJSMakeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
@@ -174,6 +192,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Global object
 
+  @_lifetime(borrow self)
   public func globalObjectValue() -> QJSValue {
     guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSInstantContext.globalObjectValue could not get global object")
@@ -181,6 +200,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return QJSValue(value: global, contextRef: core.contextRef)
   }
 
+  @_lifetime(borrow self)
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
     guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSInstantContext.getGlobalProperty could not get global object")
@@ -233,6 +253,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
     return quickJSHasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
   }
 
+  @_lifetime(borrow self)
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>
@@ -260,6 +281,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
   }
 
   @available(*, noasync)
+  @_lifetime(borrow self)
   public func resolve(_ handle: QJSPersistentHandle) -> QJSValue? {
     guard
       let bindings = quickJSPersistentBindings(for: core.contextRef),
@@ -289,6 +311,7 @@ public struct QJSInstantContext: SwiftJavaScript.JSInstantContext, ~Copyable {
 
   // MARK: - Scripts
 
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: borrowing QJSPreparedScript,
     sourceURL: String?,
@@ -352,28 +375,33 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   // MARK: - Ledger primitives
 
+  @_lifetime(borrow self)
   package func adoptCreated(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.trackCreated(value), contextRef: core.contextRef)
   }
 
+  @_lifetime(borrow self)
   package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: core.claimAndTrack(value), contextRef: core.contextRef)
   }
 
   // MARK: - Scope operations
 
+  @_lifetime(borrow self)
   public func persist(_ value: borrowing QJSValue) -> QJSValue {
     core.transferToDefaultFrame(value.value)
     return QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   @available(*, noasync)
+  @_lifetime(borrow self)
   public func localValue(_ value: borrowing QJSValue) -> QJSValue {
     QJSValue(value: value.value, contextRef: core.contextRef)
   }
 
   // MARK: - Value factories
 
+  @_lifetime(borrow self)
   public func makeString(_ value: String) -> QJSValue {
     guard let created = quickJSMakeString(value, in: core.contextRef) else {
       preconditionFailure("makeString failed")
@@ -381,6 +409,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
       let created = quickJSMakeStringValue(
@@ -393,6 +422,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: Double) -> QJSValue {
     guard let created = quickJSMakeNumber(value, in: core.contextRef) else {
       preconditionFailure("makeNumber failed")
@@ -400,6 +430,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeBoolean(_ value: Bool) -> QJSValue {
     guard let created = quickJSMakeBoolean(value, in: core.contextRef) else {
       preconditionFailure("makeBoolean failed")
@@ -407,6 +438,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNull() -> QJSValue {
     guard let created = quickJSMakeNull(in: core.contextRef) else {
       preconditionFailure("makeNull failed")
@@ -414,6 +446,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeUndefined() -> QJSValue {
     guard let created = quickJSMakeUndefined(in: core.contextRef) else {
       preconditionFailure("makeUndefined failed")
@@ -421,6 +454,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeSymbol(_ value: String) -> QJSValue {
     guard let created = quickJSMakeSymbol(value, in: core.contextRef) else {
       preconditionFailure("makeSymbol failed")
@@ -428,6 +462,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeObject() -> JSResult<QJSValue> {
     guard let result = quickJSMakeObjectResult(in: core.contextRef) else {
       preconditionFailure("makeObjectResult failed")
@@ -440,6 +475,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeArray() -> JSResult<QJSValue> {
     guard let result = quickJSMakeArrayResult(in: core.contextRef) else {
       preconditionFailure("makeArrayResult failed")
@@ -463,6 +499,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   // MARK: - Global object
 
+  @_lifetime(borrow self)
   public func globalObjectValue() -> QJSValue {
     guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSScope.globalObjectValue could not get global object")
@@ -470,6 +507,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return QJSValue(value: global, contextRef: core.contextRef)
   }
 
+  @_lifetime(borrow self)
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
     guard let global = quickJSGlobalObjectValue(core.contextRef) else {
       preconditionFailure("QJSScope.getGlobalProperty could not get global object")
@@ -522,6 +560,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
     return quickJSHasStaticStringProperty(key, on: global, in: core.contextRef) ?? false
   }
 
+  @_lifetime(borrow self)
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>
@@ -549,6 +588,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
   }
 
   @available(*, noasync)
+  @_lifetime(borrow self)
   public func resolve(_ handle: QJSPersistentHandle) -> QJSValue? {
     guard
       let bindings = quickJSPersistentBindings(for: core.contextRef),
@@ -578,6 +618,7 @@ public struct QJSScope: SwiftJavaScript.JSScope, ~Copyable, ~Sendable {
 
   // MARK: - Scripts
 
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: borrowing QJSPreparedScript,
     sourceURL: String?,

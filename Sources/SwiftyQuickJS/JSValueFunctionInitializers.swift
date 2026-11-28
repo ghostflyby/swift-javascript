@@ -14,6 +14,7 @@ import SwiftJavaScript
 extension QJSValue {
   // MARK: Plain function callback
 
+  @_lifetime(borrow context)
   public init(
     name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>,
@@ -29,17 +30,23 @@ extension QJSValue {
       preconditionFailure("QJSValue(name:callback:) could not create a function")
     }
     let adopted = context.adoptCreated(created)
-    self.init(value: adopted.value, contextRef: adopted.contextRef)
+    self.init(persisting: adopted, in: context)
   }
 
   // MARK: Typed function (decodable arguments, encodable return/error)
+  //
+  // Temporarily disabled on the non-escapable experiment branch: an
+  // `isolated` actor parameter cannot currently carry a lifetime dependence,
+  // so this API must move to an actor-scoped factory.
 
+  #if false
+  @_lifetime(borrow context)
   public init<
     each A: JSValueDecodable,
     R: JSValueEncodable,
     Err: JSValueEncodable
   >(
-    in context: isolated QJSContext = #isolation,
+    borrowing context: isolated QJSContext = #isolation,
     name: String,
     function: @escaping @Sendable (repeat each A) throws(Err) -> R
   ) {
@@ -74,14 +81,18 @@ extension QJSValue {
     self.init(value: value.value, contextRef: value.contextRef)
   }
 
+  #endif
+
   // MARK: Coder-based typed function
 
+  #if false
+  @_lifetime(borrow context)
   public init<
     each C: JSValueDecoder,
     RCoder: JSValueEncoder,
     ECoder: JSValueEncoder
   >(
-    in context: isolated QJSContext = #isolation,
+    borrowing context: isolated QJSContext = #isolation,
     name: String,
     converters: repeat (each C).Type,
     returnCoder: RCoder.Type,
@@ -120,6 +131,7 @@ extension QJSValue {
     let value = context.makeFunction(named: name, callback: callback)
     self.init(value: value.value, contextRef: value.contextRef)
   }
+  #endif
 }
 
 // MARK: - Conversion helpers

@@ -21,13 +21,13 @@ private let javaScriptCoreSurfaceFunctionCallback: JSObjectCallAsFunctionCallbac
     JSObjectGetPrivate(function)!
   ).takeUnretainedValue().value
 
-  let thisValue = JSCValue(ref: thisObject, contextRef: ctx)
+  let thisArgument = JSCCallArgument(ref: thisObject)
 
   let result = withJavaScriptCoreSurfaceCallbackArguments(
     pointer: arguments,
     count: Int(argumentCount),
   ) { args in
-    callback(scope, thisValue, args)
+    callback(scope, thisArgument, args)
   }
 
   if result.isException {

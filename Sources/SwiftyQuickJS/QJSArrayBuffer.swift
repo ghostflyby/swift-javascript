@@ -19,13 +19,14 @@ import SwiftJavaScript
 // them.
 
 /// The QuickJS ArrayBuffer wrapper.
-public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
+public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable, ~Escapable {
   public typealias Context = QJSContext
   public typealias Value = QJSValue
   public typealias InstantContext = QJSInstantContext
 
   package let value: QJSValue
 
+  @_lifetime(copy value)
   package init(value: consuming QJSValue) {
     self.value = value
   }
@@ -36,6 +37,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
 
   // MARK: - Construction
 
+  @_lifetime(borrow context)
   public init(byteLength: Int, in context: borrowing QJSInstantContext) {
     precondition(byteLength >= 0, "ArrayBuffer byteLength must be non-negative")
 
@@ -51,6 +53,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     self.init(value: value)
   }
 
+  @_lifetime(borrow context)
   public init(copying bytes: [UInt8], in context: borrowing QJSInstantContext) {
     guard
       let value = adoptArrayBufferBytesNoCopy(
@@ -64,6 +67,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     self.init(value: value)
   }
 
+  @_lifetime(borrow context)
   public init(
     copying bytes: UnsafeRawBufferPointer,
     in context: borrowing QJSInstantContext
@@ -80,6 +84,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
     self.init(value: value)
   }
 
+  @_lifetime(borrow context)
   public init?(
     value: borrowing QJSValue,
     in context: borrowing QJSInstantContext
@@ -132,7 +137,7 @@ public struct QJSArrayBuffer: SwiftJavaScript.JSArrayBuffer, ~Copyable {
 }
 
 /// The QuickJS TypedArray wrapper.
-public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
+public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable, ~Escapable {
   public typealias Context = QJSContext
   public typealias Value = QJSValue
   public typealias InstantContext = QJSInstantContext
@@ -140,6 +145,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   package let value: QJSValue
 
+  @_lifetime(copy value)
   package init(value: consuming QJSValue) {
     self.value = value
   }
@@ -150,6 +156,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   // MARK: - Construction
 
+  @_lifetime(borrow context)
   public init(kind: JSTypedArrayKind, length: Int, in context: borrowing QJSInstantContext) {
     precondition(length >= 0, "TypedArray length must be non-negative")
 
@@ -165,6 +172,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     self.init(value: context.adoptCreated(created))
   }
 
+  @_lifetime(borrow context)
   public init(
     kind: JSTypedArrayKind,
     buffer: borrowing QJSArrayBuffer,
@@ -209,6 +217,7 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
     self.init(value: context.adoptCreated(created))
   }
 
+  @_lifetime(borrow context)
   public init?(
     value: borrowing QJSValue,
     in context: borrowing QJSInstantContext
@@ -265,7 +274,8 @@ public struct QJSTypedArray: SwiftJavaScript.JSTypedArray, ~Copyable {
 
   /// QuickJS returns a new reference to the backing buffer, so the wrapper
   /// adopts it into the context default scope exactly once.
-  public var buffer: QJSArrayBuffer {
+  @_lifetime(borrow self)
+  public func buffer() -> QJSArrayBuffer {
     let contextRef = value.requiredContextRef
     guard
       let bufferValue = quickJSTypedArrayBuffer(value.value, in: contextRef)
@@ -334,6 +344,7 @@ final class QuickJSArrayBufferDeallocatorBox: @unchecked Sendable {
 }
 
 extension QJSInstantContext: JSArrayBufferHostScope {
+  @_lifetime(borrow self)
   package func adoptArrayBufferBytesNoCopy(
     bytes: UnsafeMutableRawPointer?,
     byteLength: Int,

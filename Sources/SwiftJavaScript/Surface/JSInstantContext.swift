@@ -34,14 +34,22 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
   func returnUndefined() -> CallbackReturn
   func throwUndefined() -> CallbackReturn
 
+  // MARK: - Callback tokens
+
+  /// Borrow a callback-scoped call token as a local value view.
+  @_lifetime(borrow self)
+  func value(from argument: borrowing Context.CallArgument) -> Value
+
   // MARK: - Global object
 
   /// The context's global object as a local view. Global-object handles are
   /// borrowed from the engine, so the view needs no arena entry.
+  @_lifetime(borrow self)
   func globalObjectValue() -> Value
 
   /// Read a global property. A failed read is reported as `undefined`, the
   /// same mapping the legacy scope uses.
+  @_lifetime(borrow self)
   func getGlobalProperty(forKey key: StaticString) -> Value
 
   func setGlobalProperty(
@@ -57,6 +65,7 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
   /// Create a function value using the engine's surface callback signature.
   /// The function outlives this window (it is normally stored as a property),
   /// so its creation reference is adopted by the context default scope.
+  @_lifetime(borrow self)
   func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<Self>
@@ -80,12 +89,14 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
 
   /// Resolve a handle into a local view anchored on this window's arena.
   @available(*, noasync)
+  @_lifetime(borrow self)
   func resolve(_ handle: PersistentHandle) -> Value?
 
   // MARK: - Self-owning inputs and scripts
 
   func prepareScript(_ source: String) -> PreparedScript
 
+  @_lifetime(borrow self)
   func evaluateScript(
     _ script: borrowing PreparedScript,
     sourceURL: String?,
@@ -109,6 +120,7 @@ public protocol JSInstantContext: JSValueScope, ~Copyable {
   /// Create a host object for `jsClass`, adopting its creation reference onto
   /// this window's arena. `nil` means the engine settled the failure path's
   /// reference itself.
+  @_lifetime(borrow self)
   func makeHostObject(
     of jsClass: Context.Class,
     privateData: UnsafeMutableRawPointer
@@ -161,6 +173,7 @@ extension JSInstantContext where Self: ~Copyable {
   }
 
   /// Evaluate `script` through a prepared script wrapped in this window.
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: String,
     sourceURL: String? = nil,

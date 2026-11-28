@@ -225,16 +225,19 @@ public actor QJSContext: SwiftJavaScript.JSContext {
   // below creates or settles an engine reference on the context default scope
   // through these two.
 
+  @_lifetime(borrow self)
   package func adoptCreated(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: defaultScope.trackCreated(value), contextRef: contextRef)
   }
 
+  @_lifetime(borrow self)
   package func anchorBorrowed(_ value: CQuickJSValue) -> QJSValue {
     QJSValue(value: defaultScope.claimAndTrack(value), contextRef: contextRef)
   }
 
   // MARK: - Value factories
 
+  @_lifetime(borrow self)
   public func makeString(_ value: String) -> QJSValue {
     guard let created = quickJSMakeString(value, in: contextRef) else {
       preconditionFailure("makeString failed")
@@ -242,6 +245,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeString(from key: borrowing QJSPropertyStringKey) -> QJSValue {
     guard
       let created = quickJSMakeStringValue(
@@ -254,6 +258,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNumber(_ value: Double) -> QJSValue {
     guard let created = quickJSMakeNumber(value, in: contextRef) else {
       preconditionFailure("makeNumber failed")
@@ -261,6 +266,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeBoolean(_ value: Bool) -> QJSValue {
     guard let created = quickJSMakeBoolean(value, in: contextRef) else {
       preconditionFailure("makeBoolean failed")
@@ -268,6 +274,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeNull() -> QJSValue {
     guard let created = quickJSMakeNull(in: contextRef) else {
       preconditionFailure("makeNull failed")
@@ -275,6 +282,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeUndefined() -> QJSValue {
     guard let created = quickJSMakeUndefined(in: contextRef) else {
       preconditionFailure("makeUndefined failed")
@@ -282,6 +290,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     return adoptCreated(created)
   }
 
+  @_lifetime(borrow self)
   public func makeObject() -> QJSValue {
     guard let result = quickJSMakeObjectResult(in: contextRef) else {
       preconditionFailure("makeObjectResult failed")
@@ -294,6 +303,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     }
   }
 
+  @_lifetime(borrow self)
   public func makeArray() -> QJSValue {
     guard let result = quickJSMakeArrayResult(in: contextRef) else {
       preconditionFailure("makeArrayResult failed")
@@ -308,6 +318,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   /// The creation reference is adopted by the context default scope, so the
   /// function outlives any single window.
+  @_lifetime(borrow self)
   public func makeFunction(
     named name: String,
     callback: @escaping JSFunctionCallback<QJSInstantContext>
@@ -338,6 +349,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
     )
   }
 
+  @_lifetime(borrow self)
   public func resolve(_ handle: QJSPersistentHandle) -> QJSValue? {
     guard let borrowed = persistentBindings.borrowLive(handle.identity) else {
       return nil
@@ -364,6 +376,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   // MARK: - Global object
 
+  @_lifetime(borrow self)
   public func globalObjectValue() -> QJSValue {
     guard let global = quickJSGlobalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.globalObjectValue could not get global object")
@@ -373,6 +386,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   /// Read a global property. A failed read is reported as `undefined`: the
   /// engine's exception reference is settled instead of being dropped.
+  @_lifetime(borrow self)
   public func getGlobalProperty(forKey key: StaticString) -> QJSValue {
     guard let global = quickJSGlobalObjectValue(contextRef) else {
       preconditionFailure("QJSContext.getGlobalProperty could not get global object")
@@ -421,6 +435,7 @@ public actor QJSContext: SwiftJavaScript.JSContext {
 
   // MARK: - Scripts
 
+  @_lifetime(borrow self)
   public func evaluateScript(
     _ script: borrowing QJSPreparedScript,
     sourceURL: String?,
