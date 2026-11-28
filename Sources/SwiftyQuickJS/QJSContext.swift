@@ -12,8 +12,8 @@ import Synchronization
 
 /// A weak, Sendable view of a context actor for non-actor owners (persistent
 /// handles, self-owning inputs): their deinit must not keep the context alive.
-final class QJSContextReference: @unchecked Sendable {
-  weak var value: QJSContext?
+final class QJSContextReference: Sendable {
+  weak let value: QJSContext?
 
   init(_ value: QJSContext) {
     self.value = value
